@@ -3,6 +3,8 @@
 //   DATA_KEY        the key that unlocks the village data in api/_data/ (from app-build/DATA_KEY.txt)
 //   ADMIN_PASSWORD  the superadmin password: manages every village and creates the village admins
 //   KV_REST_API_URL / KV_REST_API_TOKEN  added automatically when you connect Upstash for Redis in Vercel
+//   KEY_PREFIX      optional, default "rv:": put in front of every database key, so this app can share one
+//                   Upstash database with another app (e.g. the older single-village Adsar app) without mixing data
 const crypto = require('crypto');
 
 // Vercel may add the database variables with a custom prefix (e.g. STORAGE_KV_REST_API_URL), so accept those too.
@@ -13,8 +15,11 @@ function findEnv(names) {
 }
 const DB_URL = findEnv(['KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL']);
 const DB_TOKEN = findEnv(['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN']);
+const KEY_PREFIX = process.env.KEY_PREFIX ?? 'rv:';
 
-async function redis(...cmd) {
+// Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
+async function redis(name, key, ...args) {
+  const cmd = [name, KEY_PREFIX + key, ...args];
   if (!DB_URL || !DB_TOKEN) {
     const seen = Object.keys(process.env).filter((k) => /KV|REDIS|UPSTASH/.test(k)).join(', ') || 'none';
     throw new Error(`database not connected (database variables found: ${seen})`);

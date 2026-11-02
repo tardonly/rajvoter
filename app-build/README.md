@@ -48,8 +48,11 @@ lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 ## One-time Vercel setup
 1. **Import the repo** in Vercel: Add New → Project → pick the repo. Project name `raj-voter`.
    Root Directory: `voter-search-app` · Framework Preset: **Other** · Build Command: empty.
-2. **Add a database:** Project → Storage → Create Database → **Upstash for Redis** (free plan) → Connect to the project.
-   This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically.
+2. **Connect a database.** The free Upstash database can be shared with the older Adsar app: Vercel → **Storage** →
+   open the existing Upstash database → **Connect Project** → pick `raj-voter` (all environments). This adds
+   `KV_REST_API_URL` and `KV_REST_API_TOKEN` (possibly with a prefix; both forms work). This app stores all its
+   keys under `rv:` (change with an optional `KEY_PREFIX` variable), so it never touches the other app's passwords.
+   With no database yet: Storage → Create Database → **Upstash for Redis** (free plan) → Connect to the project.
 3. **Add two environment variables** (Project → Settings → Environment Variables):
    - `DATA_KEY` = the text in `app-build/DATA_KEY.txt`
    - `ADMIN_PASSWORD` = the superadmin password (long, not shared with anyone)
