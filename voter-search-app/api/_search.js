@@ -1,14 +1,16 @@
 // Voter data + fuzzy search, run on the server so the full list never reaches a phone.
-// The data ships encrypted (api/_voters.enc) and is decrypted in memory with the DATA_KEY environment variable.
+// Each village's data ships encrypted (api/_data/<village>.enc) and is decrypted in memory with the DATA_KEY
+// environment variable, the first time that village is searched.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { dataKey } = require('./_lib.js');
 
-let cache = null;
-function load() {
-  if (cache) return cache;
-  const file = [path.join(__dirname, '_voters.enc'), path.join(process.cwd(), 'api', '_voters.enc')].find((p) => fs.existsSync(p));
+const cache = new Map();
+function load(slug) {     // slug must already be checked against the village list
+  if (cache.has(slug)) return cache.get(slug);
+  const name = `${slug}.enc`;
+  const file = [path.join(__dirname, '_data', name), path.join(process.cwd(), 'api', '_data', name)].find((p) => fs.existsSync(p));
   const enc = JSON.parse(fs.readFileSync(file, 'utf8'));
   const d = crypto.createDecipheriv('aes-256-gcm', Buffer.from(dataKey(), 'base64'), Buffer.from(enc.iv, 'base64'));
   d.setAuthTag(Buffer.from(enc.tag, 'base64'));
@@ -22,8 +24,9 @@ function load() {
     o._epic = String(o.epic || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
     return o;
   });
-  cache = { rows, wards: [...new Set(rows.map((r) => r.ward))].sort((a, b) => a - b) };
-  return cache;
+  const v = { rows, wards: [...new Set(rows.map((r) => r.ward))].sort((a, b) => a - b) };
+  cache.set(slug, v);
+  return v;
 }
 
 // English: fold spellings that sound alike (ee/i, oo/u, w/v, sh/s, kh/k, ph/f, ksh/x, ai/e, doubled letters, spaces).
@@ -74,8 +77,8 @@ function score(q, t) {
   return s;
 }
 
-function search({ name = '', rel = '', ward = '' }) {
-  const { rows } = load();
+function search(slug, { name = '', rel = '', ward = '' }) {
+  const { rows } = load(slug);
   name = String(name).trim().slice(0, 60); rel = String(rel).trim().slice(0, 60);
   const pool = ward ? rows.filter((r) => String(r.ward) === String(ward)) : rows;
   if (!name && !rel) return [];

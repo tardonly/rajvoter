@@ -1,7 +1,7 @@
 // Shared helpers for the API routes (files starting with "_" are not routes on Vercel).
 // Environment variables (set in Vercel → Project → Settings → Environment Variables):
-//   DATA_KEY        the key that unlocks api/_voters.enc (from app-build/DATA_KEY.txt)
-//   ADMIN_PASSWORD  password for admin.html
+//   DATA_KEY        the key that unlocks the village data in api/_data/ (from app-build/DATA_KEY.txt)
+//   ADMIN_PASSWORD  the superadmin password: manages every village and creates the village admins
 //   KV_REST_API_URL / KV_REST_API_TOKEN  added automatically when you connect Upstash for Redis in Vercel
 const crypto = require('crypto');
 
@@ -29,6 +29,11 @@ async function redis(...cmd) {
   return j.result;
 }
 
+// Villages built into the app (by app-build/encrypt.mjs): slug → {name, title, ps, zp, pollTime, wards, voters}
+const VILLAGES = require('./_villages.json');
+const village = (slug) => (typeof slug === 'string' && Object.hasOwn(VILLAGES, slug) ? { slug, ...VILLAGES[slug] } : null);
+const villageList = () => Object.entries(VILLAGES).map(([slug, v]) => ({ slug, name: v.name, title: v.title }));
+
 function dataKey() {
   const k = process.env.DATA_KEY;
   if (!k) throw new Error('DATA_KEY not set');
@@ -54,7 +59,12 @@ function sameText(a, b) {
   return crypto.timingSafeEqual(x, y);
 }
 
-// Logging into the app with the admin password gives an admin token. It is derived from the current admin password,
+// Three kinds of login:
+//   superadmin  the ADMIN_PASSWORD; every village; creates village admins and assigns them villages
+//   admin       a village admin (user record with role 'admin' and villages 'a,b'); searches and adds/manages users
+//               only in those villages
+//   user        a person (role 'user' or missing, one village); searches only that village
+// Logging into the app with the superadmin password gives a superadmin token. It is derived from the current admin password,
 // so changing ADMIN_PASSWORD in Vercel signs out every admin session.
 const isAdminPassword = (pw) => !!process.env.ADMIN_PASSWORD && !!pw && sameText(String(pw).trim(), process.env.ADMIN_PASSWORD.trim());
 const adminToken = () => `admin.${hmac('adm:' + String(process.env.ADMIN_PASSWORD).trim()).slice(0, 32)}`;
@@ -72,6 +82,8 @@ async function getUser(id) {
   if (!arr || !arr.length) return null;
   const u = { id };
   for (let i = 0; i < arr.length; i += 2) u[arr[i]] = arr[i + 1];
+  u.role = u.role === 'admin' ? 'admin' : 'user';
+  u.villages = u.role === 'admin' ? String(u.villages || '').split(',').filter(Boolean) : [u.village].filter(Boolean);
   return u;
 }
 
@@ -109,18 +121,24 @@ function route(fn) {
   };
 }
 
-// The user behind a token: an admin, a person (with .status), or null.
-// status: 'ok' | 'retired' | 'logged_out' (session ended by admin or a new password)
+// The login behind a token: the superadmin, a village admin or a person (with .status), or null.
+// .admin is true for both kinds of admin; .villages lists the villages this login may open.
+// status: 'ok' | 'retired' | 'logged_out' (session ended by an admin or a new password)
 //         | 'other_device' (this password has since been opened on another phone)
-async function whoIs(token) {
-  if (isAdminToken(token)) return { id: 'admin', name: 'एडमिन', admin: true, status: 'ok' };
+//         | 'other_village' (slug given and this login is not for that village)
+async function whoIs(token, slug) {
+  if (isAdminToken(token)) {
+    return { id: 'admin', name: 'सुपर एडमिन', role: 'super', admin: true, villages: Object.keys(VILLAGES), status: 'ok' };
+  }
   const t = parseToken(token);
   const user = t && t.id !== 'admin' ? await getUser(t.id) : null;
   if (!user) return null;
-  user.status = user.retired === '1' ? 'retired' : !user.session ? 'logged_out' : user.session !== t.sid ? 'other_device' : 'ok';
+  user.admin = user.role === 'admin';
+  user.status = user.retired === '1' ? 'retired' : !user.session ? 'logged_out' : user.session !== t.sid ? 'other_device'
+    : slug != null && !user.villages.includes(slug) ? 'other_village' : 'ok';
   user.sid = t.sid;
   return user;
 }
 
-module.exports = { redis, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+module.exports = { village, villageList, redis, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };

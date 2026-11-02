@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1f4e8c">
-<link rel="icon" href="icon-192.png">
+<link rel="icon" href="/icon-192.png">
 <title>एडमिन · मतदाता खोज</title>
 <style>
   :root { --bg: #f3f4f6; --card: #fff; --ink: #111; --muted: #6b7280; --line: #d1d5db; --accent: #1f4e8c; --bad: #b91c1c; --ok: #15803d; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--ink);
     font-family: "Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  button, input { font: inherit; }
+  button, input, select { font: inherit; }
   .hidden { display: none !important; }
   .wrap { max-width: 560px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 16px 32px; }
   .card { background: var(--card); border-radius: 14px; padding: 18px 16px; box-shadow: 0 2px 12px rgba(0,0,0,.06); margin-bottom: 14px; }
@@ -52,9 +52,16 @@
   .badge.on { background: #dcfce7; color: var(--ok); }
   .badge.off { background: #fee2e2; color: var(--bad); }
   .badge.warn { background: #fef3c7; color: #92400e; }
+  .badge.vil { background: #e0e7ff; color: #1f4e8c; }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   .actions button { padding: 6px 10px; font-size: 13px; }
   .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  select { width: 100%; padding: 11px 13px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+  .filter select { width: auto; padding: 4px 10px; font-size: 14px; border-radius: 999px; margin-left: auto; }
+  .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 2px; }
+  .checks label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+  .vedit { margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+  .vedit .row { margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -71,12 +78,13 @@
   </section>
 
   <section id="panel" class="hidden">
-    <div class="bar"><h1>एडमिन</h1>
-      <span class="row"><a class="btn ghost" href="./" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
+    <div class="bar"><div><h1>एडमिन</h1><div class="sub" id="meText" style="margin:0"></div></div>
+      <span class="row"><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
 
     <div class="card">
       <h2>नया व्यक्ति जोड़ें</h2>
       <form id="addForm" class="stack" autocomplete="off">
+        <select id="newVillage" required><option value="">गाँव चुनें</option></select>
         <input id="newName" type="text" placeholder="व्यक्ति का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
         <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
         <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
@@ -93,12 +101,27 @@
       </div>
     </div>
 
+    <div class="card hidden" id="adminCard">
+      <h2>नया एडमिन जोड़ें</h2>
+      <p class="sub">एडमिन सिर्फ़ अपने गाँवों में लोग जोड़ और बंद कर सकता है।</p>
+      <form id="addAdminForm" class="stack" autocomplete="off">
+        <input id="admName" type="text" placeholder="एडमिन का नाम" maxlength="60" required>
+        <input id="admPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
+        <div class="checks" id="admVillages"></div>
+        <button class="btn" id="addAdminBtn" type="submit">एडमिन बनाएं</button>
+      </form>
+      <div class="msg" id="addAdminMsg"></div>
+      <h2 style="margin-top:16px">सभी एडमिन</h2>
+      <div id="adminList"></div>
+    </div>
+
     <div class="card">
       <h2>सभी पासवर्ड</h2>
       <div class="filter">
         <button type="button" data-f="on" class="on">चालू</button>
         <button type="button" data-f="off">बंद</button>
         <button type="button" data-f="all">सभी</button>
+        <select id="fVillage" aria-label="गाँव"><option value="">सभी गाँव</option></select>
       </div>
       <div id="list"></div>
       <div class="msg" id="listMsg"></div>
@@ -109,61 +132,110 @@
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
-let adminPassword = '', users = [], filter = 'on';
-// if the admin logged into the search app with the admin password, reuse that session here
-const appToken = (() => { try { return localStorage.getItem('tok') || sessionStorage.getItem('tok'); } catch (e) { return null; } })();
-let token = appToken && appToken.startsWith('admin.') ? appToken : null;
+// Opened as /<village>/admin that village is picked by default; /admin opens with every village.
+const SLUG = location.pathname.split('/')[2] === 'admin' ? decodeURIComponent(location.pathname.split('/')[1]).toLowerCase() : '';
+// the login is shared with the search pages (an admin login is kept under "tok:admin")
+const store = {
+  get() { try { return localStorage.getItem('tok:admin') || sessionStorage.getItem('tok:admin'); } catch (e) { return null; } },
+  set(v) { try { localStorage.setItem('tok:admin', v); } catch (e) {} },
+  del() { try { localStorage.removeItem('tok:admin'); sessionStorage.removeItem('tok:admin'); } catch (e) {} },
+};
+let token = store.get(), me = null, users = [], admins = [], filter = 'on', villages = {};
 const MSG = {
-  wrong: 'एडमिन पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
+  wrong: 'पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
+  not_admin: 'यह एडमिन पासवर्ड नहीं है', retired: 'यह पासवर्ड बंद कर दिया गया है',
+  logged_out: 'आपको लॉग आउट कर दिया गया है — दोबारा लॉगिन करें',
+  other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
   phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
+  no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
 };
 // 919876543210 → "+91 98765 43210"
 const showPhone = (p) => (/^91\d{10}$/.test(p) ? `+91 ${p.slice(2, 7)} ${p.slice(7)}` : p ? `+${p}` : '');
-async function api(payload) {
+const vName = (slug) => (villages[slug] ? villages[slug].name : slug || '—');
+async function post(path, payload) {
   let r;
   try {
-    r = await fetch('api/admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword, token, ...payload }) });
+    r = await fetch(`/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   } catch (e) { return { error: 'offline' }; }
   try { return await r.json(); } catch (e) { return { error: 'server' }; }
 }
+const api = (payload) => post('admin', { token, ...payload });
 const errText = (r) => MSG[r.error] || (r.detail ? `${MSG.server}: ${r.detail}` : MSG.server);
 const fmt = (iso) => iso ? new Date(iso).toLocaleString('hi-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
+// ---------- login ----------
+function showLogin(msg) {
+  token = null; me = null; users = []; admins = [];
+  $('list').innerHTML = ''; $('adminList').innerHTML = ''; $('newPw').classList.add('hidden');
+  $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
+  $('loginMsg').textContent = msg || '';
+}
+async function openPanel() {
+  const r = await api({ action: 'list' });
+  if (['wrong', 'retired', 'logged_out', 'other_device'].includes(r.error)) { store.del(); return showLogin(MSG[r.error]); }
+  if (r.error) return showLogin(errText(r));
+  me = r.me; users = r.users; admins = r.admins || [];
+  setup();
+  $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
+}
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  adminPassword = $('adminPw').value;
   $('loginBtn').disabled = true; $('loginMsg').textContent = '';
-  const r = await api({ action: 'list' });
+  const r = await post('unlock', { password: $('adminPw').value });
   $('loginBtn').disabled = false;
-  if (r.error) { adminPassword = ''; $('loginMsg').textContent = errText(r); return; }
+  if (r.error) { $('loginMsg').textContent = errText(r); return; }
   $('adminPw').value = '';
-  users = r.users; render();
-  $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
+  token = r.token; store.set(token);
+  openPanel();
 });
 $('logout').addEventListener('click', () => {
-  if (token) { try { localStorage.removeItem('tok'); localStorage.removeItem('who'); sessionStorage.removeItem('tok'); sessionStorage.removeItem('who'); } catch (e) {} }
-  adminPassword = ''; token = null; users = []; $('list').innerHTML = ''; $('newPw').classList.add('hidden');
-  $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
+  post('logout', { token });   // ends a village admin's session on the server; no need to wait
+  store.del(); showLogin('');
 });
-(async () => {
-  if (!token) return;
-  const r = await api({ action: 'list' });
-  if (r.error) { token = null; return; }
-  users = r.users; render();
-  $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
-})();
+
+// ---------- village choices: what this admin may use ----------
+function setup() {
+  const mine = me.villages.filter((s) => villages[s]);
+  $('meText').textContent = me.role === 'super' ? 'सुपर एडमिन · सभी गाँव' : `${me.name} · ${mine.map(vName).join(', ')}`;
+  const pick = mine.includes(SLUG) ? SLUG : mine.length === 1 ? mine[0] : '';
+  for (const id of ['newVillage', 'fVillage']) {
+    const sel = $(id);
+    sel.length = 1;
+    for (const s of mine) sel.add(new Option(vName(s), s));
+    sel.value = pick;
+  }
+  const back = pick || mine[0];
+  $('backLink').classList.toggle('hidden', !back);
+  if (back) $('backLink').href = `/${back}`;
+  $('adminCard').classList.toggle('hidden', me.role !== 'super');
+  if (me.role === 'super') $('admVillages').replaceChildren(villageChecks([]));
+  render();
+}
+function villageChecks(checked) {
+  const box = document.createDocumentFragment();
+  for (const s of Object.keys(villages)) {
+    const l = el('label'); const c = el('input'); c.type = 'checkbox'; c.value = s; c.checked = checked.includes(s);
+    l.append(c, vName(s)); box.append(l);
+  }
+  return box;
+}
+const checkedIn = (box) => [...box.querySelectorAll('input:checked')].map((c) => c.value);
 
 async function refresh() {
   const r = await api({ action: 'list' });
   if (r.error) { $('listMsg').textContent = errText(r); return; }
-  $('listMsg').textContent = ''; users = r.users; render();
+  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; render();
 }
 
-let shareTo = '';   // phone number the WhatsApp button sends to ('' = let WhatsApp ask for a contact)
-function showPassword(name, pw, phone) {
-  shareTo = phone || '';
-  $('newPwFor').textContent = `${name} का पासवर्ड:`;
+// ---------- new password box ----------
+let shareTo = '', shareLink = '', shareTitle = '';   // phone number the WhatsApp button sends to ('' = WhatsApp asks for a contact)
+function showPassword(u, pw) {
+  shareTo = u.phone || '';
+  shareLink = u.role === 'admin' ? `${location.origin}/admin` : `${location.origin}/${u.village}`;
+  shareTitle = u.role === 'admin' ? 'मतदाता खोज · एडमिन' : `मतदाता खोज · ${vName(u.village)}`;
+  $('newPwFor').textContent = u.role === 'admin' ? `एडमिन ${u.name} का पासवर्ड:` : `${u.name} (${vName(u.village)}) का पासवर्ड:`;
   $('newPwText').textContent = pw;
   $('sharePw').textContent = shareTo ? `WhatsApp पर भेजें (${showPhone(shareTo)})` : 'WhatsApp पर भेजें';
   $('sharePw').classList.toggle('wa', !!shareTo);
@@ -176,21 +248,34 @@ $('copyPw').addEventListener('click', async () => {
   setTimeout(() => { $('copyPw').textContent = 'कॉपी करें'; }, 2000);
 });
 $('sharePw').addEventListener('click', () => {
-  const link = location.href.replace(/admin\.html.*$/, '');
-  const text = `मतदाता खोज\nलिंक: ${link}\nपासवर्ड: ${$('newPwText').textContent}\n(यह पासवर्ड किसी और को न दें)`;
+  const text = `${shareTitle}\nलिंक: ${shareLink}\nपासवर्ड: ${$('newPwText').textContent}\n(यह पासवर्ड किसी और को न दें)`;
   location.href = `https://wa.me/${shareTo}?text=` + encodeURIComponent(text);   // opens the chat with that number directly
 });
 
+// ---------- add a person / an admin ----------
 $('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = $('newName').value.trim();
+  const name = $('newName').value.trim(), village = $('newVillage').value;
+  if (!village) { $('addMsg').textContent = MSG.no_village; return; }
   if (!name) return;
   $('addBtn').disabled = true; $('addMsg').textContent = '';
-  const r = await api({ action: 'add', name, phone: $('newPhone').value });
+  const r = await api({ action: 'add', village, name, phone: $('newPhone').value });
   $('addBtn').disabled = false;
   if (r.error) { $('addMsg').textContent = errText(r); return; }
   $('newName').value = ''; $('newPhone').value = '';
-  showPassword(r.user.name, r.password, r.user.phone);
+  showPassword(r.user, r.password);
+  refresh();
+});
+$('addAdminForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const vs = checkedIn($('admVillages'));
+  if (!vs.length) { $('addAdminMsg').textContent = 'कम से कम एक गाँव चुनें'; return; }
+  $('addAdminBtn').disabled = true; $('addAdminMsg').textContent = '';
+  const r = await api({ action: 'add_admin', name: $('admName').value.trim(), phone: $('admPhone').value, villages: vs });
+  $('addAdminBtn').disabled = false;
+  if (r.error) { $('addAdminMsg').textContent = errText(r); return; }
+  $('admName').value = ''; $('admPhone').value = ''; $('admVillages').replaceChildren(villageChecks([]));
+  showPassword(r.user, r.password);
   refresh();
 });
 
@@ -199,66 +284,95 @@ document.querySelectorAll('.filter button').forEach((b) => b.addEventListener('c
   document.querySelectorAll('.filter button').forEach((x) => x.classList.toggle('on', x === b));
   render();
 }));
+$('fVillage').addEventListener('change', render);
 
-function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+// ---------- lists ----------
 function render() {
+  if (!me) return;
+  const fv = $('fVillage').value;
+  const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv));
   const list = $('list'); list.innerHTML = '';
-  const shown = users.filter((u) => filter === 'all' || (filter === 'on' ? !u.retired : u.retired));
-  if (!shown.length) { list.append(el('div', 'empty', filter === 'off' ? 'कोई बंद पासवर्ड नहीं' : 'अभी कोई पासवर्ड नहीं — ऊपर नाम लिखकर बनाएं')); return; }
-  for (const u of shown) {
-    const row = el('div', 'person');
-    const left = el('div');
-    const nm = el('div', 'name', u.name); nm.append(el('span', `badge ${u.retired ? 'off' : 'on'}`, u.retired ? 'बंद' : 'चालू'));
-    if (u.kicks) nm.append(el('span', 'badge warn', `एक साथ दो फ़ोन: ${u.kicks} बार`));
-    const info = el('div', 'info', `बनाया: ${fmt(u.created)} · आखिरी इस्तेमाल: ${fmt(u.lastSeen)}` + (u.retired ? ` · बंद किया: ${fmt(u.retiredAt)}` : ''));
-    const sess = el('div', 'info', u.loggedIn
-      ? `अभी लॉगिन: ${u.sessionDevice || '—'} · IP ${u.sessionIp || '—'} · ${fmt(u.sessionAt)} से`
-      : 'अभी किसी फ़ोन पर लॉगिन नहीं');
-    const ph = el('div', 'phone', u.phone ? `📱 ${showPhone(u.phone)}` : 'मोबाइल नंबर नहीं जोड़ा');
-    const edit = el('button', null, u.phone ? 'बदलें' : 'जोड़ें');
-    edit.type = 'button';
-    edit.addEventListener('click', async () => {
-      const v = prompt(`${u.name} का WhatsApp मोबाइल नंबर:`, u.phone ? showPhone(u.phone) : '');
-      if (v === null) return;
-      const r = await api({ action: 'phone', id: u.id, phone: v });
-      if (r.error) { $('listMsg').textContent = errText(r); return; }
-      refresh();
-    });
-    ph.append(edit);
-    left.append(nm, ph, info, sess);
-    const act = el('div', 'actions');
-    if (u.loggedIn) {
-      const out = el('button', 'btn ghost', 'लॉग आउट करें');
-      out.addEventListener('click', async () => {
-        if (!confirm(`${u.name} को उनके फ़ोन से लॉग आउट करें? वे उसी पासवर्ड से फिर लॉगिन कर सकेंगे।`)) return;
-        const r = await api({ action: 'logout', id: u.id });
-        if (r.error) { $('listMsg').textContent = errText(r); return; }
-        refresh();
-      });
-      act.append(out);
-    }
-    const reset = el('button', 'btn ghost', 'नया पासवर्ड');
-    reset.addEventListener('click', async () => {
-      if (!confirm(`${u.name} के लिए नया पासवर्ड बनाएं? पुराना पासवर्ड बंद हो जाएगा।`)) return;
-      const r = await api({ action: 'reset', id: u.id });
-      if (r.error) { $('listMsg').textContent = errText(r); return; }
-      showPassword(u.name, r.password, r.user.phone); refresh();
-    });
-    act.append(reset);
-    if (!u.retired) {
-      const retire = el('button', 'btn danger', 'बंद करें');
-      retire.addEventListener('click', async () => {
-        if (!confirm(`${u.name} का पासवर्ड बंद करें? यह फ़ोन तुरंत लॉग आउट हो जाएगा।`)) return;
-        const r = await api({ action: 'retire', id: u.id });
-        if (r.error) { $('listMsg').textContent = errText(r); return; }
-        refresh();
-      });
-      act.append(retire);
-    }
-    row.append(left, act);
-    list.append(row);
+  if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? 'कोई बंद पासवर्ड नहीं' : 'अभी कोई पासवर्ड नहीं — ऊपर नाम लिखकर बनाएं'));
+  for (const u of shown) list.append(person(u));
+  const al = $('adminList'); al.innerHTML = '';
+  if (me.role === 'super') {
+    if (!admins.length) al.append(el('div', 'empty', 'अभी कोई एडमिन नहीं'));
+    for (const u of admins) al.append(person(u));
   }
 }
+
+async function act(payload, ask) {
+  if (ask && !confirm(ask)) return null;
+  const r = await api(payload);
+  if (r.error) { $('listMsg').textContent = errText(r); return null; }
+  refresh();
+  return r;
+}
+function person(u) {
+  const isAdmin = u.role === 'admin';
+  const row = el('div', 'person');
+  const nm = el('div', 'name', u.name); nm.append(el('span', `badge ${u.retired ? 'off' : 'on'}`, u.retired ? 'बंद' : 'चालू'));
+  if (isAdmin) for (const s of u.villages) nm.append(el('span', 'badge vil', vName(s)));
+  else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
+  if (u.kicks) nm.append(el('span', 'badge warn', `एक साथ दो फ़ोन: ${u.kicks} बार`));
+  const info = el('div', 'info', `बनाया: ${fmt(u.created)} · आखिरी इस्तेमाल: ${fmt(u.lastSeen)}` + (u.retired ? ` · बंद किया: ${fmt(u.retiredAt)}` : ''));
+  const sess = el('div', 'info', u.loggedIn
+    ? `अभी लॉगिन: ${u.sessionDevice || '—'} · IP ${u.sessionIp || '—'} · ${fmt(u.sessionAt)} से`
+    : 'अभी किसी फ़ोन पर लॉगिन नहीं');
+  const ph = el('div', 'phone', u.phone ? `📱 ${showPhone(u.phone)}` : 'मोबाइल नंबर नहीं जोड़ा');
+  const edit = el('button', null, u.phone ? 'बदलें' : 'जोड़ें');
+  edit.type = 'button';
+  edit.addEventListener('click', () => {
+    const v = prompt(`${u.name} का WhatsApp मोबाइल नंबर:`, u.phone ? showPhone(u.phone) : '');
+    if (v !== null) act({ action: 'phone', id: u.id, phone: v });
+  });
+  ph.append(edit);
+  row.append(nm, ph, info, sess);
+
+  const actions = el('div', 'actions');
+  if (isAdmin) {   // superadmin: change which villages this admin looks after
+    const vb = el('button', 'btn ghost', 'गाँव बदलें');
+    vb.addEventListener('click', () => {
+      if (row.querySelector('.vedit')) return row.querySelector('.vedit').remove();
+      const box = el('div', 'vedit'); const checks = el('div', 'checks'); checks.append(villageChecks(u.villages));
+      const save = el('button', 'btn', 'सेव करें'); save.type = 'button';
+      save.addEventListener('click', () => {
+        const vs = checkedIn(checks);
+        if (!vs.length) { $('listMsg').textContent = 'कम से कम एक गाँव चुनें'; return; }
+        act({ action: 'villages', id: u.id, villages: vs });
+      });
+      const r2 = el('div', 'row'); r2.append(save);
+      box.append(checks, r2); actions.after(box);
+    });
+    actions.append(vb);
+  }
+  if (u.loggedIn) {
+    const out = el('button', 'btn ghost', 'लॉग आउट करें');
+    out.addEventListener('click', () => act({ action: 'logout', id: u.id }, `${u.name} को उनके फ़ोन से लॉग आउट करें? वे उसी पासवर्ड से फिर लॉगिन कर सकेंगे।`));
+    actions.append(out);
+  }
+  const reset = el('button', 'btn ghost', 'नया पासवर्ड');
+  reset.addEventListener('click', async () => {
+    const r = await act({ action: 'reset', id: u.id }, `${u.name} के लिए नया पासवर्ड बनाएं? पुराना पासवर्ड बंद हो जाएगा।`);
+    if (r) showPassword(r.user, r.password);
+  });
+  actions.append(reset);
+  if (!u.retired) {
+    const retire = el('button', 'btn danger', 'बंद करें');
+    retire.addEventListener('click', () => act({ action: 'retire', id: u.id }, `${u.name} का पासवर्ड बंद करें? यह फ़ोन तुरंत लॉग आउट हो जाएगा।`));
+    actions.append(retire);
+  }
+  row.append(actions);
+  return row;
+}
+
+// ---------- start: load the village names, then open straight in if this device is logged in ----------
+(async () => {
+  const r = await post('info', {});
+  for (const v of r.villages || []) villages[v.slug] = v;
+  if (SLUG && villages[SLUG]) document.title = `एडमिन · ${vName(SLUG)} · मतदाता खोज`;
+  if (token) openPanel();
+})();
 </script>
 </body>
 </html>

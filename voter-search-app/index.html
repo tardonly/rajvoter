@@ -8,9 +8,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="मतदाता खोज">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
 <title>मतदाता खोज</title>
 <style>
   :root {
@@ -25,7 +24,7 @@
   .hidden { display: none !important; }
 
   /* lock screen */
-  #lock { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  #lock, #home { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
   .lockbox { width: 100%; max-width: 380px; background: var(--card); border-radius: 14px; padding: 24px 20px;
     box-shadow: 0 2px 12px rgba(0,0,0,.08); text-align: center; }
   .lockbox img { width: 72px; height: 72px; border-radius: 16px; }
@@ -38,6 +37,11 @@
   .btn:disabled { opacity: .6; }
   #lockMsg { min-height: 22px; margin-top: 10px; font-size: 14px; color: var(--bad); line-height: 1.5; }
   #lockMsg.info { color: var(--muted); }
+  #lockMsg a { color: var(--accent); font-weight: 600; }
+  .villages { display: grid; gap: 8px; margin-top: 4px; }
+  .villages a { display: block; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink);
+    text-decoration: none; font-size: 18px; font-weight: 600; }
+  .villages a small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
 
   /* search screen */
   header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
@@ -84,9 +88,9 @@
 
 <section id="lock">
   <div class="lockbox">
-    <img src="icon-192.png" alt="">
+    <img src="/icon-192.png" alt="">
     <h1>मतदाता खोज</h1>
-    <p>ग्राम पंचायत आडसर · वार्ड 1–11</p>
+    <p id="lockSub"></p>
     <form id="lockForm" autocomplete="off">
       <input id="pw" type="password" placeholder="पासवर्ड डालें" autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <label><input id="showPw" type="checkbox"> पासवर्ड दिखाएं</label>
@@ -97,10 +101,19 @@
   </div>
 </section>
 
+<section id="home" class="hidden">
+  <div class="lockbox">
+    <img src="/icon-192.png" alt="">
+    <h1>मतदाता खोज</h1>
+    <p id="homeMsg">अपना गाँव चुनें</p>
+    <div class="villages" id="villages"></div>
+  </div>
+</section>
+
 <section id="app" class="hidden">
   <header>
-    <div class="titlebar"><b>मतदाता खोज · आडसर<span class="who" id="who"></span></b>
-      <span class="tb-actions"><a id="adminBtn" class="hidden" href="admin.html">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+    <div class="titlebar"><b>मतदाता खोज · <span id="vName"></span><span class="who" id="who"></span></b>
+      <span class="tb-actions"><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / बॉक्स नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row2">
@@ -118,9 +131,10 @@
 
 <script>
 'use strict';
-const PS = 3, ZP = 35;                       // पंचायत समिति / जिला परिषद निर्वाचन क्षेत्र
-const POLL_TIME = 'मतदान समय : प्रातः 7 से सायं 5 बजे तक';
-const WARDS = 11;
+// The village comes from the address: raj-voter.vercel.app/<village>. Its details (name, पंचायत समिति / जिला परिषद
+// निर्वाचन क्षेत्र, polling time, wards) come from the server in VILLAGE once the page opens.
+const SLUG = decodeURIComponent(location.pathname.split('/')[1] || '').toLowerCase().replace(/\.html$/, '').replace(/^index$/, '');
+let VILLAGE = null;
 const $ = (id) => document.getElementById(id);
 const store = {  // localStorage can be blocked (private mode); then the user just logs in each time
   get(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } },
@@ -131,7 +145,9 @@ const store = {  // localStorage can be blocked (private mode); then the user ju
 if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
 if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
 
-for (let w = 1; w <= WARDS; w++) $('qWard').add(new Option(`वार्ड ${w}`, w));
+// A person's login is kept per village; an admin's login (superadmin or village admin) is shared by all village pages.
+let tokKey = `tok:${SLUG}`;
+const token = () => { tokKey = store.get(`tok:${SLUG}`) ? `tok:${SLUG}` : 'tok:admin'; return store.get(tokKey); };
 
 const MSG = {
   wrong: 'पासवर्ड गलत है',
@@ -143,11 +159,13 @@ const MSG = {
   slow_down: 'बहुत तेज़ खोज — एक मिनट रुककर कोशिश करें',
   offline: 'इंटरनेट नहीं है — इंटरनेट चालू करें',
   server: 'सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें',
+  no_village: 'यह गाँव नहीं मिला — पता (लिंक) जाँचें',
+  other_village: 'यह पासवर्ड इस गाँव का नहीं है',
 };
 async function api(path, payload) {
   let r;
   try {
-    r = await fetch(`api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    r = await fetch(`/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ village: SLUG, ...payload }) });
   } catch (e) { return { error: 'offline' }; }
   try { return await r.json(); } catch (e) { return { error: 'server' }; }
 }
@@ -158,7 +176,8 @@ function showLock(msg, info) {
   $('lockMsg').textContent = msg || ''; $('lockMsg').classList.toggle('info', !!info);
 }
 function signOut(msg) {
-  store.del('tok'); store.del('who');
+  if (msg === MSG.other_village) return showLock(msg);   // keep an admin's login for their own villages
+  store.del(tokKey);
   $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('count').textContent = '';
   showLock(msg);
 }
@@ -177,14 +196,16 @@ $('lockForm').addEventListener('submit', async (e) => {
   $('unlockBtn').disabled = true; showLock('खुल रहा है…', true);
   const r = await api('unlock', { password });
   $('unlockBtn').disabled = false;
+  if (r.error === 'other_village' && r.village) return otherVillage(r);
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   const keep = $('remember').checked;
-  store.set('tok', r.token, keep); store.set('who', r.name, keep);
+  tokKey = r.admin ? 'tok:admin' : `tok:${SLUG}`;
+  store.set(tokKey, r.token, keep);
   $('pw').value = '';
   showApp(r.name, r.admin);
 });
 $('lockBtn').addEventListener('click', () => {
-  api('logout', { token: store.get('tok') });   // close the session on the server; no need to wait
+  api('logout', { token: token() });   // close the session on the server; no need to wait
   signOut('');
 });
 
@@ -201,9 +222,9 @@ async function search(offset = 0) {
   if (!q.name && !q.rel) { hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }
   const mine = ++seq;
   if (!offset) $('count').textContent = 'खोज रहे हैं…';
-  const r = await api('search', { ...q, offset, token: store.get('tok') });
+  const r = await api('search', { ...q, offset, token: token() });
   if (mine !== seq) return;                       // a newer search has started
-  if (['retired', 'login', 'logged_out', 'other_device'].includes(r.error)) return signOut(MSG[r.error]);
+  if (['retired', 'login', 'logged_out', 'other_device', 'other_village'].includes(r.error)) return signOut(MSG[r.error]);
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   last = q; total = r.total;
   if (!offset) { $('results').innerHTML = ''; shown = 0; }
@@ -224,7 +245,7 @@ function slip(r) {
   const head = el('div', 'head');
   head.append(el('div'));
   const meta = el('div', 'meta');
-  const m1 = el('div'); m1.append(el('span', null, `पं.सं. ${PS}`), el('span', null, `जि.प. ${ZP}`));
+  const m1 = el('div'); m1.append(el('span', null, `पं.सं. ${VILLAGE.ps}`), el('span', null, `जि.प. ${VILLAGE.zp}`));
   const m2 = el('div'); m2.append(el('span', null, `वार्ड नं. : ${r.ward}`), el('span', null, `भाग सं. ${bhag.trim()}`));
   meta.append(m1, m2); head.append(meta);
 
@@ -242,7 +263,7 @@ function slip(r) {
   l2.append(p, ag);
 
   const k = el('div', 'kendra'); k.append('मतदान केन्द्र : ', el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
-  d.append(head, idl, l1, l2, k, el('div', 'time', POLL_TIME));
+  d.append(head, idl, l1, l2, k, el('div', 'time', VILLAGE.pollTime));
   return d;
 }
 
@@ -251,10 +272,46 @@ for (const id of ['qName', 'qRel']) $(id).addEventListener('input', () => { clea
 $('qWard').addEventListener('change', () => search(0));
 $('more').addEventListener('click', () => search(shown));
 
+// ---------- village list (start page, or a wrong village address) ----------
+function showHome(list, msg) {
+  $('lock').classList.add('hidden'); $('app').classList.add('hidden'); $('home').classList.remove('hidden');
+  if (msg) $('homeMsg').textContent = msg;
+  const box = $('villages'); box.innerHTML = '';
+  for (const v of list || []) {
+    const a = el('a', null, v.name); a.href = `/${v.slug}`; a.append(el('small', null, v.title));
+    box.append(a);
+  }
+}
+// a password of another village: point to that village's page
+function otherVillage(r) {
+  showLock(`यह पासवर्ड ${r.villageName || r.village} का है। `);
+  const a = el('a', null, `${r.villageName || r.village} की खोज खोलें →`); a.href = `/${r.village}`;
+  $('lockMsg').append(a);
+}
+function setVillage(v) {
+  VILLAGE = v;
+  document.title = `मतदाता खोज · ${v.name}`;
+  $('lockSub').textContent = `${v.title} · वार्ड ${v.wards.length > 1 ? `${v.wards[0]}–${v.wards[v.wards.length - 1]}` : v.wards[0]}`;
+  $('vName').textContent = v.name;
+  $('adminBtn').href = `/${v.slug}/admin`;
+  for (const w of v.wards) $('qWard').add(new Option(`वार्ड ${w}`, w));
+  const m = document.createElement('link'); m.rel = 'manifest'; m.href = `/${v.slug}/manifest.webmanifest`;
+  document.head.append(m);
+}
+
 // ---------- open straight into search if this phone is remembered, after checking the password is still active ----------
 (async () => {
-  const tok = store.get('tok');
-  if (!tok) return;
+  if (!SLUG) {
+    const r = await api('info', { village: '' });
+    return r.error ? showHome([], MSG[r.error] || MSG.server) : showHome(r.villages);
+  }
+  showLock('खुल रहा है…', true);
+  const info = await api('info', {});
+  if (info.error === 'no_village') return showHome(info.villages, MSG.no_village);
+  if (info.error) return showLock(MSG[info.error] || MSG.server);
+  setVillage(info.village);
+  const tok = token();
+  if (!tok) return showLock('');
   showLock('जाँच रहे हैं…', true);
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);

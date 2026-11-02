@@ -1,17 +1,19 @@
 # Allow-list: ignore everything in this folder, then let through only what the app needs.
-# This keeps the PDFs, Excel files, plain voter data (app-build/voters.json) and the
-# data key (app-build/DATA_KEY.txt) out of git even if new files are added later.
+# This keeps the village folders (PDFs, Excel files, plain voters.json) and the data key
+# (app-build/DATA_KEY.txt) out of git even when new villages are added.
 /*
 
 !/.gitignore
+!/CLAUDE.md
 
 # the website + API Vercel runs (voter data only in encrypted form, no keys or passwords)
 !/voter-search-app/
 
-# build script, local test server and instructions, but nothing else from app-build
+# build scripts, local test server and instructions, but nothing else from app-build
 !/app-build/
 /app-build/*
 !/app-build/encrypt.mjs
+!/app-build/xlsx_to_json.py
 !/app-build/dev-server.mjs
 !/app-build/README.md
 
