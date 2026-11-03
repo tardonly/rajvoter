@@ -225,9 +225,9 @@ function setup() {
     for (const s of mine) sel.add(new Option(vName(s), s));
     sel.value = pick;
   }
-  const back = pick || mine[0];
-  $('backLink').classList.toggle('hidden', !back);
-  if (back) $('backLink').href = `/${back}`;
+  // back to search: the village list when this admin has several villages, else straight to the one village
+  $('backLink').classList.toggle('hidden', !mine.length);
+  $('backLink').href = mine.length === 1 ? `/${mine[0]}` : '/';
   $('adminCard').classList.toggle('hidden', me.role !== 'super');
   if (me.role === 'super') $('admVillages').replaceChildren(villageChecks([]));
   render();

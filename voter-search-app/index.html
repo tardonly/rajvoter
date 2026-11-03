@@ -54,6 +54,7 @@
   .titlebar .who { font-size: 12px; color: var(--muted); font-weight: 400; display: block; }
   .titlebar button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px; color: var(--muted); flex: none; }
   .tb-actions { display: flex; gap: 6px; flex: none; }
+  #switchBtn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600; }
   #adminBtn { border-radius: 8px; padding: 4px 10px; font-size: 13px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
   .fields { display: grid; gap: 6px; }
   .fields input, .fields select { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
@@ -158,7 +159,7 @@
 <section id="app" class="hidden">
   <header>
     <div class="titlebar"><b>मतदाता खोज · <span id="vName"></span><span class="who" id="who"></span></b>
-      <span class="tb-actions"><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / बॉक्स नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row2">
@@ -246,9 +247,10 @@ function signOut(msg) {
   $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('count').textContent = '';
   showLock(msg);
 }
-function showApp(name, admin) {
+function showApp(name, admin, villages) {
   $('who').textContent = name ? `उपयोगकर्ता: ${name}` : '';
   $('adminBtn').classList.toggle('hidden', !admin);
+  $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
   IS_ADMIN = !!admin; wardButton();
   $('lock').classList.add('hidden'); $('app').classList.remove('hidden');
   search();
@@ -269,7 +271,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  showApp(r.name, r.admin);
+  showApp(r.name, r.admin, r.villages);
 });
 $('lockBtn').addEventListener('click', () => {
   api('logout', { token: token() });   // close the session on the server; no need to wait
@@ -473,7 +475,7 @@ async function openVillage(v) {
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
-  showApp(r.name, r.admin);
+  showApp(r.name, r.admin, r.villages);
 }
 
 (async () => {
