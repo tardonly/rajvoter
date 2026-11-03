@@ -1,11 +1,12 @@
-// POST {village, token, name, rel, ward, offset} → {total, offset, results: [...up to 50 voters, each with its mark], wards}
+// POST {village, token, name, rel, ward, offset} → {total, offset, more, results: [...up to 10 voters, each with its mark], wards}
+// With only a ward (no name), every voter of that ward in box order, 10 at a time.
 // POST {village, token, ward, all: true} → {total, results: [every voter of that ward]}   (admins only)
 // Every search checks that the password behind the token is still active and that this phone holds its newest
 // session, so retiring or logging in on another phone takes effect at once.
-const { village, redis, whoIs, send, route } = require('./_lib.js');
+const { village, redis, whoIs, markKey, marksFor, send, route } = require('./_lib.js');
 const { load, search, publicFields } = require('./_search.js');
 
-const PAGE = 50, MAX_OFFSET = 200, PER_MINUTE = 120;
+const PAGE = 10, MAX_OFFSET = 240, PER_MINUTE = 120;   // 10 slips at a time; a name search shows at most 250
 
 module.exports = route(async (req, res, b) => {
   const v = village(b.village);
@@ -28,10 +29,13 @@ module.exports = route(async (req, res, b) => {
   }
 
   const hits = search(v.slug, b);
-  const offset = Math.min(Math.max(0, parseInt(b.offset, 10) || 0), MAX_OFFSET);
+  // a name search pages up to 250 results; browsing a ward pages through the whole ward
+  const last = String(b.name || '').trim() || String(b.rel || '').trim() ? MAX_OFFSET : hits.length;
+  const offset = Math.min(Math.max(0, parseInt(b.offset, 10) || 0), last);
   const results = hits.slice(offset, offset + PAGE).map(publicFields);
   // the marks admins set (done / coming / absent), shown to everyone on the slips
-  const marks = results.length ? await redis('HMGET', `mark:${v.slug}`, ...results.map((r) => `${r.ward}:${r.box}`)) : [];
-  results.forEach((r, i) => { r.mark = (marks && marks[i]) || ''; });
-  send(res, 200, { total: hits.length, offset, page: PAGE, results, wards: load(v.slug).wards });
+  const marks = await marksFor(v.slug, results.map(markKey));
+  results.forEach((r, i) => { r.mark = marks[i]; });
+  const more = offset + PAGE < hits.length && offset + PAGE <= last;
+  send(res, 200, { total: hits.length, offset, page: PAGE, more, results, wards: load(v.slug).wards });
 });

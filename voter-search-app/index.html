@@ -38,6 +38,7 @@
   .btn:disabled { opacity: .6; }
   #lockMsg { min-height: 22px; margin-top: 10px; font-size: 14px; color: var(--bad); line-height: 1.5; }
   #lockMsg.info { color: var(--muted); }
+  #lock.loading form, #lock.loading #lockSub { display: none; }
   #lockMsg a { color: var(--accent); font-weight: 600; }
   .villages { display: grid; gap: 8px; margin-top: 4px; }
   .villages a { display: block; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink);
@@ -88,16 +89,16 @@
     padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
 
   /* marks set by an admin, seen by everyone */
-  .slip .bar { color: #fff; font-weight: 700; font-size: 14px; padding: 3px 8px; }
-  .slip.done { border-color: #15803d; }   .slip .bar.done { background: #15803d; }
-  .slip.coming { border-color: #ca8a04; } .slip .bar.coming { background: #facc15; color: #422006; }
-  .slip.absent { border-color: #b91c1c; } .slip .bar.absent { background: #b91c1c; }
-  .marks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 6px; border-top: 1px dashed var(--line); }
+  .slip .bar { display: none; color: #fff; font-weight: 700; font-size: 14px; padding: 4px 8px; }
+  .slip[data-mark] .bar { display: block; }
+  .slip[data-mark=done] { border-color: #16a34a; }   .slip[data-mark=done] .bar { background: #16a34a; }
+  .slip[data-mark=coming] { border-color: #ca8a04; } .slip[data-mark=coming] .bar { background: #facc15; color: #422006; }
+  .slip[data-mark=absent] { border-color: #dc2626; } .slip[data-mark=absent] .bar { background: #dc2626; }
+  .marks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 6px; border-top: 1px dashed var(--line); background: #fafafa; }
   .marks button { padding: 6px 4px; font-size: 14px; border-radius: 8px; background: #fff; font-weight: 600; }
-  .marks .done { border: 1.5px solid #15803d; color: #15803d; }   .marks .done.on { background: #15803d; color: #fff; }
+  .marks .done { border: 1.5px solid #16a34a; color: #15803d; }  .marks .done.on { background: #16a34a; color: #fff; }
   .marks .coming { border: 1.5px solid #ca8a04; color: #854d0e; } .marks .coming.on { background: #facc15; color: #422006; }
-  .marks .absent { border: 1.5px solid #b91c1c; color: #b91c1c; } .marks .absent.on { background: #b91c1c; color: #fff; }
-  .marks button:disabled { opacity: .5; }
+  .marks .absent { border: 1.5px solid #dc2626; color: #dc2626; } .marks .absent.on { background: #dc2626; color: #fff; }
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
@@ -129,7 +130,7 @@
 </head>
 <body>
 
-<section id="lock">
+<section id="lock" class="loading">
   <div class="lockbox">
     <img src="/icon-192.png" alt="">
     <h1>मतदाता खोज</h1>
@@ -140,7 +141,7 @@
       <label><input id="remember" type="checkbox" checked> इस फ़ोन पर याद रखें</label>
       <button class="btn" id="unlockBtn" type="submit">खोलें</button>
     </form>
-    <div id="lockMsg"></div>
+    <div id="lockMsg" class="info">खुल रहा है…</div>
   </div>
 </section>
 
@@ -217,6 +218,7 @@ const MSG = {
   no_village: 'यह गाँव नहीं मिला — पता (लिंक) जाँचें',
   other_village: 'यह पासवर्ड इस गाँव का नहीं है',
   not_admin: 'यह काम सिर्फ़ एडमिन कर सकते हैं',
+  not_found: 'यह मतदाता नहीं मिला',
 };
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
 let IS_ADMIN = false;   // admins can mark voters and print a whole ward
@@ -230,8 +232,13 @@ async function api(path, payload) {
 
 // ---------- login ----------
 function showLock(msg, info) {
-  $('app').classList.add('hidden'); $('lock').classList.remove('hidden');
+  $('app').classList.add('hidden'); $('home').classList.add('hidden'); $('lock').classList.remove('hidden', 'loading');
   $('lockMsg').textContent = msg || ''; $('lockMsg').classList.toggle('info', !!info);
+}
+// while checking a saved login: the same card without the password form
+function showLoading(msg) {
+  showLock(msg, true);
+  $('lock').classList.add('loading');
 }
 function signOut(msg) {
   if (msg === MSG.other_village) return showLock(msg);   // keep an admin's login for their own villages
@@ -261,7 +268,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   tokKey = r.admin ? 'tok:admin' : `tok:${HOME ? r.villages[0] : SLUG}`;
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
-  if (HOME) return myVillages(r.list);
+  if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
   showApp(r.name, r.admin);
 });
 $('lockBtn').addEventListener('click', () => {
@@ -274,12 +281,13 @@ let seq = 0, shown = 0, total = 0, last = null;
 function hint() {
   $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
-    'बॉक्स नंबर (जैसे <b>25</b>, वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।</div>';
+    'बॉक्स नंबर (जैसे <b>25</b>, वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।<br>' +
+    'सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।</div>';
 }
 async function search(offset = 0) {
   const q = { name: $('qName').value.trim(), rel: $('qRel').value.trim(), ward: $('qWard').value };
   $('count').classList.remove('bad');
-  if (!q.name && !q.rel) { hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }
+  if (!q.name && !q.rel && !q.ward) { hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }
   const mine = ++seq;
   if (!offset) $('count').textContent = 'खोज रहे हैं…';
   const r = await api('search', { ...q, offset, token: token() });
@@ -292,19 +300,21 @@ async function search(offset = 0) {
   for (const v of r.results) frag.appendChild(slip(v));
   $('results').appendChild(frag);
   shown = r.offset + r.results.length;
-  $('count').textContent = total ? `${total} मतदाता मिले` + (total > shown ? ` · ${shown} दिखाए` : '') : 'कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें';
-  $('more').classList.toggle('hidden', !(shown < total && shown <= 200));   // server pages up to 250 results
+  const found = !q.name && !q.rel ? `वार्ड ${q.ward} के सभी ${total} मतदाता` : `${total} मतदाता मिले`;
+  $('count').textContent = total ? found + (total > shown ? ` · ${shown} दिखाए` : '') : 'कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें';
+  $('more').classList.toggle('hidden', !r.more);
 }
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function kv(label, value) { const f = document.createDocumentFragment(); f.append(label, el('b', null, value)); return f; }
 
-const MARKS = { done: '✓ हो गया', coming: 'आ रहे हैं', absent: '✗ उपलब्ध नहीं' };
+const MARKS = { done: '✓ पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
 
 // One slip. forPrint leaves out the buttons and the admin's mark.
 function slip(r, forPrint) {
   const [bhag, ...rest] = String(r.kendra || '').split('-');
   const d = el('div', 'slip');
+  if (!forPrint) d.dataset.key = `${r.ward}:${r.box}`;
   const head = el('div', 'head');
   if (forPrint) head.append(el('div'));
   else {
@@ -334,31 +344,46 @@ function slip(r, forPrint) {
   d.append(head, idl, l1, l2, k, el('div', 'time', VILLAGE.pollTime));
   if (forPrint) return d;
 
-  if (r.mark) { d.classList.add(r.mark); d.prepend(el('div', `bar ${r.mark}`, MARKS[r.mark])); }
-  if (IS_ADMIN) {
+  d.prepend(el('div', 'bar'));
+  if (IS_ADMIN) {   // only village admins and the superadmin can mark; everyone sees the bar
     const row = el('div', 'marks');
     for (const m of Object.keys(MARKS)) {
-      const b = el('button', m + (r.mark === m ? ' on' : ''), MARKS[m]); b.type = 'button';
-      b.addEventListener('click', () => setMark(r, r.mark === m ? '' : m, d));   // tapping the current mark clears it
+      const b = el('button', m, MARKS[m].replace('✓ ', '')); b.type = 'button'; b.dataset.m = m;
+      b.addEventListener('click', () => setMark(r, d, m));
       row.append(b);
     }
     d.append(row);
   }
+  showMark(d, r.mark);
   return d;
 }
 
-async function setMark(r, mark, node) {
-  node.querySelectorAll('.marks button').forEach((b) => { b.disabled = true; });
+// ---------- status marks (admins set them; everyone sees the coloured bar) ----------
+function showMark(d, m) {
+  if (MARKS[m]) d.dataset.mark = m; else delete d.dataset.mark;
+  d.querySelector('.bar').textContent = MARKS[m] || '';
+  d.querySelectorAll('.marks button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+}
+async function setMark(r, d, m) {
+  const before = d.dataset.mark || '';
+  const mark = before === m ? '' : m;            // tapping the lit button again removes the mark
+  showMark(d, mark);                             // show it at once; undo if the server refuses
   const x = await api('mark', { token: token(), ward: r.ward, box: r.box, mark });
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
-  if (x.error) {
-    node.querySelectorAll('.marks button').forEach((b) => { b.disabled = false; });
-    $('count').textContent = MSG[x.error] || MSG.server; $('count').classList.add('bad');
-    return;
-  }
-  r.mark = x.mark;
-  node.replaceWith(slip(r));
+  if (x.error) { showMark(d, before); alert(MSG[x.error] || MSG.server); return; }
+  r.mark = mark;
 }
+// marks set on another phone reach this one without a new search: every minute, and when the app comes back on screen
+async function refreshMarks() {
+  const slips = [...document.querySelectorAll('#results .slip[data-key]')];
+  if (!slips.length || document.hidden || !VILLAGE || $('app').classList.contains('hidden')) return;
+  const x = await api('marks', { token: token(), keys: slips.map((d) => d.dataset.key) });
+  if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
+  if (!x.marks) return;
+  for (const d of slips) if (d.dataset.key in x.marks) showMark(d, x.marks[d.dataset.key]);
+}
+setInterval(refreshMarks, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarks(); });
 
 // ---------- printing / saving slips as PDF (the phone's print screen also offers "Save as PDF") ----------
 function printSlips(rows, title) {
@@ -419,6 +444,7 @@ function homeLock(msg, info) {
 $('homeOut').addEventListener('click', () => {
   const k = savedLogin();
   if (k) { api('logout', { token: store.get(k) }); store.del(k); }
+  store.del('villages');
   homeLock('');
 });
 // a password of another village: point to that village's page
@@ -443,7 +469,7 @@ async function openVillage(v) {
   setVillage(v);
   const tok = token();
   if (!tok) return showLock('');
-  showLock('जाँच रहे हैं…', true);
+  showLoading('जाँच रहे हैं…');
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
@@ -452,7 +478,7 @@ async function openVillage(v) {
 
 (async () => {
   if (SLUG) {
-    showLock('खुल रहा है…', true);
+    showLoading('खुल रहा है…');
     const info = await api('info', {});
     if (!info.error) return openVillage(info.village);
     if (info.error !== 'no_village') return showLock(MSG[info.error] || MSG.server);
@@ -461,10 +487,18 @@ async function openVillage(v) {
   // start page: log in first, then the villages of this login
   const k = savedLogin();
   if (!k) return homeLock(SLUG ? MSG.no_village : '');
-  homeLock('जाँच रहे हैं…', true);
+  // show the villages saved at the last login straight away (a village page checks the login itself),
+  // and check the login meanwhile
+  let saved = null;
+  try { saved = JSON.parse(store.get('villages')); } catch (e) {}
+  if (Array.isArray(saved) && saved.length) myVillages(saved);
+  else showLoading('जाँच रहे हैं…');
+  if (saved && saved.length === 1) return;
   const r = await api('check', { village: '', token: store.get(k) });
-  if (r.error) return homeLock(MSG[r.error] || MSG.server);
-  if (!r.active) { store.del(k); return homeLock(MSG[r.reason] || MSG.login); }
+  if (r.error) return saved ? undefined : homeLock(MSG[r.error] || MSG.server);   // offline: keep the saved list
+  if (!r.active) { store.del(k); store.del('villages'); return homeLock(MSG[r.reason] || MSG.login); }
+  let keep = false; try { keep = !!localStorage.getItem(k); } catch (e) {}
+  store.set('villages', JSON.stringify(r.list), keep);
   myVillages(r.list);
 })();
 </script>

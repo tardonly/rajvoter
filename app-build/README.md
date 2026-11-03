@@ -72,9 +72,10 @@ Log in with the superadmin password or a village admin's password (or log into a
   instead, choose **Save as PDF** in the phone's print screen (iPhone: Print → share → Save to Files).
 - **वार्ड N की सभी पर्चियाँ** (admins only, after choosing a ward): every voter of that ward in box order, two slips per
   row (about 10 per A4 page), to print or save as one PDF.
-- **Marks** (admins only): under each slip, **✓ हो गया** (green), **आ रहे हैं** (yellow, on the way) or
-  **✗ उपलब्ध नहीं** (red, not available). Tapping the current mark again removes it. Every user of the village sees the
-  coloured bar on that slip the next time they search. Marks are kept in the database per village (`mark:<village>`).
+- **Marks** (village admins and the superadmin only): under each slip, **पूरा हुआ** (green), **आ रहे हैं** (yellow,
+  on the way) or **उपलब्ध नहीं** (red, not available). Tapping the lit button again removes it. Every user of the village
+  sees the coloured bar on that slip; phones showing it pick up new marks within a minute (and at once when the app is
+  reopened), without searching again. Marks are kept per village in the database (`mark:<village>`, with the time set).
 
 **One phone at a time:** users and village admins each get one session; opening the same password on a second
 phone logs the first one out on its next request. The admin list shows each person's current phone, IP and login

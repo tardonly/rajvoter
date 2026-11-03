@@ -147,5 +147,15 @@ async function whoIs(token, slug) {
   return user;
 }
 
-module.exports = { village, villageList, redis, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+// Status marks admins put on voters, one Redis hash per village "mark:<village>": field "<ward>:<box>",
+// value "<status>|<time set>". Everyone who can open the village sees them on the slips.
+const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the way · red: not available
+const markKey = (v) => `${parseInt(v.ward, 10)}:${parseInt(v.box, 10)}`;
+async function marksFor(slug, keys) {
+  if (!keys.length) return [];
+  const vals = (await redis('HMGET', `mark:${slug}`, ...keys)) || [];
+  return keys.map((k, i) => (vals[i] ? String(vals[i]).split('|')[0] : ''));
+}
+
+module.exports = { MARKS, markKey, marksFor, village, villageList, redis, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };

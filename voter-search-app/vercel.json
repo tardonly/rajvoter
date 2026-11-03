@@ -3,6 +3,9 @@
   "functions": {
     "api/search.js": {
       "includeFiles": "api/_data/**"
+    },
+    "api/mark.js": {
+      "includeFiles": "api/_data/**"
     }
   },
   "rewrites": [

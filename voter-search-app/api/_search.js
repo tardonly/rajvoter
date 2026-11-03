@@ -81,7 +81,7 @@ function search(slug, { name = '', rel = '', ward = '' }) {
   const { rows } = load(slug);
   name = String(name).trim().slice(0, 60); rel = String(rel).trim().slice(0, 60);
   const pool = ward ? rows.filter((r) => String(r.ward) === String(ward)) : rows;
-  if (!name && !rel) return [];
+  if (!name && !rel) return ward ? [...pool].sort((a, b) => a.box - b.box) : [];   // only a ward: all its voters in box order
   if (/^\d{1,4}$/.test(name) && !rel) return pool.filter((r) => r.box === +name);            // box number
   if ((/\d{3,}/.test(name) && /[a-z]/i.test(name)) || /^rj\W?\d/i.test(name)) {                // voter ID
     const k = name.replace(/[^A-Z0-9]/gi, '').toUpperCase();
