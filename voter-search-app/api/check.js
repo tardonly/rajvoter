@@ -1,13 +1,15 @@
 // POST {village, token} → {active, name, admin, role, villages, reason}. The app calls this when it opens.
+// POST {token} (the start page) → the same, with list = the villages this login opens.
 // reason when not active: 'login' (unknown/old token) | 'retired' | 'logged_out' | 'other_device' | 'other_village'
-const { village, redis, whoIs, send, route } = require('./_lib.js');
+const { village, villageList, redis, whoIs, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, { token, village: slug }) => {
-  const v = village(slug);
-  if (!v) return send(res, 404, { error: 'no_village' });
-  const user = await whoIs(token, v.slug);
+  const v = slug ? village(slug) : null;
+  if (slug && !v) return send(res, 404, { error: 'no_village' });
+  const user = await whoIs(token, v ? v.slug : null);
   if (!user) return send(res, 200, { active: false, reason: 'login' });
   if (user.status !== 'ok') return send(res, 200, { active: false, reason: user.status });
   if (user.role !== 'super') await redis('HSET', `user:${user.id}`, 'lastSeen', new Date().toISOString());
-  send(res, 200, { active: true, name: user.name, admin: !!user.admin, role: user.role, villages: user.villages });
+  send(res, 200, { active: true, name: user.name, admin: !!user.admin, role: user.role, villages: user.villages,
+    list: villageList(user.villages) });
 });

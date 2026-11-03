@@ -1,6 +1,7 @@
 // POST {village, password} → {name, token, admin, role, villages} for an active password of that village,
 //   a village admin of that village, or the superadmin password.
 // POST {password} (no village, from the admin page) → the same, but only for the superadmin or a village admin.
+// POST {password, home: true} (the start page) → the same for any active password; list = the villages it opens.
 // A password of another village → 403 {error: 'other_village', village, villageName} so the app can point there.
 // Each login starts a new session; a phone still using an older session of the same password is logged out
 // on its next request. The token is sent with every search; an admin token also opens the admin page.
@@ -9,12 +10,13 @@ const { village, villageList, redis, pwHash, newSession, makeToken, isAdminPassw
 
 const STILL_IN_USE_MS = 30 * 60 * 1000;   // previous phone used within 30 min → counts as "two phones at once"
 
-module.exports = route(async (req, res, { password, village: slug }) => {
+module.exports = route(async (req, res, { password, village: slug, home }) => {
   const v = slug ? village(slug) : null;
   if (slug && !v) return send(res, 404, { error: 'no_village' });
   if (await blocked(req, 'unlock')) return send(res, 429, { error: 'too_many' });
   if (isAdminPassword(password)) {
-    return send(res, 200, { name: 'सुपर एडमिन', token: adminToken(), admin: true, role: 'super', villages: villageList().map((x) => x.slug) });
+    const list = villageList();
+    return send(res, 200, { name: 'सुपर एडमिन', token: adminToken(), admin: true, role: 'super', villages: list.map((x) => x.slug), list });
   }
   const id = password ? await redis('GET', `pw:${pwHash(password)}`) : null;
   const user = id ? await getUser(id) : null;
@@ -24,10 +26,10 @@ module.exports = route(async (req, res, { password, village: slug }) => {
   }
   if (user.retired === '1') return send(res, 403, { error: 'retired' });
   if (v && !user.villages.includes(v.slug)) {
-    const home = village(user.villages[0]);
-    return send(res, 403, { error: 'other_village', village: home ? home.slug : '', villageName: home ? home.name : '' });
+    const own = village(user.villages[0]);
+    return send(res, 403, { error: 'other_village', village: own ? own.slug : '', villageName: own ? own.name : '' });
   }
-  if (!v && user.role !== 'admin') return send(res, 403, { error: 'not_admin' });   // a person's password on the admin page
+  if (!v && !home && user.role !== 'admin') return send(res, 403, { error: 'not_admin' });   // a person's password on the admin page
 
   const now = new Date(), sid = newSession();
   const stillInUse = !!user.session && !!user.lastSeen && now - Date.parse(user.lastSeen) < STILL_IN_USE_MS;
@@ -35,5 +37,6 @@ module.exports = route(async (req, res, { password, village: slug }) => {
     'sessionDevice', deviceName(req), 'lastSeen', now.toISOString());
   await redis('HINCRBY', `user:${id}`, 'logins', 1);
   if (stillInUse) await redis('HINCRBY', `user:${id}`, 'kicks', 1);
-  send(res, 200, { name: user.name, token: makeToken(id, sid), admin: user.role === 'admin', role: user.role, villages: user.villages });
+  send(res, 200, { name: user.name, token: makeToken(id, sid), admin: user.role === 'admin', role: user.role, villages: user.villages,
+    list: villageList(user.villages) });
 });

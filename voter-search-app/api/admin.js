@@ -11,7 +11,7 @@
 // The password is shown to the admin once; only its hash is stored.
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
-const { village, redis, pwHash, whoIs, newPassword, getUser, blocked, failed, send, route } = require('./_lib.js');
+const { village, villageList, redis, pwHash, whoIs, newPassword, getUser, blocked, failed, send, route } = require('./_lib.js');
 
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
 function normPhone(s) {
@@ -63,7 +63,8 @@ module.exports = route(async (req, res, b) => {
     const all = (await Promise.all(ids.map(getUser))).filter(Boolean).sort((x, y) => (x.created < y.created ? 1 : -1));
     const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(view);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(view) : undefined;
-    return send(res, 200, { me: { role: me.role, name: me.name, villages: me.villages }, users, admins });
+    return send(res, 200, { me: { role: me.role, name: me.name, villages: me.villages }, users, admins,
+      villageList: villageList(me.villages) });   // names of my villages (the list is not public)
   }
 
   if (b.action === 'add' || b.action === 'add_admin') {

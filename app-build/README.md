@@ -6,7 +6,7 @@ only receive the cards that match a search. Every search checks that the user's 
 
 | Address | What it is |
 |---|---|
-| `/` | list of villages |
+| `/` | login; then the villages that password opens (a person with one village goes straight to it) |
 | `/<village>` | search for that village (login needed) |
 | `/<village>/admin` or `/admin` | admin page |
 

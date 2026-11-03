@@ -19,12 +19,13 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--ink);
     font-family: "Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  body { padding-bottom: env(safe-area-inset-bottom); }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  body > section { flex: 1 0 auto; }
   button, input, select { font: inherit; }
   .hidden { display: none !important; }
 
   /* lock screen */
-  #lock, #home { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  #lock, #home { display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
   .lockbox { width: 100%; max-width: 380px; background: var(--card); border-radius: 14px; padding: 24px 20px;
     box-shadow: 0 2px 12px rgba(0,0,0,.08); text-align: center; }
   .lockbox img { width: 72px; height: 72px; border-radius: 16px; }
@@ -41,6 +42,7 @@
   .villages { display: grid; gap: 8px; margin-top: 4px; }
   .villages a { display: block; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink);
     text-decoration: none; font-size: 18px; font-weight: 600; }
+  .linkbtn { margin-top: 16px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 14px; font-size: 14px; color: var(--muted); }
   .villages a small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
 
   /* search screen */
@@ -99,12 +101,22 @@
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
+  /* footer: who made the app and how to reach them */
+  .footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 18px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; color: var(--muted); }
+  .footer a { color: inherit; text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+  .footer .by { display: inline-flex; align-items: center; gap: 6px; }
+  .footer .by img { width: 22px; height: 22px; border-radius: 6px; }
+  .footer .by b { color: #12473f; font-size: 14px; }
+
   /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page */
   #printArea { display: none; }
   @media print {
     @page { size: A4; margin: 8mm; }
     html, body { background: #fff; }
-    body > section { display: none !important; }
+    body > section, .footer { display: none !important; }
     #printArea { display: block; font-size: 0; }
     #printArea .slip { display: inline-block; vertical-align: top; width: 94mm; margin: 0 2mm 2mm 0; font-size: 13px;
       break-inside: avoid; page-break-inside: avoid; }
@@ -138,6 +150,7 @@
     <h1>मतदाता खोज</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
     <div class="villages" id="villages"></div>
+    <button class="linkbtn" id="homeOut" type="button">लॉग आउट</button>
   </div>
 </section>
 
@@ -160,6 +173,13 @@
   </main>
 </section>
 
+<footer class="footer">
+  <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
+  <a href="mailto:contact@digyai.com">contact@digyai.com</a>
+  <a href="https://wa.me/918107244972" target="_blank" rel="noopener">WhatsApp +91 8107244972</a>
+  <span>Mon–Sat, 10:00–19:00 IST</span>
+</footer>
+
 <div id="printArea"></div>
 
 <script>
@@ -167,6 +187,8 @@
 // The village comes from the address: raj-voter.vercel.app/<village>. Its details (name, पंचायत समिति / जिला परिषद
 // निर्वाचन क्षेत्र, polling time, wards) come from the server in VILLAGE once the page opens.
 const SLUG = decodeURIComponent(location.pathname.split('/')[1] || '').toLowerCase().replace(/\.html$/, '').replace(/^index$/, '');
+// On the start page (no village, or an unknown one) you log in first, then see the villages your password opens.
+let HOME = !SLUG;
 let VILLAGE = null;
 const $ = (id) => document.getElementById(id);
 const store = {  // localStorage can be blocked (private mode); then the user just logs in each time
@@ -231,14 +253,15 @@ $('lockForm').addEventListener('submit', async (e) => {
   const password = $('pw').value.trim();
   if (!password) return;
   $('unlockBtn').disabled = true; showLock('खुल रहा है…', true);
-  const r = await api('unlock', { password });
+  const r = await api('unlock', HOME ? { password, village: '', home: true } : { password });
   $('unlockBtn').disabled = false;
   if (r.error === 'other_village' && r.village) return otherVillage(r);
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   const keep = $('remember').checked;
-  tokKey = r.admin ? 'tok:admin' : `tok:${SLUG}`;
+  tokKey = r.admin ? 'tok:admin' : `tok:${HOME ? r.villages[0] : SLUG}`;
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
+  if (HOME) return myVillages(r.list);
   showApp(r.name, r.admin);
 });
 $('lockBtn').addEventListener('click', () => {
@@ -369,16 +392,35 @@ for (const id of ['qName', 'qRel']) $(id).addEventListener('input', () => { clea
 $('qWard').addEventListener('change', () => { wardButton(); search(0); });
 $('more').addEventListener('click', () => search(shown));
 
-// ---------- village list (start page, or a wrong village address) ----------
-function showHome(list, msg) {
+// ---------- start page: after login, the villages this password opens (just one → open it straight away) ----------
+function myVillages(list) {
+  if (list.length === 1) return location.replace(`/${list[0].slug}`);
   $('lock').classList.add('hidden'); $('app').classList.add('hidden'); $('home').classList.remove('hidden');
-  if (msg) $('homeMsg').textContent = msg;
+  $('homeMsg').textContent = list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
   const box = $('villages'); box.innerHTML = '';
-  for (const v of list || []) {
+  for (const v of list) {
     const a = el('a', null, v.name); a.href = `/${v.slug}`; a.append(el('small', null, v.title));
     box.append(a);
   }
 }
+// the login kept on this phone: an admin's, or a person's (kept under their village)
+function savedLogin() {
+  if (store.get('tok:admin')) return 'tok:admin';
+  try {
+    for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) if (/^tok:/.test(s.key(i))) return s.key(i);
+  } catch (e) {}
+  return null;
+}
+function homeLock(msg, info) {
+  $('home').classList.add('hidden');
+  $('lockSub').textContent = 'अपना पासवर्ड डालें';
+  showLock(msg, info);
+}
+$('homeOut').addEventListener('click', () => {
+  const k = savedLogin();
+  if (k) { api('logout', { token: store.get(k) }); store.del(k); }
+  homeLock('');
+});
 // a password of another village: point to that village's page
 function otherVillage(r) {
   showLock(`यह पासवर्ड ${r.villageName || r.village} का है। `);
@@ -396,17 +438,9 @@ function setVillage(v) {
   document.head.append(m);
 }
 
-// ---------- open straight into search if this phone is remembered, after checking the password is still active ----------
-(async () => {
-  if (!SLUG) {
-    const r = await api('info', { village: '' });
-    return r.error ? showHome([], MSG[r.error] || MSG.server) : showHome(r.villages);
-  }
-  showLock('खुल रहा है…', true);
-  const info = await api('info', {});
-  if (info.error === 'no_village') return showHome(info.villages, MSG.no_village);
-  if (info.error) return showLock(MSG[info.error] || MSG.server);
-  setVillage(info.village);
+// ---------- open straight in if this phone is remembered, after checking the password is still active ----------
+async function openVillage(v) {
+  setVillage(v);
   const tok = token();
   if (!tok) return showLock('');
   showLock('जाँच रहे हैं…', true);
@@ -414,6 +448,24 @@ function setVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   showApp(r.name, r.admin);
+}
+
+(async () => {
+  if (SLUG) {
+    showLock('खुल रहा है…', true);
+    const info = await api('info', {});
+    if (!info.error) return openVillage(info.village);
+    if (info.error !== 'no_village') return showLock(MSG[info.error] || MSG.server);
+    HOME = true; history.replaceState(null, '', '/');   // unknown village address: go to the start page
+  }
+  // start page: log in first, then the villages of this login
+  const k = savedLogin();
+  if (!k) return homeLock(SLUG ? MSG.no_village : '');
+  homeLock('जाँच रहे हैं…', true);
+  const r = await api('check', { village: '', token: store.get(k) });
+  if (r.error) return homeLock(MSG[r.error] || MSG.server);
+  if (!r.active) { store.del(k); return homeLock(MSG[r.reason] || MSG.login); }
+  myVillages(r.list);
 })();
 </script>
 </body>

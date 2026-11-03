@@ -37,7 +37,9 @@ async function redis(name, key, ...args) {
 // Villages built into the app (by app-build/encrypt.mjs): slug → {name, title, ps, zp, pollTime, wards, voters}
 const VILLAGES = require('./_villages.json');
 const village = (slug) => (typeof slug === 'string' && Object.hasOwn(VILLAGES, slug) ? { slug, ...VILLAGES[slug] } : null);
-const villageList = () => Object.entries(VILLAGES).map(([slug, v]) => ({ slug, name: v.name, title: v.title }));
+// all villages, or only the given slugs (the villages one login may open)
+const villageList = (slugs) => Object.entries(VILLAGES).filter(([slug]) => !slugs || slugs.includes(slug))
+  .map(([slug, v]) => ({ slug, name: v.name, title: v.title }));
 
 function dataKey() {
   const k = process.env.DATA_KEY;
