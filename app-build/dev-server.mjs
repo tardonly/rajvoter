@@ -28,7 +28,9 @@ function redis([cmd, ...a]) {
     case 'INCR': { const n = Number(alive(a[0]) ? kv.get(a[0]) : 0) + 1; kv.set(a[0], String(n)); return n; }
     case 'EXPIRE': expiry.set(a[0], Date.now() + Number(a[1]) * 1000); return 1;
     case 'HSET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; for (let i = 1; i < a.length; i += 2) h[a[i]] = a[i + 1]; kv.set(a[0], h); return 1; }
-    case 'HGETALL': return alive(a[0]) ? Object.entries(kv.get(a[0])).flat() : [];
+    case 'HMGET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; return a.slice(1).map((f) => h[f] ?? null); }
+    case 'HDEL': { const h = alive(a[0]) ? kv.get(a[0]) : {}; const n = a.slice(1).filter((f) => f in h).length; a.slice(1).forEach((f) => delete h[f]); return n; }
+    case 'HGETALL':return alive(a[0]) ? Object.entries(kv.get(a[0])).flat() : [];
     case 'HINCRBY': { const h = alive(a[0]) ? kv.get(a[0]) : {}; h[a[1]] = String(Number(h[a[1]] || 0) + Number(a[2])); kv.set(a[0], h); return Number(h[a[1]]); }
     case 'SADD': { const s = alive(a[0]) ? kv.get(a[0]) : new Set(); a.slice(1).forEach((x) => s.add(x)); kv.set(a[0], s); return 1; }
     case 'SMEMBERS': return alive(a[0]) ? [...kv.get(a[0])] : [];

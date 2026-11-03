@@ -82,6 +82,37 @@
   .slip .kendra { border-top: 1px solid #222; margin: 6px 6px 0; padding: 4px 4px 3px; font-size: 13px; text-align: center; }
   .slip .time { background: var(--pink); color: #fff; text-align: center; font-size: 13px; padding: 3px 4px; }
   #more { margin: 4px auto 0; display: block; width: auto; padding: 10px 22px; font-size: 16px; }
+  .pbtn { justify-self: start; align-self: start; border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
+
+  /* marks set by an admin, seen by everyone */
+  .slip .bar { color: #fff; font-weight: 700; font-size: 14px; padding: 3px 8px; }
+  .slip.done { border-color: #15803d; }   .slip .bar.done { background: #15803d; }
+  .slip.coming { border-color: #ca8a04; } .slip .bar.coming { background: #facc15; color: #422006; }
+  .slip.absent { border-color: #b91c1c; } .slip .bar.absent { background: #b91c1c; }
+  .marks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 6px; border-top: 1px dashed var(--line); }
+  .marks button { padding: 6px 4px; font-size: 14px; border-radius: 8px; background: #fff; font-weight: 600; }
+  .marks .done { border: 1.5px solid #15803d; color: #15803d; }   .marks .done.on { background: #15803d; color: #fff; }
+  .marks .coming { border: 1.5px solid #ca8a04; color: #854d0e; } .marks .coming.on { background: #facc15; color: #422006; }
+  .marks .absent { border: 1.5px solid #b91c1c; color: #b91c1c; } .marks .absent.on { background: #b91c1c; color: #fff; }
+  .marks button:disabled { opacity: .5; }
+  .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page */
+  #printArea { display: none; }
+  @media print {
+    @page { size: A4; margin: 8mm; }
+    html, body { background: #fff; }
+    body > section { display: none !important; }
+    #printArea { display: block; font-size: 0; }
+    #printArea .slip { display: inline-block; vertical-align: top; width: 94mm; margin: 0 2mm 2mm 0; font-size: 13px;
+      break-inside: avoid; page-break-inside: avoid; }
+    #printArea .slip .epic { font-size: 19px; }
+    #printArea .slip .line b { font-size: 15px; }
+    #printArea .slip .kendra { font-size: 11px; }
+    #printArea .slip .time { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
@@ -121,13 +152,15 @@
         <select id="qWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
       </div>
     </div>
-    <div id="count"></div>
+    <div class="countrow"><div id="count"></div><button id="wardPrint" class="hidden" type="button"></button></div>
   </header>
   <main>
     <div id="results"></div>
     <button class="btn hidden" id="more" type="button">और दिखाएं</button>
   </main>
 </section>
+
+<div id="printArea"></div>
 
 <script>
 'use strict';
@@ -161,7 +194,10 @@ const MSG = {
   server: 'सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें',
   no_village: 'यह गाँव नहीं मिला — पता (लिंक) जाँचें',
   other_village: 'यह पासवर्ड इस गाँव का नहीं है',
+  not_admin: 'यह काम सिर्फ़ एडमिन कर सकते हैं',
 };
+const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
+let IS_ADMIN = false;   // admins can mark voters and print a whole ward
 async function api(path, payload) {
   let r;
   try {
@@ -184,6 +220,7 @@ function signOut(msg) {
 function showApp(name, admin) {
   $('who').textContent = name ? `उपयोगकर्ता: ${name}` : '';
   $('adminBtn').classList.toggle('hidden', !admin);
+  IS_ADMIN = !!admin; wardButton();
   $('lock').classList.add('hidden'); $('app').classList.remove('hidden');
   search();
 }
@@ -224,7 +261,7 @@ async function search(offset = 0) {
   if (!offset) $('count').textContent = 'खोज रहे हैं…';
   const r = await api('search', { ...q, offset, token: token() });
   if (mine !== seq) return;                       // a newer search has started
-  if (['retired', 'login', 'logged_out', 'other_device', 'other_village'].includes(r.error)) return signOut(MSG[r.error]);
+  if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   last = q; total = r.total;
   if (!offset) { $('results').innerHTML = ''; shown = 0; }
@@ -239,11 +276,19 @@ async function search(offset = 0) {
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function kv(label, value) { const f = document.createDocumentFragment(); f.append(label, el('b', null, value)); return f; }
 
-function slip(r) {
+const MARKS = { done: '✓ हो गया', coming: 'आ रहे हैं', absent: '✗ उपलब्ध नहीं' };
+
+// One slip. forPrint leaves out the buttons and the admin's mark.
+function slip(r, forPrint) {
   const [bhag, ...rest] = String(r.kendra || '').split('-');
   const d = el('div', 'slip');
   const head = el('div', 'head');
-  head.append(el('div'));
+  if (forPrint) head.append(el('div'));
+  else {
+    const pb = el('button', 'pbtn', 'प्रिंट / PDF'); pb.type = 'button';
+    pb.addEventListener('click', () => printSlips([r], `पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`));
+    head.append(pb);
+  }
   const meta = el('div', 'meta');
   const m1 = el('div'); m1.append(el('span', null, `पं.सं. ${VILLAGE.ps}`), el('span', null, `जि.प. ${VILLAGE.zp}`));
   const m2 = el('div'); m2.append(el('span', null, `वार्ड नं. : ${r.ward}`), el('span', null, `भाग सं. ${bhag.trim()}`));
@@ -264,12 +309,64 @@ function slip(r) {
 
   const k = el('div', 'kendra'); k.append('मतदान केन्द्र : ', el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
   d.append(head, idl, l1, l2, k, el('div', 'time', VILLAGE.pollTime));
+  if (forPrint) return d;
+
+  if (r.mark) { d.classList.add(r.mark); d.prepend(el('div', `bar ${r.mark}`, MARKS[r.mark])); }
+  if (IS_ADMIN) {
+    const row = el('div', 'marks');
+    for (const m of Object.keys(MARKS)) {
+      const b = el('button', m + (r.mark === m ? ' on' : ''), MARKS[m]); b.type = 'button';
+      b.addEventListener('click', () => setMark(r, r.mark === m ? '' : m, d));   // tapping the current mark clears it
+      row.append(b);
+    }
+    d.append(row);
+  }
   return d;
 }
 
+async function setMark(r, mark, node) {
+  node.querySelectorAll('.marks button').forEach((b) => { b.disabled = true; });
+  const x = await api('mark', { token: token(), ward: r.ward, box: r.box, mark });
+  if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
+  if (x.error) {
+    node.querySelectorAll('.marks button').forEach((b) => { b.disabled = false; });
+    $('count').textContent = MSG[x.error] || MSG.server; $('count').classList.add('bad');
+    return;
+  }
+  r.mark = x.mark;
+  node.replaceWith(slip(r));
+}
+
+// ---------- printing / saving slips as PDF (the phone's print screen also offers "Save as PDF") ----------
+function printSlips(rows, title) {
+  const area = $('printArea'); area.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const r of rows) frag.append(slip(r, true));
+  area.append(frag);
+  const old = document.title;
+  document.title = title;                 // becomes the suggested PDF file name
+  window.addEventListener('afterprint', () => { document.title = old; area.innerHTML = ''; }, { once: true });
+  window.print();
+}
+function wardButton() {
+  const w = $('qWard').value;
+  $('wardPrint').classList.toggle('hidden', !IS_ADMIN || !w);
+  $('wardPrint').textContent = `वार्ड ${w} की सभी पर्चियाँ · प्रिंट / PDF`;
+}
+$('wardPrint').addEventListener('click', async () => {
+  const w = $('qWard').value, btn = $('wardPrint');
+  if (!w) return;
+  btn.disabled = true; btn.textContent = 'पर्चियाँ आ रही हैं…';
+  const r = await api('search', { token: token(), ward: w, all: true });
+  btn.disabled = false; wardButton();
+  if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
+  if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
+  printSlips(r.results, `पर्चियाँ ${VILLAGE.name} वार्ड ${w} (${r.total})`);
+});
+
 let timer;
 for (const id of ['qName', 'qRel']) $(id).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => search(0), 300); });
-$('qWard').addEventListener('change', () => search(0));
+$('qWard').addEventListener('change', () => { wardButton(); search(0); });
 $('more').addEventListener('click', () => search(shown));
 
 // ---------- village list (start page, or a wrong village address) ----------

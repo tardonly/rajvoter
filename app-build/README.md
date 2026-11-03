@@ -67,6 +67,15 @@ Log in with the superadmin password or a village admin's password (or log into a
 - **नया पासवर्ड:** new password for the same person (e.g. they forgot it); the old one stops working.
 - **लॉग आउट करें:** ends the person's current session; they can log in again with the same password.
 
+## Slips and voter marks (on the village search page)
+- **प्रिंट / PDF** on every slip (everyone): prints that one slip in the top-left corner of an A4 page. To download
+  instead, choose **Save as PDF** in the phone's print screen (iPhone: Print → share → Save to Files).
+- **वार्ड N की सभी पर्चियाँ** (admins only, after choosing a ward): every voter of that ward in box order, two slips per
+  row (about 10 per A4 page), to print or save as one PDF.
+- **Marks** (admins only): under each slip, **✓ हो गया** (green), **आ रहे हैं** (yellow, on the way) or
+  **✗ उपलब्ध नहीं** (red, not available). Tapping the current mark again removes it. Every user of the village sees the
+  coloured bar on that slip the next time they search. Marks are kept in the database per village (`mark:<village>`).
+
 **One phone at a time:** users and village admins each get one session; opening the same password on a second
 phone logs the first one out on its next request. The admin list shows each person's current phone, IP and login
 time, and a yellow **एक साथ दो फ़ोन: N बार** count when their password was opened on another phone while the first
