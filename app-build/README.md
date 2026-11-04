@@ -57,8 +57,9 @@ the server). No printing, no whole-ward lists; परिवार works. An oran
 a box for the visitor's village name that opens a WhatsApp chat with it filled in. A new village shows up in the demo by itself; demo villages can't be given users or candidates.
 
 The start page, the demo's village list and the orange bar have **▶ वीडियो देखें**: a 31-second promo of the app
-(`voter-search-app/promo-phone.mp4` upright on phones, `promo-laptop.mp4` wide on laptops; made in `demo-video/`, kept out
-of git apart from these two files). Next to it, and on the video itself, **↗ शेयर करें** opens a box to put the upright video
+(`voter-search-app/promo-phone.mp4` upright, `promo-laptop.mp4` wide; made in `demo-video/`, kept out of git apart from
+these two files). A phone opens the phone video first, a laptop or computer the laptop one; **📱 फ़ोन / 💻 लैपटॉप** on top
+of the video switch between them. Next to it, and on the video itself, **↗ शेयर करें** opens a box to put the upright video
 with the site's link (`raj-voter.vercel.app`, never the demo's) on **WhatsApp status** (phones that can share files: pick
 WhatsApp, then "My status"; elsewhere the video downloads and the text is copied for the caption), send the link in a
 WhatsApp chat, share it to any other app, copy it, or download either video.
@@ -173,8 +174,12 @@ was still in use (used in the last 30 minutes): a sign of sharing. The superadmi
 devices. Changing `ADMIN_PASSWORD` in Vercel (and redeploying) signs out every superadmin session.
 
 ## Phones (Android or iPhone)
-Open the village link, enter the password, keep "इस फ़ोन पर याद रखें" ticked. Optional: add to home screen
-(Android ⋮ → Add to Home screen, iPhone Share → Add to Home Screen); it opens that village. Needs internet every time.
+Open the village link, enter the password, keep "इस फ़ोन पर याद रखें" ticked. Optional: install it as an app with
+**📲 ऐप इंस्टॉल करें** (on the login card, under the search help, on the village list and in the footer). Chrome and Edge
+(Android, laptops) open their own Install box; Safari on iPhone, iPad and Mac, and anything else, shows the steps for that
+device in Hindi (iPhone: Share → Add to Home Screen; Mac Safari: File → Add to Dock; Firefox on a laptop can't, so it says
+to use Chrome or Edge). Every page is its own app (`api/manifest.js`): a village page opens that village, the start page
+`/` the start page, `/demo` the demo's list. The buttons hide when the page is opened from the icon. Needs internet every time.
 
 ## Updating voter data
 ```

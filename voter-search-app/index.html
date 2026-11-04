@@ -44,14 +44,23 @@
   .demolink { display: block; margin-top: 14px; padding: 11px; border-radius: 10px; border: 1.5px solid #fdba74;
     background: #fff7ed; color: #9a3412; font-size: 16px; font-weight: 600; text-decoration: none; }
   .demolink small { display: block; font-size: 12.5px; font-weight: 500; color: #c2410c; margin-top: 2px; }
-  .howbtn { display: block; width: 100%; margin-top: 10px; padding: 11px; border-radius: 10px; border: 1.5px solid var(--line);
-    background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
-  /* the "how it works" video: a full-screen popup over the page */
-  .howpop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.92); display: flex; align-items: center; justify-content: center; }
-  .howpop video { width: 100%; height: 100%; max-width: 100vw; max-height: 100dvh; object-fit: contain; background: #000; }
-  .howpop button { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 12px; z-index: 1; padding: 8px 14px;
-    border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #111; font-size: 16px; font-weight: 600; }
-  .howpop #howShare { right: auto; left: 12px; background: #16a34a; color: #fff; }
+  .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .homeacts button { padding: 11px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
+  .homeacts .share { background: #16a34a; border-color: #16a34a; color: #fff; }
+  #home .homeacts { margin: -6px 0 14px; }
+  .demobar .homeacts { margin-top: 8px; max-width: 460px; }
+  .demobar .homeacts button { padding: 8px 6px; font-size: 15px; }
+  /* the "how it works" video: a full-screen popup over the page, a bar on top (share, phone/laptop cut, close) */
+  .howpop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.94); display: flex; flex-direction: column; }
+  .howpop video { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; }
+  .howbar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: max(10px, env(safe-area-inset-top)) 10px 10px; }
+  .howbar button { padding: 8px 12px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #111;
+    font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .howbar #howShare { background: #16a34a; color: #fff; }
+  .howcut { display: flex; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); }
+  .howcut button { background: transparent; color: #fff; padding: 6px 12px; }
+  .howcut button.on { background: #fff; color: #111; }
   /* share: the promo video and the site's link, for WhatsApp status, a chat or any other app */
   #sharePop { z-index: 60; align-items: center; }
   #sharePop .card { max-width: 420px; }
@@ -64,17 +73,11 @@
   .sharelist .wa small { color: #dcfce7; }
   .sharesave { display: flex; gap: 8px; }
   .sharesave a { flex: 1; text-align: center; font-size: 14px; padding: 9px 6px; }
-  .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -6px 0 14px; }
-  .homeacts button { padding: 10px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; font-size: 15px; font-weight: 600; }
-  #homeShare { background: #16a34a; border-color: #16a34a; color: #fff; }
-  .demobar .acts { display: flex; gap: 6px; margin-top: 8px; max-width: 460px; }
-  .demobar .acts button { flex: 1; padding: 7px 8px; border-radius: 8px; border: 1px solid #fdba74; background: #fff; color: #9a3412; font-weight: 600; font-size: 14px; }
-  .demobar .acts .share { background: #16a34a; border-color: #16a34a; color: #fff; }
   .btn { width: 100%; padding: 12px; font-size: 18px; border: 0; border-radius: 10px; background: var(--pink-dark); color: #fff; font-weight: 600; }
   .btn:disabled { opacity: .6; }
   #lockMsg { min-height: 22px; margin-top: 10px; font-size: 14px; color: var(--bad); line-height: 1.5; }
   #lockMsg.info { color: var(--muted); }
-  #lock.loading form, #lock.loading #lockSub, #lock.loading .demolink, #lock.loading .howbtn { display: none; }
+  #lock.loading form, #lock.loading #lockSub, #lock.loading .demolink, #lock.loading .homeacts, #lock.loading .installbtn { display: none; }
   #lockMsg a { color: var(--accent); font-weight: 600; }
   .villages { display: grid; gap: 8px; margin-top: 4px; }
   .villages a { display: block; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink);
@@ -158,7 +161,7 @@
   .demobar a { color: var(--accent); font-weight: 600; }
   .demobar form { display: flex; gap: 6px; margin-top: 6px; }
   .demobar input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 15px; border: 1px solid #fdba74; border-radius: 8px; }
-  .demobar button { padding: 8px 12px; border: 0; border-radius: 8px; background: #16a34a; color: #fff; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .demobar form button { padding: 8px 12px; border: 0; border-radius: 8px; background: #16a34a; color: #fff; font-weight: 600; font-size: 14px; white-space: nowrap; }
   .demobar .ask { font-weight: 600; margin-top: 6px; }
   #count.bad { color: var(--bad); }
   main { padding: 10px 10px 24px; max-width: 640px; margin: 0 auto; }
@@ -221,6 +224,22 @@
   .marks .absent { border: 1.5px solid #dc2626; color: #dc2626; } .marks .absent.on { background: #dc2626; color: #fff; }
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* install as an app: the button (start page, village pages, the village list, under the search hint, the footer) and the steps */
+  .installbtn { display: block; width: 100%; margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1.5px dashed var(--pink-dark);
+    background: #fdf2f8; color: #9d174d; font-size: 16px; font-weight: 600; line-height: 1.35; }
+  .installbtn small { display: block; font-size: 12.5px; font-weight: 500; color: #be185d; }
+  #home .installbtn { margin: -6px 0 14px; }
+  .hint .installbtn { max-width: 380px; margin-top: 14px; text-align: center; }
+  html.app .installbtn, html.app .footinstall { display: none !important; }   /* already opened as the app */
+  #installPop .card { max-width: 480px; }
+  #installClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
+  #installPop h3 { font-size: 15px; margin: 12px 0 4px; }
+  #installPop ol { margin: 0; padding-left: 22px; font-size: 15.5px; line-height: 1.6; }
+  #installPop .mine ol { font-size: 17px; }
+  #installPop details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+  #installPop summary { font-weight: 600; color: var(--accent); cursor: pointer; }
+  .footinstall { border: 0; background: none; padding: 0; font: inherit; color: var(--pink-dark); font-weight: 600; cursor: pointer; }
 
   /* footer: who made the app and how to reach them */
   .footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 18px;
@@ -289,13 +308,17 @@
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
     <a id="demoLink" class="demolink hidden" href="/demo">पासवर्ड नहीं है? डेमो देखें →<small>बिना पासवर्ड, असली मतदाता सूची में 10 खोज</small></a>
-    <button id="howBtn" class="howbtn hidden" type="button">▶ ऐप कैसे काम करता है — वीडियो देखें</button>
+    <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
+    <button class="installbtn" data-install type="button">📲 ऐप इंस्टॉल करें<small>फ़ोन या लैपटॉप पर — फिर आइकन से सीधे खुलेगा</small></button>
   </div>
 </section>
 
 <div id="howPop" class="howpop hidden" role="dialog" aria-label="ऐप कैसे काम करता है">
-  <button id="howShare" type="button">↗ शेयर करें</button>
-  <button id="howClose" type="button">✕ बंद करें</button>
+  <div class="howbar">
+    <button id="howShare" type="button">↗ शेयर</button>
+    <div class="howcut" role="group" aria-label="वीडियो"><button type="button" data-cut="phone">📱 फ़ोन</button><button type="button" data-cut="laptop">💻 लैपटॉप</button></div>
+    <button id="howClose" type="button" aria-label="बंद करें">✕</button>
+  </div>
   <video id="howVideo" controls playsinline preload="none"></video>
 </div>
 
@@ -311,6 +334,15 @@
       <div class="sharesave"><a href="/promo-phone.mp4" download="matdata-khoj-phone.mp4">⬇ वीडियो (फ़ोन)</a><a href="/promo-laptop.mp4" download="matdata-khoj-laptop.mp4">⬇ वीडियो (लैपटॉप)</a></div>
     </div>
     <div class="note" id="shareNote"></div>
+  </div>
+</div>
+
+<div id="installPop" class="progpop hidden" role="dialog" aria-label="ऐप इंस्टॉल करें">
+  <div class="card">
+    <div class="head"><h2>📲 ऐप इंस्टॉल करें</h2>
+      <span><button id="installClose" type="button" aria-label="बंद करें">✕</button></span></div>
+    <div id="installBody"></div>
+    <div class="note">आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।</div>
   </div>
 </div>
 
@@ -346,7 +378,8 @@
     <img src="/icon-192.png" alt="">
     <h1>मतदाता खोज</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
-    <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" type="button">↗ शेयर करें</button></div>
+    <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ वीडियो देखें</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
+    <button class="installbtn" data-install type="button">📲 ऐप इंस्टॉल करें<small>फ़ोन या लैपटॉप पर — फिर आइकन से सीधे खुलेगा</small></button>
     <div class="vfind hidden" id="vFind">
       <input id="vSearch" type="search" placeholder="🔍 गाँव खोजें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
       <select id="vPs" aria-label="पंचायत समिति"></select>
@@ -388,6 +421,7 @@
   <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
   <a href="mailto:ram@digyai.com">ram@digyai.com</a>
   <span>Mon–Sat, 10:00–19:00 IST</span>
+  <button class="footinstall" data-install type="button">📲 ऐप इंस्टॉल करें</button>
 </footer>
 
 <div id="printArea"></div>
@@ -486,23 +520,27 @@ function showApp(name, admin, villages, perms, cand) {
   search(false, true);
 }
 
-// "how it works" video (start page, demo pages): opens full screen as a popup and plays; ✕, a tap outside it or Esc
-// closes it. An upright screen gets the phone cut, a wide one the laptop cut (both made in demo-video/promo-*).
-function howOpen() {
-  const v = $('howVideo'), src = matchMedia('(min-aspect-ratio: 1/1)').matches ? '/promo-laptop.mp4' : '/promo-phone.mp4';
-  if (v.getAttribute('src') !== src) v.src = src;
-  $('howPop').classList.remove('hidden');
-  v.currentTime = 0;
+// "how it works" video (start page, demo pages): opens full screen as a popup and plays; ✕ or Esc closes it. Two cuts, made in
+// demo-video/: a phone opens the phone one, a laptop or computer the laptop one; the 📱 / 💻 buttons switch.
+const ON_PHONE = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
+function howPlay(cut) {
+  const v = $('howVideo');
+  v.src = `/promo-${cut}.mp4`;
+  for (const b of document.querySelectorAll('.howcut button')) b.classList.toggle('on', b.dataset.cut === cut);
   v.play().catch(() => {});
 }
+function howOpen() {
+  $('howPop').classList.remove('hidden');
+  howPlay(ON_PHONE ? 'phone' : 'laptop');
+}
+for (const b of document.querySelectorAll('.howcut button')) b.addEventListener('click', () => howPlay(b.dataset.cut));
 function howClose() {
   $('howVideo').pause();
   $('howPop').classList.add('hidden');
 }
-$('howBtn').addEventListener('click', howOpen);
 $('homeHow').addEventListener('click', howOpen);
+$('demoHow').addEventListener('click', howOpen);
 $('howClose').addEventListener('click', howClose);
-$('howPop').addEventListener('click', (e) => { if (e.target === $('howPop')) howClose(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('sharePop').classList.contains('hidden')) shareClose();
@@ -560,8 +598,66 @@ $('shMore').addEventListener('click', () => navigator.share({ title: 'मतद�
 $('shCopy').addEventListener('click', async () => { $('shareNote').textContent = (await copyText(SITE)) ? 'लिंक कॉपी हो गया' : SITE; });
 $('shareClose').addEventListener('click', shareClose);
 $('sharePop').addEventListener('click', (e) => { if (e.target === $('sharePop')) shareClose(); });
+
+// ---------- install as an app (home screen, Dock, Start menu). Each page has its own app (api/manifest.js): a village
+// page opens that village, the start page the start page. Chrome and Edge (Android, laptops) offer their own "Install"
+// box, kept here for the button; Safari (iPhone, iPad, Mac) and the rest get the steps for their device. ----------
+function setManifest(q) {
+  let m = document.querySelector('link[rel=manifest]');
+  if (!m) { m = document.createElement('link'); m.rel = 'manifest'; document.head.append(m); }
+  m.href = `/api/manifest?${q}`;
+}
+if (!SLUG || SLUG === DEMO_PICK) setManifest(SLUG ? 'page=demo' : 'page=home');
+const IN_APP = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches || navigator.standalone === true;
+document.documentElement.classList.toggle('app', IN_APP);   // opened from the icon: no install buttons
+let installPrompt = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
+addEventListener('appinstalled', () => { installPrompt = null; document.documentElement.classList.add('app'); installClose(); });
+const UA = navigator.userAgent;
+const DEVICE = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1) ? 'ios'
+  : /Android/.test(UA) ? 'android'
+  : /Macintosh/.test(UA) && /Safari\//.test(UA) && !/Chrome|Chromium|Edg\/|Firefox|OPR\//.test(UA) ? 'mac'
+  : /Firefox\//.test(UA) ? 'firefox' : 'laptop';
+const STEPS = {
+  android: ['Android फ़ोन (Chrome)', [
+    'ऊपर दाईं ओर मेनू <b>⋮</b> दबाएं',
+    '<b>Add to Home screen</b> या <b>Install app</b> (होम स्क्रीन में जोड़ें) चुनें',
+    '<b>Install</b> दबाएं — होम स्क्रीन पर मतदाता खोज का आइकन आ जाएगा']],
+  ios: ['iPhone / iPad (Safari या Chrome)', [
+    'शेयर बटन <b>□↑</b> दबाएं (Safari में नीचे, Chrome में ऊपर)',
+    'नीचे स्क्रॉल करके <b>Add to Home Screen</b> (होम स्क्रीन में जोड़ें) चुनें',
+    '<b>Add</b> दबाएं — होम स्क्रीन पर मतदाता खोज का आइकन आ जाएगा']],
+  laptop: ['लैपटॉप / कंप्यूटर (Chrome या Edge)', [
+    'Chrome: पता बार में दाईं ओर इंस्टॉल आइकन <b>⊕</b> दबाएं, या मेनू <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>',
+    'Edge: मेनू <b>…</b> → <b>Apps</b> → <b>Install this site as an app</b>',
+    '<b>Install</b> दबाएं — ऐप अपनी अलग विंडो में खुलेगा, आइकन Start मेनू / Dock में']],
+  mac: ['Mac (Safari)', [
+    'ऊपर मेनू में <b>File</b> → <b>Add to Dock…</b> चुनें (macOS 14 Sonoma या नया)',
+    '<b>Add</b> दबाएं — Dock में मतदाता खोज का आइकन आ जाएगा',
+    'पुराने Mac पर: यह पेज Chrome में खोलें और लैपटॉप वाले तरीके से इंस्टॉल करें']],
+};
+const stepsHtml = (k) => `<h3>${STEPS[k][0]}</h3><ol>${STEPS[k][1].map((s) => `<li>${s}</li>`).join('')}</ol>`;
+async function installOpen() {
+  if (installPrompt) {   // Chrome / Edge: their own "Install app?" box (once per page load; after a "no", the steps)
+    const p = installPrompt; installPrompt = null;
+    p.prompt();
+    return;
+  }
+  const mine = DEVICE === 'firefox'
+    ? '<h3>Firefox</h3><ol><li>Firefox में ऐप इंस्टॉल नहीं होता: यह पेज <b>Chrome</b> या <b>Edge</b> में खोलें</li><li>फिर से <b>📲 ऐप इंस्टॉल करें</b> दबाएं</li></ol>'
+    : stepsHtml(DEVICE);
+  const others = Object.keys(STEPS).filter((k) => k !== DEVICE).map(stepsHtml).join('');
+  $('installBody').innerHTML = `<div class="mine">${mine}</div><details><summary>दूसरे फ़ोन या लैपटॉप पर कैसे करें</summary>${others}</details>`;
+  $('installPop').classList.remove('hidden');
+}
+function installClose() { $('installPop').classList.add('hidden'); }
+document.addEventListener('click', (e) => { if (e.target.closest('[data-install]')) installOpen(); });
+$('installClose').addEventListener('click', installClose);
+$('installPop').addEventListener('click', (e) => { if (e.target === $('installPop')) installClose(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') installClose(); });
 $('howShare').addEventListener('click', shareOpen);
 $('homeShare').addEventListener('click', shareOpen);
+$('demoShare').addEventListener('click', shareOpen);
 $('showPw').addEventListener('change', (e) => { $('pw').type = e.target.checked ? 'text' : 'password'; });
 $('lockForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -599,7 +695,8 @@ function hint() {
   $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
     'मकान नंबर (जैसे <b>512</b>, चाहें तो वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।' +
-    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') + '</div>';
+    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') +
+    '<button class="installbtn" data-install type="button">📲 ऐप इंस्टॉल करें<small>अगली बार होम स्क्रीन के आइकन से सीधे खोलें</small></button></div>';
 }
 const FILTER = { none: 'बिना निशान वाले', done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // a name with one letter matches nearly everyone: wait for a second one (a house number like 5 is fine)
@@ -955,7 +1052,7 @@ function myVillages(list) {
   $('lock').classList.add('hidden'); $('app').classList.add('hidden'); $('home').classList.remove('hidden');
   $('homeAdmin').classList.toggle('hidden', DEMO || savedLogin() !== 'tok:admin');   // superadmin and village admins
   $('homeOut').classList.toggle('hidden', DEMO);
-  $('homeActs').classList.toggle('hidden', !DEMO);   // the demo's villages: the video and a share button
+  $('demoActs').classList.toggle('hidden', !DEMO);   // the demo's villages: the video and a share button
   $('homeMsg').textContent = DEMO ? `डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} खोज बाकी`
     : list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
   homeList = list;
@@ -1031,7 +1128,7 @@ function homeLock(msg, info) {
   $('home').classList.add('hidden');
   $('lockSub').textContent = 'अपना पासवर्ड डालें';
   $('demoLink').classList.remove('hidden');   // the start page offers the demo to anyone without a password
-  $('howBtn').classList.remove('hidden');     // and a short video of the app in use (promo-*.mp4, made in demo-video/)
+  $('homeActs').classList.remove('hidden');   // and a short video of the app in use, and a share button
   showLock(msg, info);
 }
 $('homeOut').addEventListener('click', () => {
@@ -1053,8 +1150,7 @@ function setVillage(v) {
   $('vName').textContent = v.name;
   $('adminBtn').href = '/admin';   // one admin page for every village (the old /<village>/admin redirects there)
   for (const w of v.wards) $('qWard').add(new Option(`वार्ड ${w}`, w));
-  const m = document.createElement('link'); m.rel = 'manifest'; m.href = `/api/manifest?village=${v.slug}`;
-  document.head.append(m);
+  setManifest(`village=${v.slug}`);
 }
 
 // ---------- the demo: a random id kept on this phone stands in for a password; the server counts its searches ----------
@@ -1089,7 +1185,7 @@ function demoBar() {
       if (!name) { gaon.focus(); gaon.placeholder = 'पहले अपने गाँव का नाम लिखें'; return; }
       window.open(waLink(name), '_blank', 'noopener');
     });
-    const acts = el('div', 'acts'), how = el('button', null, '▶ वीडियो देखें'), share = el('button', 'share', '↗ शेयर करें');
+    const acts = el('div', 'homeacts'), how = el('button', null, '▶ वीडियो देखें'), share = el('button', 'share', '↗ शेयर करें');
     how.type = share.type = 'button';
     how.addEventListener('click', howOpen); share.addEventListener('click', shareOpen);
     acts.append(how, share);
@@ -1122,6 +1218,7 @@ async function openVillage(v) {
     if (!info.error) return openVillage(info.village);
     if (info.error !== 'no_village') return showLock(MSG[info.error] || MSG.server);
     HOME = true; history.replaceState(null, '', '/');   // unknown village address: go to the start page
+    setManifest('page=home');
   }
   // start page: log in first, then the villages of this login
   const k = savedLogin();
