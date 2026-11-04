@@ -176,9 +176,9 @@ devices. Changing `ADMIN_PASSWORD` in Vercel (and redeploying) signs out every s
 ## Phones (Android or iPhone)
 Open the village link, enter the password, keep "इस फ़ोन पर याद रखें" ticked. Optional: install it as an app with
 **📲 ऐप इंस्टॉल करें** (at the top of every page, and in the footer). Chrome and Edge
-(Android, laptops) open their own Install box; Safari on iPhone, iPad and Mac, and anything else, shows the steps for that
-device in Hindi (iPhone: Share → Add to Home Screen; Mac Safari: File → Add to Dock; Firefox on a laptop can't, so it says
-to use Chrome or Edge). Every page is its own app (`api/manifest.js`): a village page opens that village, the start page
+(Android, laptops) open their own Install box; elsewhere it shows the steps for that device only, in Hindi (Mac Safari:
+File → Add to Dock; Firefox on a laptop can't, so it says to use Chrome or Edge). iPhone and iPad get no button: no page
+can ask to be installed there, it is only Share → Add to Home Screen by hand. Every page is its own app (`api/manifest.js`): a village page opens that village, the start page
 `/` the start page, `/demo` the demo's list. The buttons hide when the page is opened from the icon. Needs internet every time.
 
 ## Updating voter data

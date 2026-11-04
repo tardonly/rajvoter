@@ -228,14 +228,12 @@
   /* install as an app: a button at the top of every page (and a link in the footer), and the steps */
   .topinstall { display: block; margin: 10px auto 0; padding: 7px 18px; border-radius: 999px; border: 1.5px solid var(--pink-dark);
     background: #fdf2f8; color: #9d174d; font-size: 15px; font-weight: 600; }
-  html.app .topinstall, html.app .footinstall { display: none !important; }   /* already opened as the app */
+  html.noinstall .topinstall, html.noinstall .footinstall { display: none !important; }   /* opened as the app, or iPhone/iPad */
   #installPop .card { max-width: 480px; }
   #installClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
   #installPop h3 { font-size: 15px; margin: 12px 0 4px; }
   #installPop ol { margin: 0; padding-left: 22px; font-size: 15.5px; line-height: 1.6; }
-  #installPop .mine ol { font-size: 17px; }
-  #installPop details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
-  #installPop summary { font-weight: 600; color: var(--accent); cursor: pointer; }
+  #installPop ol { font-size: 17px; }
   .footinstall { border: 0; background: none; padding: 0; font: inherit; color: var(--pink-dark); font-weight: 600; cursor: pointer; }
 
   /* footer: who made the app and how to reach them */
@@ -597,7 +595,7 @@ $('sharePop').addEventListener('click', (e) => { if (e.target === $('sharePop'))
 
 // ---------- install as an app (home screen, Dock, Start menu). Each page has its own app (api/manifest.js): a village
 // page opens that village, the start page the start page. Chrome and Edge (Android, laptops) offer their own "Install"
-// box, kept here for the button; Safari (iPhone, iPad, Mac) and the rest get the steps for their device. ----------
+// box, kept here for the button; Safari on a Mac and the rest get the steps for their device. ----------
 function setManifest(q) {
   let m = document.querySelector('link[rel=manifest]');
   if (!m) { m = document.createElement('link'); m.rel = 'manifest'; document.head.append(m); }
@@ -605,24 +603,22 @@ function setManifest(q) {
 }
 if (!SLUG || SLUG === DEMO_PICK) setManifest(SLUG ? 'page=demo' : 'page=home');
 const IN_APP = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: window-controls-overlay)').matches || navigator.standalone === true;
-document.documentElement.classList.toggle('app', IN_APP);   // opened from the icon: no install buttons
 let installPrompt = null;
 addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
-addEventListener('appinstalled', () => { installPrompt = null; document.documentElement.classList.add('app'); installClose(); });
+addEventListener('appinstalled', () => { installPrompt = null; document.documentElement.classList.add('noinstall'); installClose(); });
 const UA = navigator.userAgent;
 const DEVICE = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1) ? 'ios'
   : /Android/.test(UA) ? 'android'
   : /Macintosh/.test(UA) && /Safari\//.test(UA) && !/Chrome|Chromium|Edg\/|Firefox|OPR\//.test(UA) ? 'mac'
   : /Firefox\//.test(UA) ? 'firefox' : 'laptop';
+// no install button when opened from the icon, nor on iPhone and iPad: no page there can ask to be installed (only
+// Share → Add to Home Screen by hand, in every browser)
+document.documentElement.classList.toggle('noinstall', IN_APP || DEVICE === 'ios');
 const STEPS = {
   android: ['Android फ़ोन (Chrome)', [
     'ऊपर दाईं ओर मेनू <b>⋮</b> दबाएं',
     '<b>Add to Home screen</b> या <b>Install app</b> (होम स्क्रीन में जोड़ें) चुनें',
     '<b>Install</b> दबाएं — होम स्क्रीन पर मतदाता खोज का आइकन आ जाएगा']],
-  ios: ['iPhone / iPad (Safari या Chrome)', [
-    'शेयर बटन <b>□↑</b> दबाएं (Safari में नीचे, Chrome में ऊपर)',
-    'नीचे स्क्रॉल करके <b>Add to Home Screen</b> (होम स्क्रीन में जोड़ें) चुनें',
-    '<b>Add</b> दबाएं — होम स्क्रीन पर मतदाता खोज का आइकन आ जाएगा']],
   laptop: ['लैपटॉप / कंप्यूटर (Chrome या Edge)', [
     'Chrome: पता बार में दाईं ओर इंस्टॉल आइकन <b>⊕</b> दबाएं, या मेनू <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>',
     'Edge: मेनू <b>…</b> → <b>Apps</b> → <b>Install this site as an app</b>',
@@ -642,8 +638,7 @@ async function installOpen() {
   const mine = DEVICE === 'firefox'
     ? '<h3>Firefox</h3><ol><li>Firefox में ऐप इंस्टॉल नहीं होता: यह पेज <b>Chrome</b> या <b>Edge</b> में खोलें</li><li>फिर से <b>📲 ऐप इंस्टॉल करें</b> दबाएं</li></ol>'
     : stepsHtml(DEVICE);
-  const others = Object.keys(STEPS).filter((k) => k !== DEVICE).map(stepsHtml).join('');
-  $('installBody').innerHTML = `<div class="mine">${mine}</div><details><summary>दूसरे फ़ोन या लैपटॉप पर कैसे करें</summary>${others}</details>`;
+  $('installBody').innerHTML = mine;   // this device's steps only
   $('installPop').classList.remove('hidden');
 }
 function installClose() { $('installPop').classList.add('hidden'); }
