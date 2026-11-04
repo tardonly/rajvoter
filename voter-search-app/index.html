@@ -104,6 +104,28 @@
   .prog .c-done { color: #15803d; } .prog .c-coming { color: #854d0e; } .prog .c-absent { color: #b91c1c; }
   .pmeter { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
   .pmeter i { display: block; } .pmeter .done { background: #16a34a; } .pmeter .coming { background: #facc15; } .pmeter .absent { background: #dc2626; }
+  /* मतदाता सूची: the voters behind the report's numbers, by mark, in the same kind of popup */
+  #listBtn { border: 1px solid #93c5fd; background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+  .prog td.go { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .lpick { display: flex; gap: 6px; }
+  .lpick select { flex: 1; padding: 8px 10px; font-size: 15px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+  .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 4px; }
+  .chips button { padding: 8px 2px; border-radius: 10px; border: 1.5px solid; background: #fff; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+  .chips button b { display: block; font-size: 18px; }
+  .chips .done { border-color: #16a34a; color: #15803d; } .chips .coming { border-color: #ca8a04; color: #854d0e; }
+  .chips .absent { border-color: #dc2626; color: #b91c1c; } .chips .none { border-color: #9ca3af; color: #374151; }
+  .chips .done.on { background: #16a34a; color: #fff; } .chips .coming.on { background: #facc15; color: #422006; }
+  .chips .absent.on { background: #dc2626; color: #fff; } .chips .none.on { background: #4b5563; color: #fff; }
+  .voter { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid #eee; }
+  .voter:first-child { border-top: 0; }
+  .voter .no { flex: none; width: 54px; font-size: 12px; color: var(--muted); line-height: 1.3; font-variant-numeric: tabular-nums; }
+  .voter .no b { display: block; font-size: 17px; color: var(--ink); }
+  .voter .nm { font-weight: 600; font-size: 15.5px; }
+  .voter .nm span { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 4px; }
+  .voter .info { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .voter .c-done { color: #15803d; } .voter .c-coming { color: #854d0e; } .voter .c-absent { color: #b91c1c; }
+  .lempty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  #listMore { width: 100%; margin-top: 8px; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px; font-size: 14px; font-weight: 600; }
   #adminBtn { border-radius: 8px; padding: 4px 10px; font-size: 13px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
   .fields { display: grid; gap: 6px; }
   .fields input, .fields select { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
@@ -243,6 +265,23 @@
   </div>
 </div>
 
+<div id="listPop" class="progpop hidden" role="dialog" aria-label="मतदाता सूची">
+  <div class="card">
+    <div class="head"><h2>मतदाता सूची</h2>
+      <span><button id="listReload" type="button">↻ रिफ्रेश</button> <button id="listClose" type="button" aria-label="बंद करें">✕</button></span></div>
+    <div class="lpick"><select id="listWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select></div>
+    <div class="chips" id="listStatus">
+      <button type="button" class="done" data-s="done">वोट दिया <b>0</b></button>
+      <button type="button" class="coming" data-s="coming">आ रहे हैं <b>0</b></button>
+      <button type="button" class="absent" data-s="absent">वोटर नहीं है <b>0</b></button>
+      <button type="button" class="none" data-s="none">बाकी <b>0</b></button>
+    </div>
+    <div id="listBody"></div>
+    <button id="listMore" class="hidden" type="button">और दिखाएं</button>
+    <div class="note" id="listNote"></div>
+  </div>
+</div>
+
 <section id="home" class="hidden">
   <div class="lockbox">
     <div class="homebar"><a id="homeAdmin" class="hidden" href="/admin">एडमिन</a><button id="homeOut" type="button">लॉग आउट</button></div>
@@ -261,7 +300,7 @@
 <section id="app" class="hidden">
   <header>
     <div class="titlebar"><b><span class="appname">मतदाता खोज · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -341,6 +380,7 @@ const MSG = {
   not_found: 'यह मतदाता नहीं मिला', deleted: 'यह मतदाता सूची से हटाया गया है — निशान नहीं लग सकता',
   no_mark: 'निशान लगाने की अनुमति नहीं है — एडमिन से पूछें',
   no_progress: 'प्रगति देखने की अनुमति नहीं है — एडमिन से पूछें',
+  no_list: 'मतदाता सूची देखने की अनुमति नहीं है — एडमिन से पूछें',
   no_pdf: 'पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें',
   no_ward_list: 'पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें',
 };
@@ -379,7 +419,7 @@ function showApp(name, admin, villages, perms, cand) {
   $('who').textContent = (name ? `उपयोगकर्ता: ${name}` : '') + (cand ? ` · उम्मीदवार: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
-  IS_ADMIN = !!admin; wardButton(); progButton();
+  IS_ADMIN = !!admin; wardButton(); progButton(); listButton();
   if (DEMO) {   // ← वापस: back to the start page; गाँव बदलें: back to the demo's villages
     $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); $('switchBtn').href = '/demo'; demoBar();
   }
@@ -486,7 +526,7 @@ async function search(more = false, force = false) {
 function updatePerms(p) {
   if (IS_ADMIN || p.join() === PERMS.join()) return;
   PERMS = p;
-  wardButton(); progButton();
+  wardButton(); progButton(); listButton();
   if (shown) search(false, true);   // redraw the slips with the right buttons
 }
 
@@ -656,8 +696,13 @@ async function progLoad() {
     for (const w of [...g.wards, sum]) {
       const tr = el('tr', w === sum ? 'sum' : null);
       tr.append(el('td', null, w === sum ? 'कुल' : `वार्ड ${w.ward}`), el('td', null, w.total));
-      for (const k of ['done', 'coming', 'absent']) tr.append(el('td', `c-${k}`, w[k]));
-      tr.append(el('td', null, w.total - w.done - w.coming - w.absent));
+      // with the "list" permission a tap on a number opens those voters in the मतदाता सूची (own group's marks only)
+      const tap = can('list') && !(IS_ADMIN && g.candName);   // an admin's list is the village's own marks
+      for (const [k, n] of [['done', w.done], ['coming', w.coming], ['absent', w.absent], ['none', w.total - w.done - w.coming - w.absent]]) {
+        const c = el('td', `c-${k}${tap && n ? ' go' : ''}`, n);
+        if (tap && n) c.addEventListener('click', () => listOpen(w === sum ? '' : w.ward, k));
+        tr.append(c);
+      }
       const bar = el('tr', 'mrow'), td = el('td'), m = el('div', 'pmeter'); td.colSpan = 6;
       for (const k of ['done', 'coming', 'absent']) { const i = el('i', k); i.style.width = `${(100 * w[k]) / (w.total || 1)}%`; m.append(i); }
       td.append(m); bar.append(td); tb.append(tr, bar);
@@ -673,6 +718,77 @@ $('progClose').addEventListener('click', progClose);
 $('progPop').addEventListener('click', (e) => { if (e.target === $('progPop')) progClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') progClose(); });
 setInterval(() => { if (!document.hidden && !$('progPop').classList.contains('hidden')) progLoad(); }, 60000);
+
+// ---------- मतदाता सूची: voters by mark (वोट दिया / आ रहे हैं / वोटर नहीं है / बाकी), 100 at a time, as on the admin
+// page; for admins and people with the "list" permission (not in the demo) ----------
+const MARK_NAME = { done: 'वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
+const ls = { status: 'done', rows: [], seq: 0 };
+function listButton() {
+  const ok = !DEMO && can('list');
+  $('listBtn').classList.toggle('hidden', !ok);
+  if (!ok) listClose();
+}
+function listCounts(wards) {   // the numbers on the four buttons and the ward choices, from the server's per-ward counts
+  const keep = $('listWard').value;
+  $('listWard').length = 1;
+  for (const w of wards) $('listWard').add(new Option(`वार्ड ${w.ward}`, w.ward));
+  $('listWard').value = wards.some((w) => String(w.ward) === keep) ? keep : '';
+  const n = { done: 0, coming: 0, absent: 0, none: 0 };
+  for (const w of wards) {
+    if ($('listWard').value && String(w.ward) !== $('listWard').value) continue;
+    n.done += w.done; n.coming += w.coming; n.absent += w.absent; n.none += w.total - w.done - w.coming - w.absent;
+  }
+  document.querySelectorAll('#listStatus button').forEach((b) => {
+    b.querySelector('b').textContent = n[b.dataset.s];
+    b.classList.toggle('on', b.dataset.s === ls.status);
+  });
+}
+function listRow(x) {
+  const row = el('div', 'voter'), no = el('div', 'no'), body = el('div');
+  no.append(el('b', null, x.box), `वार्ड ${x.ward}`);
+  const nm = el('div', 'nm', x.hname || x.name);
+  if (x.hname && x.name) nm.append(el('span', null, x.name));
+  body.append(nm, el('div', 'info', [x.hrel && `${x.rel || 'पिता/पति'}: ${x.hrel}`, x.house && `मकान ${x.house}`,
+    x.age && `आयु ${x.age}`, x.sex].filter(Boolean).join(' · ')));
+  if (ls.status !== 'none' && (x.by || x.at)) {
+    const at = x.at ? new Date(x.at).toLocaleString('hi-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    body.append(el('div', `info c-${ls.status}`, [MARK_NAME[ls.status], x.by, at].filter(Boolean).join(' · ')));
+  }
+  row.append(no, body);
+  return row;
+}
+async function listLoad(more) {
+  const seq = ++ls.seq, offset = more ? ls.rows.length : 0;
+  $('listMore').disabled = true; $('listNote').textContent = '';
+  if (!more) $('listBody').replaceChildren(el('div', 'lempty', 'आ रहा है…'));
+  const r = await api('progress', { token: token(), status: ls.status, ward: $('listWard').value, offset });
+  if (seq !== ls.seq) return;   // a newer choice was made meanwhile
+  $('listMore').disabled = false;
+  if (r.error) { $('listNote').textContent = MSG[r.error] || MSG.server; if (!more) $('listBody').innerHTML = ''; return; }
+  listCounts(r.wards);
+  ls.rows = more ? ls.rows.concat(r.rows) : r.rows;
+  if (!more) $('listBody').innerHTML = '';
+  if (!ls.rows.length) $('listBody').append(el('div', 'lempty', ls.status === 'none' ? 'सब पर्चियों पर निशान लग गए हैं' : 'इस रंग का कोई निशान नहीं'));
+  for (const x of r.rows) $('listBody').append(listRow(x));
+  $('listMore').classList.toggle('hidden', !r.more);
+  if (r.more) $('listMore').textContent = `और दिखाएं (${r.total - ls.rows.length} बाकी)`;
+}
+function listOpen(ward, status) {
+  progClose();
+  if (status) ls.status = status;
+  if (ward !== undefined) { if (![...$('listWard').options].some((o) => o.value === String(ward))) $('listWard').add(new Option(`वार्ड ${ward}`, ward)); $('listWard').value = ward; }
+  $('listPop').classList.remove('hidden');
+  listLoad();
+}
+function listClose() { $('listPop').classList.add('hidden'); }
+$('listBtn').addEventListener('click', () => listOpen());
+$('listReload').addEventListener('click', () => listLoad());
+$('listClose').addEventListener('click', listClose);
+$('listMore').addEventListener('click', () => listLoad(true));
+$('listWard').addEventListener('change', () => listLoad());
+document.querySelectorAll('#listStatus button').forEach((b) => b.addEventListener('click', () => { ls.status = b.dataset.s; listLoad(); }));
+$('listPop').addEventListener('click', (e) => { if (e.target === $('listPop')) listClose(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') listClose(); });
 
 function wardButton() {
   const w = $('qWard').value;

@@ -26,6 +26,11 @@ only receive the cards that match a search. Every search checks that the user's 
     see **एडमिन**) opens the per-ward table (**↻ रिफ्रेश** reloads it, **✕** closes it): कुल, वोट दिया, आ रहे, वोटर नहीं, बाकी, with a coloured bar per ward. A
     candidate's worker sees only that candidate's marks; others see the village's own marks. Admins always have the
     button and see the village's own marks plus each candidate's. Not in the demo.
+  - **मतदाता सूची देख सकते हैं** — a blue **मतदाता सूची** button next to it opens the same list as the admin page's
+    मतदाता सूची tab: the voters marked वोट दिया / आ रहे हैं / वोटर नहीं है or still बाकी, all wards or one, with who
+    marked them and when, 100 at a time (**और दिखाएं**). A tap on a number in the वोटर रिपोर्ट table opens those
+    voters. Same groups as the report: a candidate's worker sees only that candidate's marks; an admin, the village's
+    own. Not in the demo.
 
   New users (and users added before these boxes existed) start with only **पर्ची प्रिंट**. A change reaches the
   person's phone on their next search, or within a minute. Admins and the superadmin can always do everything.

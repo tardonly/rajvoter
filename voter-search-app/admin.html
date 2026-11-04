@@ -564,7 +564,7 @@ $('vsReload').addEventListener('click', () => { refresh(); loadVoters(); });
 
 // what a user may do besides searching by name (the server checks these on every request)
 const PERM_NAME = { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट',
-  progress: 'वार्ड अनुसार प्रगति देख सकते हैं' };
+  progress: 'वार्ड अनुसार प्रगति देख सकते हैं', list: 'मतदाता सूची देख सकते हैं' };
 function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
   for (const [p, label] of Object.entries(PERM_NAME)) {

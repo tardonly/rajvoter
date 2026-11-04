@@ -191,7 +191,8 @@ async function whoIs(token, slug) {
 // person. Admins and the superadmin can do all of them.
 //   mark: set status marks on slips · ward: list a whole ward without a name · wardPdf: print / save a whole ward's
 //   slips · print: the प्रिंट / PDF button on a slip
-const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress'];   // progress: वार्ड अनुसार प्रगति in the app (api/progress.js)
+const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress', 'list'];   // progress: वार्ड अनुसार प्रगति in the app,
+// list: its मतदाता सूची (voters by mark) — both api/progress.js
 const DEFAULT_PERMS = ['print'];   // for new users, and users added before permissions existed
 const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
 // today's date in India, for the per-person daily search count

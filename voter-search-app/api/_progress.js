@@ -1,4 +1,5 @@
-// Marks per ward (वार्ड अनुसार प्रगति), shared by the admin page (api/admin.js) and the app (api/progress.js).
+// Marks per ward (वार्ड अनुसार प्रगति) and the voters behind them (मतदाता सूची), shared by the admin page (api/admin.js)
+// and the app (api/progress.js).
 const { load } = require('./_search.js');
 const { village, MARKS, allMarks, markHash, getCand, redis } = require('./_lib.js');
 
@@ -28,6 +29,26 @@ async function markSummary(slug, cand, all) {
     wards: Object.values(perWard).sort((a, b) => a.ward - b.ward), backup };
 }
 
+// मतदाता सूची: voters of a village (of one candidate's group) carrying a mark ('done' | 'coming' | 'absent') or none yet
+// ('none'), in ward and box order, LIST_PAGE at a time from offset; null for an unknown status
+const LIST_PAGE = 100;
+async function markedList(slug, candId, status, ward, offset) {
+  if (status !== 'none' && !MARKS.includes(status)) return null;
+  const all = await allMarks(slug, candId);
+  const want = (r) => {
+    const m = all[`${r.ward}:${r.box}`];
+    return status === 'none' ? !(m && MARKS.includes(m.m)) : !!m && m.m === status;
+  };
+  const hits = load(slug).rows.filter((r) => !r.del && (!ward || String(r.ward) === String(ward)) && want(r))
+    .sort((x, y) => x.ward - y.ward || x.box - y.box);
+  const from = Math.max(0, Number(offset) || 0);
+  const rows = hits.slice(from, from + LIST_PAGE).map(({ ward: w, box, hname, name, hrel, relname, rel, house, age, sex }) => {
+    const m = all[`${w}:${box}`];
+    return { ward: w, box, hname, name, hrel, relname, rel, house, age, sex, by: m ? m.by : '', at: m ? m.at : '' };
+  });
+  return { total: hits.length, more: from + rows.length < hits.length, rows };
+}
+
 // the candidates of these villages, oldest first
 async function candsOf(slugs) {
   const ids = (await redis('SMEMBERS', 'cands')) || [];
@@ -37,4 +58,4 @@ async function candsOf(slugs) {
 // every mark group of these villages: the village's own marks ({id: ''}) and then each of its candidates
 const groupsOf = (slugs, cands) => slugs.flatMap((s) => [{ slug: s, cand: { id: '' } }, ...cands.filter((c) => c.village === s).map((c) => ({ slug: s, cand: c }))]);
 
-module.exports = { markSummary, candsOf, groupsOf };
+module.exports = { markSummary, markedList, candsOf, groupsOf };

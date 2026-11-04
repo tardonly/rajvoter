@@ -10,14 +10,14 @@
 //   action "retire", id         → {ok}               (password stops working; the phone is logged out at once)
 //   action "logout", id         → {ok}               (ends the person's current session; they can log in again)
 //   action "phone",  id, phone  → {user}             (add or change the person's WhatsApp number; "" removes it)
-//   action "perms",  id, perms  → {user}             (what a user may do: any of 'mark', 'ward', 'wardPdf', 'print')
+//   action "perms",  id, perms  → {user}             (what a user may do: any of PERMS in _lib.js)
 //   action "limit",  id, limit  → {user}             (searches a user may start per day; 0 or '' = the default)
 //   action "extra",  id [, n]   → {user}             (n more searches, default 100, for today only)
 //   action "clearMarks", village [, cand], status → {progress}   (removes every 'done' | 'coming' | 'absent' mark of the
 //                                         village (of that candidate's group), or 'all' of them; kept as a backup first)
 //   action "restoreMarks", village [, cand]       → {progress}   (puts back the marks removed by the last clearMarks)
 //   action "marked", village [, cand], status [, ward, offset] → {total, more, rows}   voters carrying a mark ('done' |
-//                                         'coming' | 'absent') or none yet ('none'), in ward and box order, LIST_PAGE at a time
+//                                         'coming' | 'absent') or none yet ('none'), in ward and box order, 100 at a time
 //   action "cand_add", village, name → {cand}   new candidate (उम्मीदवार) of one village: a group of its users whose marks
 //                                         only they see (see markHash in _lib.js)
 //   action "cand_delete", cand       → {ok}     removes the candidate and its marks; its users go back to the village's marks
@@ -31,8 +31,7 @@
 // The password is shown to the admin once; only its hash is stored.
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
-const { load } = require('./_search.js');
-const { markSummary, candsOf, groupsOf } = require('./_progress.js');
+const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
 const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
@@ -53,9 +52,6 @@ function villageSlugs(list) {
   const ok = [...new Set((Array.isArray(list) ? list : []).filter((s) => realVillage(s)))];
   return ok.length ? ok : null;
 }
-
-const LIST_PAGE = 100;   // voters per page in the "marked" list
-
 
 async function freshPassword() {
   for (;;) {
@@ -120,20 +116,9 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'marked') {
     const g = await groupOf();
     if (g.error) return send(res, g.error[0], { error: g.error[1] });
-    if (b.status !== 'none' && !MARKS.includes(b.status)) return send(res, 400, { error: 'bad_mark' });
-    const all = await allMarks(b.village, g.cand.id);
-    const want = (r) => {
-      const m = all[`${r.ward}:${r.box}`];
-      return b.status === 'none' ? !(m && MARKS.includes(m.m)) : !!m && m.m === b.status;
-    };
-    const hits = load(b.village).rows.filter((r) => !r.del && (!b.ward || String(r.ward) === String(b.ward)) && want(r))
-      .sort((x, y) => x.ward - y.ward || x.box - y.box);
-    const offset = Math.max(0, Number(b.offset) || 0);
-    const rows = hits.slice(offset, offset + LIST_PAGE).map(({ ward, box, hname, name, hrel, relname, rel, house, age, sex }) => {
-      const m = all[`${ward}:${box}`];
-      return { ward, box, hname, name, hrel, relname, rel, house, age, sex, by: m ? m.by : '', at: m ? m.at : '' };
-    });
-    return send(res, 200, { total: hits.length, more: offset + rows.length < hits.length, rows });
+    const list = await markedList(b.village, g.cand.id, b.status, b.ward, b.offset);
+    if (!list) return send(res, 400, { error: 'bad_mark' });
+    return send(res, 200, list);
   }
 
   if (b.action === 'clearMarks' || b.action === 'restoreMarks') {
