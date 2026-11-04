@@ -70,6 +70,8 @@
   #switchBtn { display: inline-block; margin-left: 8px; vertical-align: 2px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 1px 8px; font-size: 12.5px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
   @media (max-width: 480px) { .titlebar .appname { display: none; } }   /* phones: village name and its button on one line */
+  #backBtn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px;
+    color: var(--ink); text-decoration: none; font-weight: 600; white-space: nowrap; }
   #adminBtn { border-radius: 8px; padding: 4px 10px; font-size: 13px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
   .fields { display: grid; gap: 6px; }
   .fields input, .fields select { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
@@ -210,7 +212,7 @@
 <section id="app" class="hidden">
   <header>
     <div class="titlebar"><b><span class="appname">मतदाता खोज · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / बॉक्स नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -325,7 +327,7 @@ function showApp(name, admin, villages, perms) {
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
   IS_ADMIN = !!admin; wardButton();
-  if (DEMO) { $('who').textContent = ''; $('lockBtn').classList.add('hidden'); demoBar(); }
+  if (DEMO) { $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); demoBar(); }   // back to the start page
   $('lock').classList.add('hidden'); $('app').classList.remove('hidden');
   search(false, true);
 }
@@ -634,7 +636,8 @@ function myVillages(list) {
 function savedLogin() {
   if (store.get('tok:admin')) return 'tok:admin';
   try {
-    for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) if (/^tok:/.test(s.key(i))) return s.key(i);
+    // the demo's login (tok:demo) is not a password login: the start page ignores it
+    for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) if (/^tok:/.test(s.key(i)) && s.key(i) !== 'tok:demo') return s.key(i);
   } catch (e) {}
   return null;
 }
