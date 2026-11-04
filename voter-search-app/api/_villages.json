@@ -23,6 +23,81 @@
   "panchayatSamiti": "श्रीडूंगरगढ़",
   "district": "बीकानेर"
  },
+ "adsisar": {
+  "name": "अड़सीसर",
+  "title": "ग्राम पंचायत अड़सीसर",
+  "ps": 3,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 705,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "amarsar": {
+  "name": "अमरसर",
+  "title": "ग्राम पंचायत अमरसर",
+  "ps": 2,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 612,
+  "deleted": 1,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "asasar": {
+  "name": "आसासर",
+  "title": "ग्राम पंचायत आसासर",
+  "ps": 4,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 441,
+  "deleted": 1,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "aspalsar-bara": {
+  "name": "आसपालसर बड़ा",
+  "title": "ग्राम पंचायत आसपालसर बड़ा",
+  "ps": 13,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 714,
+  "deleted": 6,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "badela": {
+  "name": "बाडेला",
+  "title": "ग्राम पंचायत बाडेला",
+  "ps": 17,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 532,
+  "deleted": 5,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
  "baijasar-rajalwara": {
   "name": "बैजासर",
   "title": "ग्राम पंचायत बैजासर",
@@ -40,6 +115,246 @@
   ],
   "voters": 1867,
   "deleted": 806,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bana": {
+  "name": "बाना",
+  "title": "ग्राम पंचायत बाना",
+  "ps": 4,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 695,
+  "deleted": 11,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "bandhnau-dikhanada": {
+  "name": "बन्धनाऊ दिखणादा",
+  "title": "ग्राम पंचायत बन्धनाऊ दिखणादा",
+  "ps": 6,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 516,
+  "deleted": 8,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bandhnau-uttarada": {
+  "name": "बंधनाऊ उत्तरादा",
+  "title": "ग्राम पंचायत बंधनाऊ उत्तरादा",
+  "ps": 6,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 573,
+  "deleted": 13,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bapeu": {
+  "name": "बापेऊ",
+  "title": "ग्राम पंचायत बापेऊ",
+  "ps": 12,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 517,
+  "deleted": 10,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "barjangsar": {
+  "name": "बरजांगसर",
+  "title": "ग्राम पंचायत बरजांगसर",
+  "ps": 15,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 616,
+  "deleted": 0,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "beekamsara": {
+  "name": "बीकमसरा",
+  "title": "ग्राम पंचायत बीकमसरा",
+  "ps": 8,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 599,
+  "deleted": 8,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "benisar": {
+  "name": "बेनीसर",
+  "title": "ग्राम पंचायत बेनीसर",
+  "ps": 14,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 806,
+  "deleted": 19,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "bhadasar-dikhnada": {
+  "name": "भादासर दिखणादा",
+  "title": "ग्राम पंचायत भादासर दिखणादा",
+  "ps": 5,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 608,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bhadasar-uttarada": {
+  "name": "भादासर उत्तरादा",
+  "title": "ग्राम पंचायत भादासर उत्तरादा",
+  "ps": 4,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 728,
+  "deleted": 6,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bhimwsar": {
+  "name": "भींवसर",
+  "title": "ग्राम पंचायत भींवसर",
+  "ps": 9,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 405,
+  "deleted": 3,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bhojoosar-upadhiyan": {
+  "name": "भोजूसर उपाधियान",
+  "title": "ग्राम पंचायत भोजूसर उपाधियान",
+  "ps": 5,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 449,
+  "deleted": 10,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bhojrasar": {
+  "name": "भोजरासर",
+  "title": "ग्राम पंचायत भोजरासर",
+  "ps": 13,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 564,
+  "deleted": 13,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "bigga": {
+  "name": "बिग्गा",
+  "title": "ग्राम पंचायत बिग्गा",
+  "ps": 16,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 816,
+  "deleted": 19,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "bigga-ramsara": {
+  "name": "बिग्गा बास रामसरा",
+  "title": "ग्राम पंचायत बिग्गा बास रामसरा",
+  "ps": 17,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 585,
+  "deleted": 48,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "binjhasar": {
+  "name": "बींझासर",
+  "title": "ग्राम पंचायत बींझासर",
+  "ps": 10,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 580,
+  "deleted": 4,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "bukansar-chhota": {
+  "name": "बुकनसर छोटा",
+  "title": "ग्राम पंचायत बुकनसर छोटा",
+  "ps": 9,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 584,
+  "deleted": 8,
   "panchayatSamiti": "सरदारशहर",
   "district": "चुरू"
  },
@@ -62,6 +377,696 @@
   "deleted": 20,
   "panchayatSamiti": "सरदारशहर",
   "district": "चुरू"
+ },
+ "delwan": {
+  "name": "डेलवां",
+  "title": "ग्राम पंचायत डेलवां",
+  "ps": 8,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 666,
+  "deleted": 25,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "derajsar": {
+  "name": "देराजसर",
+  "title": "ग्राम पंचायत देराजसर",
+  "ps": 8,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 647,
+  "deleted": 0,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "dhaneru": {
+  "name": "धनेरू",
+  "title": "ग्राम पंचायत धनेरू",
+  "ps": 16,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 657,
+  "deleted": 0,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "dhani-panchera": {
+  "name": "ढाणी पाँचेरा",
+  "title": "ग्राम पंचायत ढाणी पाँचेरा",
+  "ps": 11,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 635,
+  "deleted": 22,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "dharmas": {
+  "name": "धर्मास",
+  "title": "ग्राम पंचायत धर्मास",
+  "ps": 1,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 280,
+  "deleted": 23,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "dheerdesar-chotiyan": {
+  "name": "धीरदेसर चोटियान",
+  "title": "ग्राम पंचायत धीरदेसर चोटियान",
+  "ps": 19,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 661,
+  "deleted": 23,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "dheerdesar-purohitan": {
+  "name": "धीरदेसर पुरोहितान",
+  "title": "ग्राम पंचायत धीरदेसर पुरोहितान",
+  "ps": 4,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 496,
+  "deleted": 9,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "dulchasar": {
+  "name": "दुलचासर",
+  "title": "ग्राम पंचायत दुलचासर",
+  "ps": 7,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 715,
+  "deleted": 13,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "dusarna-pandreekji": {
+  "name": "दुसारणा पण्डरीकजी",
+  "title": "ग्राम पंचायत दुसारणा पण्डरीकजी",
+  "ps": 6,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 462,
+  "deleted": 15,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "gajusar": {
+  "name": "गाजूसर",
+  "title": "ग्राम पंचायत गाजूसर",
+  "ps": 11,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 567,
+  "deleted": 7,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "ghadsisar": {
+  "name": "घड़सीसर",
+  "title": "ग्राम पंचायत घड़सीसर",
+  "ps": 2,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 745,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "gidgichia": {
+  "name": "गिड़गिचिया",
+  "title": "ग्राम पंचायत गिड़गिचिया",
+  "ps": 13,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 490,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "gopalsar": {
+  "name": "गोपालसर",
+  "title": "ग्राम पंचायत गोपालसर",
+  "ps": 7,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 428,
+  "deleted": 9,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "gusainsar-bada": {
+  "name": "गुसाईंसर बड़ा",
+  "title": "ग्राम पंचायत गुसाईंसर बड़ा",
+  "ps": 9,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 805,
+  "deleted": 34,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "hariyasar-gharsotan": {
+  "name": "हरियासर घड़सोतान",
+  "title": "ग्राम पंचायत हरियासर घड़सोतान",
+  "ps": 9,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 443,
+  "deleted": 8,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "hemasar": {
+  "name": "हेमासर",
+  "title": "ग्राम पंचायत हेमासर",
+  "ps": 14,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 507,
+  "deleted": 7,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "indpalsar-bada": {
+  "name": "इन्दपालसर बड़ा",
+  "title": "ग्राम पंचायत इन्दपालसर बड़ा",
+  "ps": 1,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 418,
+  "deleted": 8,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "indpalsar-gusainsar": {
+  "name": "इन्दपालसर गुसाईंसर",
+  "title": "ग्राम पंचायत इन्दपालसर गुसाईंसर",
+  "ps": 2,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 727,
+  "deleted": 0,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "indpalsar-sankhlan": {
+  "name": "इन्दपालसर सांखलान",
+  "title": "ग्राम पंचायत इन्दपालसर सांखलान",
+  "ps": 1,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 522,
+  "deleted": 1,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "jaisalsar": {
+  "name": "जैसलसर",
+  "title": "ग्राम पंचायत जैसलसर",
+  "ps": 15,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 522,
+  "deleted": 24,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "jaisangsar": {
+  "name": "जयसंगसर",
+  "title": "ग्राम पंचायत जयसंगसर",
+  "ps": 10,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 607,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "jaitasar": {
+  "name": "जैतासर",
+  "title": "ग्राम पंचायत जैतासर",
+  "ps": 6,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 626,
+  "deleted": 10,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "jakhasar": {
+  "name": "जाखासर",
+  "title": "ग्राम पंचायत जाखासर",
+  "ps": 14,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 673,
+  "deleted": 18,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "jakhasar-bhomsinghavtan": {
+  "name": "जाखासर भोमसिंहावतान",
+  "title": "ग्राम पंचायत जाखासर भोमसिंहावतान",
+  "ps": 14,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 366,
+  "deleted": 94,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "jalabsar": {
+  "name": "जालबसर",
+  "title": "ग्राम पंचायत जालबसर",
+  "ps": 7,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 609,
+  "deleted": 6,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "jodhasar": {
+  "name": "जोधासर",
+  "title": "ग्राम पंचायत जोधासर",
+  "ps": 13,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 782,
+  "deleted": 53,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "kalyansar": {
+  "name": "कल्याणसर",
+  "title": "ग्राम पंचायत कल्याणसर",
+  "ps": 6,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 498,
+  "deleted": 11,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "kalyansar-naya": {
+  "name": "कल्याणसर नया",
+  "title": "ग्राम पंचायत कल्याणसर नया",
+  "ps": 10,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 679,
+  "deleted": 19,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "kanadwas": {
+  "name": "कानड़वास",
+  "title": "ग्राम पंचायत कानड़वास",
+  "ps": 12,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 707,
+  "deleted": 5,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "kanwalasar": {
+  "name": "कंवलासर",
+  "title": "ग्राम पंचायत कंवलासर",
+  "ps": 2,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 508,
+  "deleted": 1,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "keekasar": {
+  "name": "कीकासर",
+  "title": "ग्राम पंचायत कीकासर",
+  "ps": 1,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 763,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "keu": {
+  "name": "केऊ",
+  "title": "ग्राम पंचायत केऊ",
+  "ps": 14,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 539,
+  "deleted": 32,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "kitasar-bhatiyan": {
+  "name": "कितासर भाटियान",
+  "title": "ग्राम पंचायत कितासर भाटियान",
+  "ps": 18,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 526,
+  "deleted": 5,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "kitasar-bidawatan": {
+  "name": "कितासर बिदावतान",
+  "title": "ग्राम पंचायत कितासर बिदावतान",
+  "ps": 18,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 588,
+  "deleted": 19,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "kotasar": {
+  "name": "कोटासर",
+  "title": "ग्राम पंचायत कोटासर",
+  "ps": 9,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 390,
+  "deleted": 23,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "kunpalsar": {
+  "name": "कुनपालसर",
+  "title": "ग्राम पंचायत कुनपालसर",
+  "ps": 15,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 560,
+  "deleted": 16,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "kuntasar": {
+  "name": "कुन्तासर",
+  "title": "ग्राम पंचायत कुन्तासर",
+  "ps": 19,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 644,
+  "deleted": 21,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "lakhansar": {
+  "name": "लाखनसर",
+  "title": "ग्राम पंचायत लाखनसर",
+  "ps": 7,
+  "zp": 35,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 404,
+  "deleted": 7,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "lakhasar": {
+  "name": "लखासर",
+  "title": "ग्राम पंचायत लखासर",
+  "ps": 14,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 624,
+  "deleted": 25,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "likhmadesar": {
+  "name": "लिखमादेसर",
+  "title": "ग्राम पंचायत लिखमादेसर",
+  "ps": 2,
+  "zp": 35,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 713,
+  "deleted": 24,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "likhmisar-dikhnada": {
+  "name": "लिखमीसर दिखणादा",
+  "title": "ग्राम पंचायत लिखमीसर दिखणादा",
+  "ps": 11,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 435,
+  "deleted": 0,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "likhmisar-utrada": {
+  "name": "लिखमीसर उतरादा",
+  "title": "ग्राम पंचायत लिखमीसर उतरादा",
+  "ps": 10,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 709,
+  "deleted": 0,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "lodera": {
+  "name": "लोडेरा",
+  "title": "ग्राम पंचायत लोडेरा",
+  "ps": 8,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 505,
+  "deleted": 15,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "manakrasar": {
+  "name": "माणकरासर",
+  "title": "ग्राम पंचायत माणकरासर",
+  "ps": 10,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 524,
+  "deleted": 17,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "meetasar": {
+  "name": "मीतासर",
+  "title": "ग्राम पंचायत मीतासर",
+  "ps": 14,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 516,
+  "deleted": 8,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "mingsariya": {
+  "name": "मिंगसरिया",
+  "title": "ग्राम पंचायत मिंगसरिया",
+  "ps": 17,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 635,
+  "deleted": 23,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
  },
  "momasar": {
   "name": "मोमासर",
@@ -105,6 +1110,126 @@
   "panchayatSamiti": "श्रीडूंगरगढ़",
   "district": "बीकानेर"
  },
+ "pundalsar": {
+  "name": "पुंदलसर",
+  "title": "ग्राम पंचायत पुंदलसर",
+  "ps": 15,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 577,
+  "deleted": 13,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "punrasar": {
+  "name": "पूनरासर",
+  "title": "ग्राम पंचायत पूनरासर",
+  "ps": 11,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 712,
+  "deleted": 4,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "punusar": {
+  "name": "पुनुसर",
+  "title": "ग्राम पंचायत पुनुसर",
+  "ps": 15,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 379,
+  "deleted": 7,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "rajasar-beekan": {
+  "name": "राजासर बीकान",
+  "title": "ग्राम पंचायत राजासर बीकान",
+  "ps": 7,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 744,
+  "deleted": 3,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "rajedu": {
+  "name": "राजेडू",
+  "title": "ग्राम पंचायत राजेडू",
+  "ps": 11,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 566,
+  "deleted": 0,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "ramsisar-bhedwaliya": {
+  "name": "रामसीसर भेड़वालिया",
+  "title": "ग्राम पंचायत रामसीसर भेड़वालिया",
+  "ps": 14,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 645,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "ramsisar-chhajlaniya": {
+  "name": "रामसीसर छजलाणिया",
+  "title": "ग्राम पंचायत रामसीसर छजलाणिया",
+  "ps": 14,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 658,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "rangaisar": {
+  "name": "रंगाईसर",
+  "title": "ग्राम पंचायत रंगाईसर",
+  "ps": 15,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 640,
+  "deleted": 17,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
  "riri": {
   "name": "रीड़ी",
   "title": "ग्राम पंचायत रीड़ी",
@@ -138,6 +1263,261 @@
   ],
   "voters": 8008,
   "deleted": 125,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "samandsar": {
+  "name": "समन्दसर",
+  "title": "ग्राम पंचायत समन्दसर",
+  "ps": 10,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 616,
+  "deleted": 16,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "satleran": {
+  "name": "सातलेरां",
+  "title": "ग्राम पंचायत सातलेरां",
+  "ps": 15,
+  "zp": 38,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 503,
+  "deleted": 20,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "sattasar": {
+  "name": "सत्तासर",
+  "title": "ग्राम पंचायत सत्तासर",
+  "ps": 2,
+  "zp": 35,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 620,
+  "deleted": 12,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "sawantsar": {
+  "name": "सावंतसर",
+  "title": "ग्राम पंचायत सावंतसर",
+  "ps": 9,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 740,
+  "deleted": 15,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "sheruna": {
+  "name": "शेरूणा",
+  "title": "ग्राम पंचायत शेरूणा",
+  "ps": 12,
+  "zp": 37,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 582,
+  "deleted": 30,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "somasar": {
+  "name": "सोमासर",
+  "title": "ग्राम पंचायत सोमासर",
+  "ps": 3,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 428,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "soniyasar-mithiya": {
+  "name": "सोनियासर मीठीया",
+  "title": "ग्राम पंचायत सोनियासर मीठीया",
+  "ps": 13,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 556,
+  "deleted": 9,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "soniyasar-shivdansingh": {
+  "name": "सोनियासर शिवदानसिंह",
+  "title": "ग्राम पंचायत सोनियासर शिवदानसिंह",
+  "ps": 13,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 554,
+  "deleted": 2,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "sonpalsar": {
+  "name": "सोनपालसर",
+  "title": "ग्राम पंचायत सोनपालसर",
+  "ps": 1,
+  "zp": 4,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 566,
+  "deleted": 0,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "sudsar": {
+  "name": "सूडसर",
+  "title": "ग्राम पंचायत सूडसर",
+  "ps": 8,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 631,
+  "deleted": 14,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "surjansar": {
+  "name": "सुरजनसर",
+  "title": "ग्राम पंचायत सुरजनसर",
+  "ps": 4,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 518,
+  "deleted": 29,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "teu": {
+  "name": "टेऊ",
+  "title": "ग्राम पंचायत टेऊ",
+  "ps": 8,
+  "zp": 41,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 605,
+  "deleted": 58,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
+ },
+ "thukariyasar": {
+  "name": "ठुकरियासर",
+  "title": "ग्राम पंचायत ठुकरियासर",
+  "ps": 5,
+  "zp": 35,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 622,
+  "deleted": 15,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "toliyasar": {
+  "name": "तोलियासर",
+  "title": "ग्राम पंचायत तोलियासर",
+  "ps": 6,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 537,
+  "deleted": 55,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "udrasar": {
+  "name": "उदरासर",
+  "title": "ग्राम पंचायत उदरासर",
+  "ps": 7,
+  "zp": 36,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 620,
+  "deleted": 18,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
+ "udsar-lodera": {
+  "name": "उड़सर लोडेरा",
+  "title": "ग्राम पंचायत उड़सर लोडेरा",
+  "ps": 10,
+  "zp": 6,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 656,
+  "deleted": 2,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
+ },
+ "upani": {
+  "name": "ऊपनी",
+  "title": "ग्राम पंचायत ऊपनी",
+  "ps": 5,
+  "zp": 40,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
+  "wards": [
+   1,
+   2
+  ],
+  "voters": 700,
+  "deleted": 15,
   "panchayatSamiti": "रीड़ी",
   "district": "बीकानेर"
  }

@@ -35,15 +35,17 @@ for f, v in sorted(cards.items(), key=lambda kv: int(kv[1]['info']['ward'])):
     names = {(n['section'], n['box']): n for n in json.load(open(os.path.join(T, 'names', f'w{w}.json')))}
     kendra = BOOTH[info['booth']]
     main = {c['box']: c for c in cs if c['section'] == 'main'}
-    for c in cs:
-        if c['section'] == 'correction': main[c['box']] = c
+    fixed = {c['box']: c for c in cs if c['section'] == 'correction'}   # a correction can replace a main card or an addition
+    added = [fixed.get(c['box'], c) for c in cs if c['section'] == 'addition']
+    main.update((b, c) for b, c in fixed.items() if b in main)
     deleted = {c['box']: c['mark'] or 'S' for c in cs if c['section'] == 'deletion'}   # box → E / S / R
-    final = [c for b, c in sorted(main.items()) if b not in deleted] + [c for c in cs if c['section'] == 'addition']
-    listed = sorted(main.values(), key=lambda c: c['box']) + [c for c in cs if c['section'] == 'addition']   # with the deleted
+    # box numbers run on through the additions, so a voter added and then struck off is in the deletion supplement too
+    final = [c for b, c in sorted(main.items()) if b not in deleted] + [c for c in added if c['box'] not in deleted]
+    listed = sorted(main.values(), key=lambda c: c['box']) + added   # with the deleted
     vrows, hrows = [], []
     for c in listed:
         n = names[(c['section'], c['box'])]
-        gone = deleted.get(c['box']) if c['section'] == 'main' else None
+        gone = deleted.get(c['box']) if c['section'] in ('main', 'correction', 'addition') else None
         vrows.append([c['box'], c['epic'] or None, n['name'], n['relname'], c['rel'], c['house'], c['age'], c['sex'], w, kendra, gone])
         hrows.append([w, c['box'], n['hname'], n['hrel'], n['name'], n['relname'], c['page']])
     wb = openpyxl.Workbook()
@@ -54,7 +56,7 @@ for f, v in sorted(cards.items(), key=lambda kv: int(kv[1]['info']['ward'])):
     sx = collections.Counter(c['sex'] for c in final)
     ok = (sx['पुरुष'], sx['स्त्री'], len(final)) == (info['male'], info['female'], info['total'])
     report.append(f"ward {w}: {len(final)} voters ({sx['पुरुष']} M, {sx['स्त्री']} F) cover {info['total']} ({info['male']} M, {info['female']} F) "
-                  f"{'OK' if ok else 'MISMATCH'} · booth {kendra} · +{sum(c['section'] == 'addition' for c in final)} added, "
+                  f"{'OK' if ok else 'MISMATCH'} · booth {kendra} · +{sum(c in added for c in final)} added, "
                   f"-{len(deleted)} deleted (kept, tagged), corrected {[c['box'] for c in cs if c['section'] == 'correction']}")
 
 wb = openpyxl.Workbook()
