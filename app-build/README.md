@@ -69,7 +69,8 @@ lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).
 - **नया व्यक्ति जोड़ें:** choose the village, type the person's name → you get their password once → Copy or send by
-  WhatsApp (the message has that village's link).
+  WhatsApp (the message has that village's link). The same box has the person's permission ticks (they start with only
+  पर्ची प्रिंट), so you can set what they may do right away.
 - **नया एडमिन जोड़ें** (superadmin only): name + tick the villages → the admin's password, sent with the `/admin` link.
 - **बंद करें:** that password stops working; the person is logged out on their next search.
 - **नया पासवर्ड:** new password for the same person (e.g. they forgot it); the old one stops working.

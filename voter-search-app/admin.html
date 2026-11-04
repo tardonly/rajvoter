@@ -103,6 +103,9 @@
   .pane:not(.on) { display: none; }
   .newpw .x { border: 0; background: none; font-size: 18px; color: var(--muted); padding: 0 4px; }
   .newpw { margin: 0 0 14px; }
+  .newpw .permsbox { margin-top: 12px; padding-top: 10px; border-top: 1px solid #bfdbfe; }
+  .newpw .permsbox .ph { font-size: 14px; font-weight: 600; }
+  .newpw .perms { font-size: 15px; gap: 8px 16px; }
   /* voters by mark */
   .pick select { flex: 1; min-width: 0; }
   .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 4px; }
@@ -168,6 +171,8 @@
         <button class="btn ghost" id="copyPw" type="button">कॉपी करें</button>
         <button class="btn ghost" id="sharePw" type="button">WhatsApp पर भेजें</button>
       </div>
+      <div class="permsbox hidden" id="newPwPerms"></div>
+      <div class="msg" id="newPwMsg" style="min-height:0"></div>
       <div class="note">यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।</div>
     </div>
 
@@ -507,7 +512,7 @@ $('vsReload').addEventListener('click', () => { refresh(); loadVoters(); });
 // what a user may do besides searching by name (the server checks these on every request)
 const PERM_NAME = { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट' };
 const HEAVY = 500;   // searches in a day that get a yellow badge: a sign the list is being copied
-function permBoxes(u) {
+function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
   for (const [p, label] of Object.entries(PERM_NAME)) {
     const l = el('label'), c = el('input');
@@ -517,8 +522,9 @@ function permBoxes(u) {
       box.querySelectorAll('input').forEach((x) => { x.disabled = true; });
       const r = await api({ action: 'perms', id: u.id, perms: want });
       box.querySelectorAll('input').forEach((x) => { x.disabled = false; });
-      if (r.error) { c.checked = !c.checked; $('listMsg').textContent = errText(r); return; }
-      u.perms = r.user.perms;
+      if (r.error) { c.checked = !c.checked; $(msg).textContent = errText(r); return; }
+      $(msg).textContent = ''; u.perms = r.user.perms;
+      if (saved) saved();
     });
     l.append(c, label); box.append(l);
   }
@@ -535,6 +541,11 @@ function showPassword(u, pw) {
   $('newPwText').textContent = pw;
   $('sharePw').textContent = shareTo ? `WhatsApp पर भेजें (${showPhone(shareTo)})` : 'WhatsApp पर भेजें';
   $('sharePw').classList.toggle('wa', !!shareTo);
+  // a new user starts with only पर्ची प्रिंट: their other permissions can be ticked right here
+  const isUser = u.role === 'user' && u.perms;
+  $('newPwPerms').classList.toggle('hidden', !isUser);
+  $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', 'यह व्यक्ति क्या कर सकता है:'), permBoxes(u, 'newPwMsg', refresh)] : []));
+  $('newPwMsg').textContent = '';
   $('newPw').classList.remove('hidden');
   $('newPw').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
