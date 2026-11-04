@@ -62,5 +62,21 @@
   "deleted": 20,
   "panchayatSamiti": "सरदारशहर",
   "district": "चुरू"
+ },
+ "riri": {
+  "name": "रीड़ी",
+  "title": "ग्राम पंचायत रीड़ी",
+  "ps": 3,
+  "zp": 39,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 5 बजे तक",
+  "wards": [
+   1,
+   2,
+   3
+  ],
+  "voters": 1100,
+  "deleted": 16,
+  "panchayatSamiti": "रीड़ी",
+  "district": "बीकानेर"
  }
 }
