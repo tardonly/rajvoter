@@ -40,6 +40,7 @@ function redis([cmd, ...a]) {
     case 'HINCRBY': { const h = alive(a[0]) ? kv.get(a[0]) : {}; h[a[1]] = String(Number(h[a[1]] || 0) + Number(a[2])); kv.set(a[0], h); return Number(h[a[1]]); }
     case 'SADD': { const s = alive(a[0]) ? kv.get(a[0]) : new Set(); a.slice(1).forEach((x) => s.add(x)); kv.set(a[0], s); return 1; }
     case 'SMEMBERS': return alive(a[0]) ? [...kv.get(a[0])] : [];
+    case 'SREM': { const s = alive(a[0]) ? kv.get(a[0]) : new Set(); return a.slice(1).filter((x) => s.delete(x)).length; }
     default: throw new Error('unsupported ' + cmd);
   }
 }

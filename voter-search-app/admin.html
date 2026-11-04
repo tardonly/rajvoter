@@ -96,6 +96,15 @@
   .limit input { width: 76px; padding: 6px 8px; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; }
   .limit button { padding: 6px 10px; font-size: 13px; }
   .limit .note { color: var(--muted); font-size: 12.5px; }
+  .limit select { width: auto; padding: 5px 8px; font-size: 14px; border-radius: 8px; }
+  .badge.cand { background: #fae8ff; color: #86198f; }
+  .candrow { padding: 12px 0; border-top: 1px solid var(--line); }
+  .candrow:first-child { border-top: 0; }
+  .candrow .name { font-weight: 600; font-size: 16px; }
+  .candrow .members { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .candrow .members span { display: inline-flex; align-items: center; gap: 4px; background: #f3f4f6; border-radius: 999px; padding: 3px 4px 3px 10px; font-size: 14px; }
+  .candrow .members button { border: 0; background: none; color: var(--bad); font-size: 15px; padding: 0 6px; cursor: pointer; }
+  .candrow .row select { flex: 1; min-width: 0; padding: 7px 10px; font-size: 15px; }
 
   /* tabs along the top of the panel; on a phone they scroll sideways */
   .tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
@@ -165,6 +174,7 @@
     <nav class="tabs" id="tabs" role="tablist">
       <button type="button" data-tab="people">व्यक्ति</button>
       <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
+      <button type="button" data-tab="cands">उम्मीदवार</button>
       <button type="button" data-tab="prog">प्रगति</button>
       <button type="button" data-tab="voters">मतदाता सूची</button>
       <button type="button" data-tab="clear">निशान हटाएं</button>
@@ -209,6 +219,19 @@
       <div class="msg" id="listMsg"></div>
     </div>
 
+    <div class="card pane" data-tab="cands">
+      <h2>उम्मीदवार</h2>
+      <p class="sub">हर उम्मीदवार के कार्यकर्ता (3–4 पासवर्ड) एक समूह हैं: वे सिर्फ़ अपने उम्मीदवार के निशान लगाते और देखते हैं,
+        दूसरे उम्मीदवार के लोग ये निशान नहीं देख सकते। बिना उम्मीदवार वाले लोग गाँव के आम निशान देखते हैं।</p>
+      <form id="candForm" class="stack" autocomplete="off">
+        <select id="candVillage" aria-label="गाँव"></select>
+        <input id="candName" type="text" placeholder="उम्मीदवार का नाम" maxlength="60" required>
+        <button class="btn" id="candBtn" type="submit">उम्मीदवार बनाएं</button>
+      </form>
+      <div class="msg" id="candMsg"></div>
+      <div id="candList"></div>
+    </div>
+
     <div class="card pane" data-tab="prog">
       <div class="bar2"><h2>वार्ड अनुसार प्रगति</h2><button class="btn ghost" id="reload" type="button">ताज़ा करें</button></div>
       <div id="prog"></div>
@@ -222,9 +245,9 @@
         <select id="vsWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
       </div>
       <div class="chips" id="vsStatus">
-        <button type="button" class="done" data-s="done">पूरा हुआ <b>0</b></button>
+        <button type="button" class="done" data-s="done">वोट दिया <b>0</b></button>
         <button type="button" class="coming" data-s="coming">आ रहे हैं <b>0</b></button>
-        <button type="button" class="absent" data-s="absent">उपलब्ध नहीं <b>0</b></button>
+        <button type="button" class="absent" data-s="absent">वोटर नहीं है <b>0</b></button>
         <button type="button" class="none" data-s="none">बाकी <b>0</b></button>
       </div>
       <div id="vsList"></div>
@@ -237,9 +260,9 @@
       <p class="sub" style="margin-bottom:8px">बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।</p>
       <select id="mkVillage" aria-label="गाँव"></select>
       <div class="marks">
-        <button type="button" class="done" data-s="done"><b>0</b>पूरा हुआ<small>हटाएं</small></button>
+        <button type="button" class="done" data-s="done"><b>0</b>वोट दिया<small>हटाएं</small></button>
         <button type="button" class="coming" data-s="coming"><b>0</b>आ रहे हैं<small>हटाएं</small></button>
-        <button type="button" class="absent" data-s="absent"><b>0</b>उपलब्ध नहीं<small>हटाएं</small></button>
+        <button type="button" class="absent" data-s="absent"><b>0</b>वोटर नहीं है<small>हटाएं</small></button>
       </div>
       <button class="btn ghost full" id="clearAll" type="button">सभी निशान हटाएं</button>
       <button class="btn ghost full hidden" id="restore" type="button"></button>
@@ -257,6 +280,7 @@
       <select id="newVillage" required><option value="">गाँव चुनें</option></select>
       <input id="newName" type="text" placeholder="व्यक्ति का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
       <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
+      <select id="newCand" class="hidden" aria-label="उम्मीदवार"></select>
       <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
     </form>
     <div class="msg" id="addMsg"></div>
@@ -279,7 +303,7 @@ const store = {
   set(v) { try { localStorage.setItem('tok:admin', v); } catch (e) {} },
   del() { try { localStorage.removeItem('tok:admin'); sessionStorage.removeItem('tok:admin'); } catch (e) {} },
 };
-let token = store.get(), me = null, users = [], admins = [], filter = 'on', villages = {}, progress = [];
+let token = store.get(), me = null, users = [], admins = [], filter = 'on', villages = {}, progress = [], cands = [];
 const MSG = {
   wrong: 'पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
   not_admin: 'यह एडमिन पासवर्ड नहीं है', retired: 'यह पासवर्ड बंद कर दिया गया है',
@@ -289,10 +313,23 @@ const MSG = {
   phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
+  no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
 };
 // 919876543210 → "+91 98765 43210"
 const showPhone = (p) => (/^91\d{10}$/.test(p) ? `+91 ${p.slice(2, 7)} ${p.slice(7)}` : p ? `+${p}` : '');
 const vName = (slug) => (villages[slug] ? villages[slug].name : slug || '—');
+const candOf = (id) => cands.find((c) => c.id === id);
+// a mark group (progress entry): the village's own marks, or one candidate's; key "<village>|<candidate id>"
+const groupName = (g) => (g.cand ? `${g.name} · उम्मीदवार ${g.candName}` : progress.some((x) => x.cand && x.slug === g.slug) ? `${g.name} · आम निशान` : g.name);
+const groupOf = (key) => progress.find((x) => x.key === key);
+const groupArgs = (key) => { const [village, cand] = String(key).split('|'); return { village, cand: cand || '' }; };
+function groupOptions(sel, pick) {   // a select of every mark group, keeping its choice when it still exists
+  const keep = sel.value;
+  sel.length = 0;
+  for (const g of progress) sel.add(new Option(groupName(g), g.key));
+  sel.value = progress.some((g) => g.key === keep) ? keep : pick && progress.some((g) => g.key === pick) ? pick : (progress[0] || {}).key || '';
+  sel.classList.toggle('hidden', progress.length < 2);
+}
 async function post(path, payload) {
   let r;
   try {
@@ -316,7 +353,7 @@ async function openPanel() {
   const r = await api({ action: 'list' });
   if (['wrong', 'retired', 'logged_out', 'other_device'].includes(r.error)) { store.del(); return showLogin(MSG[r.error]); }
   if (r.error) return showLogin(errText(r));
-  me = r.me; users = r.users; admins = r.admins || [];
+  me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; progress = r.progress || [];
   for (const v of r.villageList || []) villages[v.slug] = v;
   if (SLUG && villages[SLUG]) document.title = `एडमिन · ${vName(SLUG)} · मतदाता खोज`;
   setup(); showMarks(r);
@@ -343,25 +380,19 @@ function setup() {
   const mine = me.villages.filter((s) => villages[s]);
   $('meText').textContent = me.role === 'super' ? 'सुपर एडमिन · सभी गाँव' : `${me.name} · ${mine.map(vName).join(', ')}`;
   const pick = mine.includes(SLUG) ? SLUG : mine.length === 1 ? mine[0] : '';
-  $('mkVillage').length = 0;
-  for (const s of mine) $('mkVillage').add(new Option(vName(s), s));
-  $('mkVillage').value = pick || mine[0] || '';
-  $('mkVillage').classList.toggle('hidden', mine.length < 2);
-  for (const id of ['newVillage', 'fVillage']) {
+  for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id), `${pick || mine[0] || ''}|`);
+  for (const id of ['newVillage', 'fVillage', 'candVillage']) {
     const sel = $(id);
-    sel.length = 1;
+    sel.length = id === 'candVillage' ? 0 : 1;
     for (const s of mine) sel.add(new Option(vName(s), s));
-    sel.value = pick;
+    sel.value = pick || (id === 'candVillage' ? mine[0] || '' : '');
   }
+  $('candVillage').classList.toggle('hidden', mine.length < 2);
   // back to search: the village list when this admin has several villages, else straight to the one village
   $('backLink').classList.toggle('hidden', !mine.length);
   $('backLink').href = mine.length === 1 ? `/${mine[0]}` : '/';
   $('adminTab').classList.toggle('hidden', me.role !== 'super');
   if (me.role === 'super') $('admVillages').replaceChildren(villageChecks([]));
-  $('vsVillage').length = 0;
-  for (const s of mine) $('vsVillage').add(new Option(vName(s), s));
-  $('vsVillage').value = pick || mine[0] || '';
-  $('vsVillage').classList.toggle('hidden', mine.length < 2);
   render();
 }
 
@@ -393,7 +424,7 @@ const checkedIn = (box) => [...box.querySelectorAll('input:checked')].map((c) =>
 async function refresh() {
   const r = await api({ action: 'list' });
   if (r.error) { $('listMsg').textContent = errText(r); return; }
-  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; render(); showMarks(r);
+  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; render(); showMarks(r);
 }
 $('reload').addEventListener('click', refresh);
 // polling day: keep the numbers fresh while the page is open
@@ -403,9 +434,9 @@ setInterval(() => { if (!document.hidden && !$('panel').classList.contains('hidd
 function showProgress() {
   const box = $('prog'); box.innerHTML = '';
   for (const v of progress) {
-    if (progress.length > 1) box.append(el('div', 'vh', v.name));
+    if (progress.length > 1) box.append(el('div', 'vh', groupName(v)));
     const t = el('table', 'prog');
-    t.innerHTML = '<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ पूरा</th><th class="c-coming">आ रहे</th><th class="c-absent">नहीं</th><th>बाकी</th></tr></thead>';
+    t.innerHTML = '<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ वोट दिया</th><th class="c-coming">आ रहे</th><th class="c-absent">वोटर नहीं</th><th>बाकी</th></tr></thead>';
     const body = el('tbody');
     const sum = { total: 0, done: 0, coming: 0, absent: 0 };
     for (const w of v.wards) for (const k of Object.keys(sum)) sum[k] += w[k];
@@ -416,7 +447,7 @@ function showProgress() {
       // a tap on a number opens those voters in the मतदाता सूची tab
       for (const [k, n] of [['done', w.done], ['coming', w.coming], ['absent', w.absent], ['none', left]]) {
         const td = el('td', `c-${k}${n ? ' go' : ''}`, n);
-        if (n) td.addEventListener('click', () => openVoters(v.slug, w === sum ? '' : w.ward, k));
+        if (n) td.addEventListener('click', () => openVoters(v.key, w === sum ? '' : w.ward, k));
         tr.append(td);
       }
       const bar = el('tr', 'mrow'), td = el('td'); td.colSpan = 6;
@@ -431,11 +462,12 @@ function showProgress() {
 }
 
 // ---------- status marks on the slips: how many of each, and clearing them (the last clear can be undone) ----------
-const MARK_NAME = { done: 'पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
+const MARK_NAME = { done: 'वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 function showMarks(r) {
   if (r.progress) progress = r.progress;
+  for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id));   // candidates may have come or gone
   showProgress();
-  const v = progress.find((x) => x.slug === $('mkVillage').value) || { marks: { done: 0, coming: 0, absent: 0 }, backup: null };
+  const v = groupOf($('mkVillage').value) || { marks: { done: 0, coming: 0, absent: 0 }, backup: null };
   $('restore').classList.toggle('hidden', !v.backup);
   if (v.backup) $('restore').textContent = `↺ ${fmt(v.backup.at)} को हटाए गए ${v.backup.n} निशान वापस लाएं`;
   document.querySelectorAll('.marks button').forEach((b) => { b.querySelector('b').textContent = v.marks[b.dataset.s]; b.disabled = !v.marks[b.dataset.s]; });
@@ -443,18 +475,18 @@ function showMarks(r) {
   voterCounts();
 }
 async function clearMarks(status) {
-  const slug = $('mkVillage').value, v = progress.find((x) => x.slug === slug);
+  const key = $('mkVillage').value, v = groupOf(key);
   if (!v) return;
   const n = status === 'all' ? v.marks.done + v.marks.coming + v.marks.absent : v.marks[status];
   const what = status === 'all' ? 'सभी' : `"${MARK_NAME[status]}" के सभी`;
-  if (!confirm(`${vName(slug)}: ${what} ${n} निशान हटाएं? गलती हो तो "वापस लाएं" से ये निशान लौट आएंगे (सिर्फ़ आखिरी बार हटाए गए)।`)) return;
-  const r = await api({ action: 'clearMarks', village: slug, status });
+  if (!confirm(`${groupName(v)}: ${what} ${n} निशान हटाएं? गलती हो तो "वापस लाएं" से ये निशान लौट आएंगे (सिर्फ़ आखिरी बार हटाए गए)।`)) return;
+  const r = await api({ action: 'clearMarks', ...groupArgs(key), status });
   if (r.error) { $('marksMsg').textContent = errText(r); return; }
   $('marksMsg').textContent = ''; showMarks(r);
 }
 $('restore').addEventListener('click', async () => {
   if (!confirm('आखिरी बार हटाए गए निशान वापस लाएं? उसके बाद लगे नए निशान भी बने रहेंगे।')) return;
-  const r = await api({ action: 'restoreMarks', village: $('mkVillage').value });
+  const r = await api({ action: 'restoreMarks', ...groupArgs($('mkVillage').value) });
   if (r.error) { $('marksMsg').textContent = errText(r); return; }
   $('marksMsg').textContent = ''; showMarks(r);
 });
@@ -462,10 +494,10 @@ document.querySelectorAll('.marks button').forEach((b) => b.addEventListener('cl
 $('clearAll').addEventListener('click', () => clearMarks('all'));
 $('mkVillage').addEventListener('change', () => showMarks({}));
 
-// ---------- voters by mark: पूरा हुआ / आ रहे हैं / उपलब्ध नहीं / बाकी (no mark yet), 100 at a time ----------
+// ---------- voters by mark: वोट दिया / आ रहे हैं / वोटर नहीं है / बाकी (no mark yet), 100 at a time ----------
 const vs = { status: 'done', rows: [], loaded: false, seq: 0 };
 function voterCounts() {   // the numbers on the four buttons, and the ward choices, from the progress figures
-  const v = progress.find((x) => x.slug === $('vsVillage').value);
+  const v = groupOf($('vsVillage').value);
   if (!v) return;
   const keep = $('vsWard').value;
   $('vsWard').length = 1;
@@ -484,7 +516,7 @@ async function loadVoters(more) {
   vs.loaded = true;
   $('vsMore').disabled = true; $('vsMsg').textContent = '';
   if (!more) $('vsList').replaceChildren(el('div', 'empty', 'लोड हो रहा है…'));
-  const r = await api({ action: 'marked', village: $('vsVillage').value, ward: $('vsWard').value, status: vs.status, offset });
+  const r = await api({ action: 'marked', ...groupArgs($('vsVillage').value), ward: $('vsWard').value, status: vs.status, offset });
   if (seq !== vs.seq) return;   // a newer choice was made meanwhile
   $('vsMore').disabled = false;
   if (r.error) { $('vsMsg').textContent = errText(r); if (!more) $('vsList').innerHTML = ''; return; }
@@ -506,8 +538,8 @@ function voterRow(x) {
   row.append(no, body);
   return row;
 }
-function openVoters(slug, ward, status) {   // from a number in the progress table
-  $('vsVillage').value = slug; vs.status = status;
+function openVoters(key, ward, status) {   // from a number in the progress table
+  $('vsVillage').value = key; vs.status = status;
   voterCounts();
   $('vsWard').value = ward; voterCounts();
   showTab('voters'); loadVoters();
@@ -597,9 +629,20 @@ $('sharePw').addEventListener('click', () => {
 });
 
 // ---------- add a person (in a popup) / an admin ----------
+// the add form's candidate choice: only that village's candidates, and only when it has any
+function newCandOptions() {
+  const list = cands.filter((c) => c.village === $('newVillage').value), keep = $('newCand').value;
+  $('newCand').length = 0;
+  $('newCand').add(new Option('उम्मीदवार: कोई नहीं (गाँव के आम निशान)', ''));
+  for (const c of list) $('newCand').add(new Option(`उम्मीदवार: ${c.name}`, c.id));
+  $('newCand').value = list.some((c) => c.id === keep) ? keep : '';
+  $('newCand').classList.toggle('hidden', !list.length);
+}
+$('newVillage').addEventListener('change', newCandOptions);
 function openAdd() {
   $('addMsg').textContent = '';
   if ($('fVillage').value) $('newVillage').value = $('fVillage').value;   // the village the list is showing
+  newCandOptions();
   $('addModal').classList.remove('hidden');
   $('newName').focus();
 }
@@ -614,7 +657,7 @@ $('addForm').addEventListener('submit', async (e) => {
   if (!village) { $('addMsg').textContent = MSG.no_village; return; }
   if (!name) return;
   $('addBtn').disabled = true; $('addMsg').textContent = '';
-  const r = await api({ action: 'add', village, name, phone: $('newPhone').value });
+  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value });
   $('addBtn').disabled = false;
   if (r.error) { $('addMsg').textContent = errText(r); return; }
   $('newName').value = ''; $('newPhone').value = '';
@@ -650,11 +693,71 @@ function render() {
   const list = $('list'); list.innerHTML = '';
   if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? 'कोई बंद पासवर्ड नहीं' : 'अभी कोई व्यक्ति नहीं — "+ नया व्यक्ति" से जोड़ें'));
   for (const u of shown) list.append(person(u));
+  renderCands();
   const al = $('adminList'); al.innerHTML = '';
   if (me.role === 'super') {
     if (!admins.length) al.append(el('div', 'empty', 'अभी कोई एडमिन नहीं'));
     for (const u of admins) al.append(person(u));
   }
+}
+
+// ---------- candidates: each a group of a village's users with marks of its own ----------
+function renderCands() {
+  const box = $('candList'); box.innerHTML = '';
+  if (!cands.length) box.append(el('div', 'empty', 'अभी कोई उम्मीदवार नहीं'));
+  const many = me.villages.length > 1;
+  for (const c of cands) {
+    const row = el('div', 'candrow'), members = users.filter((u) => u.cand === c.id && !u.retired);
+    const nm = el('div', 'name', c.name);
+    if (many) nm.append(el('span', 'badge vil', vName(c.village)));
+    nm.append(el('span', 'badge cand', `${members.length} कार्यकर्ता`));
+    const list = el('div', 'members');
+    if (!members.length) list.append(el('div', 'info', 'अभी कोई कार्यकर्ता नहीं — नीचे से जोड़ें'));
+    for (const u of members) {
+      const chip = el('span', null, u.name), x = el('button', null, '✕');
+      x.type = 'button'; x.title = 'इस समूह से हटाएं';
+      x.addEventListener('click', () => act({ action: 'cand_set', id: u.id, cand: '' }, `${u.name} को उम्मीदवार ${c.name} के समूह से हटाएं? फिर वे गाँव के आम निशान देखेंगे।`));
+      chip.append(x); list.append(chip);
+    }
+    // add someone already made (a user of this village not in this group)
+    const add = el('div', 'row'), pick = el('select'), go = el('button', 'btn ghost', 'जोड़ें');
+    pick.add(new Option('व्यक्ति चुनें…', ''));
+    for (const u of users.filter((x) => x.village === c.village && !x.retired && x.cand !== c.id)) {
+      const other = u.cand && candOf(u.cand);
+      pick.add(new Option(other ? `${u.name} (अभी ${other.name} के साथ)` : u.name, u.id));
+    }
+    go.type = 'button';
+    go.addEventListener('click', () => { if (pick.value) act({ action: 'cand_set', id: pick.value, cand: c.id }); });
+    const del = el('button', 'btn danger', 'उम्मीदवार हटाएं'); del.type = 'button';
+    del.addEventListener('click', () => act({ action: 'cand_delete', cand: c.id },
+      `उम्मीदवार ${c.name} को हटाएं? इनके समूह के सभी निशान मिट जाएंगे और इनके कार्यकर्ता गाँव के आम निशान देखेंगे।`));
+    add.append(pick, go);
+    const actions = el('div', 'actions'); actions.append(del);
+    row.append(nm, list, add, actions);
+    box.append(row);
+  }
+}
+$('candForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('candName').value.trim(), village = $('candVillage').value;
+  if (!name) return;
+  $('candBtn').disabled = true; $('candMsg').textContent = '';
+  const r = await api({ action: 'cand_add', village, name });
+  $('candBtn').disabled = false;
+  if (r.error) { $('candMsg').textContent = errText(r); return; }
+  $('candName').value = '';
+  refresh();
+});
+
+// which candidate a user works for ('' = none: the village's own marks)
+function candBox(u) {
+  const box = el('div', 'limit'), sel = el('select');
+  sel.add(new Option('कोई नहीं', ''));
+  for (const c of cands.filter((x) => x.village === u.village)) sel.add(new Option(c.name, c.id));
+  sel.value = candOf(u.cand) ? u.cand : '';
+  sel.addEventListener('change', () => act({ action: 'cand_set', id: u.id, cand: sel.value }));
+  box.append('उम्मीदवार:', sel);
+  return box;
 }
 
 async function act(payload, ask) {
@@ -672,6 +775,7 @@ function person(u) {
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (u.kicks) nm.append(el('span', 'badge warn', `एक साथ दो फ़ोन: ${u.kicks} बार`));
   if (!isAdmin && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', 'आज की खोज सीमा पूरी'));
+  if (!isAdmin && candOf(u.cand)) nm.append(el('span', 'badge cand', `उम्मीदवार ${candOf(u.cand).name}`));
   const info = el('div', 'info', `बनाया: ${fmt(u.created)} · आखिरी इस्तेमाल: ${fmt(u.lastSeen)}` + (u.retired ? ` · बंद किया: ${fmt(u.retiredAt)}` : ''));
   const sess = el('div', 'info', u.loggedIn
     ? `अभी लॉगिन: ${u.sessionDevice || '—'} · IP ${u.sessionIp || '—'} · ${fmt(u.sessionAt)} से`
@@ -686,7 +790,7 @@ function person(u) {
   ph.append(edit);
   const use = el('div', 'info', isAdmin ? `${u.marked} पर्चियों पर इनके निशान` : `आज ${u.searchesToday} / ${u.limit} खोज · ${u.marked} पर्चियों पर इनके निशान`);
   row.append(nm, ph, info, sess, use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u));
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
   if (isAdmin) {   // superadmin: change which villages this admin looks after

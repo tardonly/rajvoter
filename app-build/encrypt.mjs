@@ -47,7 +47,7 @@ for (const slug of folders.sort()) {
     JSON.stringify({ v: 3, iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), ct: ct.toString('base64') }));
   villages[slug] = {
     name: meta.name, title: meta.title || `ग्राम पंचायत ${meta.name}`, ps: meta.ps ?? '', zp: meta.zp ?? '',
-    pollTime: meta.pollTime || 'मतदान समय : प्रातः 7 से सायं 5 बजे तक', wards,
+    pollTime: meta.pollTime || 'मतदान समय : प्रातः 7 से सायं 6 बजे तक', wards,
     voters: data.rows.filter((r) => !(del >= 0 && r[del])).length, deleted: del >= 0 ? data.rows.filter((r) => r[del]).length : 0,
     panchayatSamiti: meta.panchayatSamiti || '', district: meta.district || '',   // shown in the village list
   };

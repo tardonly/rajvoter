@@ -54,7 +54,7 @@ Read page 1 of **every** ward PDF first (from the page image; its text layer may
    (shown in the village list); the rest are kept for reference:
    ```json
    { "name": "डालमाण", "title": "ग्राम पंचायत डालमाण", "ps": 12, "zp": 6,
-     "pollTime": "मतदान समय : प्रातः 7 से सायं 5 बजे तक",
+     "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक",
      "district": "चुरू", "panchayatSamiti": "सरदारशहर", "tehsil": "सरदारशहर", "assembly": "21-सरदारशहर",
      "listDate": "25-02-2026" }
    ```

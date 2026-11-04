@@ -41,7 +41,7 @@ To add a user the admin must pick the **village** from the dropdown (only their 
 `raj-voter.vercel.app/demo` opens Adsar's voter list (wards 1–3 only) for anyone, with no password, to try the search. Each phone keeps
 a random device id and gets **10 searches in all** (counted the same way as above, by the server); one internet address
 gets at most 30 a day, so clearing the browser doesn't give more. The demo never changes real data: your team's marks
-aren't shown, and the पूरा हुआ / आ रहे हैं / उपलब्ध नहीं buttons work only on the visitor's phone (kept there, never sent to
+aren't shown, and the वोट दिया / आ रहे हैं / वोटर नहीं है buttons work only on the visitor's phone (kept there, never sent to
 the server). No printing, no whole-ward lists; परिवार works. An orange bar shows the searches left and
 a box for the visitor's village name that opens a WhatsApp chat with it filled in. To show another village, set a `DEMO_VILLAGE` variable in Vercel (e.g. `dalman`) and redeploy.
 
@@ -57,7 +57,7 @@ voter-search-app/         the website + API that Vercel runs
 ```
 `village.json` example:
 ```json
-{ "name": "आडसर", "title": "ग्राम पंचायत आडसर", "ps": 3, "zp": 35, "pollTime": "मतदान समय : प्रातः 7 से सायं 5 बजे तक" }
+{ "name": "आडसर", "title": "ग्राम पंचायत आडसर", "ps": 3, "zp": 35, "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक" }
 ```
 `ps` / `zp` are the पंचायत समिति / जिला परिषद निर्वाचन क्षेत्र numbers printed on the slips. Optional `panchayatSamiti`
 and `district` (e.g. `"सरदारशहर"`, `"चुरू"`) are shown under the village's name in the अपना गाँव चुनें list. Folder names must be
@@ -95,10 +95,11 @@ Log in with the superadmin password or a village admin's password (or log into a
 - **लॉग आउट करें:** ends the person's current session; they can log in again with the same password.
 
 ## Search page
-- **Search** by name or father/husband name (Hindi or English), box number with a ward chosen, `3/25` (ward 3, box 25)
-  or Voter ID. The search starts once typing pauses (0.6 s) or on Enter, needs at least two letters, and isn't sent
+- **Search** by name or father/husband name (Hindi or English), **house number** (मकान नं., e.g. `445` finds 445, 445 क
+  and 445A; `445 क` only that one; choose a ward to narrow it) or Voter ID. The box number is shown on the slip but is
+  not searched (people remember their house number, not their box). The search starts once typing pauses (0.6 s) or on Enter, needs at least two letters, and isn't sent
   again when nothing changed. Choosing only a ward lists the whole ward in box order, 10 at a time (people allowed to).
-- **Filter by mark** (once a ward is chosen): सभी, सिर्फ़ बिना निशान वाले, पूरा हुआ, आ रहे हैं, उपलब्ध नहीं. Marking slips
+- **Filter by mark** (once a ward is chosen): सभी, सिर्फ़ बिना निशान वाले, वोट दिया, आ रहे हैं, वोटर नहीं है. Marking slips
   while going through the unmarked list doesn't skip anyone on the next page.
 - **परिवार** on a slip opens everyone else at the same house number in that ward, as full slips.
 - **अ+** (top right) makes the slips and search boxes bigger; the phone remembers it.
@@ -111,19 +112,29 @@ Log in with the superadmin password or a village admin's password (or log into a
   **Save as PDF** in the phone's print screen (iPhone: Print → share → Save to Files).
 - **वार्ड N की सभी पर्चियाँ** (after choosing a ward): every voter of that ward in box order, two slips per row (about
   10 per A4 page), to print or save as one PDF.
-- **Marks**: under each slip, **पूरा हुआ** (green), **आ रहे हैं** (yellow, on the way) or **उपलब्ध नहीं** (red, not
-  available). Tapping the lit button again removes it. Every user of the village sees the coloured bar with who set it
+- **Marks**: under each slip, **वोट दिया** (green), **आ रहे हैं** (yellow, on the way) or **वोटर नहीं है** (red, not a
+  voter here). Tapping the lit button again removes it. Every user of the village sees the coloured bar with who set it
   and when (e.g. "आ रहे हैं · Ramesh, 4 नव॰, 10:30 am"); phones showing the slip pick up new marks within a minute (and at
   once when the app is reopened), without searching again. Marks are kept per village in the database (`mark:<village>`).
+- **Candidates (उम्मीदवार)**: a candidate is a group of a village's users (usually 3–4 workers). They mark and see only
+  their candidate's marks (`mark:<village>:c:<id>`); other candidates' workers never see them, and they don't see the
+  village's own marks. Users with no candidate, and admins searching the village, use the village's own marks. A
+  worker's top bar shows "उम्मीदवार: <name>".
 
 ## Admin page extras
 The admin page is split into tabs along the top (they scroll sideways on a phone, and the phone reopens the last one):
 **व्यक्ति** (everyone's passwords, with a **+ नया व्यक्ति** button that opens the add form in a popup), **एडमिन**
-(superadmin only), **प्रगति**, **मतदाता सूची**, **निशान हटाएं**. A new password
+(superadmin only), **उम्मीदवार**, **प्रगति**, **मतदाता सूची**, **निशान हटाएं**. A new password
 shows above the tabs, whichever tab made it.
-- **प्रगति** (वार्ड अनुसार प्रगति): for each of your villages and wards, the total, ✓ पूरा, आ रहे, नहीं and बाकी, with a
+- **उम्मीदवार**: create a candidate (village + name), add people already made to it (**व्यक्ति चुनें… → जोड़ें**; someone
+  in another candidate's group moves over), remove them (✕), or delete the candidate (its marks are deleted, its
+  workers go back to the village's marks). The add-person popup and each person's row also have an **उम्मीदवार** choice
+  once their village has candidates.
+- प्रगति, मतदाता सूची and निशान हटाएं show each group apart once a village has candidates: "रीड़ी · आम निशान" (the
+  village's own marks) and "रीड़ी · उम्मीदवार <name>".
+- **प्रगति** (वार्ड अनुसार प्रगति): for each of your villages and wards, the total, ✓ वोट दिया, आ रहे, वोटर नहीं and बाकी, with a
   coloured bar and a total row. It refreshes every minute. Tapping a number opens those voters in मतदाता सूची.
-- **मतदाता सूची**: pick the village and a ward (or सभी वार्ड), then **पूरा हुआ**, **आ रहे हैं**, **उपलब्ध नहीं** or **बाकी**
+- **मतदाता सूची**: pick the village and a ward (or सभी वार्ड), then **वोट दिया**, **आ रहे हैं**, **वोटर नहीं है** or **बाकी**
   (no mark yet) to list those voters in ward and box order, 100 at a time, with who set the mark and when.
 - Each person shows **आज N / L खोज** (searches today out of their daily limit) and how many slips carry their marks; a
   person who has used up today's limit gets a yellow **आज की खोज सीमा पूरी** badge.

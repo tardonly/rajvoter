@@ -7,7 +7,7 @@
 // A password of another village → 403 {error: 'other_village', village, villageName} so the app can point there.
 // Each login starts a new session; a phone still using an older session of the same password is logged out
 // on its next request. The token is sent with every search; an admin token also opens the admin page.
-const { DEMO, isDevice, demoId, village, villageList, PERMS, permsOf, redis, pwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
+const { getCand, DEMO, isDevice, demoId, village, villageList, PERMS, permsOf, redis, pwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
   deviceName, blocked, failed, send, route } = require('./_lib.js');
 
 const STILL_IN_USE_MS = 30 * 60 * 1000;   // previous phone used within 30 min → counts as "two phones at once"
@@ -40,11 +40,13 @@ module.exports = route(async (req, res, { password, village: slug, home, device 
   if (!v && !home && user.role !== 'admin') return send(res, 403, { error: 'not_admin' });   // a person's password on the admin page
 
   const now = new Date(), sid = newSession();
+  const cand = user.role === 'user' && user.cand ? await getCand(user.cand) : null;   // shown on the app's top bar
   const stillInUse = !!user.session && !!user.lastSeen && now - Date.parse(user.lastSeen) < STILL_IN_USE_MS;
   await redis('HSET', `user:${id}`, 'session', sid, 'sessionAt', now.toISOString(), 'sessionIp', clientIp(req),
     'sessionDevice', deviceName(req), 'lastSeen', now.toISOString());
   await redis('HINCRBY', `user:${id}`, 'logins', 1);
   if (stillInUse) await redis('HINCRBY', `user:${id}`, 'kicks', 1);
   send(res, 200, { name: user.name, token: makeToken(id, sid), admin: user.role === 'admin', role: user.role, villages: user.villages,
-    list: villageList(user.villages), perms: user.role === 'admin' ? PERMS.slice() : permsOf(user) });
+    list: villageList(user.villages), perms: user.role === 'admin' ? PERMS.slice() : permsOf(user),
+    cand: cand && cand.village === user.village ? cand.name : '' });
 });

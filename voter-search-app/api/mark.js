@@ -1,8 +1,9 @@
 // POST {village, token, ward, box, mark} → {ok, mark, by, at}. Admins of this village, the superadmin and users their
-// admin allowed 'mark' mark a voter: 'done' (green), 'coming' (yellow, on the way) or 'absent' (red, not available);
+// admin allowed 'mark' mark a voter: 'done' (green), 'coming' (yellow, on the way) or 'absent' (red, not a voter here);
 // '' clears the mark. Every user of the village sees the mark on the slip, with who set it and when
-// (see marks.js for how phones pick up new marks).
-const { village, redis, whoIs, MARKS, markKey, send, route } = require('./_lib.js');
+// (see marks.js for how phones pick up new marks); a candidate's workers mark and see only their candidate's marks
+// (see markHash in _lib.js).
+const { village, redis, whoIs, MARKS, markKey, markHash, send, route } = require('./_lib.js');
 const { load } = require('./_search.js');
 
 module.exports = route(async (req, res, b) => {
@@ -21,7 +22,8 @@ module.exports = route(async (req, res, b) => {
   if (mark && !MARKS.includes(mark)) return send(res, 400, { error: 'bad_mark' });
 
   const at = new Date().toISOString(), by = String(user.name || '').replace(/\|/g, '/');
-  if (mark) await redis('HSET', `mark:${v.slug}`, key, `${mark}|${at}|${user.id}|${by}`);
-  else await redis('HDEL', `mark:${v.slug}`, key);
+  const hash = markHash(v.slug, user.cand);
+  if (mark) await redis('HSET', hash, key, `${mark}|${at}|${user.id}|${by}`);
+  else await redis('HDEL', hash, key);
   send(res, 200, { ok: true, mark, by: mark ? by : '', at: mark ? at : '' });
 });

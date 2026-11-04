@@ -215,17 +215,17 @@
       <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
-      <input id="qName" type="search" placeholder="नाम / Name / बॉक्स नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row2">
         <input id="qRel" type="search" placeholder="पिता / पति का नाम" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
         <select id="qWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
       </div>
       <select id="qMark" class="hidden" aria-label="निशान से छाँटें">
-        <option value="">सभी मतदाता (निशान कोई भी)</option>
+        <option value="">सभी मतदाता</option>
         <option value="none">सिर्फ़ बिना निशान वाले</option>
-        <option value="done">सिर्फ़ ✓ पूरा हुआ</option>
+        <option value="done">सिर्फ़ ✓ वोट दिया</option>
         <option value="coming">सिर्फ़ आ रहे हैं</option>
-        <option value="absent">सिर्फ़ उपलब्ध नहीं</option>
+        <option value="absent">सिर्फ़ वोटर नहीं है</option>
       </select>
     </div>
     <div class="countrow"><div id="count"></div><button id="wardPrint" class="hidden" type="button"></button></div>
@@ -321,9 +321,9 @@ function signOut(msg) {
   $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('qMark').value = ''; $('count').textContent = '';
   showLock(msg);
 }
-function showApp(name, admin, villages, perms) {
+function showApp(name, admin, villages, perms, cand) {
   PERMS = perms || [];
-  $('who').textContent = name ? `उपयोगकर्ता: ${name}` : '';
+  $('who').textContent = (name ? `उपयोगकर्ता: ${name}` : '') + (cand ? ` · उम्मीदवार: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
   IS_ADMIN = !!admin; wardButton();
@@ -361,7 +361,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  showApp(r.name, r.admin, r.villages, r.perms);
+  showApp(r.name, r.admin, r.villages, r.perms, r.cand);
 });
 $('lockBtn').addEventListener('click', () => {
   api('logout', { token: token() });   // close the session on the server; no need to wait
@@ -382,11 +382,11 @@ const leftNote = () => (!DEMO && searchesLeft != null && searchesLeft < 20 ? ` �
 function hint() {
   $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
-    'बॉक्स नंबर (जैसे <b>25</b>, वार्ड चुनकर, या <b>3/25</b> = वार्ड 3 का बॉक्स 25) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।' +
+    'मकान नंबर (जैसे <b>512</b>, चाहें तो वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।' +
     (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') + '</div>';
 }
-const FILTER = { none: 'बिना निशान वाले', done: '✓ पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
-// a name with one letter matches nearly everyone: wait for a second one (a box number like 5 is fine)
+const FILTER = { none: 'बिना निशान वाले', done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
+// a name with one letter matches nearly everyone: wait for a second one (a house number like 5 is fine)
 const tooShort = (s) => s && !/^\d+$/.test(s) && s.replace(/\s/g, '').length < 2;
 async function search(more = false, force = false) {
   clearTimeout(timer);
@@ -438,7 +438,7 @@ function updatePerms(p) {
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function kv(label, value) { const f = document.createDocumentFragment(); f.append(label, el('b', null, value)); return f; }
 
-const MARKS = { done: '✓ पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
+const MARKS = { done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // voters struck off the roll in the list's supplement: still found, shown greyed with the reason, no marks or printing
 const DELETED = { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend
 
@@ -720,7 +720,7 @@ async function openVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
-  showApp(r.name, r.admin, r.villages, r.perms);
+  showApp(r.name, r.admin, r.villages, r.perms, r.cand);
 }
 
 (async () => {

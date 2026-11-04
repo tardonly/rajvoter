@@ -13,18 +13,24 @@
 //   action "perms",  id, perms  → {user}             (what a user may do: any of 'mark', 'ward', 'wardPdf', 'print')
 //   action "limit",  id, limit  → {user}             (searches a user may start per day; 0 or '' = the default)
 //   action "extra",  id [, n]   → {user}             (n more searches, default 100, for today only)
-//   action "clearMarks", village, status → {progress}   (removes every 'done' | 'coming' | 'absent' mark of the village,
-//                                                       or 'all' of them; the removed marks are kept as a backup first)
-//   action "restoreMarks", village       → {progress}   (puts back the marks removed by that village's last clearMarks)
-//   action "marked", village, status [, ward, offset] → {total, more, rows}   voters carrying a mark ('done' | 'coming' |
-//                                         'absent') or none yet ('none'), in ward and box order, LIST_PAGE at a time
-// progress: [{slug, name, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}], backup: {n, at} | null}]
-//   one entry per village of this admin: how many slips carry each mark, overall and per ward.
+//   action "clearMarks", village [, cand], status → {progress}   (removes every 'done' | 'coming' | 'absent' mark of the
+//                                         village (of that candidate's group), or 'all' of them; kept as a backup first)
+//   action "restoreMarks", village [, cand]       → {progress}   (puts back the marks removed by the last clearMarks)
+//   action "marked", village [, cand], status [, ward, offset] → {total, more, rows}   voters carrying a mark ('done' |
+//                                         'coming' | 'absent') or none yet ('none'), in ward and box order, LIST_PAGE at a time
+//   action "cand_add", village, name → {cand}   new candidate (उम्मीदवार) of one village: a group of its users whose marks
+//                                         only they see (see markHash in _lib.js)
+//   action "cand_delete", cand       → {ok}     removes the candidate and its marks; its users go back to the village's marks
+//   action "cand_set", id, cand      → {user}   puts a user of the candidate's village in that group ('' = no candidate)
+// progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
+//   backup: {n, at} | null}]   one entry per village of this admin and per candidate of it (cand '' = the village's own
+//   marks): how many slips carry each mark, overall and per ward.
+// cands (in "list"): [{id, name, village, created}] the candidates of this admin's villages.
 // The password is shown to the admin once; only its hash is stored.
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { load } = require('./_search.js');
-const { village, villageList, MARKS, PERMS, permsOf, allMarks, today, DAILY_SEARCHES, extraToday, dailyLimit, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
+const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
@@ -43,9 +49,10 @@ function villageSlugs(list) {
   return ok.length ? ok : null;
 }
 
-// how many slips of a village carry each mark, overall and per ward, and the backup its last "clear" left
-async function markSummary(slug, all) {
-  all ||= await allMarks(slug);
+// how many slips of a village (of one candidate's group) carry each mark, overall and per ward, and the backup its last
+// "clear" left
+async function markSummary(slug, cand, all) {
+  all ||= await allMarks(slug, cand.id);
   const zero = () => Object.fromEntries(MARKS.map((m) => [m, 0]));
   const marks = zero(), perWard = {};
   const onRoll = new Set();
@@ -61,13 +68,23 @@ async function markSummary(slug, all) {
     const w = perWard[key.split(':')[0]];
     if (w) w[m]++;
   }
-  const bk = await redis('GET', `mark:${slug}:backup`);
+  const bk = await redis('GET', `${markHash(slug, cand.id)}:backup`);
   let backup = null;
   try { if (bk) { const j = JSON.parse(bk); backup = { n: j.flat.length / 2, at: j.at }; } } catch (e) { /* ignore a broken backup */ }
-  return { slug, name: village(slug).name, marks, wards: Object.values(perWard).sort((a, b) => a.ward - b.ward), backup };
+  return { key: `${slug}|${cand.id}`, slug, cand: cand.id, name: village(slug).name, candName: cand.name || '', marks,
+    wards: Object.values(perWard).sort((a, b) => a.ward - b.ward), backup };
 }
 
 const LIST_PAGE = 100;   // voters per page in the "marked" list
+
+// the candidates of these villages, oldest first
+async function candsOf(slugs) {
+  const ids = (await redis('SMEMBERS', 'cands')) || [];
+  return (await Promise.all(ids.map(getCand))).filter((c) => c && slugs.includes(c.village))
+    .sort((x, y) => (x.created < y.created ? -1 : 1));
+}
+// every mark group of these villages: the village's own marks ({id: ''}) and then each of its candidates
+const groupsOf = (slugs, cands) => slugs.flatMap((s) => [{ slug: s, cand: { id: '' } }, ...cands.filter((c) => c.village === s).map((c) => ({ slug: s, cand: c }))]);
 
 async function freshPassword() {
   for (;;) {
@@ -77,7 +94,7 @@ async function freshPassword() {
 }
 
 const view = (u) => ({
-  perms: u.role === 'user' ? permsOf(u) : PERMS.slice(),
+  perms: u.role === 'user' ? permsOf(u) : PERMS.slice(), cand: u.role === 'user' ? u.cand || '' : '',
   limit: u.role === 'user' ? dailyLimit(u) : null, ownLimit: Number(u.limit) || '', extraToday: extraToday(u),
   defaultLimit: DAILY_SEARCHES,
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
@@ -104,9 +121,10 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'list') {
     const ids = (await redis('SMEMBERS', 'users')) || [];
     const all = (await Promise.all(ids.map(getUser))).filter(Boolean).sort((x, y) => (x.created < y.created ? 1 : -1));
-    // marks of my villages: progress, and how many slips each person marked
-    const marksBy = await Promise.all(me.villages.map((s) => allMarks(s)));
-    const progress = await Promise.all(me.villages.map((s, i) => markSummary(s, marksBy[i])));
+    // marks of my villages (each candidate's apart): progress, and how many slips each person marked
+    const cands = await candsOf(me.villages), groups = groupsOf(me.villages, cands);
+    const marksBy = await Promise.all(groups.map((g) => allMarks(g.slug, g.cand.id)));
+    const progress = await Promise.all(groups.map((g, i) => markSummary(g.slug, g.cand, marksBy[i])));
     const marked = {};
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
     const day = today();
@@ -115,14 +133,24 @@ module.exports = route(async (req, res, b) => {
     const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
     return send(res, 200, { me: { role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins,
-      villageList: villageList(me.villages), progress });   // names of my villages (the list is not public)
+      villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
+      // villageList: names of my villages (the list is not public)
+  }
+
+  // the mark group a request names: the village's own marks (no cand) or one of its candidates'
+  async function groupOf() {
+    if (!village(b.village)) return { error: [400, 'no_village'] };
+    if (!mayUse(b.village)) return { error: [403, 'not_your_village'] };
+    if (!b.cand) return { cand: { id: '' } };
+    const c = await getCand(b.cand);
+    return c && c.village === b.village ? { cand: c } : { error: [404, 'no_cand'] };
   }
 
   if (b.action === 'marked') {
-    if (!village(b.village)) return send(res, 400, { error: 'no_village' });
-    if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
+    const g = await groupOf();
+    if (g.error) return send(res, g.error[0], { error: g.error[1] });
     if (b.status !== 'none' && !MARKS.includes(b.status)) return send(res, 400, { error: 'bad_mark' });
-    const all = await allMarks(b.village);
+    const all = await allMarks(b.village, g.cand.id);
     const want = (r) => {
       const m = all[`${r.ward}:${r.box}`];
       return b.status === 'none' ? !(m && MARKS.includes(m.m)) : !!m && m.m === b.status;
@@ -138,9 +166,9 @@ module.exports = route(async (req, res, b) => {
   }
 
   if (b.action === 'clearMarks' || b.action === 'restoreMarks') {
-    if (!village(b.village)) return send(res, 400, { error: 'no_village' });
-    if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
-    const key = `mark:${b.village}`, backupKey = `mark:${b.village}:backup`;
+    const g = await groupOf();
+    if (g.error) return send(res, g.error[0], { error: g.error[1] });
+    const key = markHash(b.village, g.cand.id), backupKey = `${key}:backup`;
     if (b.action === 'clearMarks') {
       if (b.status !== 'all' && !MARKS.includes(b.status)) return send(res, 400, { error: 'bad_mark' });
       const flat = (await redis('HGETALL', key)) || [];
@@ -158,7 +186,31 @@ module.exports = route(async (req, res, b) => {
       for (let i = 0; i < flat.length; i += 1000) await redis('HSET', key, ...flat.slice(i, i + 1000));
       await redis('DEL', backupKey);
     }
-    return send(res, 200, { progress: await Promise.all(me.villages.map((s) => markSummary(s))) });
+    const groups = groupsOf(me.villages, await candsOf(me.villages));
+    return send(res, 200, { progress: await Promise.all(groups.map((x) => markSummary(x.slug, x.cand))) });
+  }
+
+  if (b.action === 'cand_add') {
+    const name = String(b.name || '').trim().slice(0, 60);
+    if (!name) return send(res, 400, { error: 'name' });
+    if (!village(b.village)) return send(res, 400, { error: 'no_village' });
+    if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
+    const id = crypto.randomBytes(4).toString('hex');
+    await redis('HSET', `cand:${id}`, 'name', name, 'village', b.village, 'created', now);
+    await redis('SADD', 'cands', id);
+    return send(res, 200, { cand: await getCand(id) });
+  }
+
+  if (b.action === 'cand_delete') {
+    const c = await getCand(b.cand);
+    if (!c || !mayUse(c.village)) return send(res, 404, { error: 'no_cand' });
+    const ids = (await redis('SMEMBERS', 'users')) || [];
+    for (const u of (await Promise.all(ids.map(getUser))).filter((u) => u && u.cand === c.id)) await redis('HSET', `user:${u.id}`, 'cand', '');
+    await redis('DEL', markHash(c.village, c.id));
+    await redis('DEL', `${markHash(c.village, c.id)}:backup`);
+    await redis('SREM', 'cands', c.id);
+    await redis('DEL', `cand:${c.id}`);
+    return send(res, 200, { ok: true });
   }
 
   if (b.action === 'add' || b.action === 'add_admin') {
@@ -171,6 +223,11 @@ module.exports = route(async (req, res, b) => {
       if (!village(b.village)) return send(res, 400, { error: 'no_village' });
       if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
       fields = ['role', 'user', 'village', b.village];
+      if (b.cand) {   // straight into a candidate's group
+        const c = await getCand(b.cand);
+        if (!c || c.village !== b.village) return send(res, 404, { error: 'no_cand' });
+        fields.push('cand', c.id);
+      }
     } else {
       if (!isSuper) return send(res, 403, { error: 'super_only' });
       const vs = villageSlugs(b.villages);
@@ -195,6 +252,18 @@ module.exports = route(async (req, res, b) => {
     const vs = villageSlugs(b.villages);
     if (!vs) return send(res, 400, { error: 'no_village' });
     await redis('HSET', `user:${user.id}`, 'villages', vs.join(','));
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'cand_set') {
+    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });   // admins see the village's marks
+    let id = '';
+    if (b.cand) {
+      const c = await getCand(b.cand);
+      if (!c || c.village !== user.village) return send(res, 404, { error: 'no_cand' });
+      id = c.id;
+    }
+    await redis('HSET', `user:${user.id}`, 'cand', id);
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

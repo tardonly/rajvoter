@@ -29,6 +29,7 @@ function load(slug) {     // slug must already be checked against the village li
     o.del = o.del || '';   // 'E' death, 'S' shifted, 'R' repeated: struck off the final roll, still shown (tagged)
     o._nEn = normEn(o.name); o._rEn = normEn(o.relname); o._nHi = normHi(o.hname); o._rHi = normHi(o.hrel);
     o._epic = String(o.epic || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    o._house = normHouse(o.house);
     return o;
   });
   const v = { rows, wards: [...new Set(rows.map((r) => r.ward))].sort((a, b) => a - b) };
@@ -52,6 +53,18 @@ function normHi(s) {
           .replace(/[शष]/g, 'स').replace(/[णञङ]/g, 'न');
 }
 const isHindi = (s) => /[ऀ-ॿ]/.test(s);
+// House numbers as printed: "512", "445 क", "445A", "440-2", "०५१२" (Hindi digits). Compared with Hindi digits made
+// English, spaces dropped and leading zeros gone.
+const normHouse = (s) => String(s || '').replace(/[०-९]/g, (d) => d.charCodeAt(0) - 0x966).replace(/\s+/g, '').replace(/^0+(?=\d)/, '').toLowerCase();
+// A search typed as a house number → a test for a voter's normalised house, or null when it isn't one.
+// Only digits ("445") finds every house with that number, "445 क" and "445A" too; with more after the number ("445क",
+// "440-2") the house must start with exactly that.
+function houseQuery(q) {
+  const h = normHouse(q);
+  if (!/^\d{1,5}(?:[^\d].{0,5})?$/.test(h) || /[a-z]{2}/.test(h)) return null;   // two Latin letters: a Voter ID
+  if (/^\d+$/.test(h)) return (x) => (x.match(/^\d+/) || [''])[0] === h;
+  return (x) => x.startsWith(h);
+}
 
 // Smallest number of edits that turns q into some part of t (so "mangi" matches inside "mangilal").
 // Swapping two neighbouring letters ("parkash" for "prakash") counts as one edit.
@@ -89,9 +102,8 @@ function search(slug, { name = '', rel = '', ward = '' }) {
   name = String(name).trim().slice(0, 60); rel = String(rel).trim().slice(0, 60);
   const pool = ward ? rows.filter((r) => String(r.ward) === String(ward)) : rows;
   if (!name && !rel) return ward ? [...pool].sort((a, b) => a.box - b.box) : [];   // only a ward: all its voters in box order
-  if (/^\d{1,4}$/.test(name) && !rel) return pool.filter((r) => r.box === +name);            // box number
-  const wb = !rel && name.match(/^(\d{1,3})\s*[/-]\s*(\d{1,4})$/);                            // "3/25" = ward 3, box 25
-  if (wb) return rows.filter((r) => r.ward === +wb[1] && r.box === +wb[2]);
+  const hq = !rel && houseQuery(name);                                                        // house number
+  if (hq) return pool.filter((r) => hq(r._house)).sort((a, b) => a.ward - b.ward || a.box - b.box);
   if ((/\d{3,}/.test(name) && /[a-z]/i.test(name)) || /^rj\W?\d/i.test(name)) {                // voter ID
     const k = name.replace(/[^A-Z0-9]/gi, '').toUpperCase();
     return pool.filter((r) => r._epic.includes(k));

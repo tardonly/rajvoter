@@ -174,6 +174,10 @@ async function whoIs(token, slug) {
   user.status = user.retired === '1' ? 'retired' : !user.session ? 'logged_out' : user.session !== t.sid ? 'other_device'
     : slug != null && !user.villages.includes(slug) ? 'other_village' : 'ok';
   user.sid = t.sid;
+  // a user's candidate group, if it still exists and is of their village (admins never have one)
+  const cand = user.role === 'user' && user.cand ? await getCand(user.cand) : null;
+  user.cand = cand && cand.village === user.village ? cand.id : '';
+  user.candName = user.cand ? cand.name : '';
   return user;
 }
 
@@ -192,27 +196,39 @@ const DAILY_SEARCHES = 500;
 const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
 
-// Status marks put on voters, one Redis hash per village "mark:<village>": field "<ward>:<box>",
+// Status marks put on voters, one Redis hash per village and group: field "<ward>:<box>",
 // value "<status>|<time>|<who's id>|<who's name>" (older marks have only "<status>|<time>" or "<status>").
-// Everyone who can open the village sees them on the slips, with who set them and when.
-const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the way · red: not available
+// A candidate (उम्मीदवार) is a group of a village's users ("cand:<id>": name, village, created; all ids in the set
+// "cands"; a user's field "cand" names theirs). A candidate's workers mark and see only "mark:<village>:c:<id>", so
+// one candidate's workers never see another's marks. Everyone else (users without a candidate, and admins searching
+// the village) uses the village's own "mark:<village>". The admin page shows every group's marks separately.
+const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the way · red: not a voter here (वोटर नहीं है)
 const markKey = (v) => `${parseInt(v.ward, 10)}:${parseInt(v.box, 10)}`;
+const markHash = (slug, cand) => (cand ? `mark:${slug}:c:${cand}` : `mark:${slug}`);
 function parseMark(val) {
   const [m = '', at = '', byId = '', by = ''] = val ? String(val).split('|') : [];
   return { m, at, byId, by };
 }
-async function marksFor(slug, keys) {
+async function marksFor(slug, keys, cand) {
   if (!keys.length) return [];
-  const vals = (await redis('HMGET', `mark:${slug}`, ...keys)) || [];
+  const vals = (await redis('HMGET', markHash(slug, cand), ...keys)) || [];
   return keys.map((k, i) => parseMark(vals[i]));
 }
-async function allMarks(slug) {   // "<ward>:<box>" → parsed mark, for every marked slip of the village
-  const flat = (await redis('HGETALL', `mark:${slug}`)) || [];
+async function allMarks(slug, cand) {   // "<ward>:<box>" → parsed mark, for every marked slip of the village (of that group)
+  const flat = (await redis('HGETALL', markHash(slug, cand))) || [];
   const out = {};
   for (let i = 0; i < flat.length; i += 2) out[flat[i]] = parseMark(flat[i + 1]);
   return out;
 }
+async function getCand(id) {
+  if (!/^[0-9a-f]{8}$/.test(String(id || ''))) return null;
+  const arr = await redis('HGETALL', `cand:${id}`);
+  if (!arr || !arr.length) return null;
+  const c = { id };
+  for (let i = 0; i < arr.length; i += 2) c[arr[i]] = arr[i + 1];
+  return c;
+}
 
-module.exports = { MARKS, markKey, parseMark, marksFor, allMarks, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
   DEMO, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };

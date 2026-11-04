@@ -62,9 +62,9 @@ async function countSearch(req, user, b, named) {
   return { searchId: next ? next.id : '', left: limit - used };
 }
 
-async function withMarks(slug, list) {
+async function withMarks(slug, list, cand) {   // cand: the searcher's candidate group, whose marks they see
   const results = list.map(publicFields);
-  const marks = await marksFor(slug, results.map(markKey));
+  const marks = await marksFor(slug, results.map(markKey), cand);
   results.forEach((r, i) => { r.mark = marks[i].m; r.markBy = marks[i].by; r.markAt = marks[i].at; });
   return results;
 }
@@ -91,14 +91,14 @@ module.exports = route(async (req, res, b) => {
   }
 
   if (b.family) {
-    const results = await withMarks(v.slug, family(v.data, b.family).slice(0, MAX_FAMILY));
+    const results = await withMarks(v.slug, family(v.data, b.family).slice(0, MAX_FAMILY), user.cand);
     return send(res, 200, { total: results.length, results, perms: user.perms, ...left });
   }
 
   let hits = search(v.data, b);
   const filter = String(b.mark || '');
   if (filter === 'none' || MARKS.includes(filter)) {
-    const marks = await allMarks(v.slug);
+    const marks = await allMarks(v.slug, user.cand);
     hits = hits.filter((r) => !r.del && ((marks[markKey(r)] || {}).m || 'none') === filter);
   }
   const total = hits.length;
@@ -114,5 +114,5 @@ module.exports = route(async (req, res, b) => {
     page = rest.slice(0, PAGE);
     more = rest.length > PAGE;
   }
-  send(res, 200, { total, more, results: await withMarks(v.slug, page), wards: load(v.data).wards, perms: user.perms, ...left });
+  send(res, 200, { total, more, results: await withMarks(v.slug, page, user.cand), wards: load(v.data).wards, perms: user.perms, ...left });
 });
