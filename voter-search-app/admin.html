@@ -651,7 +651,9 @@ $('copyPw').addEventListener('click', async () => {
   setTimeout(() => { $('copyPw').textContent = 'कॉपी करें'; }, 2000);
 });
 $('sharePw').addEventListener('click', () => {
-  const text = `${shareTitle}\nलिंक: ${shareLink}\nपासवर्ड: ${$('newPwText').textContent}\n(यह पासवर्ड किसी और को न दें)`;
+  // the mobile number as the login page asks for it (10 digits), when the person has one
+  const mobile = /^91\d{10}$/.test(shareTo) ? shareTo.slice(2) : shareTo ? `+${shareTo}` : '';
+  const text = `${shareTitle}\nलिंक: ${shareLink}\n${mobile ? `मोबाइल नंबर: ${mobile}\n` : ''}पासवर्ड: ${$('newPwText').textContent}\n(यह पासवर्ड किसी और को न दें)`;
   location.href = `https://wa.me/${shareTo}?text=` + encodeURIComponent(text);   // opens the chat with that number directly
 });
 
