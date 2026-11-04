@@ -37,6 +37,14 @@ only receive the cards that match a search. Every search checks that the user's 
 
 To add a user the admin must pick the **village** from the dropdown (only their own villages are listed).
 
+## Demo (for marketing)
+`raj-voter.vercel.app/demo` opens Adsar's voter list (wards 1–3 only) for anyone, with no password, to try the search. Each phone keeps
+a random device id and gets **10 searches in all** (counted the same way as above, by the server); one internet address
+gets at most 30 a day, so clearing the browser doesn't give more. The demo never changes real data: your team's marks
+aren't shown, and the पूरा हुआ / आ रहे हैं / उपलब्ध नहीं buttons work only on the visitor's phone (kept there, never sent to
+the server). No printing, no whole-ward lists; परिवार works. An orange bar shows the searches left and
+a box for the visitor's village name that opens a WhatsApp chat with it filled in. To show another village, set a `DEMO_VILLAGE` variable in Vercel (e.g. `dalman`) and redeploy.
+
 ## Folder layout (this repo)
 ```
 adsar/                    one folder per village; the folder name is the web address

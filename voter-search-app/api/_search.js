@@ -4,11 +4,17 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { dataKey } = require('./_lib.js');
+const { dataKey, DEMO } = require('./_lib.js');
 
 const cache = new Map();
-function load(slug) {     // slug must already be checked against the village list
+function load(slug) {     // slug must already be checked against the village list (a village's .data)
   if (cache.has(slug)) return cache.get(slug);
+  if (slug === DEMO.slug) {   // the demo: only the first DEMO.wards wards of its village
+    const all = load(DEMO.from), wards = all.wards.slice(0, DEMO.wards);
+    const v = { rows: all.rows.filter((r) => wards.includes(r.ward)), wards };
+    cache.set(slug, v);
+    return v;
+  }
   const name = `${slug}.enc`;
   const file = [path.join(__dirname, '_data', name), path.join(process.cwd(), 'api', '_data', name)].find((p) => fs.existsSync(p));
   const enc = JSON.parse(fs.readFileSync(file, 'utf8'));

@@ -67,6 +67,14 @@
   .row2 { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
   .row2 select { width: auto; }
   #count { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
+  .demobar { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa;
+    color: #9a3412; font-size: 13.5px; line-height: 1.5; }
+  .demobar b { color: #7c2d12; }
+  .demobar a { color: var(--accent); font-weight: 600; }
+  .demobar form { display: flex; gap: 6px; margin-top: 6px; }
+  .demobar input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 15px; border: 1px solid #fdba74; border-radius: 8px; }
+  .demobar button { padding: 8px 12px; border: 0; border-radius: 8px; background: #16a34a; color: #fff; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .demobar .ask { font-weight: 600; margin-top: 6px; }
   #count.bad { color: var(--bad); }
   main { padding: 10px 10px 24px; max-width: 640px; margin: 0 auto; }
   .hint { color: var(--muted); font-size: 14px; line-height: 1.6; padding: 8px 6px; }
@@ -186,6 +194,7 @@
   <header>
     <div class="titlebar"><b><span class="appname">मतदाता खोज · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
       <span class="tb-actions"><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+    <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / बॉक्स नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row2">
@@ -210,8 +219,8 @@
 
 <footer class="footer">
   <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
-  <a href="mailto:ram@digyai.com">ram@digyai.com</a>
   <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
+  <a href="mailto:ram@digyai.com">ram@digyai.com</a>
   <span>Mon–Sat, 10:00–19:00 IST</span>
 </footer>
 
@@ -224,6 +233,10 @@
 const SLUG = decodeURIComponent(location.pathname.split('/')[1] || '').toLowerCase().replace(/\.html$/, '').replace(/^index$/, '');
 // On the start page (no village, or an unknown one) you log in first, then see the villages your password opens.
 let HOME = !SLUG;
+// raj-voter.vercel.app/demo: a real village's list for anyone to try, no password, 10 searches per phone, read-only
+const DEMO = SLUG === 'demo';
+const WHATSAPP = '917888924374';
+const waLink = (gaon) => `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`नमस्ते, मुझे गाँव ${gaon} के लिए मतदाता खोज ऐप चाहिए।`)}`;
 let VILLAGE = null;
 const $ = (id) => document.getElementById(id);
 const store = {  // localStorage can be blocked (private mode); then the user just logs in each time
@@ -237,7 +250,7 @@ if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k)
 
 // A person's login is kept per village; an admin's login (superadmin or village admin) is shared by all village pages.
 let tokKey = `tok:${SLUG}`;
-const token = () => { tokKey = store.get(`tok:${SLUG}`) ? `tok:${SLUG}` : 'tok:admin'; return store.get(tokKey); };
+const token = () => { if (DEMO) return store.get('tok:demo'); tokKey = store.get(`tok:${SLUG}`) ? `tok:${SLUG}` : 'tok:admin'; return store.get(tokKey); };
 
 const MSG = {
   wrong: 'पासवर्ड गलत है',
@@ -248,6 +261,7 @@ const MSG = {
   too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
   slow_down: 'बहुत तेज़ खोज — एक मिनट रुककर कोशिश करें',
   limit: 'आज की खोज सीमा पूरी हो गई — कल फिर खोजें या एडमिन से बात करें',
+  demo_limit: 'डेमो की खोज पूरी हो गईं — अपने गाँव के लिए यह ऐप लेने को ऊपर अपने गाँव का नाम लिखकर WhatsApp करें',
   offline: 'इंटरनेट नहीं है — इंटरनेट चालू करें',
   server: 'सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें',
   no_village: 'यह गाँव नहीं मिला — पता (लिंक) जाँचें',
@@ -261,7 +275,7 @@ const MSG = {
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
 // What this login may do besides searching by name (admins: everything); the server checks these on every request.
 let IS_ADMIN = false, PERMS = [];
-const can = (p) => IS_ADMIN || PERMS.includes(p);
+const can = (p) => IS_ADMIN || PERMS.includes(p) || (DEMO && p === 'mark');   // demo marks stay on the phone
 async function api(path, payload) {
   let r;
   try {
@@ -281,6 +295,7 @@ function showLoading(msg) {
   $('lock').classList.add('loading');
 }
 function signOut(msg) {
+  if (DEMO) { store.del('tok:demo'); return demoLogin(); }   // a demo phone just gets a fresh demo login
   if (msg === MSG.other_village) return showLock(msg);   // keep an admin's login for their own villages
   store.del(tokKey);
   searchId = ''; searchesLeft = null;
@@ -293,6 +308,7 @@ function showApp(name, admin, villages, perms) {
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
   IS_ADMIN = !!admin; wardButton();
+  if (DEMO) { $('who').textContent = ''; $('lockBtn').classList.add('hidden'); demoBar(); }
   $('lock').classList.add('hidden'); $('app').classList.remove('hidden');
   search(false, true);
 }
@@ -327,8 +343,9 @@ let searchId = '', searchesLeft = null;
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
   if (r.left != null) searchesLeft = r.left;
+  if (DEMO) demoBar();
 }
-const leftNote = () => (searchesLeft != null && searchesLeft < 20 ? ` · आज ${searchesLeft} खोज बाकी` : '');
+const leftNote = () => (!DEMO && searchesLeft != null && searchesLeft < 20 ? ` · आज ${searchesLeft} खोज बाकी` : '');
 function hint() {
   $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
@@ -347,8 +364,8 @@ async function search(more = false, force = false) {
   lastAsked = asked;
   $('count').classList.remove('bad');
   wardButton();
-  $('qMark').classList.toggle('hidden', !q.ward);   // filter by mark once a ward is chosen
-  if (!q.ward) q.mark = '';
+  $('qMark').classList.toggle('hidden', !q.ward || DEMO);   // filter by mark once a ward is chosen (not in the demo)
+  if (!q.ward || DEMO) q.mark = '';
   if (tooShort(q.name) || tooShort(q.rel)) { ++seq; $('results').innerHTML = '';
     $('count').textContent = 'कम से कम दो अक्षर लिखें'; $('more').classList.add('hidden'); return; }
   if (!named && !q.ward) { ++seq; hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }   // ++seq: drop a search still on its way
@@ -448,6 +465,7 @@ function slip(r, forPrint, inFamily) {
     d.append(row);
   }
   d.dataset.by = r.markBy || ''; d.dataset.at = r.markAt || '';
+  if (DEMO) [r.mark, r.markBy, r.markAt] = demoMarks()[`${r.ward}:${r.box}`] || [];
   showMark(d, r.mark, r.markBy, r.markAt);
   return d;
 }
@@ -480,9 +498,19 @@ function showMark(d, m, by, at) {
   if (MARKS[m] && (by || at)) bar.append(el('small', null, [by, at && when(at)].filter(Boolean).join(', ')));
   d.querySelectorAll('.marks button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
 }
+// Demo marks are kept only on this phone (never sent to the server), so a visitor can try the buttons without
+// changing anyone's real list.
+function demoMarks() { try { return JSON.parse(store.get('demoMarks')) || {}; } catch (e) { return {}; } }
 async function setMark(r, d, m) {
   const before = [d.dataset.mark || '', d.dataset.by || '', d.dataset.at || ''];
   const mark = before[0] === m ? '' : m;         // tapping the lit button again removes the mark
+  if (DEMO) {
+    const all = demoMarks(), key = `${r.ward}:${r.box}`, at = new Date().toISOString(), by = 'डेमो (सिर्फ़ इस फ़ोन पर)';
+    if (mark) all[key] = [mark, by, at]; else delete all[key];
+    store.set('demoMarks', JSON.stringify(all), true);
+    r.mark = mark;
+    return showMark(d, mark, mark ? by : '', mark ? at : '');
+  }
   showMark(d, mark);                             // show it at once; undo if the server refuses
   const x = await api('mark', { token: token(), ward: r.ward, box: r.box, mark });
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
@@ -493,7 +521,7 @@ async function setMark(r, d, m) {
 // marks set on another phone reach this one without a new search: every minute, and when the app comes back on screen
 async function refreshMarks() {
   const slips = [...document.querySelectorAll('#results .slip[data-key]')];   // family slips included
-  if (!slips.length || document.hidden || !VILLAGE || $('app').classList.contains('hidden')) return;
+  if (DEMO || !slips.length || document.hidden || !VILLAGE || $('app').classList.contains('hidden')) return;
   const x = await api('marks', { token: token(), keys: slips.map((d) => d.dataset.key) });
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
   if (!x.marks) return;
@@ -607,15 +635,55 @@ function setVillage(v) {
   document.head.append(m);
 }
 
+// ---------- the demo: a random id kept on this phone stands in for a password; the server counts its searches ----------
+function deviceId() {
+  let d = store.get('device');
+  if (!d) {
+    d = window.crypto && crypto.randomUUID ? crypto.randomUUID() : Array.from({ length: 24 }, () => Math.random().toString(36)[2]).join('');
+    store.set('device', d, true);
+  }
+  return d;
+}
+async function demoLogin() {
+  showLoading('डेमो खुल रहा है…');
+  const r = await api('unlock', { device: deviceId() });
+  if (r.error) return showLock(MSG[r.error] || MSG.server);
+  store.set('tok:demo', r.token, true);
+  searchesLeft = r.left;
+  showApp(r.name, false, r.villages, r.perms);
+}
+// the orange bar: searches left, and a box for the visitor's own village name that opens WhatsApp with it filled in
+function demoBar() {
+  const bar = $('demoBar');
+  if (!bar.firstChild) {
+    const form = el('form'), gaon = el('input'), send = el('button', null, 'WhatsApp करें');
+    gaon.id = 'demoGaon'; gaon.placeholder = 'अपने गाँव का नाम लिखें'; gaon.autocomplete = 'off';
+    send.type = 'submit';
+    form.append(gaon, send);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = gaon.value.trim();
+      if (!name) { gaon.focus(); gaon.placeholder = 'पहले अपने गाँव का नाम लिखें'; return; }
+      window.open(waLink(name), '_blank', 'noopener');
+    });
+    bar.append(el('div'), el('div', 'ask', 'अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:'), form);
+  }
+  bar.firstChild.replaceChildren(el('b', null, 'डेमो'), ` · ${VILLAGE.name} की असली मतदाता सूची में खोजकर देखें`,
+    searchesLeft != null ? ` · ${searchesLeft} खोज बाकी` : '');
+  bar.classList.remove('hidden');
+}
+
 // ---------- open straight in if this phone is remembered, after checking the password is still active ----------
 async function openVillage(v) {
   setVillage(v);
   const tok = token();
+  if (DEMO && !tok) return demoLogin();
   if (!tok) return showLock('');
   showLoading('जाँच रहे हैं…');
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
+  if (r.left != null) searchesLeft = r.left;
   showApp(r.name, r.admin, r.villages, r.perms);
 }
 

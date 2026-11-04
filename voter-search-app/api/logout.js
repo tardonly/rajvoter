@@ -3,6 +3,6 @@ const { redis, whoIs, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, { token, village }) => {
   const user = await whoIs(token, village || null);
-  if (user && user.role !== 'super' && user.status === 'ok') await redis('HSET', `user:${user.id}`, 'session', '');
+  if (user && user.role !== 'super' && !user.demo && user.status === 'ok') await redis('HSET', `user:${user.id}`, 'session', '');
   send(res, 200, { ok: true });
 });

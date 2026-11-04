@@ -45,7 +45,23 @@ async function pipeline(cmds) {
 
 // Villages built into the app (by app-build/encrypt.mjs): slug → {name, title, ps, zp, pollTime, wards, voters}
 const VILLAGES = require('./_villages.json');
-const village = (slug) => (typeof slug === 'string' && Object.hasOwn(VILLAGES, slug) ? { slug, ...VILLAGES[slug] } : null);
+// The marketing demo: /demo opens the voters of the first DEMO.wards wards of DEMO.from (optional DEMO_VILLAGE variable,
+// default adsar) with no password. Each phone keeps a random device id and logs in with it; it gets DEMO.searches searches in all, and one
+// internet address at most DEMO.perIp a day (so clearing the browser doesn't give more). The demo is read-only: no
+// marks are shown or set (its marks live apart, under "mark:demo", and no one can set them), no printing, no ward lists.
+// (The demo page lets a visitor try the mark buttons, but those marks stay on that phone and never reach the server.)
+const DEMO = { slug: 'demo', from: process.env.DEMO_VILLAGE || 'adsar', wards: 3, searches: 10, perIp: 30 };
+// .data is the village whose voter list to read (differs from .slug only for the demo)
+function village(slug) {
+  if (slug === DEMO.slug && Object.hasOwn(VILLAGES, DEMO.from)) {
+    const v = VILLAGES[DEMO.from];
+    return { ...v, slug: DEMO.slug, data: DEMO.slug, demo: true, title: `डेमो · ${v.title}`,
+      wards: [...v.wards].sort((a, b) => a - b).slice(0, DEMO.wards) };
+  }
+  return typeof slug === 'string' && Object.hasOwn(VILLAGES, slug) ? { slug, data: slug, ...VILLAGES[slug] } : null;
+}
+const isDevice = (d) => /^[A-Za-z0-9_-]{16,64}$/.test(String(d || ''));
+const demoId = (device) => `demo_${device}`;
 // all villages, or only the given slugs (the villages one login may open)
 const villageList = (slugs) => Object.entries(VILLAGES).filter(([slug]) => !slugs || slugs.includes(slug))
   .map(([slug, v]) => ({ slug, name: v.name, title: v.title, panchayatSamiti: v.panchayatSamiti || '', district: v.district || '' }));
@@ -147,6 +163,10 @@ async function whoIs(token, slug) {
     return { id: 'admin', name: 'सुपर एडमिन', role: 'super', admin: true, villages: Object.keys(VILLAGES), status: 'ok', perms: PERMS.slice() };
   }
   const t = parseToken(token);
+  if (t && t.id.startsWith('demo_')) {   // a demo phone: no user record, nothing it may do but search
+    return { id: t.id, name: 'डेमो', role: 'user', demo: true, admin: false, villages: [DEMO.slug], perms: [], sid: t.sid,
+      status: slug != null && slug !== DEMO.slug ? 'other_village' : 'ok' };
+  }
   const user = t && t.id !== 'admin' ? await getUser(t.id) : null;
   if (!user) return null;
   user.admin = user.role === 'admin';
@@ -194,5 +214,5 @@ async function allMarks(slug) {   // "<ward>:<box>" → parsed mark, for every m
 }
 
 module.exports = { MARKS, markKey, parseMark, marksFor, allMarks, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  DEMO, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };

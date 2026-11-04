@@ -11,10 +11,10 @@ module.exports = route(async (req, res, b) => {
   const user = await whoIs(b.token, v.slug);
   if (!user) return send(res, 401, { error: 'login' });
   if (user.status !== 'ok') return send(res, 403, { error: user.status });
-  if (!user.perms.includes('mark')) return send(res, 403, { error: 'no_mark' });
+  if (!user.perms.includes('mark') || v.demo) return send(res, 403, { error: 'no_mark' });   // the demo is read-only
 
   const key = markKey(b);
-  const row = load(v.slug).rows.find((r) => markKey(r) === key);
+  const row = load(v.data).rows.find((r) => markKey(r) === key);
   if (!row) return send(res, 404, { error: 'not_found' });
   if (row.del && b.mark) return send(res, 400, { error: 'deleted' });   // struck off the roll: nothing to mark
   const mark = String(b.mark || '');

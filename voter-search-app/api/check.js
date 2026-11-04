@@ -1,7 +1,7 @@
-// POST {village, token} → {active, name, admin, role, villages, perms, reason}. The app calls this when it opens.
+// POST {village, token} → {active, name, admin, role, villages, perms, reason, demo, left (demo searches remaining)}. The app calls this when it opens.
 // POST {token} (the start page) → the same, with list = the villages this login opens.
 // reason when not active: 'login' (unknown/old token) | 'retired' | 'logged_out' | 'other_device' | 'other_village'
-const { village, villageList, redis, whoIs, send, route } = require('./_lib.js');
+const { DEMO, village, villageList, redis, whoIs, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, { token, village: slug }) => {
   const v = slug ? village(slug) : null;
@@ -9,7 +9,8 @@ module.exports = route(async (req, res, { token, village: slug }) => {
   const user = await whoIs(token, v ? v.slug : null);
   if (!user) return send(res, 200, { active: false, reason: 'login' });
   if (user.status !== 'ok') return send(res, 200, { active: false, reason: user.status });
-  if (user.role !== 'super') await redis('HSET', `user:${user.id}`, 'lastSeen', new Date().toISOString());
-  send(res, 200, { active: true, name: user.name, admin: !!user.admin, role: user.role, villages: user.villages,
+  if (user.role !== 'super' && !user.demo) await redis('HSET', `user:${user.id}`, 'lastSeen', new Date().toISOString());
+  const left = user.demo ? Math.max(0, DEMO.searches - (Number(await redis('GET', `searches:${user.id}`)) || 0)) : undefined;
+  send(res, 200, { active: true, demo: !!user.demo, left, name: user.name, admin: !!user.admin, role: user.role, villages: user.villages,
     list: villageList(user.villages), perms: user.perms });
 });
