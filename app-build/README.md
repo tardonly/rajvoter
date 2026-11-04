@@ -25,9 +25,9 @@ only receive the cards that match a search. Every search checks that the user's 
 
   New users (and users added before these boxes existed) start with only **पर्ची प्रिंट**. A change reaches the
   person's phone on their next search, or within a minute. Admins and the superadmin can always do everything.
-- **Daily search limit (users only):** each user may start 200 searches a day (Indian time), or the number their admin
+- **Daily search limit (users only):** each user may start 500 searches a day (Indian time), or the number their admin
   types under **रोज़ की खोज सीमा** (in the new-password box when the person is added, or under their name later; empty =
-  200). **+100 आज के लिए** adds 100 for today only. One search is everything from typing a name until the search box is
+  500). **+100 आज के लिए** adds 100 for today only. One search is everything from typing a name until the search box is
   cleared: typing more letters or deleting some, adding the father's name, changing the ward or mark filter, the next
   pages and **परिवार** all count once. The server hands out the search id and checks it (same person, the same name
   typed further or shorter, at most 25 requests and 10 minutes), so a phone can't avoid counting. A whole ward listed

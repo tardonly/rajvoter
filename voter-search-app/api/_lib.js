@@ -168,7 +168,7 @@ const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u
 const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
 // Searches a user may start per day (see api/search.js for what one search is): their own limit if their admin set one
 // (user field "limit"), else DAILY_SEARCHES, plus any extra the admin gave for today (field "extra" = "<day>:<n>").
-const DAILY_SEARCHES = 200;
+const DAILY_SEARCHES = 500;
 const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
 
