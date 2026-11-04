@@ -15,6 +15,7 @@
 /app-build/*
 !/app-build/encrypt.mjs
 !/app-build/xlsx_to_json.py
+!/app-build/import_json.mjs
 !/app-build/analyse/
 !/app-build/dev-server.mjs
 !/app-build/README.md

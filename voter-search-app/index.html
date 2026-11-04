@@ -743,7 +743,7 @@ function kv(label, value) { const f = document.createDocumentFragment(); f.appen
 
 const MARKS = { done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // voters struck off the roll in the list's supplement: still found, shown greyed with the reason, no marks or printing
-const DELETED = { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend
+const DELETED = { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend; X: no reason known
 
 // One slip. forPrint leaves out the buttons and the mark; inFamily leaves out the परिवार button.
 function slip(r, forPrint, inFamily) {
@@ -764,7 +764,8 @@ function slip(r, forPrint, inFamily) {
   }
   head.append(tools);
   const meta = el('div', 'meta');
-  const m1 = el('div'); m1.append(el('span', null, `पं.सं. ${VILLAGE.ps}`), el('span', null, `जि.प. ${VILLAGE.zp}`));
+  const [ps, zp] = (VILLAGE.seats || {})[r.ward] || [VILLAGE.ps, VILLAGE.zp];   // some wards have other numbers
+  const m1 = el('div'); m1.append(el('span', null, `पं.सं. ${ps}`), el('span', null, `जि.प. ${zp}`));
   const m2 = el('div'); m2.append(el('span', null, `वार्ड नं. : ${r.ward}`), el('span', null, `भाग सं. ${bhag.trim()}`));
   meta.append(m1, m2); head.append(meta);
 
@@ -786,7 +787,7 @@ function slip(r, forPrint, inFamily) {
   if (forPrint) return d;
   if (r.del) {
     d.classList.add('gone');
-    d.prepend(el('div', 'gonebar', `✕ सूची से हटाया गया (${r.del}${DELETED[r.del] ? ` – ${DELETED[r.del]}` : ''})`));
+    d.prepend(el('div', 'gonebar', `✕ सूची से हटाया गया${r.del === 'X' ? '' : ` (${r.del}${DELETED[r.del] ? ` – ${DELETED[r.del]}` : ''})`}`));
     return d;
   }
 

@@ -92,6 +92,41 @@ lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 4. `git add -A && git commit -m "Add Bigga" && git push` → Vercel redeploys; `raj-voter.vercel.app/bigga` is live.
 5. In the admin page, give the village to a village admin (or create one) and add its users.
 
+### From another team's JSON files (no PDFs needed)
+Voter lists already converted by another team, one `.json.gz` file per gram panchayat (with `panchayat` like
+`bikaner/sri-dungargarh/adsar`, `people`, `ward_booth`, `seats`), go straight into the app. They are kept in an S3
+bucket under `rolls/bikaner/sri-dungargarh`, `rolls/bikaner/reedee`, `rolls/bikaner/lunkaransar` and
+`rolls/churu/sardarshahar`, one folder per village inside (`rolls/bikaner/sri-dungargarh/<village>/`) holding a few
+versions of that village's file (the newest is used); the `aws` command on this Mac must be logged in.
+1. `node app-build/import_json.mjs --bucket <bucket name> --dry-run` → downloads the `.json.gz` files of those four
+   folders into `import/` (kept out of git; a rerun downloads only changed files) and prints per village which wards
+   are kept, which are added, and the voter count. Only some folders: name them after the bucket, e.g.
+   `--bucket <bucket name> rolls/bikaner/lunkaransar`.
+2. The same without `--dry-run` writes the village folders.
+3. `node app-build/encrypt.mjs`, check, commit and push as above.
+
+Files already on this Mac work too: `node app-build/import_json.mjs <files or folders>` (`.json` or `.json.gz`).
+
+- A village goes to our folder with the same Hindi name and पंचायत समिति (their `ridi` → our `riri`, `baijasar` →
+  `baijasar-rajalwara`, `bigga-bass-ramsara` → `bigga-ramsara`), else to the last part of `panchayat` (`…/adsar` →
+  `adsar/`); if that folder holds a village of another samiti, the samiti is added (`bigga-lunkaransar/`). A village we
+  don't have yet gets a new folder with `voters.json` and a `village.json` (name, ps/zp, district, पंचायत समिति from the
+  S3 folder: श्रीडूंगरगढ़, रीड़ी, लूणकरणसर, सरदारशहर); check it before pushing.
+- **पं.सं. / जि.प. per ward**: in about 25 villages some wards belong to another पंचायत समिति / जिला परिषद
+  constituency (e.g. बामनवाली wards 1–4 पं.सं. 1, wards 5–11 पं.सं. 4). The import keeps each ward's numbers in
+  `voters.json` (`seats`), `encrypt.mjs` puts the wards that differ from `village.json` into `_villages.json`, and each
+  slip prints its own ward's numbers. Our own wards use the cover pages (`village.json`); where their file disagrees
+  the import prints a CHECK line (only अमरसर: they say 7, the cover pages of wards 1–2 say 2).
+- **Wards we analysed ourselves are kept as they are**; only the missing wards are added from their file (the
+  `imported` list in `voters.json` remembers which). A rerun with a newer file replaces only those. If their Voter IDs
+  don't match ours at the same ward + box, the village is skipped. With several files for one village, the newest
+  (`generated`) is used.
+- Their files have no English names. These are made from the Hindi, word by word from the names in our own villages
+  (Adsar test: 97% the same as the names typed from the PDFs, the rest one or two letters off, which search allows).
+  Common slips in their Hindi are fixed (सिह → सिंह, ॅ → ँ, ॉ → ाँ). Their struck-off voters have no reason, so the
+  slip says only "सूची से हटाया गया" (`del` = `X`); voters marked R (repeated) are missing from their files.
+- Not taken over (yet): their caste, family and parent links.
+
 ## One-time Vercel setup
 1. **Import the repo** in Vercel: Add New → Project → pick the repo. Project name `raj-voter`.
    Root Directory: `voter-search-app` · Framework Preset: **Other** · Build Command: empty.

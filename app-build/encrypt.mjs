@@ -51,6 +51,10 @@ for (const slug of folders.sort()) {
     voters: data.rows.filter((r) => !(del >= 0 && r[del])).length, deleted: del >= 0 ? data.rows.filter((r) => r[del]).length : 0,
     panchayatSamiti: meta.panchayatSamiti || '', district: meta.district || '',   // shown in the village list
   };
+  // wards whose पं.सं. / जि.प. differ from village.json (voters.json "seats", from app-build/import_json.mjs)
+  const seats = Object.fromEntries(Object.entries(data.seats || {})
+    .filter(([w, s]) => wards.includes(+w) && `${s[0]}/${s[1]}` !== `${villages[slug].ps}/${villages[slug].zp}`));
+  if (Object.keys(seats).length) villages[slug].seats = seats;
   console.log(`${slug}: ${villages[slug].voters} voters (+${villages[slug].deleted} struck off), wards ${wards.join(', ')}`);
 }
 
