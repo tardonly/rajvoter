@@ -757,6 +757,19 @@ $('candForm').addEventListener('submit', async (e) => {
 });
 
 // which candidate a user works for ('' = none: the village's own marks)
+// the person's village, when this admin looks after more than one: moving them clears their candidate and logs them out
+function villageBox(u) {
+  const box = el('div', 'limit'), sel = el('select');
+  for (const s of me.villages.filter((x) => villages[x])) sel.add(new Option(vName(s), s));
+  sel.value = u.village;
+  sel.addEventListener('change', async () => {
+    const to = sel.value;
+    if (!confirm(`${u.name} को ${vName(to)} गाँव में भेजें?\nउनका उम्मीदवार हट जाएगा और उन्हें दोबारा लॉगिन करना होगा।`)) { sel.value = u.village; return; }
+    if (!(await act({ action: 'move', id: u.id, village: to }))) sel.value = u.village;
+  });
+  box.append('गाँव:', sel);
+  return box;
+}
 function candBox(u) {
   const box = el('div', 'limit'), sel = el('select');
   sel.add(new Option('कोई नहीं', ''));
@@ -813,7 +826,8 @@ function person(u) {
   const use = el('div', 'info', `${u.marked} पर्चियों पर इनके निशान`);
   const meter = isAdmin ? null : useMeter(u);
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u, 'listMsg', meter.update), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u, 'listMsg', meter.update),
+    ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
   if (isAdmin) {   // superadmin: change which villages this admin looks after

@@ -144,6 +144,9 @@ shows above the tabs, whichever tab made it.
   coloured bar and a total row. It refreshes every minute. Tapping a number opens those voters in मतदाता सूची.
 - **मतदाता सूची**: pick the village and a ward (or सभी वार्ड), then **वोट दिया**, **आ रहे हैं**, **वोटर नहीं है** or **बाकी**
   (no mark yet) to list those voters in ward and box order, 100 at a time, with who set the mark and when.
+- **गाँव:** (when you look after more than one village) moves a person to another village. Their उम्मीदवार is cleared
+  (candidates belong to one village) and their phone is logged out; their password then opens the new village, and on
+  the old village's page it points there. Their marks stay with the old village.
 - Each person shows **आज की खोज: N / L (P%) · R बाकी** (searches today out of their daily limit, and how many are left)
   over a bar that is green under half the limit, yellow from 50% to 80% and red above 80%, and how many slips carry
   their marks. A person who has used up today's limit also gets a yellow **आज की खोज सीमा पूरी** badge. The +100 and

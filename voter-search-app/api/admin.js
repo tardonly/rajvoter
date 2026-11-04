@@ -22,6 +22,8 @@
 //                                         only they see (see markHash in _lib.js)
 //   action "cand_delete", cand       → {ok}     removes the candidate and its marks; its users go back to the village's marks
 //   action "cand_set", id, cand      → {user}   puts a user of the candidate's village in that group ('' = no candidate)
+//   action "move", id, village       → {user}   moves a user to another village (both must be the admin's): their
+//                                               candidate is cleared and their phone is logged out
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
 //   backup: {n, at} | null}]   one entry per village of this admin and per candidate of it (cand '' = the village's own
 //   marks): how many slips carry each mark, overall and per ward.
@@ -221,6 +223,14 @@ module.exports = route(async (req, res, b) => {
     const vs = villageSlugs(b.villages);
     if (!vs) return send(res, 400, { error: 'no_village' });
     await redis('HSET', `user:${user.id}`, 'villages', vs.join(','));
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'move') {   // a person to another village: their candidate (of the old village) goes, and they log in again
+    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });
+    if (!realVillage(b.village)) return send(res, 400, { error: 'no_village' });
+    if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
+    if (b.village !== user.village) await redis('HSET', `user:${user.id}`, 'village', b.village, 'cand', '', 'session', '');
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
