@@ -164,6 +164,20 @@
   .footer .by { display: inline-flex; align-items: center; gap: 6px; }
   .footer .by img { width: 22px; height: 22px; border-radius: 6px; }
   .footer .by b { color: #12473f; font-size: 14px; }
+
+  /* laptops and big tablets: a wider page, the lists and the progress tables in columns */
+  #prog { display: grid; row-gap: 12px; }
+  @media (min-width: 900px) {
+    .wrap { max-width: 1180px; padding-left: 24px; padding-right: 24px; }
+    .tabs { margin: 0 -24px 14px; padding: 8px 24px; }
+    #login { max-width: 440px; margin: 40px auto; }
+    #list, #adminList, #candList, #vsList { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); column-gap: 28px; }
+    .person, .candrow, #vsList .voter { border-top: 0; border-bottom: 1px solid var(--line); }
+    #vsList .voter { border-bottom-color: #eee; }
+    #list .empty, #adminList .empty, #candList .empty, #vsList .empty { grid-column: 1 / -1; }
+    #prog { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); column-gap: 36px; align-items: start; }
+    #addAdminForm, #candForm, .pane .pick, .pane .chips, .pane[data-tab=clear] > * { max-width: 720px; }
+  }
 </style>
 </head>
 <body>
@@ -445,7 +459,8 @@ setInterval(() => { if (!document.hidden && !$('panel').classList.contains('hidd
 function showProgress() {
   const box = $('prog'); box.innerHTML = '';
   for (const v of progress) {
-    if (progress.length > 1) box.append(el('div', 'vh', groupName(v)));
+    const g = el('div');   // one village or candidate: its name and its table, kept together for the columns on a laptop
+    if (progress.length > 1) g.append(el('div', 'vh', groupName(v)));
     const t = el('table', 'prog');
     t.innerHTML = '<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ वोट दिया</th><th class="c-coming">आ रहे</th><th class="c-absent">वोटर नहीं</th><th>बाकी</th></tr></thead>';
     const body = el('tbody');
@@ -467,7 +482,7 @@ function showProgress() {
       td.append(m); bar.append(td);
       body.append(tr, bar);
     }
-    t.append(body); box.append(t);
+    t.append(body); g.append(t); box.append(g);
   }
   $('progFoot').textContent = `आपने ${me.marked || 0} पर्चियों पर निशान लगाए · हर मिनट अपने-आप ताज़ा होता है`;
 }
