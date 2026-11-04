@@ -51,6 +51,25 @@
   .howpop video { width: 100%; height: 100%; max-width: 100vw; max-height: 100dvh; object-fit: contain; background: #000; }
   .howpop button { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 12px; z-index: 1; padding: 8px 14px;
     border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #111; font-size: 16px; font-weight: 600; }
+  .howpop #howShare { right: auto; left: 12px; background: #16a34a; color: #fff; }
+  /* share: the promo video and the site's link, for WhatsApp status, a chat or any other app */
+  #sharePop { z-index: 60; align-items: center; }
+  #sharePop .card { max-width: 420px; }
+  #shareClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
+  .sharelist { display: grid; gap: 8px; }
+  .sharelist button, .sharelist a { display: block; width: 100%; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--line);
+    background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; text-align: left; text-decoration: none; line-height: 1.35; }
+  .sharelist small { display: block; font-size: 12.5px; font-weight: 400; color: var(--muted); word-break: break-all; }
+  .sharelist .wa { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .sharelist .wa small { color: #dcfce7; }
+  .sharesave { display: flex; gap: 8px; }
+  .sharesave a { flex: 1; text-align: center; font-size: 14px; padding: 9px 6px; }
+  .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -6px 0 14px; }
+  .homeacts button { padding: 10px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; font-size: 15px; font-weight: 600; }
+  #homeShare { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .demobar .acts { display: flex; gap: 6px; margin-top: 8px; max-width: 460px; }
+  .demobar .acts button { flex: 1; padding: 7px 8px; border-radius: 8px; border: 1px solid #fdba74; background: #fff; color: #9a3412; font-weight: 600; font-size: 14px; }
+  .demobar .acts .share { background: #16a34a; border-color: #16a34a; color: #fff; }
   .btn { width: 100%; padding: 12px; font-size: 18px; border: 0; border-radius: 10px; background: var(--pink-dark); color: #fff; font-weight: 600; }
   .btn:disabled { opacity: .6; }
   #lockMsg { min-height: 22px; margin-top: 10px; font-size: 14px; color: var(--bad); line-height: 1.5; }
@@ -275,8 +294,24 @@
 </section>
 
 <div id="howPop" class="howpop hidden" role="dialog" aria-label="ऐप कैसे काम करता है">
+  <button id="howShare" type="button">↗ शेयर करें</button>
   <button id="howClose" type="button">✕ बंद करें</button>
-  <video id="howVideo" src="/demo.mp4" controls playsinline preload="none"></video>
+  <video id="howVideo" controls playsinline preload="none"></video>
+</div>
+
+<div id="sharePop" class="progpop hidden" role="dialog" aria-label="शेयर करें">
+  <div class="card">
+    <div class="head"><h2>शेयर करें</h2>
+      <span><button id="shareClose" type="button" aria-label="बंद करें">✕</button></span></div>
+    <div class="sharelist">
+      <button id="shStatus" class="wa" type="button">WhatsApp स्टेटस पर लगाएं<small>ऐप का वीडियो और लिंक, फिर "My status" चुनें</small></button>
+      <button id="shWa" type="button">WhatsApp पर भेजें<small>किसी चैट या ग्रुप में ऐप का लिंक</small></button>
+      <button id="shMore" type="button">दूसरे ऐप में शेयर करें<small>Facebook, Telegram, SMS…</small></button>
+      <button id="shCopy" type="button">लिंक कॉपी करें<small id="shLink"></small></button>
+      <div class="sharesave"><a href="/promo-phone.mp4" download="matdata-khoj-phone.mp4">⬇ वीडियो (फ़ोन)</a><a href="/promo-laptop.mp4" download="matdata-khoj-laptop.mp4">⬇ वीडियो (लैपटॉप)</a></div>
+    </div>
+    <div class="note" id="shareNote"></div>
+  </div>
 </div>
 
 <div id="progPop" class="progpop hidden" role="dialog" aria-label="वोटर रिपोर्ट">
@@ -311,6 +346,7 @@
     <img src="/icon-192.png" alt="">
     <h1>मतदाता खोज</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
+    <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" type="button">↗ शेयर करें</button></div>
     <div class="vfind hidden" id="vFind">
       <input id="vSearch" type="search" placeholder="🔍 गाँव खोजें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
       <select id="vPs" aria-label="पंचायत समिति"></select>
@@ -450,20 +486,82 @@ function showApp(name, admin, villages, perms, cand) {
   search(false, true);
 }
 
-// "how it works" video on the start page: opens full screen as a popup and plays; ✕, a tap outside it or Esc closes it
+// "how it works" video (start page, demo pages): opens full screen as a popup and plays; ✕, a tap outside it or Esc
+// closes it. An upright screen gets the phone cut, a wide one the laptop cut (both made in demo-video/promo-*).
 function howOpen() {
+  const v = $('howVideo'), src = matchMedia('(min-aspect-ratio: 1/1)').matches ? '/promo-laptop.mp4' : '/promo-phone.mp4';
+  if (v.getAttribute('src') !== src) v.src = src;
   $('howPop').classList.remove('hidden');
-  $('howVideo').currentTime = 0;
-  $('howVideo').play().catch(() => {});
+  v.currentTime = 0;
+  v.play().catch(() => {});
 }
 function howClose() {
   $('howVideo').pause();
   $('howPop').classList.add('hidden');
 }
 $('howBtn').addEventListener('click', howOpen);
+$('homeHow').addEventListener('click', howOpen);
 $('howClose').addEventListener('click', howClose);
 $('howPop').addEventListener('click', (e) => { if (e.target === $('howPop')) howClose(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('howPop').classList.contains('hidden')) howClose(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('sharePop').classList.contains('hidden')) shareClose();
+  else if (!$('howPop').classList.contains('hidden')) howClose();
+});
+
+// ---------- share: the promo video with the site's link (never the demo's), for WhatsApp status, a chat or any app ----------
+const SITE = 'https://raj-voter.vercel.app/';   // the live site, also from test and preview copies
+const SHARE_LINE = 'मतदाता खोज — अपने गाँव की मतदाता सूची, फ़ोन और लैपटॉप पर। नाम लिखते ही पर्ची, वोट के निशान और वार्ड रिपोर्ट।';
+const SHARE_TEXT = `${SHARE_LINE}\n${SITE}`;
+const PROMO = '/promo-phone.mp4';   // upright, as WhatsApp status shows it
+let promoFile = null;
+function promoLoad() {   // fetched as the share box opens, so a tap can share it at once (phones allow sharing only right after a tap)
+  promoFile ||= fetch(PROMO).then((r) => (r.ok ? r.blob() : Promise.reject(new Error('no video'))))
+    .then((b) => new File([b], 'matdata-khoj.mp4', { type: 'video/mp4' }))
+    .catch(() => { promoFile = null; return null; });
+  return promoFile;
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+  const ta = el('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.append(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  ta.remove();
+  return ok;
+}
+function shareOpen() {
+  $('shareNote').textContent = '';
+  $('shLink').textContent = SITE;
+  $('shMore').classList.toggle('hidden', !navigator.share);
+  $('sharePop').classList.remove('hidden');
+  promoLoad();
+}
+function shareClose() { $('sharePop').classList.add('hidden'); }
+async function shareStatus() {
+  const note = $('shareNote');
+  note.textContent = 'वीडियो तैयार हो रहा है…';
+  const file = await promoLoad();
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    note.textContent = 'WhatsApp चुनें, फिर सबसे ऊपर "My status" (मेरा स्टेटस)।';
+    try { await navigator.share({ files: [file], text: SHARE_TEXT }); return; } catch (e) {
+      if (e.name === 'AbortError') { note.textContent = ''; return; }
+      if (e.name === 'NotAllowedError') { note.textContent = 'वीडियो तैयार है — बटन एक बार फिर दबाएं।'; return; }
+    }
+  }
+  // no sharing of files here (most laptops): save the video and copy the text, to post it from WhatsApp
+  const a = el('a'); a.href = PROMO; a.download = 'matdata-khoj.mp4'; document.body.append(a); a.click(); a.remove();
+  const copied = await copyText(SHARE_TEXT);
+  note.textContent = `वीडियो डाउनलोड हो रहा है। WhatsApp में Status → ＋ से यह वीडियो लगाएं${copied ? ' और कैप्शन में लिंक पेस्ट करें (कॉपी हो गया है)' : ''}।`;
+}
+$('shStatus').addEventListener('click', shareStatus);
+$('shWa').addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(SHARE_TEXT)}`, '_blank', 'noopener'));
+$('shMore').addEventListener('click', () => navigator.share({ title: 'मतदाता खोज', text: SHARE_LINE, url: SITE }).catch(() => {}));
+$('shCopy').addEventListener('click', async () => { $('shareNote').textContent = (await copyText(SITE)) ? 'लिंक कॉपी हो गया' : SITE; });
+$('shareClose').addEventListener('click', shareClose);
+$('sharePop').addEventListener('click', (e) => { if (e.target === $('sharePop')) shareClose(); });
+$('howShare').addEventListener('click', shareOpen);
+$('homeShare').addEventListener('click', shareOpen);
 $('showPw').addEventListener('change', (e) => { $('pw').type = e.target.checked ? 'text' : 'password'; });
 $('lockForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -857,6 +955,7 @@ function myVillages(list) {
   $('lock').classList.add('hidden'); $('app').classList.add('hidden'); $('home').classList.remove('hidden');
   $('homeAdmin').classList.toggle('hidden', DEMO || savedLogin() !== 'tok:admin');   // superadmin and village admins
   $('homeOut').classList.toggle('hidden', DEMO);
+  $('homeActs').classList.toggle('hidden', !DEMO);   // the demo's villages: the video and a share button
   $('homeMsg').textContent = DEMO ? `डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} खोज बाकी`
     : list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
   homeList = list;
@@ -932,7 +1031,7 @@ function homeLock(msg, info) {
   $('home').classList.add('hidden');
   $('lockSub').textContent = 'अपना पासवर्ड डालें';
   $('demoLink').classList.remove('hidden');   // the start page offers the demo to anyone without a password
-  $('howBtn').classList.remove('hidden');     // and a short video of the app in use (demo.mp4, made in demo-video/)
+  $('howBtn').classList.remove('hidden');     // and a short video of the app in use (promo-*.mp4, made in demo-video/)
   showLock(msg, info);
 }
 $('homeOut').addEventListener('click', () => {
@@ -990,7 +1089,11 @@ function demoBar() {
       if (!name) { gaon.focus(); gaon.placeholder = 'पहले अपने गाँव का नाम लिखें'; return; }
       window.open(waLink(name), '_blank', 'noopener');
     });
-    bar.append(el('div'), el('div', 'ask', 'अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:'), form);
+    const acts = el('div', 'acts'), how = el('button', null, '▶ वीडियो देखें'), share = el('button', 'share', '↗ शेयर करें');
+    how.type = share.type = 'button';
+    how.addEventListener('click', howOpen); share.addEventListener('click', shareOpen);
+    acts.append(how, share);
+    bar.append(el('div'), el('div', 'ask', 'अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:'), form, acts);
   }
   bar.firstChild.replaceChildren(el('b', null, 'डेमो'), ` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में खोजकर देखें`,
     searchesLeft != null ? ` · ${searchesLeft} खोज बाकी` : '');

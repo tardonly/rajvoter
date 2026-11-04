@@ -56,6 +56,13 @@ aren't shown, and the वोट दिया / आ रहे हैं / वो�
 the server). No printing, no whole-ward lists; परिवार works. An orange bar shows the searches left and
 a box for the visitor's village name that opens a WhatsApp chat with it filled in. A new village shows up in the demo by itself; demo villages can't be given users or candidates.
 
+The start page, the demo's village list and the orange bar have **▶ वीडियो देखें**: a 31-second promo of the app
+(`voter-search-app/promo-phone.mp4` upright on phones, `promo-laptop.mp4` wide on laptops; made in `demo-video/`, kept out
+of git apart from these two files). Next to it, and on the video itself, **↗ शेयर करें** opens a box to put the upright video
+with the site's link (`raj-voter.vercel.app`, never the demo's) on **WhatsApp status** (phones that can share files: pick
+WhatsApp, then "My status"; elsewhere the video downloads and the text is copied for the caption), send the link in a
+WhatsApp chat, share it to any other app, copy it, or download either video.
+
 ## Folder layout (this repo)
 ```
 adsar/                    one folder per village; the folder name is the web address
