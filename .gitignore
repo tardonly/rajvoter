@@ -5,6 +5,7 @@
 
 !/.gitignore
 !/CLAUDE.md
+!/.vade-report
 
 # the website + API Vercel runs (voter data only in encrypted form, no keys or passwords)
 !/voter-search-app/
@@ -19,3 +20,4 @@
 !/app-build/README.md
 
 .DS_Store
+node_modules/
