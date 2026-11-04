@@ -77,7 +77,7 @@
   .btn:disabled { opacity: .6; }
   #lockMsg { min-height: 22px; margin-top: 10px; font-size: 14px; color: var(--bad); line-height: 1.5; }
   #lockMsg.info { color: var(--muted); }
-  #lock.loading form, #lock.loading #lockSub, #lock.loading .demolink, #lock.loading .homeacts, #lock.loading .installbtn { display: none; }
+  #lock.loading form, #lock.loading #lockSub, #lock.loading .demolink, #lock.loading .homeacts { display: none; }
   #lockMsg a { color: var(--accent); font-weight: 600; }
   .villages { display: grid; gap: 8px; margin-top: 4px; }
   .villages a { display: block; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink);
@@ -225,13 +225,10 @@
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
-  /* install as an app: the button (start page, village pages, the village list, under the search hint, the footer) and the steps */
-  .installbtn { display: block; width: 100%; margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1.5px dashed var(--pink-dark);
-    background: #fdf2f8; color: #9d174d; font-size: 16px; font-weight: 600; line-height: 1.35; }
-  .installbtn small { display: block; font-size: 12.5px; font-weight: 500; color: #be185d; }
-  #home .installbtn { margin: -6px 0 14px; }
-  .hint .installbtn { max-width: 380px; margin-top: 14px; text-align: center; }
-  html.app .installbtn, html.app .footinstall { display: none !important; }   /* already opened as the app */
+  /* install as an app: a button at the top of every page (and a link in the footer), and the steps */
+  .topinstall { display: block; margin: 10px auto 0; padding: 7px 18px; border-radius: 999px; border: 1.5px solid var(--pink-dark);
+    background: #fdf2f8; color: #9d174d; font-size: 15px; font-weight: 600; }
+  html.app .topinstall, html.app .footinstall { display: none !important; }   /* already opened as the app */
   #installPop .card { max-width: 480px; }
   #installClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
   #installPop h3 { font-size: 15px; margin: 12px 0 4px; }
@@ -279,7 +276,7 @@
   @media print {
     @page { size: A4; margin: 8mm; }
     html, body { background: #fff; }
-    body > section, .footer { display: none !important; }
+    body > section, .footer, .topinstall { display: none !important; }
     #printArea { display: block; font-size: 0; }
     #printArea .slip { display: inline-block; vertical-align: top; width: 94mm; margin: 0 2mm 2mm 0; font-size: 13px;
       break-inside: avoid; page-break-inside: avoid; }
@@ -291,6 +288,7 @@
 </style>
 </head>
 <body>
+<button class="topinstall" data-install type="button">📲 ऐप इंस्टॉल करें</button>
 
 <section id="lock" class="loading">
   <div class="lockbox">
@@ -309,7 +307,6 @@
     <div id="lockMsg" class="info">खुल रहा है…</div>
     <a id="demoLink" class="demolink hidden" href="/demo">पासवर्ड नहीं है? डेमो देखें →<small>बिना पासवर्ड, असली मतदाता सूची में 10 खोज</small></a>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
-    <button class="installbtn" data-install type="button">📲 ऐप इंस्टॉल करें<small>फ़ोन या लैपटॉप पर — फिर आइकन से सीधे खुलेगा</small></button>
   </div>
 </section>
 
@@ -379,7 +376,6 @@
     <h1>मतदाता खोज</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
     <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ वीडियो देखें</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
-    <button class="installbtn" data-install type="button">📲 ऐप इंस्टॉल करें<small>फ़ोन या लैपटॉप पर — फिर आइकन से सीधे खुलेगा</small></button>
     <div class="vfind hidden" id="vFind">
       <input id="vSearch" type="search" placeholder="🔍 गाँव खोजें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
       <select id="vPs" aria-label="पंचायत समिति"></select>
@@ -695,8 +691,7 @@ function hint() {
   $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
     'मकान नंबर (जैसे <b>512</b>, चाहें तो वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।' +
-    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') +
-    '<button class="installbtn" data-install type="button">📲 ऐप इंस्टॉल करें<small>अगली बार होम स्क्रीन के आइकन से सीधे खोलें</small></button></div>';
+    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') + '</div>';
 }
 const FILTER = { none: 'बिना निशान वाले', done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // a name with one letter matches nearly everyone: wait for a second one (a house number like 5 is fine)
