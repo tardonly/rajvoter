@@ -5,9 +5,14 @@
 // Writes voter-search-app/api/_data/<village>.enc for each and voter-search-app/api/_villages.json (names and
 // slip details, no voter data). The same key must be set as the DATA_KEY environment variable in Vercel.
 //
+// Each .enc file: "RVZ1", 12-byte iv, 16-byte GCM tag, 32-byte HMAC of voters.json (so an unchanged village is not
+// rewritten and git sees no change), then voters.json brotli-compressed and AES-256-GCM encrypted.
+// Vercel bundles api/_data into the search functions, which may be at most 250 MB: a warning is printed near that.
+//
 // Usage:  node app-build/encrypt.mjs    (creates DATA_KEY.txt the first time)
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, unlinkSync, statSync } from 'node:fs';
-import { randomBytes, createCipheriv } from 'node:crypto';
+import { randomBytes, createCipheriv, createHmac } from 'node:crypto';
+import { brotliCompressSync, constants as Z } from 'node:zlib';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,6 +33,8 @@ const folders = readdirSync(root).filter((d) => !d.startsWith('.') && statSync(j
 
 mkdirSync(outDir, { recursive: true });
 const villages = {};
+const MAGIC = Buffer.from('RVZ1');
+let changed = 0;
 for (const slug of folders.sort()) {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) || RESERVED.has(slug)) {
     throw new Error(`folder "${slug}": a village folder name must be lower-case English letters/digits (e.g. adsar, bigga-bas)`);
@@ -40,11 +47,17 @@ for (const slug of folders.sort()) {
   const ward = data.fields.indexOf('ward'), del = data.fields.indexOf('del');
   const wards = [...new Set(data.rows.map((r) => r[ward]))].sort((a, b) => a - b);
 
-  const iv = randomBytes(12);
-  const c = createCipheriv('aes-256-gcm', key, iv);
-  const ct = Buffer.concat([c.update(plain), c.final()]);
-  writeFileSync(join(outDir, `${slug}.enc`),
-    JSON.stringify({ v: 3, iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), ct: ct.toString('base64') }));
+  const out = join(outDir, `${slug}.enc`), h = createHmac('sha256', key).update(plain).digest();
+  const old = existsSync(out) ? readFileSync(out) : null;
+  const same = old && old.subarray(0, 4).equals(MAGIC) && old.subarray(32, 64).equals(h);
+  if (!same) {
+    const iv = randomBytes(12);
+    const c = createCipheriv('aes-256-gcm', key, iv);
+    const z = brotliCompressSync(plain, { params: { [Z.BROTLI_PARAM_QUALITY]: 9, [Z.BROTLI_PARAM_SIZE_HINT]: plain.length } });
+    const ct = Buffer.concat([c.update(z), c.final()]);
+    writeFileSync(out, Buffer.concat([MAGIC, iv, c.getAuthTag(), h, ct]));
+    changed++;
+  }
   villages[slug] = {
     name: meta.name, title: meta.title || `ग्राम पंचायत ${meta.name}`, ps: meta.ps ?? '', zp: meta.zp ?? '',
     pollTime: meta.pollTime || 'मतदान समय : प्रातः 7 से सायं 6 बजे तक', wards,
@@ -55,7 +68,7 @@ for (const slug of folders.sort()) {
   const seats = Object.fromEntries(Object.entries(data.seats || {})
     .filter(([w, s]) => wards.includes(+w) && `${s[0]}/${s[1]}` !== `${villages[slug].ps}/${villages[slug].zp}`));
   if (Object.keys(seats).length) villages[slug].seats = seats;
-  console.log(`${slug}: ${villages[slug].voters} voters (+${villages[slug].deleted} struck off), wards ${wards.join(', ')}`);
+  if (!same) console.log(`${slug}: ${villages[slug].voters} voters (+${villages[slug].deleted} struck off), wards ${wards.join(', ')}`);
 }
 
 // remove data of villages whose folder is gone
@@ -63,5 +76,12 @@ for (const f of readdirSync(outDir)) {
   if (f.endsWith('.enc') && !villages[f.slice(0, -4)]) { unlinkSync(join(outDir, f)); console.log(`removed _data/${f}`); }
 }
 writeFileSync(join(api, '_villages.json'), JSON.stringify(villages, null, 1) + '\n');
-console.log(`api/_villages.json written (${Object.keys(villages).length} villages).` +
+const mb = readdirSync(outDir).reduce((a, f) => a + statSync(join(outDir, f)).size, 0) / 1e6;
+const all = Object.values(villages);
+console.log(`api/_villages.json written (${all.length} villages, ${all.reduce((a, v) => a + v.voters, 0)} voters; ` +
+  `${changed} villages rebuilt, the rest unchanged; voter data ${mb.toFixed(0)} MB).` +
   (created ? ' New key created in app-build/DATA_KEY.txt: copy it into the DATA_KEY environment variable in Vercel.' : ''));
+if (mb > 200) {
+  console.log(`WARNING: ${mb.toFixed(0)} MB of voter data. Vercel allows 250 MB per function (the data is bundled into it), so a ` +
+    'deploy will fail near that size. Keep fewer villages here, or move the data out of the deployment first.');
+}

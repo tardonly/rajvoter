@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const { dataKey, DEMO, demoOf } = require('./_lib.js');
 
 const cache = new Map();
@@ -17,10 +18,15 @@ function load(slug) {     // slug must already be checked against the village li
   }
   const name = `${slug}.enc`;
   const file = [path.join(__dirname, '_data', name), path.join(process.cwd(), 'api', '_data', name)].find((p) => fs.existsSync(p));
-  const enc = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const d = crypto.createDecipheriv('aes-256-gcm', Buffer.from(dataKey(), 'base64'), Buffer.from(enc.iv, 'base64'));
-  d.setAuthTag(Buffer.from(enc.tag, 'base64'));
-  const data = JSON.parse(Buffer.concat([d.update(Buffer.from(enc.ct, 'base64')), d.final()]).toString('utf8'));
+  // "RVZ1" + iv(12) + tag(16) + hmac(32) + brotli-compressed, encrypted voters.json (app-build/encrypt.mjs);
+  // older builds: JSON {iv, tag, ct} in base64, not compressed
+  const buf = fs.readFileSync(file), packed = buf.subarray(0, 4).toString() === 'RVZ1';
+  const enc = packed ? { iv: buf.subarray(4, 16), tag: buf.subarray(16, 32), ct: buf.subarray(64) }
+    : Object.fromEntries(Object.entries(JSON.parse(buf.toString('utf8'))).map(([k, x]) => [k, typeof x === 'string' ? Buffer.from(x, 'base64') : x]));
+  const d = crypto.createDecipheriv('aes-256-gcm', Buffer.from(dataKey(), 'base64'), enc.iv);
+  d.setAuthTag(enc.tag);
+  const plain = Buffer.concat([d.update(enc.ct), d.final()]);
+  const data = JSON.parse((packed ? zlib.brotliDecompressSync(plain) : plain).toString('utf8'));
   const F = Object.fromEntries(data.fields.map((f, i) => [f, i]));
   const rows = data.rows.map((r) => {
     const o = {};

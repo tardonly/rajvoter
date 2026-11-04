@@ -93,25 +93,35 @@ lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 5. In the admin page, give the village to a village admin (or create one) and add its users.
 
 ### From another team's JSON files (no PDFs needed)
-Voter lists already converted by another team, one `.json.gz` file per gram panchayat (with `panchayat` like
-`bikaner/sri-dungargarh/adsar`, `people`, `ward_booth`, `seats`), go straight into the app. They are kept in an S3
-bucket under `rolls/bikaner/sri-dungargarh`, `rolls/bikaner/reedee`, `rolls/bikaner/lunkaransar` and
-`rolls/churu/sardarshahar`, one folder per village inside (`rolls/bikaner/sri-dungargarh/<village>/`) holding a few
-versions of that village's file (the newest is used); the `aws` command on this Mac must be logged in.
-1. `node app-build/import_json.mjs --bucket <bucket name> --dry-run` → downloads the `.json.gz` files of those four
-   folders into `import/` (kept out of git; a rerun downloads only changed files) and prints per village which wards
-   are kept, which are added, and the voter count. Only some folders: name them after the bucket, e.g.
-   `--bucket <bucket name> rolls/bikaner/lunkaransar`.
-2. The same without `--dry-run` writes the village folders.
-3. `node app-build/encrypt.mjs`, check, commit and push as above.
+Voter lists already converted by another team come as one folder per district / पंचायत समिति / gram panchayat, each
+holding a few versions of that village's `.json.gz` (e.g. `rajasthan/bikaner/lunkaransar/kaloo/*.json.gz`). One command
+turns all of it into village folders and builds the app data:
+```
+node app-build/import_json.mjs rajasthan --dry-run     # see what it would do (nothing written)
+node app-build/import_json.mjs rajasthan               # write the village folders, then run encrypt.mjs
+```
+(`rajasthan` = the folder copied into this project; it stays out of git. Any part of it works too, e.g.
+`rajasthan/bikaner`.) From the S3 bucket instead: `node app-build/import_json.mjs --bucket <bucket name>` downloads
+everything under `rolls/` into `import/` first (only changed files on a rerun; `--bucket <name> rolls/bikaner` for one
+district). Then commit and push.
 
-Files already on this Mac work too: `node app-build/import_json.mjs <files or folders>` (`.json` or `.json.gz`).
+It prints only what may need a look (lines starting `!`), then per district · पंचायत समिति how many villages are new,
+got wards added, were unchanged or skipped, and the voters. Every village's line is in `import-report.txt`. Rerunning
+is safe: unchanged villages are not rewritten (`encrypt.mjs` also leaves their `.enc` file as it is, so git shows only
+real changes). `--no-build` skips the encrypt step. The newest version of each village is used (of two made at the same
+time, the one with more in it); unreadable files are listed and skipped.
+
+**Size limit:** the encrypted voter data is bundled into the search functions, and Vercel allows 250 MB per function.
+Compressed, a village takes about 70 KB (145 villages = 10 MB), so roughly 3,000 villages fit; `encrypt.mjs` warns
+above 200 MB. All of Rajasthan (about 11,000 gram panchayats) does not fit: that needs the data moved out of the
+deployment (e.g. to S3) first.
 
 - A village goes to our folder with the same Hindi name and पंचायत समिति (their `ridi` → our `riri`, `baijasar` →
   `baijasar-rajalwara`, `bigga-bass-ramsara` → `bigga-ramsara`), else to the last part of `panchayat` (`…/adsar` →
   `adsar/`); if that folder holds a village of another samiti, the samiti is added (`bigga-lunkaransar/`). A village we
-  don't have yet gets a new folder with `voters.json` and a `village.json` (name, ps/zp, district, पंचायत समिति from the
-  S3 folder: श्रीडूंगरगढ़, रीड़ी, लूणकरणसर, सरदारशहर); check it before pushing.
+  don't have yet gets a new folder with `voters.json` and a `village.json` (name, ps/zp, district, पंचायत समिति from
+  their `tehsil`, which holds the samiti's name). If `<village>-<samiti>` is taken too, `<village>-<samiti>-<district>`.
+- **Wards we analysed ourselves** (folders with `* All Wards.xlsx`) are the source of the English names.
 - **पं.सं. / जि.प. per ward**: in about 25 villages some wards belong to another पंचायत समिति / जिला परिषद
   constituency (e.g. बामनवाली wards 1–4 पं.सं. 1, wards 5–11 पं.सं. 4). The import keeps each ward's numbers in
   `voters.json` (`seats`), `encrypt.mjs` puts the wards that differ from `village.json` into `_villages.json`, and each
@@ -218,7 +228,7 @@ can ask to be installed there, it is only Share → Add to Home Screen by hand. 
 
 ## Updating voter data
 ```
-node app-build/encrypt.mjs        # re-encrypts every village with the same DATA_KEY
+node app-build/encrypt.mjs        # compresses + encrypts every changed village with the same DATA_KEY
 git add -A && git commit -m "Update voter data" && git push
 ```
 If you ever create a new `DATA_KEY.txt`, update the `DATA_KEY` variable in Vercel too. Changing the key makes
