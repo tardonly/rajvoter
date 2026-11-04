@@ -63,6 +63,35 @@
   .checks label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
   .vedit { margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
   .vedit .row { margin-top: 6px; }
+  /* progress per ward */
+  .bar2 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .bar2 button { padding: 4px 10px; font-size: 13px; }
+  .vh { font-size: 15px; font-weight: 700; margin: 12px 0 4px; }
+  .vh:first-child { margin-top: 0; }
+  .prog { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .prog th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: right; padding: 0 4px 6px; }
+  .prog th:first-child, .prog td:first-child { text-align: left; }
+  .prog td { padding: 6px 4px 2px; text-align: right; font-variant-numeric: tabular-nums; border-top: 1px solid #eee; }
+  .prog tr.mrow td { border: 0; padding: 0 4px 6px; }
+  .prog tr.sum td { font-weight: 700; border-top: 1.5px solid var(--line); }
+  .prog .c-done { color: #15803d; } .prog .c-coming { color: #854d0e; } .prog .c-absent { color: #b91c1c; }
+  .meter { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
+  .meter i { display: block; } .meter .done { background: #16a34a; } .meter .coming { background: #facc15; } .meter .absent { background: #dc2626; }
+  .foot { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  /* clearing marks */
+  .marks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .marks button { padding: 10px 4px; border-radius: 10px; border: 1.5px solid; background: #fff; font-weight: 600; line-height: 1.35; }
+  .marks button b { display: block; font-size: 22px; }
+  .marks button small { display: block; font-size: 12px; font-weight: 500; }
+  .marks button:disabled { opacity: .45; }
+  .marks .done { border-color: #16a34a; color: #15803d; } .marks .coming { border-color: #ca8a04; color: #854d0e; }
+  .marks .absent { border-color: #dc2626; color: #b91c1c; }
+  #clearAll { margin-top: 10px; }
+  #restore { margin-top: 8px; }
+  /* what each user may do */
+  .perms { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13.5px; }
+  .perms label { display: flex; align-items: center; gap: 5px; }
+  .perms input { width: 17px; height: 17px; margin: 0; }
 
   /* footer: who made the app and how to reach them */
   .footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 18px;
@@ -91,6 +120,12 @@
   <section id="panel" class="hidden">
     <div class="bar"><div><h1>एडमिन</h1><div class="sub" id="meText" style="margin:0"></div></div>
       <span class="row"><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
+
+    <div class="card">
+      <div class="bar2"><h2>वार्ड अनुसार प्रगति</h2><button class="btn ghost" id="reload" type="button">ताज़ा करें</button></div>
+      <div id="prog"></div>
+      <div class="foot" id="progFoot"></div>
+    </div>
 
     <div class="card">
       <h2>नया व्यक्ति जोड़ें</h2>
@@ -137,13 +172,27 @@
       <div id="list"></div>
       <div class="msg" id="listMsg"></div>
     </div>
+
+    <div class="card">
+      <h2>पर्चियों के निशान हटाएं</h2>
+      <p class="sub" style="margin-bottom:8px">बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।</p>
+      <select id="mkVillage" aria-label="गाँव"></select>
+      <div class="marks">
+        <button type="button" class="done" data-s="done"><b>0</b>पूरा हुआ<small>हटाएं</small></button>
+        <button type="button" class="coming" data-s="coming"><b>0</b>आ रहे हैं<small>हटाएं</small></button>
+        <button type="button" class="absent" data-s="absent"><b>0</b>उपलब्ध नहीं<small>हटाएं</small></button>
+      </div>
+      <button class="btn ghost full" id="clearAll" type="button">सभी निशान हटाएं</button>
+      <button class="btn ghost full hidden" id="restore" type="button"></button>
+      <div class="msg" id="marksMsg"></div>
+    </div>
   </section>
 
 </div>
 <footer class="footer">
   <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
   <a href="mailto:contact@digyai.com">contact@digyai.com</a>
-  <a href="https://wa.me/918107244972" target="_blank" rel="noopener">WhatsApp +91 8107244972</a>
+  <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
   <span>Mon–Sat, 10:00–19:00 IST</span>
 </footer>
 <script>
@@ -157,7 +206,7 @@ const store = {
   set(v) { try { localStorage.setItem('tok:admin', v); } catch (e) {} },
   del() { try { localStorage.removeItem('tok:admin'); sessionStorage.removeItem('tok:admin'); } catch (e) {} },
 };
-let token = store.get(), me = null, users = [], admins = [], filter = 'on', villages = {};
+let token = store.get(), me = null, users = [], admins = [], filter = 'on', villages = {}, progress = [];
 const MSG = {
   wrong: 'पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
   not_admin: 'यह एडमिन पासवर्ड नहीं है', retired: 'यह पासवर्ड बंद कर दिया गया है',
@@ -166,6 +215,7 @@ const MSG = {
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
   phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
+  no_backup: 'वापस लाने के लिए कुछ नहीं है',
 };
 // 919876543210 → "+91 98765 43210"
 const showPhone = (p) => (/^91\d{10}$/.test(p) ? `+91 ${p.slice(2, 7)} ${p.slice(7)}` : p ? `+${p}` : '');
@@ -196,7 +246,7 @@ async function openPanel() {
   me = r.me; users = r.users; admins = r.admins || [];
   for (const v of r.villageList || []) villages[v.slug] = v;
   if (SLUG && villages[SLUG]) document.title = `एडमिन · ${vName(SLUG)} · मतदाता खोज`;
-  setup();
+  setup(); showMarks(r);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
 }
 $('loginForm').addEventListener('submit', async (e) => {
@@ -219,6 +269,10 @@ function setup() {
   const mine = me.villages.filter((s) => villages[s]);
   $('meText').textContent = me.role === 'super' ? 'सुपर एडमिन · सभी गाँव' : `${me.name} · ${mine.map(vName).join(', ')}`;
   const pick = mine.includes(SLUG) ? SLUG : mine.length === 1 ? mine[0] : '';
+  $('mkVillage').length = 0;
+  for (const s of mine) $('mkVillage').add(new Option(vName(s), s));
+  $('mkVillage').value = pick || mine[0] || '';
+  $('mkVillage').classList.toggle('hidden', mine.length < 2);
   for (const id of ['newVillage', 'fVillage']) {
     const sel = $(id);
     sel.length = 1;
@@ -245,7 +299,88 @@ const checkedIn = (box) => [...box.querySelectorAll('input:checked')].map((c) =>
 async function refresh() {
   const r = await api({ action: 'list' });
   if (r.error) { $('listMsg').textContent = errText(r); return; }
-  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; render();
+  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; render(); showMarks(r);
+}
+$('reload').addEventListener('click', refresh);
+// polling day: keep the numbers fresh while the page is open
+setInterval(() => { if (!document.hidden && !$('panel').classList.contains('hidden')) refresh(); }, 60000);
+
+// ---------- progress per ward, one table per village ----------
+function showProgress() {
+  const box = $('prog'); box.innerHTML = '';
+  for (const v of progress) {
+    if (progress.length > 1) box.append(el('div', 'vh', v.name));
+    const t = el('table', 'prog');
+    t.innerHTML = '<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ पूरा</th><th class="c-coming">आ रहे</th><th class="c-absent">नहीं</th><th>बाकी</th></tr></thead>';
+    const body = el('tbody');
+    const sum = { total: 0, done: 0, coming: 0, absent: 0 };
+    for (const w of v.wards) for (const k of Object.keys(sum)) sum[k] += w[k];
+    for (const w of [...v.wards, sum]) {
+      const left = w.total - w.done - w.coming - w.absent;
+      const tr = el('tr', w === sum ? 'sum' : null);
+      tr.append(el('td', null, w === sum ? 'कुल' : `वार्ड ${w.ward}`), el('td', null, w.total),
+        el('td', 'c-done', w.done), el('td', 'c-coming', w.coming), el('td', 'c-absent', w.absent), el('td', null, left));
+      const bar = el('tr', 'mrow'), td = el('td'); td.colSpan = 6;
+      const m = el('div', 'meter');
+      for (const k of ['done', 'coming', 'absent']) { const i = el('i', k); i.style.width = `${(100 * w[k]) / (w.total || 1)}%`; m.append(i); }
+      td.append(m); bar.append(td);
+      body.append(tr, bar);
+    }
+    t.append(body); box.append(t);
+  }
+  $('progFoot').textContent = `आपने ${me.marked || 0} पर्चियों पर निशान लगाए · हर मिनट अपने-आप ताज़ा होता है`;
+}
+
+// ---------- status marks on the slips: how many of each, and clearing them (the last clear can be undone) ----------
+const MARK_NAME = { done: 'पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
+function showMarks(r) {
+  if (r.progress) progress = r.progress;
+  showProgress();
+  const v = progress.find((x) => x.slug === $('mkVillage').value) || { marks: { done: 0, coming: 0, absent: 0 }, backup: null };
+  $('restore').classList.toggle('hidden', !v.backup);
+  if (v.backup) $('restore').textContent = `↺ ${fmt(v.backup.at)} को हटाए गए ${v.backup.n} निशान वापस लाएं`;
+  document.querySelectorAll('.marks button').forEach((b) => { b.querySelector('b').textContent = v.marks[b.dataset.s]; b.disabled = !v.marks[b.dataset.s]; });
+  $('clearAll').disabled = !(v.marks.done + v.marks.coming + v.marks.absent);
+}
+async function clearMarks(status) {
+  const slug = $('mkVillage').value, v = progress.find((x) => x.slug === slug);
+  if (!v) return;
+  const n = status === 'all' ? v.marks.done + v.marks.coming + v.marks.absent : v.marks[status];
+  const what = status === 'all' ? 'सभी' : `"${MARK_NAME[status]}" के सभी`;
+  if (!confirm(`${vName(slug)}: ${what} ${n} निशान हटाएं? गलती हो तो "वापस लाएं" से ये निशान लौट आएंगे (सिर्फ़ आखिरी बार हटाए गए)।`)) return;
+  const r = await api({ action: 'clearMarks', village: slug, status });
+  if (r.error) { $('marksMsg').textContent = errText(r); return; }
+  $('marksMsg').textContent = ''; showMarks(r);
+}
+$('restore').addEventListener('click', async () => {
+  if (!confirm('आखिरी बार हटाए गए निशान वापस लाएं? उसके बाद लगे नए निशान भी बने रहेंगे।')) return;
+  const r = await api({ action: 'restoreMarks', village: $('mkVillage').value });
+  if (r.error) { $('marksMsg').textContent = errText(r); return; }
+  $('marksMsg').textContent = ''; showMarks(r);
+});
+document.querySelectorAll('.marks button').forEach((b) => b.addEventListener('click', () => clearMarks(b.dataset.s)));
+$('clearAll').addEventListener('click', () => clearMarks('all'));
+$('mkVillage').addEventListener('change', () => showMarks({}));
+
+// what a user may do besides searching by name (the server checks these on every request)
+const PERM_NAME = { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट' };
+const HEAVY = 500;   // searches in a day that get a yellow badge: a sign the list is being copied
+function permBoxes(u) {
+  const box = el('div', 'perms');
+  for (const [p, label] of Object.entries(PERM_NAME)) {
+    const l = el('label'), c = el('input');
+    c.type = 'checkbox'; c.checked = u.perms.includes(p);
+    c.addEventListener('change', async () => {
+      const want = [...box.querySelectorAll('input')].map((x, i) => x.checked && Object.keys(PERM_NAME)[i]).filter(Boolean);
+      box.querySelectorAll('input').forEach((x) => { x.disabled = true; });
+      const r = await api({ action: 'perms', id: u.id, perms: want });
+      box.querySelectorAll('input').forEach((x) => { x.disabled = false; });
+      if (r.error) { c.checked = !c.checked; $('listMsg').textContent = errText(r); return; }
+      u.perms = r.user.perms;
+    });
+    l.append(c, label); box.append(l);
+  }
+  return box;
 }
 
 // ---------- new password box ----------
@@ -334,6 +469,7 @@ function person(u) {
   if (isAdmin) for (const s of u.villages) nm.append(el('span', 'badge vil', vName(s)));
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (u.kicks) nm.append(el('span', 'badge warn', `एक साथ दो फ़ोन: ${u.kicks} बार`));
+  if (!isAdmin && u.searchesToday >= HEAVY) nm.append(el('span', 'badge warn', `आज ${u.searchesToday} खोज`));
   const info = el('div', 'info', `बनाया: ${fmt(u.created)} · आखिरी इस्तेमाल: ${fmt(u.lastSeen)}` + (u.retired ? ` · बंद किया: ${fmt(u.retiredAt)}` : ''));
   const sess = el('div', 'info', u.loggedIn
     ? `अभी लॉगिन: ${u.sessionDevice || '—'} · IP ${u.sessionIp || '—'} · ${fmt(u.sessionAt)} से`
@@ -346,7 +482,9 @@ function person(u) {
     if (v !== null) act({ action: 'phone', id: u.id, phone: v });
   });
   ph.append(edit);
-  row.append(nm, ph, info, sess);
+  const use = el('div', 'info', isAdmin ? `${u.marked} पर्चियों पर इनके निशान` : `आज ${u.searchesToday} खोज · ${u.marked} पर्चियों पर इनके निशान`);
+  row.append(nm, ph, info, sess, use);
+  if (!isAdmin && !u.retired) row.append(permBoxes(u));
 
   const actions = el('div', 'actions');
   if (isAdmin) {   // superadmin: change which villages this admin looks after
@@ -386,7 +524,7 @@ function person(u) {
 }
 
 // ---------- start: open straight in if this device is logged in (the village names come with the list) ----------
-if (token) openPanel();
+if (token) { $('login').classList.add('hidden'); openPanel(); }   // no login form flashing while the saved login is checked
 </script>
 </body>
 </html>

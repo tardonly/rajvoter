@@ -16,7 +16,15 @@ only receive the cards that match a search. Every search checks that the user's 
 - **Village admin** — created by the superadmin. Searches only their villages and adds/manages users only there.
   Cannot see or create other admins.
 - **User** — belongs to exactly one village; their password only opens that village. Opening another village's
-  page with it shows "यह पासवर्ड … का है" with a link to the right village.
+  page with it shows "यह पासवर्ड … का है" with a link to the right village. Besides searching by name, a user can do
+  only what their admin ticks under their name on the admin page (the server checks this on every request):
+  - **निशान लगा सकते हैं** — set marks on slips
+  - **पूरा वार्ड देख सकते हैं** — list a whole ward with no name typed
+  - **वार्ड की सभी पर्चियाँ** — print / save a whole ward's slips
+  - **पर्ची प्रिंट** — the प्रिंट / PDF button on a slip
+
+  New users (and users added before these boxes existed) start with only **पर्ची प्रिंट**. A change reaches the
+  person's phone on their next search, or within a minute. Admins and the superadmin can always do everything.
 
 To add a user the admin must pick the **village** from the dropdown (only their own villages are listed).
 
@@ -67,15 +75,31 @@ Log in with the superadmin password or a village admin's password (or log into a
 - **नया पासवर्ड:** new password for the same person (e.g. they forgot it); the old one stops working.
 - **लॉग आउट करें:** ends the person's current session; they can log in again with the same password.
 
-## Slips and voter marks (on the village search page)
-- **प्रिंट / PDF** on every slip (everyone): prints that one slip in the top-left corner of an A4 page. To download
-  instead, choose **Save as PDF** in the phone's print screen (iPhone: Print → share → Save to Files).
-- **वार्ड N की सभी पर्चियाँ** (admins only, after choosing a ward): every voter of that ward in box order, two slips per
-  row (about 10 per A4 page), to print or save as one PDF.
-- **Marks** (village admins and the superadmin only): under each slip, **पूरा हुआ** (green), **आ रहे हैं** (yellow,
-  on the way) or **उपलब्ध नहीं** (red, not available). Tapping the lit button again removes it. Every user of the village
-  sees the coloured bar on that slip; phones showing it pick up new marks within a minute (and at once when the app is
-  reopened), without searching again. Marks are kept per village in the database (`mark:<village>`, with the time set).
+## Search page
+- **Search** by name or father/husband name (Hindi or English), box number with a ward chosen, `3/25` (ward 3, box 25)
+  or Voter ID. Choosing only a ward lists the whole ward in box order, 10 at a time (people allowed to).
+- **Filter by mark** (once a ward is chosen): सभी, सिर्फ़ बिना निशान वाले, पूरा हुआ, आ रहे हैं, उपलब्ध नहीं. Marking slips
+  while going through the unmarked list doesn't skip anyone on the next page.
+- **परिवार** on a slip opens everyone else at the same house number in that ward, as full slips.
+- **अ+** (top right) makes the slips and search boxes bigger; the phone remembers it.
+
+## Slips and voter marks
+- **प्रिंट / PDF** on a slip: prints that one slip in the top-left corner of an A4 page. To download instead, choose
+  **Save as PDF** in the phone's print screen (iPhone: Print → share → Save to Files).
+- **वार्ड N की सभी पर्चियाँ** (after choosing a ward): every voter of that ward in box order, two slips per row (about
+  10 per A4 page), to print or save as one PDF.
+- **Marks**: under each slip, **पूरा हुआ** (green), **आ रहे हैं** (yellow, on the way) or **उपलब्ध नहीं** (red, not
+  available). Tapping the lit button again removes it. Every user of the village sees the coloured bar with who set it
+  and when (e.g. "आ रहे हैं · Ramesh, 4 नव॰, 10:30 am"); phones showing the slip pick up new marks within a minute (and at
+  once when the app is reopened), without searching again. Marks are kept per village in the database (`mark:<village>`).
+
+## Admin page extras
+- **वार्ड अनुसार प्रगति** (top): for each of your villages and wards, the total, ✓ पूरा, आ रहे, नहीं and बाकी, with a
+  coloured bar and a total row. It refreshes every minute.
+- Each person shows **आज N खोज** (searches today) and how many slips carry their marks; 500 or more searches in a day
+  get a yellow badge (a sign the list is being copied).
+- **पर्चियों के निशान हटाएं**: pick the village, then remove all marks of one colour, or all of them. After clearing,
+  **↺ … निशान वापस लाएं** puts them back; only the most recent clear of each village can be undone.
 
 **One phone at a time:** users and village admins each get one session; opening the same password on a second
 phone logs the first one out on its next request. The admin list shows each person's current phone, IP and login

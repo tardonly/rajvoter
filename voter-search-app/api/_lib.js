@@ -135,27 +135,49 @@ function route(fn) {
 //         | 'other_village' (slug given and this login is not for that village)
 async function whoIs(token, slug) {
   if (isAdminToken(token)) {
-    return { id: 'admin', name: 'सुपर एडमिन', role: 'super', admin: true, villages: Object.keys(VILLAGES), status: 'ok' };
+    return { id: 'admin', name: 'सुपर एडमिन', role: 'super', admin: true, villages: Object.keys(VILLAGES), status: 'ok', perms: PERMS.slice() };
   }
   const t = parseToken(token);
   const user = t && t.id !== 'admin' ? await getUser(t.id) : null;
   if (!user) return null;
   user.admin = user.role === 'admin';
+  user.perms = user.admin ? PERMS.slice() : permsOf(user);
   user.status = user.retired === '1' ? 'retired' : !user.session ? 'logged_out' : user.session !== t.sid ? 'other_device'
     : slug != null && !user.villages.includes(slug) ? 'other_village' : 'ok';
   user.sid = t.sid;
   return user;
 }
 
-// Status marks admins put on voters, one Redis hash per village "mark:<village>": field "<ward>:<box>",
-// value "<status>|<time set>". Everyone who can open the village sees them on the slips.
+// What a user may do besides searching by name; their village admin (or the superadmin) turns these on and off per
+// person. Admins and the superadmin can do all of them.
+//   mark: set status marks on slips · ward: list a whole ward without a name · wardPdf: print / save a whole ward's
+//   slips · print: the प्रिंट / PDF button on a slip
+const PERMS = ['mark', 'ward', 'wardPdf', 'print'];
+const DEFAULT_PERMS = ['print'];   // for new users, and users added before permissions existed
+const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
+// today's date in India, for the per-person daily search count
+const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+
+// Status marks put on voters, one Redis hash per village "mark:<village>": field "<ward>:<box>",
+// value "<status>|<time>|<who's id>|<who's name>" (older marks have only "<status>|<time>" or "<status>").
+// Everyone who can open the village sees them on the slips, with who set them and when.
 const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the way · red: not available
 const markKey = (v) => `${parseInt(v.ward, 10)}:${parseInt(v.box, 10)}`;
+function parseMark(val) {
+  const [m = '', at = '', byId = '', by = ''] = val ? String(val).split('|') : [];
+  return { m, at, byId, by };
+}
 async function marksFor(slug, keys) {
   if (!keys.length) return [];
   const vals = (await redis('HMGET', `mark:${slug}`, ...keys)) || [];
-  return keys.map((k, i) => (vals[i] ? String(vals[i]).split('|')[0] : ''));
+  return keys.map((k, i) => parseMark(vals[i]));
+}
+async function allMarks(slug) {   // "<ward>:<box>" → parsed mark, for every marked slip of the village
+  const flat = (await redis('HGETALL', `mark:${slug}`)) || [];
+  const out = {};
+  for (let i = 0; i < flat.length; i += 2) out[flat[i]] = parseMark(flat[i + 1]);
+  return out;
 }
 
-module.exports = { MARKS, markKey, marksFor, village, villageList, redis, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+module.exports = { MARKS, markKey, parseMark, marksFor, allMarks, PERMS, DEFAULT_PERMS, permsOf, today, village, villageList, redis, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };

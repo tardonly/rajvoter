@@ -6,6 +6,9 @@
     },
     "api/mark.js": {
       "includeFiles": "api/_data/**"
+    },
+    "api/admin.js": {
+      "includeFiles": "api/_data/**"
     }
   },
   "rewrites": [

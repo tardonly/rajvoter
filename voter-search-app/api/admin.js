@@ -1,6 +1,7 @@
 // POST {token, action, ...}   token = from logging in (api/unlock) as the superadmin or a village admin
 // The superadmin manages everything. A village admin sees and manages only the users of their assigned villages.
-//   action "list" [, village]          → {me: {role, name, villages}, users: [...], admins: [...] (superadmin only)}
+//   action "list" [, village]          → {me: {role, name, villages, marked}, users: [...], admins: [...] (superadmin only),
+//                                         progress}   users carry perms, searchesToday and marked (slips with their marks)
 //   action "add", village, name, phone → {user, password}   new user of one village (must be one of the admin's villages)
 //   action "add_admin", name, phone, villages: [slug, ...] → {user, password}            (superadmin only)
 //   action "villages", id, villages: [slug, ...]           → {user}   change an admin's villages (superadmin only)
@@ -8,10 +9,18 @@
 //   action "retire", id         → {ok}               (password stops working; the phone is logged out at once)
 //   action "logout", id         → {ok}               (ends the person's current session; they can log in again)
 //   action "phone",  id, phone  → {user}             (add or change the person's WhatsApp number; "" removes it)
+//   action "perms",  id, perms  → {user}             (what a user may do: any of 'mark', 'ward', 'wardPdf', 'print')
+//   action "clearMarks", village, status → {progress}   (removes every 'done' | 'coming' | 'absent' mark of the village,
+//                                                       or 'all' of them; the removed marks are kept as a backup first)
+//   action "restoreMarks", village       → {progress}   (puts back the marks removed by that village's last clearMarks)
+// progress: [{slug, name, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}], backup: {n, at} | null}]
+//   one entry per village of this admin: how many slips carry each mark, overall and per ward.
 // The password is shown to the admin once; only its hash is stored.
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
-const { village, villageList, redis, pwHash, whoIs, newPassword, getUser, blocked, failed, send, route } = require('./_lib.js');
+const { load } = require('./_search.js');
+const { village, villageList, MARKS, PERMS, permsOf, allMarks, today, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
+  send, route } = require('./_lib.js');
 
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
 function normPhone(s) {
@@ -29,6 +38,27 @@ function villageSlugs(list) {
   return ok.length ? ok : null;
 }
 
+// how many slips of a village carry each mark, overall and per ward, and the backup its last "clear" left
+async function markSummary(slug, all) {
+  all ||= await allMarks(slug);
+  const zero = () => Object.fromEntries(MARKS.map((m) => [m, 0]));
+  const marks = zero(), perWard = {};
+  for (const r of load(slug).rows) {
+    perWard[r.ward] ||= { ward: r.ward, total: 0, ...zero() };
+    perWard[r.ward].total++;
+  }
+  for (const [key, { m }] of Object.entries(all)) {
+    if (!MARKS.includes(m)) continue;
+    marks[m]++;
+    const w = perWard[key.split(':')[0]];
+    if (w) w[m]++;
+  }
+  const bk = await redis('GET', `mark:${slug}:backup`);
+  let backup = null;
+  try { if (bk) { const j = JSON.parse(bk); backup = { n: j.flat.length / 2, at: j.at }; } } catch (e) { /* ignore a broken backup */ }
+  return { slug, name: village(slug).name, marks, wards: Object.values(perWard).sort((a, b) => a.ward - b.ward), backup };
+}
+
 async function freshPassword() {
   for (;;) {
     const pw = newPassword();
@@ -37,6 +67,7 @@ async function freshPassword() {
 }
 
 const view = (u) => ({
+  perms: u.role === 'user' ? permsOf(u) : PERMS.slice(),
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
@@ -61,10 +92,42 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'list') {
     const ids = (await redis('SMEMBERS', 'users')) || [];
     const all = (await Promise.all(ids.map(getUser))).filter(Boolean).sort((x, y) => (x.created < y.created ? 1 : -1));
-    const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(view);
-    const admins = isSuper ? all.filter((u) => u.role === 'admin').map(view) : undefined;
-    return send(res, 200, { me: { role: me.role, name: me.name, villages: me.villages }, users, admins,
-      villageList: villageList(me.villages) });   // names of my villages (the list is not public)
+    // marks of my villages: progress, and how many slips each person marked
+    const marksBy = await Promise.all(me.villages.map((s) => allMarks(s)));
+    const progress = await Promise.all(me.villages.map((s, i) => markSummary(s, marksBy[i])));
+    const marked = {};
+    for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
+    const day = today();
+    const searches = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, Number(await redis('GET', `searches:${id}:${day}`)) || 0])));
+    const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, marked: marked[u.id] || 0 });
+    const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(withUse);
+    const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
+    return send(res, 200, { me: { role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins,
+      villageList: villageList(me.villages), progress });   // names of my villages (the list is not public)
+  }
+
+  if (b.action === 'clearMarks' || b.action === 'restoreMarks') {
+    if (!village(b.village)) return send(res, 400, { error: 'no_village' });
+    if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
+    const key = `mark:${b.village}`, backupKey = `mark:${b.village}:backup`;
+    if (b.action === 'clearMarks') {
+      if (b.status !== 'all' && !MARKS.includes(b.status)) return send(res, 400, { error: 'bad_mark' });
+      const flat = (await redis('HGETALL', key)) || [];
+      const gone = [];
+      for (let i = 0; i < flat.length; i += 2) if (b.status === 'all' || String(flat[i + 1]).split('|')[0] === b.status) gone.push(flat[i], flat[i + 1]);
+      if (gone.length) {
+        await redis('SET', backupKey, JSON.stringify({ at: now, flat: gone }));   // only the last clear can be undone
+        const keys = gone.filter((x, i) => i % 2 === 0);
+        for (let i = 0; i < keys.length; i += 500) await redis('HDEL', key, ...keys.slice(i, i + 500));
+      }
+    } else {
+      const bk = await redis('GET', backupKey);
+      if (!bk) return send(res, 404, { error: 'no_backup' });
+      const { flat } = JSON.parse(bk);
+      for (let i = 0; i < flat.length; i += 1000) await redis('HSET', key, ...flat.slice(i, i + 1000));
+      await redis('DEL', backupKey);
+    }
+    return send(res, 200, { progress: await Promise.all(me.villages.map((s) => markSummary(s))) });
   }
 
   if (b.action === 'add' || b.action === 'add_admin') {
@@ -101,6 +164,13 @@ module.exports = route(async (req, res, b) => {
     const vs = villageSlugs(b.villages);
     if (!vs) return send(res, 400, { error: 'no_village' });
     await redis('HSET', `user:${user.id}`, 'villages', vs.join(','));
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'perms') {
+    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });   // admins can always do everything
+    const perms = PERMS.filter((p) => Array.isArray(b.perms) && b.perms.includes(p));
+    await redis('HSET', `user:${user.id}`, 'perms', perms.join(','));
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

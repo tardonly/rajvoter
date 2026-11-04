@@ -43,7 +43,10 @@
   .villages { display: grid; gap: 8px; margin-top: 4px; }
   .villages a { display: block; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink);
     text-decoration: none; font-size: 18px; font-weight: 600; }
-  .linkbtn { margin-top: 16px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 14px; font-size: 14px; color: var(--muted); }
+  .homebar { display: flex; justify-content: flex-end; gap: 6px; margin: -10px -6px 6px; }
+  .homebar a, .homebar button { border-radius: 8px; padding: 5px 12px; font-size: 14px; text-decoration: none; }
+  #homeAdmin { background: var(--accent); color: #fff; font-weight: 600; }
+  #homeOut { border: 1px solid var(--line); background: #fff; color: var(--muted); }
   .villages a small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
 
   /* search screen */
@@ -88,6 +91,20 @@
   .slip .kendra { border-top: 1px solid #222; margin: 6px 6px 0; padding: 4px 4px 3px; font-size: 13px; text-align: center; }
   .slip .time { background: var(--pink); color: #fff; text-align: center; font-size: 13px; padding: 3px 4px; }
   #more { margin: 4px auto 0; display: block; width: auto; padding: 10px 22px; font-size: 16px; }
+  #qMark { font-size: 15px; padding: 8px 10px; }
+  #bigBtn { font-weight: 700; color: var(--ink); }
+  #bigBtn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .slip .tools { display: flex; flex-wrap: wrap; gap: 6px; justify-self: start; align-self: start; }
+  .slip .tools .fam { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 9px; font-size: 13px; color: var(--ink); font-weight: 600; }
+  .slip .tools .fam.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .family { margin: -4px 0 14px 10px; padding: 8px 0 0 10px; border-left: 3px solid var(--accent); }
+  .family .fh { font-size: 13.5px; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
+  .family .slip:last-child { margin-bottom: 0; }
+  .slip .bar small { font-weight: 400; font-size: 12px; margin-left: 8px; opacity: .9; }
+  /* bigger text (अ+ button), remembered on this phone */
+  html.big .slip, html.big .family .fh, html.big .hint { zoom: 1.2; }
+  html.big .fields input, html.big .fields select { font-size: 20px; }
+  html.big #count { font-size: 15px; }
   .pbtn { justify-self: start; align-self: start; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
 
@@ -150,24 +167,31 @@
 
 <section id="home" class="hidden">
   <div class="lockbox">
+    <div class="homebar"><a id="homeAdmin" class="hidden" href="/admin">एडमिन</a><button id="homeOut" type="button">लॉग आउट</button></div>
     <img src="/icon-192.png" alt="">
     <h1>मतदाता खोज</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
     <div class="villages" id="villages"></div>
-    <button class="linkbtn" id="homeOut" type="button">लॉग आउट</button>
   </div>
 </section>
 
 <section id="app" class="hidden">
   <header>
     <div class="titlebar"><b><span class="appname">मतदाता खोज · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / बॉक्स नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row2">
         <input id="qRel" type="search" placeholder="पिता / पति का नाम" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
         <select id="qWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
       </div>
+      <select id="qMark" class="hidden" aria-label="निशान से छाँटें">
+        <option value="">सभी मतदाता (निशान कोई भी)</option>
+        <option value="none">सिर्फ़ बिना निशान वाले</option>
+        <option value="done">सिर्फ़ ✓ पूरा हुआ</option>
+        <option value="coming">सिर्फ़ आ रहे हैं</option>
+        <option value="absent">सिर्फ़ उपलब्ध नहीं</option>
+      </select>
     </div>
     <div class="countrow"><div id="count"></div><button id="wardPrint" class="hidden" type="button"></button></div>
   </header>
@@ -180,7 +204,7 @@
 <footer class="footer">
   <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
   <a href="mailto:contact@digyai.com">contact@digyai.com</a>
-  <a href="https://wa.me/918107244972" target="_blank" rel="noopener">WhatsApp +91 8107244972</a>
+  <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
   <span>Mon–Sat, 10:00–19:00 IST</span>
 </footer>
 
@@ -222,9 +246,14 @@ const MSG = {
   other_village: 'यह पासवर्ड इस गाँव का नहीं है',
   not_admin: 'यह काम सिर्फ़ एडमिन कर सकते हैं',
   not_found: 'यह मतदाता नहीं मिला',
+  no_mark: 'निशान लगाने की अनुमति नहीं है — एडमिन से पूछें',
+  no_pdf: 'पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें',
+  no_ward_list: 'पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें',
 };
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
-let IS_ADMIN = false;   // admins can mark voters and print a whole ward
+// What this login may do besides searching by name (admins: everything); the server checks these on every request.
+let IS_ADMIN = false, PERMS = [];
+const can = (p) => IS_ADMIN || PERMS.includes(p);
 async function api(path, payload) {
   let r;
   try {
@@ -246,10 +275,11 @@ function showLoading(msg) {
 function signOut(msg) {
   if (msg === MSG.other_village) return showLock(msg);   // keep an admin's login for their own villages
   store.del(tokKey);
-  $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('count').textContent = '';
+  $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('qMark').value = ''; $('count').textContent = '';
   showLock(msg);
 }
-function showApp(name, admin, villages) {
+function showApp(name, admin, villages, perms) {
+  PERMS = perms || [];
   $('who').textContent = name ? `उपयोगकर्ता: ${name}` : '';
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
@@ -273,7 +303,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  showApp(r.name, r.admin, r.villages);
+  showApp(r.name, r.admin, r.villages, r.perms);
 });
 $('lockBtn').addEventListener('click', () => {
   api('logout', { token: token() });   // close the session on the server; no need to wait
@@ -281,32 +311,51 @@ $('lockBtn').addEventListener('click', () => {
 });
 
 // ---------- search ----------
-let seq = 0, shown = 0, total = 0, last = null;
+let seq = 0, shown = 0, total = 0, lastBox = 0;
 function hint() {
   $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
-    'बॉक्स नंबर (जैसे <b>25</b>, वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।<br>' +
-    'सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।</div>';
+    'बॉक्स नंबर (जैसे <b>25</b>, वार्ड चुनकर, या <b>3/25</b> = वार्ड 3 का बॉक्स 25) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।' +
+    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') + '</div>';
 }
-async function search(offset = 0) {
-  const q = { name: $('qName').value.trim(), rel: $('qRel').value.trim(), ward: $('qWard').value };
+const FILTER = { none: 'बिना निशान वाले', done: '✓ पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
+async function search(more = false) {
+  const q = { name: $('qName').value.trim(), rel: $('qRel').value.trim(), ward: $('qWard').value, mark: $('qMark').value };
+  const named = !!(q.name || q.rel);
   $('count').classList.remove('bad');
-  if (!q.name && !q.rel && !q.ward) { hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }
+  wardButton();
+  $('qMark').classList.toggle('hidden', !q.ward);   // filter by mark once a ward is chosen
+  if (!q.ward) q.mark = '';
+  if (!named && !q.ward) { ++seq; hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }   // ++seq: drop a search still on its way
+  if (!named && !can('ward')) { ++seq; $('results').innerHTML = '';
+    $('count').textContent = MSG.no_ward_list; $('more').classList.add('hidden'); return; }
   const mine = ++seq;
-  if (!offset) $('count').textContent = 'खोज रहे हैं…';
-  const r = await api('search', { ...q, offset, token: token() });
+  if (!more) $('count').textContent = 'खोज रहे हैं…';
+  // a whole ward pages on from the last box shown, so slips marked meanwhile don't shift the list
+  const r = await api('search', { ...q, offset: more ? shown : 0, after: more ? lastBox : 0, token: token() });
   if (mine !== seq) return;                       // a newer search has started
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
-  last = q; total = r.total;
-  if (!offset) { $('results').innerHTML = ''; shown = 0; }
+  if (r.perms) updatePerms(r.perms);
+  total = r.total;
+  if (!more) { $('results').innerHTML = ''; shown = 0; }
   const frag = document.createDocumentFragment();
   for (const v of r.results) frag.appendChild(slip(v));
   $('results').appendChild(frag);
-  shown = r.offset + r.results.length;
-  const found = !q.name && !q.rel ? `वार्ड ${q.ward} के सभी ${total} मतदाता` : `${total} मतदाता मिले`;
-  $('count').textContent = total ? found + (total > shown ? ` · ${shown} दिखाए` : '') : 'कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें';
+  shown += r.results.length;
+  if (r.results.length) lastBox = r.results[r.results.length - 1].box;
+  const which = q.mark ? `${FILTER[q.mark]} ` : '';
+  const found = named ? `${total} ${which}मतदाता मिले` : `वार्ड ${q.ward} · ${q.mark ? which : 'सभी '}${total} मतदाता, बॉक्स क्रम में`;
+  $('count').textContent = total ? found + (total > shown ? ` · ${shown} दिखाए` : '')
+    : q.mark ? `वार्ड ${q.ward} में ${which}कोई मतदाता नहीं` : 'कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें';
   $('more').classList.toggle('hidden', !r.more);
+}
+// the admin can change what this person may do at any time; the next answer from the server says so
+function updatePerms(p) {
+  if (IS_ADMIN || p.join() === PERMS.join()) return;
+  PERMS = p;
+  wardButton();
+  if (shown) search();   // redraw the slips with the right buttons
 }
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -314,18 +363,24 @@ function kv(label, value) { const f = document.createDocumentFragment(); f.appen
 
 const MARKS = { done: '✓ पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
 
-// One slip. forPrint leaves out the buttons and the admin's mark.
-function slip(r, forPrint) {
+// One slip. forPrint leaves out the buttons and the mark; inFamily leaves out the परिवार button.
+function slip(r, forPrint, inFamily) {
   const [bhag, ...rest] = String(r.kendra || '').split('-');
   const d = el('div', 'slip');
   if (!forPrint) d.dataset.key = `${r.ward}:${r.box}`;
   const head = el('div', 'head');
-  if (forPrint) head.append(el('div'));
-  else {
+  const tools = el('div', 'tools');
+  if (!forPrint && can('print')) {
     const pb = el('button', 'pbtn', 'प्रिंट / PDF'); pb.type = 'button';
     pb.addEventListener('click', () => printSlips([r], `पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`));
-    head.append(pb);
+    tools.append(pb);
   }
+  if (!forPrint && !inFamily && String(r.house || '').trim()) {
+    const fb = el('button', 'fam', 'परिवार'); fb.type = 'button';
+    fb.addEventListener('click', () => toggleFamily(r, d, fb));
+    tools.append(fb);
+  }
+  head.append(tools);
   const meta = el('div', 'meta');
   const m1 = el('div'); m1.append(el('span', null, `पं.सं. ${VILLAGE.ps}`), el('span', null, `जि.प. ${VILLAGE.zp}`));
   const m2 = el('div'); m2.append(el('span', null, `वार्ड नं. : ${r.ward}`), el('span', null, `भाग सं. ${bhag.trim()}`));
@@ -349,7 +404,7 @@ function slip(r, forPrint) {
   if (forPrint) return d;
 
   d.prepend(el('div', 'bar'));
-  if (IS_ADMIN) {   // only village admins and the superadmin can mark; everyone sees the bar
+  if (can('mark')) {   // admins, and users their admin allowed to mark; everyone sees the bar
     const row = el('div', 'marks');
     for (const m of Object.keys(MARKS)) {
       const b = el('button', m, MARKS[m].replace('✓ ', '')); b.type = 'button'; b.dataset.m = m;
@@ -358,33 +413,62 @@ function slip(r, forPrint) {
     }
     d.append(row);
   }
-  showMark(d, r.mark);
+  d.dataset.by = r.markBy || ''; d.dataset.at = r.markAt || '';
+  showMark(d, r.mark, r.markBy, r.markAt);
   return d;
 }
 
-// ---------- status marks (admins set them; everyone sees the coloured bar) ----------
-function showMark(d, m) {
+// everyone else at the same house number in the ward, opened under the slip
+async function toggleFamily(r, d, btn) {
+  const open = d.nextElementSibling && d.nextElementSibling.classList.contains('family') ? d.nextElementSibling : null;
+  if (open) { open.remove(); btn.classList.remove('on'); btn.textContent = 'परिवार'; return; }
+  btn.disabled = true; btn.textContent = 'ला रहे हैं…';
+  const x = await api('search', { family: `${r.ward}:${r.box}`, token: token() });
+  btn.disabled = false; btn.textContent = 'परिवार';
+  if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
+  if (x.error) { alert(MSG[x.error] || MSG.server); return; }
+  const others = x.results.filter((v) => v.box !== r.box);
+  const box = el('div', 'family');
+  box.append(el('div', 'fh', others.length ? `मकान नं. ${r.house} · वार्ड ${r.ward} · इसी मकान के और ${others.length} मतदाता`
+    : `मकान नं. ${r.house} पर और कोई मतदाता नहीं`));
+  for (const v of others) box.append(slip(v, false, true));
+  d.after(box);
+  btn.classList.add('on'); btn.textContent = 'परिवार छुपाएं';
+}
+
+// ---------- status marks (set by admins and people allowed to; everyone sees the bar, who set it and when) ----------
+const when = (iso) => new Date(iso).toLocaleString('hi-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+function showMark(d, m, by, at) {
   if (MARKS[m]) d.dataset.mark = m; else delete d.dataset.mark;
-  d.querySelector('.bar').textContent = MARKS[m] || '';
+  const bar = d.querySelector('.bar');
+  bar.textContent = MARKS[m] || '';
+  if (MARKS[m] && (by || at)) bar.append(el('small', null, [by, at && when(at)].filter(Boolean).join(', ')));
   d.querySelectorAll('.marks button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
 }
 async function setMark(r, d, m) {
-  const before = d.dataset.mark || '';
-  const mark = before === m ? '' : m;            // tapping the lit button again removes the mark
+  const before = [d.dataset.mark || '', d.dataset.by || '', d.dataset.at || ''];
+  const mark = before[0] === m ? '' : m;         // tapping the lit button again removes the mark
   showMark(d, mark);                             // show it at once; undo if the server refuses
   const x = await api('mark', { token: token(), ward: r.ward, box: r.box, mark });
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
-  if (x.error) { showMark(d, before); alert(MSG[x.error] || MSG.server); return; }
-  r.mark = mark;
+  if (x.error) { showMark(d, ...before); alert(MSG[x.error] || MSG.server); return; }
+  r.mark = mark; d.dataset.by = x.by; d.dataset.at = x.at;
+  showMark(d, mark, x.by, x.at);
 }
 // marks set on another phone reach this one without a new search: every minute, and when the app comes back on screen
 async function refreshMarks() {
-  const slips = [...document.querySelectorAll('#results .slip[data-key]')];
+  const slips = [...document.querySelectorAll('#results .slip[data-key]')];   // family slips included
   if (!slips.length || document.hidden || !VILLAGE || $('app').classList.contains('hidden')) return;
   const x = await api('marks', { token: token(), keys: slips.map((d) => d.dataset.key) });
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
   if (!x.marks) return;
-  for (const d of slips) if (d.dataset.key in x.marks) showMark(d, x.marks[d.dataset.key]);
+  for (const d of slips) {
+    const k = x.marks[d.dataset.key];
+    if (!k) continue;
+    d.dataset.by = k.by; d.dataset.at = k.at;
+    showMark(d, k.m, k.by, k.at);
+  }
+  if (x.perms) updatePerms(x.perms);
 }
 setInterval(refreshMarks, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarks(); });
@@ -402,7 +486,7 @@ function printSlips(rows, title) {
 }
 function wardButton() {
   const w = $('qWard').value;
-  $('wardPrint').classList.toggle('hidden', !IS_ADMIN || !w);
+  $('wardPrint').classList.toggle('hidden', !can('wardPdf') || !w);
   $('wardPrint').textContent = `वार्ड ${w} की सभी पर्चियाँ · प्रिंट / PDF`;
 }
 $('wardPrint').addEventListener('click', async () => {
@@ -417,14 +501,25 @@ $('wardPrint').addEventListener('click', async () => {
 });
 
 let timer;
-for (const id of ['qName', 'qRel']) $(id).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => search(0), 300); });
-$('qWard').addEventListener('change', () => { wardButton(); search(0); });
-$('more').addEventListener('click', () => search(shown));
+for (const id of ['qName', 'qRel']) $(id).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => search(), 300); });
+$('qWard').addEventListener('change', () => search());
+$('qMark').addEventListener('change', () => search());
+$('more').addEventListener('click', () => search(true));
+
+// bigger text, remembered on this phone
+function setBig(on) {
+  document.documentElement.classList.toggle('big', on);
+  $('bigBtn').classList.toggle('on', on); $('bigBtn').setAttribute('aria-pressed', on);
+  store.set('big', on ? '1' : '', true);
+}
+setBig(store.get('big') === '1');
+$('bigBtn').addEventListener('click', () => setBig(!document.documentElement.classList.contains('big')));
 
 // ---------- start page: after login, the villages this password opens (just one → open it straight away) ----------
 function myVillages(list) {
   if (list.length === 1) return location.replace(`/${list[0].slug}`);
   $('lock').classList.add('hidden'); $('app').classList.add('hidden'); $('home').classList.remove('hidden');
+  $('homeAdmin').classList.toggle('hidden', savedLogin() !== 'tok:admin');   // superadmin and village admins
   $('homeMsg').textContent = list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
   const box = $('villages'); box.innerHTML = '';
   for (const v of list) {
@@ -477,7 +572,7 @@ async function openVillage(v) {
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
-  showApp(r.name, r.admin, r.villages);
+  showApp(r.name, r.admin, r.villages, r.perms);
 }
 
 (async () => {

@@ -83,6 +83,8 @@ function search(slug, { name = '', rel = '', ward = '' }) {
   const pool = ward ? rows.filter((r) => String(r.ward) === String(ward)) : rows;
   if (!name && !rel) return ward ? [...pool].sort((a, b) => a.box - b.box) : [];   // only a ward: all its voters in box order
   if (/^\d{1,4}$/.test(name) && !rel) return pool.filter((r) => r.box === +name);            // box number
+  const wb = !rel && name.match(/^(\d{1,3})\s*[/-]\s*(\d{1,4})$/);                            // "3/25" = ward 3, box 25
+  if (wb) return rows.filter((r) => r.ward === +wb[1] && r.box === +wb[2]);
   if ((/\d{3,}/.test(name) && /[a-z]/i.test(name)) || /^rj\W?\d/i.test(name)) {                // voter ID
     const k = name.replace(/[^A-Z0-9]/gi, '').toUpperCase();
     return pool.filter((r) => r._epic.includes(k));
@@ -101,7 +103,17 @@ function search(slug, { name = '', rel = '', ward = '' }) {
   return hits.map((h) => h[1]);
 }
 
+// everyone with the same house number in the same ward as voter "<ward>:<box>", by box number
+function family(slug, key) {
+  const [ward, box] = String(key).split(':').map(Number);
+  const { rows } = load(slug);
+  const me = rows.find((r) => r.ward === ward && r.box === box);
+  if (!me) return [];
+  if (!String(me.house || '').trim()) return [me];
+  return rows.filter((r) => r.ward === ward && r.house === me.house).sort((a, b) => a.box - b.box);
+}
+
 const publicFields = ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra }) =>
   ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra });
 
-module.exports = { load, search, publicFields };
+module.exports = { load, search, family, publicFields };
