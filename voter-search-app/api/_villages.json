@@ -63,6 +63,20 @@
   "panchayatSamiti": "सरदारशहर",
   "district": "चुरू"
  },
+ "momasar": {
+  "name": "मोमासर",
+  "title": "ग्राम पंचायत मोमासर",
+  "ps": 1,
+  "zp": 35,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 5 बजे तक",
+  "wards": [
+   29
+  ],
+  "voters": 321,
+  "deleted": 8,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
+ },
  "riri": {
   "name": "रीड़ी",
   "title": "ग्राम पंचायत रीड़ी",

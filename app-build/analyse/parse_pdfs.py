@@ -20,9 +20,11 @@ def spans(page):
 def parse(path):
     d = pymupdf.open(path)
     cover = d[0].get_text()
-    nums = lambda pat: (re.search(pat, cover) or [None, None])[1]
-    info = dict(ward=nums(r'रररर कमरपक : (\d+)'), zp=nums(r'नज॰ प॰ सदसज ननरररचन ककत : (\d+)'),
-                ps=nums(r'पप॰ स॰ सदसज ननरररचन ककत : (\d+)'), booth=nums(r'\n(\d+) - [^\n]*\n'))
+    nums = lambda pat, text=None: (re.search(pat, cover if text is None else text) or [None, None])[1]
+    # the garbled labels differ a little between PDFs (रररर / ररडर, ककत / कनत)
+    info = dict(ward=nums(r'रर[रड]र कमरपक : (\d+)') or nums(r'Ward No-0*(\d+)', os.path.basename(path)),
+                zp=nums(r'नज॰ प॰ सदसज ननरररचन क[कन]त : (\d+)'),
+                ps=nums(r'पप॰ स॰ सदसज ननरररचन क[कन]त : (\d+)'), booth=nums(r'\n(\d+) - [^\n]*\n'))
     # counts block after the booth line: start, end?, ..., male, female, third, total (order seen in text)
     m = re.search(r'\n\d+ - [^\n]*\n(\d+)\n(\d+)\nततलज ललग\n(\d+)\n(\d+)\n(\d+)\n(\d+)', cover)
     if m: info.update(last=int(m[1]), first=int(m[2]), male=int(m[3]), female=int(m[4]), third=int(m[5]), total=int(m[6]))
