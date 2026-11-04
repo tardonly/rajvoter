@@ -22,8 +22,8 @@ only receive the cards that match a search. Every search checks that the user's 
   - **पूरा वार्ड देख सकते हैं** — list a whole ward with no name typed
   - **वार्ड की सभी पर्चियाँ** — print / save a whole ward's slips
   - **पर्ची प्रिंट** — the प्रिंट / PDF button on a slip
-  - **वार्ड अनुसार प्रगति देख सकते हैं** — a green **प्रगति** button at the top of the app (next to where admins see
-    **एडमिन**) opens the per-ward table: कुल, वोट दिया, आ रहे, वोटर नहीं, बाकी, with a coloured bar per ward. A
+  - **वार्ड अनुसार प्रगति देख सकते हैं** — a green **वोटर रिपोर्ट** button at the top of the app (next to where admins
+    see **एडमिन**) opens the per-ward table (**↻ रिफ्रेश** reloads it, **✕** closes it): कुल, वोट दिया, आ रहे, वोटर नहीं, बाकी, with a coloured bar per ward. A
     candidate's worker sees only that candidate's marks; others see the village's own marks. Admins always have the
     button and see the village's own marks plus each candidate's. Not in the demo.
 
@@ -66,7 +66,9 @@ voter-search-app/         the website + API that Vercel runs
 { "name": "आडसर", "title": "ग्राम पंचायत आडसर", "ps": 3, "zp": 35, "pollTime": "मतदान समय : प्रातः 7 से सायं 6 बजे तक" }
 ```
 `ps` / `zp` are the पंचायत समिति / जिला परिषद निर्वाचन क्षेत्र numbers printed on the slips. Optional `panchayatSamiti`
-and `district` (e.g. `"सरदारशहर"`, `"चुरू"`) are shown under the village's name in the अपना गाँव चुनें list. Folder names must be
+and `district` (e.g. `"सरदारशहर"`, `"चुरू"`) are shown under the village's name in the अपना गाँव चुनें list. With more than
+5 villages (the superadmin's list, the demo) that list gets a **गाँव खोजें** box (Hindi or English, spelling need not be
+exact: "kitsar" finds कितासर) and a **पंचायत समिति** filter, which the phone remembers. Folder names must be
 lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 
 ## Adding a village

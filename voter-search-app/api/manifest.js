@@ -2,8 +2,12 @@
 // → the home-screen app details for that village, so "Add to Home screen" opens that village's page.
 const { village } = require('./_lib.js');
 
+// The village is read with the WHATWG URL API, not req.query: Vercel fills req.query with Node's url.parse(), which
+// logs a DEP0169 deprecation warning. Depending on the rewrite, req.url is "/api/manifest?village=<village>" or the
+// original "/<village>/manifest.webmanifest", so both are understood.
 module.exports = (req, res) => {
-  const v = village(req.query && req.query.village);
+  const u = new URL(req.url || '/', 'http://localhost');
+  const v = village(u.searchParams.get('village') || u.pathname.split('/')[1]);
   if (!v) { res.statusCode = 404; return res.end('not found'); }
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');

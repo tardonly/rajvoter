@@ -58,6 +58,11 @@
   .homebar a, .homebar button { border-radius: 8px; padding: 5px 12px; font-size: 14px; text-decoration: none; }
   #homeAdmin { background: var(--accent); color: #fff; font-weight: 600; }
   #homeOut { border: 1px solid var(--line); background: #fff; color: var(--muted); }
+  /* many villages: search box (spelling need not be exact) and a पंचायत समिति filter */
+  .vfind { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 8px; text-align: left; }
+  .vfind input, .vfind select { width: 100%; padding: 10px 12px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+  .vfind input:focus, .vfind select:focus { outline: none; border-color: var(--accent); }
+  .vfind .vcount { font-size: 12.5px; color: var(--muted); }
   .villages a small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
 
   /* search screen */
@@ -238,6 +243,11 @@
     <img src="/icon-192.png" alt="">
     <h1>मतदाता खोज</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
+    <div class="vfind hidden" id="vFind">
+      <input id="vSearch" type="search" placeholder="🔍 गाँव खोजें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
+      <select id="vPs" aria-label="पंचायत समिति"></select>
+      <div class="vcount" id="vCount"></div>
+    </div>
     <div class="villages" id="villages"></div>
   </div>
 </section>
@@ -702,6 +712,22 @@ function myVillages(list) {
   $('homeOut').classList.toggle('hidden', DEMO);
   $('homeMsg').textContent = DEMO ? `डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} खोज बाकी`
     : list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
+  homeList = list;
+  const many = list.length > 5;
+  $('vFind').classList.toggle('hidden', !many);
+  const sams = [...new Set(list.map((v) => v.panchayatSamiti).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'hi'));
+  $('vPs').replaceChildren(new Option('सभी पंचायत समिति', ''), ...sams.map((p) => new Option(`पंचायत समिति ${p}`, p)));
+  $('vPs').classList.toggle('hidden', sams.length < 2);
+  const keep = store.get('vPs');
+  $('vPs').value = sams.includes(keep) ? keep : '';
+  showVillages();
+}
+// the village cards, narrowed by the search box and the पंचायत समिति filter
+let homeList = [];
+function showVillages() {
+  const q = $('vSearch').value.trim(), ps = $('vPs').value;
+  let list = homeList.filter((v) => !ps || v.panchayatSamiti === ps);
+  if (q) list = list.map((v) => [villageScore(q, v), v]).filter(([sc]) => sc != null).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
   const box = $('villages'); box.innerHTML = '';
   for (const v of list) {
     const a = el('a', null, v.name); a.href = `/${v.slug}`; a.append(el('small', null, v.title));
@@ -709,6 +735,42 @@ function myVillages(list) {
     if (where) a.append(el('small', null, where));
     box.append(a);
   }
+  $('vCount').textContent = list.length ? `${list.length} गाँव` : 'कोई गाँव नहीं मिला — स्पेलिंग बदलकर देखें';
+}
+$('vSearch').addEventListener('input', showVillages);
+$('vPs').addEventListener('change', () => { store.set('vPs', $('vPs').value, true); showVillages(); });
+// Fuzzy village search, Hindi or English: the same folding as the voter search on the server (api/_search.js), so
+// "कितासर", "kitasar", "keetasar" and "kitsar" all find कितासर. Lower score = better; null = no match.
+function foldEn(s) {
+  s = String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+  s = s.replace(/ksh/g, 'x').replace(/chh/g, 'c').replace(/ch/g, 'c').replace(/sh/g, 's').replace(/ph/g, 'f')
+       .replace(/([kgbdtj])h/g, '$1').replace(/w/g, 'v').replace(/z/g, 'j').replace(/q/g, 'k')
+       .replace(/ee/g, 'i').replace(/oo/g, 'u').replace(/ay/g, 'ai').replace(/ai/g, 'e').replace(/au/g, 'o')
+       .replace(/y/g, 'i').replace(/m(?=[bp])/g, 'n');
+  return s.replace(/(.)\1+/g, '$1');
+}
+function foldHi(s) {
+  s = String(s || '').normalize('NFD').replace(/[\s\u093c\u094d\u0900-\u0903\u0970\u200c\u200d]/g, '');
+  return s.replace(/ी/g, 'ि').replace(/ू/g, 'ु').replace(/ै/g, 'े').replace(/ौ/g, 'ो').replace(/ॉ/g, 'ा')
+          .replace(/[शष]/g, 'स').replace(/[णञङ]/g, 'न');
+}
+function editsInside(q, t) {   // fewest edits that turn q into some part of t
+  let prev = new Array(t.length + 1).fill(0), cur = new Array(t.length + 1);
+  for (let i = 1; i <= q.length; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= t.length; j++) cur[j] = Math.min(prev[j - 1] + (q[i - 1] === t[j - 1] ? 0 : 1), prev[j] + 1, cur[j - 1] + 1);
+    [prev, cur] = [cur, prev];
+  }
+  return Math.min(...prev);
+}
+function villageScore(q, v) {
+  const hi = /[\u0900-\u097f]/.test(q);
+  const qq = hi ? foldHi(q) : foldEn(q);
+  if (!qq) return 0;
+  const t = hi ? foldHi(v.name) : foldEn(v.slug.replace(/^demo-/, ''));
+  const d = editsInside(qq, t), ok = qq.length <= 3 ? 0 : qq.length <= 7 ? 1 : 2;
+  if (d > ok) return null;
+  return d * 10 + (t.startsWith(qq) ? 0 : 5) + Math.abs(t.length - qq.length) * 0.05;
 }
 // the login kept on this phone: an admin's, or a person's (kept under their village)
 function savedLogin() {
