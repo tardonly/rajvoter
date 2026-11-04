@@ -9,6 +9,9 @@
     },
     "api/admin.js": {
       "includeFiles": "api/_data/**"
+    },
+    "api/progress.js": {
+      "includeFiles": "api/_data/**"
     }
   },
   "rewrites": [

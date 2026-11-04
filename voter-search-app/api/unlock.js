@@ -2,25 +2,27 @@
 //   a village admin of that village, or the superadmin password.
 // POST {password} (no village, from the admin page) → the same, but only for the superadmin or a village admin.
 // POST {password, home: true} (the start page) → the same for any active password; list = the villages it opens.
-// POST {village: 'demo', device} → a demo login for that phone (device = a random id the phone keeps), with left =
-//   how many of its demo searches remain. No password.
+// POST {village: 'demo' or 'demo-<village>', device} → a demo login for that phone (device = a random id the phone keeps),
+//   with left = how many of its demo searches remain and list = the demo villages. No password.
 // A password of another village → 403 {error: 'other_village', village, villageName} so the app can point there.
 // Each login starts a new session; a phone still using an older session of the same password is logged out
 // on its next request. The token is sent with every search; an admin token also opens the admin page.
-const { getCand, DEMO, isDevice, demoId, village, villageList, PERMS, permsOf, redis, pwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
+const { getCand, DEMO, demoSlugs, isDevice, demoId, village, villageList, PERMS, permsOf, redis, pwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
   deviceName, blocked, failed, send, route } = require('./_lib.js');
 
 const STILL_IN_USE_MS = 30 * 60 * 1000;   // previous phone used within 30 min → counts as "two phones at once"
 
 module.exports = route(async (req, res, { password, village: slug, home, device }) => {
   const v = slug ? village(slug) : null;
-  if (slug && !v) return send(res, 404, { error: 'no_village' });
-  if (v && v.demo) {
+  if (slug === DEMO.slug || (v && v.demo)) {
     if (!isDevice(device)) return send(res, 400, { error: 'device' });
     const used = Number(await redis('GET', `searches:${demoId(device)}`)) || 0;
     return send(res, 200, { name: 'डेमो', token: makeToken(demoId(device), 'demo'), admin: false, role: 'user', demo: true,
-      villages: [DEMO.slug], list: [], perms: [], left: Math.max(0, DEMO.searches - used) });
+      villages: demoSlugs(), list: demoSlugs().map((s) => village(s)).map(({ slug: s, name, title, panchayatSamiti, district }) =>
+        ({ slug: s, name, title, panchayatSamiti: panchayatSamiti || '', district: district || '' })),
+      perms: [], left: Math.max(0, DEMO.searches - used) });
   }
+  if (slug && !v) return send(res, 404, { error: 'no_village' });
   if (await blocked(req, 'unlock')) return send(res, 429, { error: 'too_many' });
   if (isAdminPassword(password)) {
     const list = villageList();

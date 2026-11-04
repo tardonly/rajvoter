@@ -30,6 +30,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { load } = require('./_search.js');
+const { markSummary, candsOf, groupsOf } = require('./_progress.js');
 const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
@@ -43,48 +44,16 @@ function normPhone(s) {
   if (!d.startsWith('91') && d.length >= 11 && d.length <= 15) return d;   // other countries, already with code
   return null;
 }
+// a village people and candidates can be added to: not a demo village ("demo-riri")
+const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 // list of village slugs from the request → only real villages, no repeats; null when none
 function villageSlugs(list) {
-  const ok = [...new Set((Array.isArray(list) ? list : []).filter((s) => village(s)))];
+  const ok = [...new Set((Array.isArray(list) ? list : []).filter((s) => realVillage(s)))];
   return ok.length ? ok : null;
-}
-
-// how many slips of a village (of one candidate's group) carry each mark, overall and per ward, and the backup its last
-// "clear" left
-async function markSummary(slug, cand, all) {
-  all ||= await allMarks(slug, cand.id);
-  const zero = () => Object.fromEntries(MARKS.map((m) => [m, 0]));
-  const marks = zero(), perWard = {};
-  const onRoll = new Set();
-  for (const r of load(slug).rows) {
-    perWard[r.ward] ||= { ward: r.ward, total: 0, ...zero() };
-    if (r.del) continue;   // struck off the roll: not counted
-    perWard[r.ward].total++;
-    onRoll.add(`${r.ward}:${r.box}`);
-  }
-  for (const [key, { m }] of Object.entries(all)) {
-    if (!MARKS.includes(m) || !onRoll.has(key)) continue;
-    marks[m]++;
-    const w = perWard[key.split(':')[0]];
-    if (w) w[m]++;
-  }
-  const bk = await redis('GET', `${markHash(slug, cand.id)}:backup`);
-  let backup = null;
-  try { if (bk) { const j = JSON.parse(bk); backup = { n: j.flat.length / 2, at: j.at }; } } catch (e) { /* ignore a broken backup */ }
-  return { key: `${slug}|${cand.id}`, slug, cand: cand.id, name: village(slug).name, candName: cand.name || '', marks,
-    wards: Object.values(perWard).sort((a, b) => a.ward - b.ward), backup };
 }
 
 const LIST_PAGE = 100;   // voters per page in the "marked" list
 
-// the candidates of these villages, oldest first
-async function candsOf(slugs) {
-  const ids = (await redis('SMEMBERS', 'cands')) || [];
-  return (await Promise.all(ids.map(getCand))).filter((c) => c && slugs.includes(c.village))
-    .sort((x, y) => (x.created < y.created ? -1 : 1));
-}
-// every mark group of these villages: the village's own marks ({id: ''}) and then each of its candidates
-const groupsOf = (slugs, cands) => slugs.flatMap((s) => [{ slug: s, cand: { id: '' } }, ...cands.filter((c) => c.village === s).map((c) => ({ slug: s, cand: c }))]);
 
 async function freshPassword() {
   for (;;) {
@@ -139,7 +108,7 @@ module.exports = route(async (req, res, b) => {
 
   // the mark group a request names: the village's own marks (no cand) or one of its candidates'
   async function groupOf() {
-    if (!village(b.village)) return { error: [400, 'no_village'] };
+    if (!realVillage(b.village)) return { error: [400, 'no_village'] };
     if (!mayUse(b.village)) return { error: [403, 'not_your_village'] };
     if (!b.cand) return { cand: { id: '' } };
     const c = await getCand(b.cand);
@@ -193,7 +162,7 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'cand_add') {
     const name = String(b.name || '').trim().slice(0, 60);
     if (!name) return send(res, 400, { error: 'name' });
-    if (!village(b.village)) return send(res, 400, { error: 'no_village' });
+    if (!realVillage(b.village)) return send(res, 400, { error: 'no_village' });
     if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
     const id = crypto.randomBytes(4).toString('hex');
     await redis('HSET', `cand:${id}`, 'name', name, 'village', b.village, 'created', now);
@@ -220,7 +189,7 @@ module.exports = route(async (req, res, b) => {
     if (phone === null) return send(res, 400, { error: 'phone' });
     let fields;
     if (b.action === 'add') {
-      if (!village(b.village)) return send(res, 400, { error: 'no_village' });
+      if (!realVillage(b.village)) return send(res, 400, { error: 'no_village' });
       if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
       fields = ['role', 'user', 'village', b.village];
       if (b.cand) {   // straight into a candidate's group

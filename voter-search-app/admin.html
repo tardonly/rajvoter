@@ -92,6 +92,12 @@
   .perms { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13.5px; }
   .perms label { display: flex; align-items: center; gap: 5px; }
   .perms input { width: 17px; height: 17px; margin: 0; }
+  .usage { margin-top: 8px; max-width: 420px; }
+  .usage .usetext { font-size: 14px; font-weight: 600; color: var(--ok); }
+  .usage .usebar { height: 12px; margin-top: 4px; border-radius: 6px; background: #e5e7eb; overflow: hidden; }
+  .usage .usebar div { height: 100%; min-width: 4px; background: #22c55e; }
+  .usage.mid .usetext { color: #a16207; } .usage.mid .usebar div { background: #eab308; }
+  .usage.high .usetext { color: var(--bad); } .usage.high .usebar div { background: #ef4444; }
   .limit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; font-size: 13.5px; }
   .limit input { width: 76px; padding: 6px 8px; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; }
   .limit button { padding: 6px 10px; font-size: 13px; }
@@ -552,7 +558,8 @@ $('vsMore').addEventListener('click', () => loadVoters(true));
 $('vsReload').addEventListener('click', () => { refresh(); loadVoters(); });
 
 // what a user may do besides searching by name (the server checks these on every request)
-const PERM_NAME = { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट' };
+const PERM_NAME = { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट',
+  progress: 'वार्ड अनुसार प्रगति देख सकते हैं' };
 function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
   for (const [p, label] of Object.entries(PERM_NAME)) {
@@ -767,6 +774,21 @@ async function act(payload, ask) {
   refresh();
   return r;
 }
+// how much of today's search limit a person has used: "आज की खोज: 120 / 500 · 380 बाकी" over a bar that is
+// green under half the limit, yellow up to 80% and red above that (or with the limit reached)
+function useMeter(u) {
+  const box = el('div', 'usage'), text = el('div', 'usetext'), bar = el('div', 'usebar'), fill = el('div');
+  bar.append(fill); box.append(text, bar);
+  box.update = () => {
+    const used = u.searchesToday || 0, pct = u.limit ? Math.min(100, Math.round((used / u.limit) * 100)) : 0;
+    text.textContent = `आज की खोज: ${used} / ${u.limit} (${pct}%) · ${Math.max(0, u.limit - used)} बाकी`;
+    fill.style.width = pct + '%';
+    const share = u.limit ? used / u.limit : 0;
+    box.className = 'usage' + (share > 0.8 || used >= u.limit ? ' high' : share >= 0.5 ? ' mid' : '');
+  };
+  box.update();
+  return box;
+}
 function person(u) {
   const isAdmin = u.role === 'admin';
   const row = el('div', 'person');
@@ -788,9 +810,10 @@ function person(u) {
     if (v !== null) act({ action: 'phone', id: u.id, phone: v });
   });
   ph.append(edit);
-  const use = el('div', 'info', isAdmin ? `${u.marked} पर्चियों पर इनके निशान` : `आज ${u.searchesToday} / ${u.limit} खोज · ${u.marked} पर्चियों पर इनके निशान`);
-  row.append(nm, ph, info, sess, use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
+  const use = el('div', 'info', `${u.marked} पर्चियों पर इनके निशान`);
+  const meter = isAdmin ? null : useMeter(u);
+  row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u, 'listMsg', meter.update), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
   if (isAdmin) {   // superadmin: change which villages this admin looks after

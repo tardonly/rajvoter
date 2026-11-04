@@ -4,13 +4,13 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { dataKey, DEMO } = require('./_lib.js');
+const { dataKey, DEMO, demoOf } = require('./_lib.js');
 
 const cache = new Map();
 function load(slug) {     // slug must already be checked against the village list (a village's .data)
   if (cache.has(slug)) return cache.get(slug);
-  if (slug === DEMO.slug) {   // the demo: only the first DEMO.wards wards of its village
-    const all = load(DEMO.from), wards = all.wards.slice(0, DEMO.wards);
+  if (demoOf(slug)) {   // a demo village ("demo-riri"): only the first DEMO.wards wards of that village
+    const all = load(demoOf(slug)), wards = all.wards.slice(0, DEMO.wards);
     const v = { rows: all.rows.filter((r) => wards.includes(r.ward)), wards };
     cache.set(slug, v);
     return v;

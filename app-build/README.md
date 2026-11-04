@@ -22,6 +22,10 @@ only receive the cards that match a search. Every search checks that the user's 
   - **पूरा वार्ड देख सकते हैं** — list a whole ward with no name typed
   - **वार्ड की सभी पर्चियाँ** — print / save a whole ward's slips
   - **पर्ची प्रिंट** — the प्रिंट / PDF button on a slip
+  - **वार्ड अनुसार प्रगति देख सकते हैं** — a green **प्रगति** button at the top of the app (next to where admins see
+    **एडमिन**) opens the per-ward table: कुल, वोट दिया, आ रहे, वोटर नहीं, बाकी, with a coloured bar per ward. A
+    candidate's worker sees only that candidate's marks; others see the village's own marks. Admins always have the
+    button and see the village's own marks plus each candidate's. Not in the demo.
 
   New users (and users added before these boxes existed) start with only **पर्ची प्रिंट**. A change reaches the
   person's phone on their next search, or within a minute. Admins and the superadmin can always do everything.
@@ -38,12 +42,14 @@ only receive the cards that match a search. Every search checks that the user's 
 To add a user the admin must pick the **village** from the dropdown (only their own villages are listed).
 
 ## Demo (for marketing)
-`raj-voter.vercel.app/demo` opens Adsar's voter list (wards 1–3 only) for anyone, with no password, to try the search. Each phone keeps
-a random device id and gets **10 searches in all** (counted the same way as above, by the server); one internet address
+`raj-voter.vercel.app/demo` lists every village in the app; picking one opens `/demo-<village>` (e.g. `/demo-riri`): that
+village's voter list, **wards 1–2 only**, for anyone, with no password, to try the search. **गाँव बदलें** goes back to the
+list. Each phone keeps a random device id and gets **10 searches in all**, across all demo villages (counted the same way
+as above, by the server); one internet address
 gets at most 30 a day, so clearing the browser doesn't give more. The demo never changes real data: your team's marks
 aren't shown, and the वोट दिया / आ रहे हैं / वोटर नहीं है buttons work only on the visitor's phone (kept there, never sent to
 the server). No printing, no whole-ward lists; परिवार works. An orange bar shows the searches left and
-a box for the visitor's village name that opens a WhatsApp chat with it filled in. To show another village, set a `DEMO_VILLAGE` variable in Vercel (e.g. `dalman`) and redeploy.
+a box for the visitor's village name that opens a WhatsApp chat with it filled in. A new village shows up in the demo by itself; demo villages can't be given users or candidates.
 
 ## Folder layout (this repo)
 ```
@@ -136,8 +142,10 @@ shows above the tabs, whichever tab made it.
   coloured bar and a total row. It refreshes every minute. Tapping a number opens those voters in मतदाता सूची.
 - **मतदाता सूची**: pick the village and a ward (or सभी वार्ड), then **वोट दिया**, **आ रहे हैं**, **वोटर नहीं है** or **बाकी**
   (no mark yet) to list those voters in ward and box order, 100 at a time, with who set the mark and when.
-- Each person shows **आज N / L खोज** (searches today out of their daily limit) and how many slips carry their marks; a
-  person who has used up today's limit gets a yellow **आज की खोज सीमा पूरी** badge.
+- Each person shows **आज की खोज: N / L (P%) · R बाकी** (searches today out of their daily limit, and how many are left)
+  over a bar that is green under half the limit, yellow from 50% to 80% and red above 80%, and how many slips carry
+  their marks. A person who has used up today's limit also gets a yellow **आज की खोज सीमा पूरी** badge. The +100 and
+  the limit box update the bar straight away.
 - **पर्चियों के निशान हटाएं**: pick the village, then remove all marks of one colour, or all of them. After clearing,
   **↺ … निशान वापस लाएं** puts them back; only the most recent clear of each village can be undone.
 

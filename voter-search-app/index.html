@@ -31,8 +31,9 @@
   .lockbox img { width: 72px; height: 72px; border-radius: 16px; }
   .lockbox h1 { font-size: 22px; margin: 12px 0 2px; }
   .lockbox p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
-  .lockbox input[type=password], .lockbox input[type=text] { width: 100%; padding: 12px 14px; font-size: 18px;
+  .lockbox input[type=password], .lockbox input[type=text], .lockbox input[type=tel] { width: 100%; padding: 12px 14px; font-size: 18px;
     border: 1.5px solid var(--line); border-radius: 10px; text-align: center; letter-spacing: 1px; }
+  .lockbox .phonenote { margin: 5px 0 12px; font-size: 13px; color: var(--muted); }
   .lockbox label { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 12px 0; font-size: 14px; color: var(--muted); }
   .demolink { display: block; margin-top: 14px; padding: 11px; border-radius: 10px; border: 1.5px solid #fdba74;
     background: #fff7ed; color: #9a3412; font-size: 16px; font-weight: 600; text-decoration: none; }
@@ -72,6 +73,25 @@
   @media (max-width: 480px) { .titlebar .appname { display: none; } }   /* phones: village name and its button on one line */
   #backBtn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px;
     color: var(--ink); text-decoration: none; font-weight: 600; white-space: nowrap; }
+  #progBtn { border: 1px solid #86efac; background: #f0fdf4; color: #15803d; font-weight: 600; }
+  /* वार्ड अनुसार प्रगति: a popup over the search screen, one table per mark group */
+  .progpop { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.45); display: flex; align-items: flex-start; justify-content: center;
+    padding: calc(12px + env(safe-area-inset-top)) 12px 12px; overflow-y: auto; }
+  .progpop .card { width: 100%; max-width: 560px; background: var(--card); border-radius: 14px; padding: 14px 14px 12px; }
+  .progpop .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .progpop h2 { font-size: 18px; margin: 0; }
+  .progpop .head button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 5px 10px; font-size: 13px; }
+  .progpop .vh { font-size: 15px; font-weight: 700; margin: 12px 0 4px; }
+  .progpop .note { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .prog { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .prog th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: right; padding: 0 4px 6px; }
+  .prog th:first-child, .prog td:first-child { text-align: left; }
+  .prog td { padding: 6px 4px 2px; text-align: right; font-variant-numeric: tabular-nums; border-top: 1px solid #eee; }
+  .prog tr.mrow td { border: 0; padding: 0 4px 6px; }
+  .prog tr.sum td { font-weight: 700; border-top: 1.5px solid var(--line); }
+  .prog .c-done { color: #15803d; } .prog .c-coming { color: #854d0e; } .prog .c-absent { color: #b91c1c; }
+  .pmeter { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
+  .pmeter i { display: block; } .pmeter .done { background: #16a34a; } .pmeter .coming { background: #facc15; } .pmeter .absent { background: #dc2626; }
   #adminBtn { border-radius: 8px; padding: 4px 10px; font-size: 13px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
   .fields { display: grid; gap: 6px; }
   .fields input, .fields select { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
@@ -183,6 +203,9 @@
     <h1>मतदाता खोज</h1>
     <p id="lockSub"></p>
     <form id="lockForm" autocomplete="off">
+      <!-- only for people used to "mobile + password" logins: never sent or checked -->
+      <input id="phone" type="tel" inputmode="numeric" maxlength="10" placeholder="मोबाइल नंबर डालें">
+      <div class="phonenote">जिस नंबर पर पासवर्ड व्हाट्सऐप पर आया था</div>
       <input id="pw" type="password" placeholder="पासवर्ड डालें" autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <label><input id="showPw" type="checkbox"> पासवर्ड दिखाएं</label>
       <label><input id="remember" type="checkbox" checked> इस फ़ोन पर याद रखें</label>
@@ -199,6 +222,15 @@
   <video id="howVideo" src="/demo.mp4" controls playsinline preload="none"></video>
 </div>
 
+<div id="progPop" class="progpop hidden" role="dialog" aria-label="वार्ड अनुसार प्रगति">
+  <div class="card">
+    <div class="head"><h2>वार्ड अनुसार प्रगति</h2>
+      <span><button id="progReload" type="button">ताज़ा करें</button> <button id="progClose" type="button">✕ बंद करें</button></span></div>
+    <div id="progBody"></div>
+    <div class="note" id="progNote"></div>
+  </div>
+</div>
+
 <section id="home" class="hidden">
   <div class="lockbox">
     <div class="homebar"><a id="homeAdmin" class="hidden" href="/admin">एडमिन</a><button id="homeOut" type="button">लॉग आउट</button></div>
@@ -212,7 +244,7 @@
 <section id="app" class="hidden">
   <header>
     <div class="titlebar"><b><span class="appname">मतदाता खोज · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">प्रगति</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -252,8 +284,9 @@
 const SLUG = decodeURIComponent(location.pathname.split('/')[1] || '').toLowerCase().replace(/\.html$/, '').replace(/^index$/, '');
 // On the start page (no village, or an unknown one) you log in first, then see the villages your password opens.
 let HOME = !SLUG;
-// raj-voter.vercel.app/demo: a real village's list for anyone to try, no password, 10 searches per phone, read-only
-const DEMO = SLUG === 'demo';
+// raj-voter.vercel.app/demo: pick a village; /demo-<village> (e.g. /demo-riri): its first 2 wards for anyone to try,
+// no password, 10 searches per phone in all, read-only
+const DEMO_PICK = 'demo', DEMO = SLUG === DEMO_PICK || SLUG.startsWith('demo-');
 const WHATSAPP = '917888924374';
 const waLink = (gaon) => `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`नमस्ते, मुझे गाँव ${gaon} के लिए मतदाता खोज ऐप चाहिए।`)}`;
 let VILLAGE = null;
@@ -288,6 +321,7 @@ const MSG = {
   not_admin: 'यह काम सिर्फ़ एडमिन कर सकते हैं',
   not_found: 'यह मतदाता नहीं मिला', deleted: 'यह मतदाता सूची से हटाया गया है — निशान नहीं लग सकता',
   no_mark: 'निशान लगाने की अनुमति नहीं है — एडमिन से पूछें',
+  no_progress: 'प्रगति देखने की अनुमति नहीं है — एडमिन से पूछें',
   no_pdf: 'पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें',
   no_ward_list: 'पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें',
 };
@@ -326,8 +360,10 @@ function showApp(name, admin, villages, perms, cand) {
   $('who').textContent = (name ? `उपयोगकर्ता: ${name}` : '') + (cand ? ` · उम्मीदवार: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
-  IS_ADMIN = !!admin; wardButton();
-  if (DEMO) { $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); demoBar(); }   // back to the start page
+  IS_ADMIN = !!admin; wardButton(); progButton();
+  if (DEMO) {   // ← वापस: back to the start page; गाँव बदलें: back to the demo's villages
+    $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); $('switchBtn').href = '/demo'; demoBar();
+  }
   $('lock').classList.add('hidden'); $('app').classList.remove('hidden');
   search(false, true);
 }
@@ -431,7 +467,7 @@ async function search(more = false, force = false) {
 function updatePerms(p) {
   if (IS_ADMIN || p.join() === PERMS.join()) return;
   PERMS = p;
-  wardButton();
+  wardButton(); progButton();
   if (shown) search(false, true);   // redraw the slips with the right buttons
 }
 
@@ -580,6 +616,45 @@ function printSlips(rows, title) {
   window.addEventListener('afterprint', () => { document.title = old; area.innerHTML = ''; }, { once: true });
   window.print();
 }
+// ---------- वार्ड अनुसार प्रगति: for admins and people with the "progress" permission (not in the demo) ----------
+function progButton() {
+  const ok = !DEMO && can('progress');
+  $('progBtn').classList.toggle('hidden', !ok);
+  if (!ok) progClose();
+}
+async function progLoad() {
+  $('progNote').textContent = 'आ रहा है…';
+  const r = await api('progress', { token: token() });
+  if (r.error) { $('progNote').textContent = MSG[r.error] || MSG.server; return; }
+  const body = $('progBody'); body.innerHTML = '';
+  for (const g of r.progress) {
+    if (r.progress.length > 1) body.append(el('div', 'vh', g.candName ? `उम्मीदवार ${g.candName}` : 'आम निशान'));
+    else if (g.candName) body.append(el('div', 'vh', `उम्मीदवार ${g.candName}`));
+    const t = el('table', 'prog');
+    t.innerHTML = '<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ वोट दिया</th><th class="c-coming">आ रहे</th><th class="c-absent">वोटर नहीं</th><th>बाकी</th></tr></thead>';
+    const tb = el('tbody'), sum = { total: 0, done: 0, coming: 0, absent: 0 };
+    for (const w of g.wards) for (const k of Object.keys(sum)) sum[k] += w[k];
+    for (const w of [...g.wards, sum]) {
+      const tr = el('tr', w === sum ? 'sum' : null);
+      tr.append(el('td', null, w === sum ? 'कुल' : `वार्ड ${w.ward}`), el('td', null, w.total));
+      for (const k of ['done', 'coming', 'absent']) tr.append(el('td', `c-${k}`, w[k]));
+      tr.append(el('td', null, w.total - w.done - w.coming - w.absent));
+      const bar = el('tr', 'mrow'), td = el('td'), m = el('div', 'pmeter'); td.colSpan = 6;
+      for (const k of ['done', 'coming', 'absent']) { const i = el('i', k); i.style.width = `${(100 * w[k]) / (w.total || 1)}%`; m.append(i); }
+      td.append(m); bar.append(td); tb.append(tr, bar);
+    }
+    t.append(tb); body.append(t);
+  }
+  $('progNote').textContent = `${new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' })} तक · खुला रहने पर हर मिनट अपने-आप ताज़ा होता है`;
+}
+function progClose() { $('progPop').classList.add('hidden'); }
+$('progBtn').addEventListener('click', () => { $('progPop').classList.remove('hidden'); progLoad(); });
+$('progReload').addEventListener('click', progLoad);
+$('progClose').addEventListener('click', progClose);
+$('progPop').addEventListener('click', (e) => { if (e.target === $('progPop')) progClose(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') progClose(); });
+setInterval(() => { if (!document.hidden && !$('progPop').classList.contains('hidden')) progLoad(); }, 60000);
+
 function wardButton() {
   const w = $('qWard').value;
   $('wardPrint').classList.toggle('hidden', !can('wardPdf') || !w);
@@ -622,8 +697,10 @@ $('bigBtn').addEventListener('click', () => setBig(!document.documentElement.cla
 function myVillages(list) {
   if (list.length === 1) return location.replace(`/${list[0].slug}`);
   $('lock').classList.add('hidden'); $('app').classList.add('hidden'); $('home').classList.remove('hidden');
-  $('homeAdmin').classList.toggle('hidden', savedLogin() !== 'tok:admin');   // superadmin and village admins
-  $('homeMsg').textContent = list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
+  $('homeAdmin').classList.toggle('hidden', DEMO || savedLogin() !== 'tok:admin');   // superadmin and village admins
+  $('homeOut').classList.toggle('hidden', DEMO);
+  $('homeMsg').textContent = DEMO ? `डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} खोज बाकी`
+    : list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
   const box = $('villages'); box.innerHTML = '';
   for (const v of list) {
     const a = el('a', null, v.name); a.href = `/${v.slug}`; a.append(el('small', null, v.title));
@@ -686,6 +763,7 @@ async function demoLogin() {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   store.set('tok:demo', r.token, true);
   searchesLeft = r.left;
+  if (SLUG === DEMO_PICK) return myVillages(r.list);   // /demo: the villages to try
   showApp(r.name, false, r.villages, r.perms);
 }
 // the orange bar: searches left, and a box for the visitor's own village name that opens WhatsApp with it filled in
@@ -704,7 +782,7 @@ function demoBar() {
     });
     bar.append(el('div'), el('div', 'ask', 'अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:'), form);
   }
-  bar.firstChild.replaceChildren(el('b', null, 'डेमो'), ` · ${VILLAGE.name} की असली मतदाता सूची में खोजकर देखें`,
+  bar.firstChild.replaceChildren(el('b', null, 'डेमो'), ` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में खोजकर देखें`,
     searchesLeft != null ? ` · ${searchesLeft} खोज बाकी` : '');
   bar.classList.remove('hidden');
 }
@@ -724,6 +802,7 @@ async function openVillage(v) {
 }
 
 (async () => {
+  if (SLUG === DEMO_PICK) return demoLogin();   // the demo's start: pick a village
   if (SLUG) {
     showLoading('खुल रहा है…');
     const info = await api('info', {});

@@ -45,17 +45,23 @@ async function pipeline(cmds) {
 
 // Villages built into the app (by app-build/encrypt.mjs): slug → {name, title, ps, zp, pollTime, wards, voters}
 const VILLAGES = require('./_villages.json');
-// The marketing demo: /demo opens the voters of the first DEMO.wards wards of DEMO.from (optional DEMO_VILLAGE variable,
-// default adsar) with no password. Each phone keeps a random device id and logs in with it; it gets DEMO.searches searches in all, and one
-// internet address at most DEMO.perIp a day (so clearing the browser doesn't give more). The demo is read-only: no
-// marks are shown or set (its marks live apart, under "mark:demo", and no one can set them), no printing, no ward lists.
+// The marketing demo: /demo lists every village; /demo-<village> (e.g. /demo-riri) opens the voters of that village's
+// first DEMO.wards wards with no password. Each phone keeps a random device id and logs in with it; it gets DEMO.searches
+// searches in all (whichever demo villages they are in), and one internet address at most DEMO.perIp a day (so clearing
+// the browser doesn't give more). The demo is read-only: no marks are shown or set (its marks would live apart, under
+// "mark:demo-<village>", and no one can set them), no printing, no ward lists.
 // (The demo page lets a visitor try the mark buttons, but those marks stay on that phone and never reach the server.)
-const DEMO = { slug: 'demo', from: process.env.DEMO_VILLAGE || 'adsar', wards: 3, searches: 10, perIp: 30 };
-// .data is the village whose voter list to read (differs from .slug only for the demo)
+const DEMO = { slug: 'demo', prefix: 'demo-', wards: 2, searches: 10, perIp: 30 };
+// "demo-riri" → "riri"; null when slug is not a demo village
+const demoOf = (slug) => (typeof slug === 'string' && slug.startsWith(DEMO.prefix) && Object.hasOwn(VILLAGES, slug.slice(DEMO.prefix.length))
+  ? slug.slice(DEMO.prefix.length) : null);
+const demoSlugs = () => Object.keys(VILLAGES).map((s) => DEMO.prefix + s);
+// .data is the village whose voter list to read (the demo village's own slug, read by _search.js from its village)
 function village(slug) {
-  if (slug === DEMO.slug && Object.hasOwn(VILLAGES, DEMO.from)) {
-    const v = VILLAGES[DEMO.from];
-    return { ...v, slug: DEMO.slug, data: DEMO.slug, demo: true, title: `डेमो · ${v.title}`,
+  const from = demoOf(slug);
+  if (from) {
+    const v = VILLAGES[from];
+    return { ...v, slug, data: slug, demo: true, title: `डेमो · ${v.title}`,
       wards: [...v.wards].sort((a, b) => a - b).slice(0, DEMO.wards) };
   }
   return typeof slug === 'string' && Object.hasOwn(VILLAGES, slug) ? { slug, data: slug, ...VILLAGES[slug] } : null;
@@ -164,8 +170,8 @@ async function whoIs(token, slug) {
   }
   const t = parseToken(token);
   if (t && t.id.startsWith('demo_')) {   // a demo phone: no user record, nothing it may do but search
-    return { id: t.id, name: 'डेमो', role: 'user', demo: true, admin: false, villages: [DEMO.slug], perms: [], sid: t.sid,
-      status: slug != null && slug !== DEMO.slug ? 'other_village' : 'ok' };
+    return { id: t.id, name: 'डेमो', role: 'user', demo: true, admin: false, villages: demoSlugs(), perms: [], sid: t.sid,
+      status: slug != null && slug !== DEMO.slug && !demoOf(slug) ? 'other_village' : 'ok' };
   }
   const user = t && t.id !== 'admin' ? await getUser(t.id) : null;
   if (!user) return null;
@@ -185,7 +191,7 @@ async function whoIs(token, slug) {
 // person. Admins and the superadmin can do all of them.
 //   mark: set status marks on slips · ward: list a whole ward without a name · wardPdf: print / save a whole ward's
 //   slips · print: the प्रिंट / PDF button on a slip
-const PERMS = ['mark', 'ward', 'wardPdf', 'print'];
+const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress'];   // progress: वार्ड अनुसार प्रगति in the app (api/progress.js)
 const DEFAULT_PERMS = ['print'];   // for new users, and users added before permissions existed
 const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
 // today's date in India, for the per-person daily search count
@@ -230,5 +236,5 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  DEMO, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };
