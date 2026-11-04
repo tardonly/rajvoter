@@ -13,6 +13,8 @@
 //   action "clearMarks", village, status → {progress}   (removes every 'done' | 'coming' | 'absent' mark of the village,
 //                                                       or 'all' of them; the removed marks are kept as a backup first)
 //   action "restoreMarks", village       → {progress}   (puts back the marks removed by that village's last clearMarks)
+//   action "marked", village, status [, ward, offset] → {total, more, rows}   voters carrying a mark ('done' | 'coming' |
+//                                         'absent') or none yet ('none'), in ward and box order, LIST_PAGE at a time
 // progress: [{slug, name, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}], backup: {n, at} | null}]
 //   one entry per village of this admin: how many slips carry each mark, overall and per ward.
 // The password is shown to the admin once; only its hash is stored.
@@ -59,6 +61,8 @@ async function markSummary(slug, all) {
   return { slug, name: village(slug).name, marks, wards: Object.values(perWard).sort((a, b) => a.ward - b.ward), backup };
 }
 
+const LIST_PAGE = 100;   // voters per page in the "marked" list
+
 async function freshPassword() {
   for (;;) {
     const pw = newPassword();
@@ -104,6 +108,25 @@ module.exports = route(async (req, res, b) => {
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
     return send(res, 200, { me: { role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins,
       villageList: villageList(me.villages), progress });   // names of my villages (the list is not public)
+  }
+
+  if (b.action === 'marked') {
+    if (!village(b.village)) return send(res, 400, { error: 'no_village' });
+    if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
+    if (b.status !== 'none' && !MARKS.includes(b.status)) return send(res, 400, { error: 'bad_mark' });
+    const all = await allMarks(b.village);
+    const want = (r) => {
+      const m = all[`${r.ward}:${r.box}`];
+      return b.status === 'none' ? !(m && MARKS.includes(m.m)) : !!m && m.m === b.status;
+    };
+    const hits = load(b.village).rows.filter((r) => (!b.ward || String(r.ward) === String(b.ward)) && want(r))
+      .sort((x, y) => x.ward - y.ward || x.box - y.box);
+    const offset = Math.max(0, Number(b.offset) || 0);
+    const rows = hits.slice(offset, offset + LIST_PAGE).map(({ ward, box, hname, name, hrel, relname, rel, house, age, sex }) => {
+      const m = all[`${ward}:${box}`];
+      return { ward, box, hname, name, hrel, relname, rel, house, age, sex, by: m ? m.by : '', at: m ? m.at : '' };
+    });
+    return send(res, 200, { total: hits.length, more: offset + rows.length < hits.length, rows });
   }
 
   if (b.action === 'clearMarks' || b.action === 'restoreMarks') {

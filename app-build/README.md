@@ -94,8 +94,13 @@ Log in with the superadmin password or a village admin's password (or log into a
   once when the app is reopened), without searching again. Marks are kept per village in the database (`mark:<village>`).
 
 ## Admin page extras
-- **वार्ड अनुसार प्रगति** (top): for each of your villages and wards, the total, ✓ पूरा, आ रहे, नहीं and बाकी, with a
-  coloured bar and a total row. It refreshes every minute.
+The admin page is split into tabs along the top (they scroll sideways on a phone, and the phone reopens the last one):
+**नया व्यक्ति**, **एडमिन** (superadmin only), **सभी पासवर्ड**, **प्रगति**, **मतदाता सूची**, **निशान हटाएं**. A new password
+shows above the tabs, whichever tab made it.
+- **प्रगति** (वार्ड अनुसार प्रगति): for each of your villages and wards, the total, ✓ पूरा, आ रहे, नहीं and बाकी, with a
+  coloured bar and a total row. It refreshes every minute. Tapping a number opens those voters in मतदाता सूची.
+- **मतदाता सूची**: pick the village and a ward (or सभी वार्ड), then **पूरा हुआ**, **आ रहे हैं**, **उपलब्ध नहीं** or **बाकी**
+  (no mark yet) to list those voters in ward and box order, 100 at a time, with who set the mark and when.
 - Each person shows **आज N खोज** (searches today) and how many slips carry their marks; 500 or more searches in a day
   get a yellow badge (a sign the list is being copied).
 - **पर्चियों के निशान हटाएं**: pick the village, then remove all marks of one colour, or all of them. After clearing,

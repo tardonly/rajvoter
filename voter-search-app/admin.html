@@ -39,7 +39,7 @@
   .msg { min-height: 20px; margin-top: 8px; font-size: 14px; color: var(--bad); }
   .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .bar button { padding: 6px 12px; font-size: 14px; }
-  .newpw { margin-top: 12px; padding: 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; }
+  .newpw { padding: 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; }
   .newpw .pw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; font-weight: 700; letter-spacing: 1px; margin: 6px 0 10px; user-select: all; word-break: break-all; }
   .newpw .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
   .filter { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -93,6 +93,36 @@
   .perms label { display: flex; align-items: center; gap: 5px; }
   .perms input { width: 17px; height: 17px; margin: 0; }
 
+  /* tabs along the top of the panel; on a phone they scroll sideways */
+  .tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -16px 14px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { flex: none; padding: 8px 14px; font-size: 15px; border-radius: 999px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink); white-space: nowrap; }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .pane:not(.on) { display: none; }
+  .newpw .x { border: 0; background: none; font-size: 18px; color: var(--muted); padding: 0 4px; }
+  .newpw { margin: 0 0 14px; }
+  /* voters by mark */
+  .pick select { flex: 1; min-width: 0; }
+  .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 4px; }
+  .chips button { padding: 8px 2px; border-radius: 10px; border: 1.5px solid; background: #fff; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+  .chips button b { display: block; font-size: 18px; }
+  .chips .done { border-color: #16a34a; color: #15803d; } .chips .coming { border-color: #ca8a04; color: #854d0e; }
+  .chips .absent { border-color: #dc2626; color: #b91c1c; } .chips .none { border-color: #9ca3af; color: #374151; }
+  .chips .done.on { background: #16a34a; color: #fff; } .chips .coming.on { background: #facc15; color: #422006; }
+  .chips .absent.on { background: #dc2626; color: #fff; } .chips .none.on { background: #4b5563; color: #fff; }
+  .voter { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid #eee; }
+  .voter:first-child { border-top: 0; }
+  .voter .no { flex: none; width: 54px; font-size: 12px; color: var(--muted); line-height: 1.3; font-variant-numeric: tabular-nums; }
+  .voter .no b { display: block; font-size: 17px; color: var(--ink); }
+  .voter .nm { font-weight: 600; font-size: 15.5px; }
+  .voter .nm span { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 4px; }
+  .voter .info { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .voter .by { font-size: 12.5px; }
+  .voter .c-done { color: #15803d; } .voter .c-coming { color: #854d0e; } .voter .c-absent { color: #b91c1c; }
+  .prog td.go { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+
   /* footer: who made the app and how to reach them */
   .footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 18px;
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card);
@@ -121,7 +151,27 @@
     <div class="bar"><div><h1>एडमिन</h1><div class="sub" id="meText" style="margin:0"></div></div>
       <span class="row"><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
 
-    <div class="card">
+    <nav class="tabs" id="tabs" role="tablist">
+      <button type="button" data-tab="add">नया व्यक्ति</button>
+      <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
+      <button type="button" data-tab="people">सभी पासवर्ड</button>
+      <button type="button" data-tab="prog">प्रगति</button>
+      <button type="button" data-tab="voters">मतदाता सूची</button>
+      <button type="button" data-tab="clear">निशान हटाएं</button>
+    </nav>
+
+    <!-- a new password, from any tab (new person, new admin, नया पासवर्ड) -->
+    <div class="newpw hidden" id="newPw">
+      <div class="bar2"><div id="newPwFor"></div><button class="x" id="closePw" type="button" aria-label="बंद करें">✕</button></div>
+      <div class="pw" id="newPwText"></div>
+      <div class="row">
+        <button class="btn ghost" id="copyPw" type="button">कॉपी करें</button>
+        <button class="btn ghost" id="sharePw" type="button">WhatsApp पर भेजें</button>
+      </div>
+      <div class="note">यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।</div>
+    </div>
+
+    <div class="card pane" data-tab="add">
       <h2>नया व्यक्ति जोड़ें</h2>
       <form id="addForm" class="stack" autocomplete="off">
         <select id="newVillage" required><option value="">गाँव चुनें</option></select>
@@ -130,18 +180,9 @@
         <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
       </form>
       <div class="msg" id="addMsg"></div>
-      <div class="newpw hidden" id="newPw">
-        <div id="newPwFor"></div>
-        <div class="pw" id="newPwText"></div>
-        <div class="row">
-          <button class="btn ghost" id="copyPw" type="button">कॉपी करें</button>
-          <button class="btn ghost" id="sharePw" type="button">WhatsApp पर भेजें</button>
-        </div>
-        <div class="note">यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।</div>
-      </div>
     </div>
 
-    <div class="card hidden" id="adminCard">
+    <div class="card pane" data-tab="admins" id="adminCard">
       <h2>नया एडमिन जोड़ें</h2>
       <p class="sub">एडमिन सिर्फ़ अपने गाँवों में लोग जोड़ और बंद कर सकता है।</p>
       <form id="addAdminForm" class="stack" autocomplete="off">
@@ -155,7 +196,7 @@
       <div id="adminList"></div>
     </div>
 
-    <div class="card">
+    <div class="card pane" data-tab="people">
       <h2>सभी पासवर्ड</h2>
       <div class="filter">
         <button type="button" data-f="on" class="on">चालू</button>
@@ -167,13 +208,30 @@
       <div class="msg" id="listMsg"></div>
     </div>
 
-    <div class="card">
+    <div class="card pane" data-tab="prog">
       <div class="bar2"><h2>वार्ड अनुसार प्रगति</h2><button class="btn ghost" id="reload" type="button">ताज़ा करें</button></div>
       <div id="prog"></div>
       <div class="foot" id="progFoot"></div>
     </div>
 
-    <div class="card">
+    <div class="card pane" data-tab="voters">
+      <div class="bar2"><h2>मतदाता सूची</h2><button class="btn ghost" id="vsReload" type="button">ताज़ा करें</button></div>
+      <div class="row pick">
+        <select id="vsVillage" aria-label="गाँव"></select>
+        <select id="vsWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
+      </div>
+      <div class="chips" id="vsStatus">
+        <button type="button" class="done" data-s="done">पूरा हुआ <b>0</b></button>
+        <button type="button" class="coming" data-s="coming">आ रहे हैं <b>0</b></button>
+        <button type="button" class="absent" data-s="absent">उपलब्ध नहीं <b>0</b></button>
+        <button type="button" class="none" data-s="none">बाकी <b>0</b></button>
+      </div>
+      <div id="vsList"></div>
+      <button class="btn ghost full hidden" id="vsMore" type="button">और दिखाएं</button>
+      <div class="msg" id="vsMsg"></div>
+    </div>
+
+    <div class="card pane" data-tab="clear">
       <h2>पर्चियों के निशान हटाएं</h2>
       <p class="sub" style="margin-bottom:8px">बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।</p>
       <select id="mkVillage" aria-label="गाँव"></select>
@@ -248,6 +306,7 @@ async function openPanel() {
   if (SLUG && villages[SLUG]) document.title = `एडमिन · ${vName(SLUG)} · मतदाता खोज`;
   setup(); showMarks(r);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
+  showTab(saved.get('adminTab') || 'add');   // after the panel shows, so the chosen tab can be scrolled into sight
 }
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -282,10 +341,30 @@ function setup() {
   // back to search: the village list when this admin has several villages, else straight to the one village
   $('backLink').classList.toggle('hidden', !mine.length);
   $('backLink').href = mine.length === 1 ? `/${mine[0]}` : '/';
-  $('adminCard').classList.toggle('hidden', me.role !== 'super');
+  $('adminTab').classList.toggle('hidden', me.role !== 'super');
   if (me.role === 'super') $('admVillages').replaceChildren(villageChecks([]));
+  $('vsVillage').length = 0;
+  for (const s of mine) $('vsVillage').add(new Option(vName(s), s));
+  $('vsVillage').value = pick || mine[0] || '';
+  $('vsVillage').classList.toggle('hidden', mine.length < 2);
   render();
 }
+
+// ---------- tabs (the phone remembers the last one) ----------
+const saved = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+function showTab(name) {
+  const btn = document.querySelector(`.tabs button[data-tab="${name}"]:not(.hidden)`) ? name : 'add';
+  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === btn));
+  document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.dataset.tab === btn));
+  const bar = $('tabs'), on = bar.querySelector('button.on');   // keep the chosen tab in sight on a narrow phone
+  bar.scrollLeft = on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2;
+  saved.set('adminTab', btn);
+  if (btn === 'voters' && !vs.loaded) loadVoters();
+}
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 function villageChecks(checked) {
   const box = document.createDocumentFragment();
   for (const s of Object.keys(villages)) {
@@ -318,8 +397,13 @@ function showProgress() {
     for (const w of [...v.wards, sum]) {
       const left = w.total - w.done - w.coming - w.absent;
       const tr = el('tr', w === sum ? 'sum' : null);
-      tr.append(el('td', null, w === sum ? 'कुल' : `वार्ड ${w.ward}`), el('td', null, w.total),
-        el('td', 'c-done', w.done), el('td', 'c-coming', w.coming), el('td', 'c-absent', w.absent), el('td', null, left));
+      tr.append(el('td', null, w === sum ? 'कुल' : `वार्ड ${w.ward}`), el('td', null, w.total));
+      // a tap on a number opens those voters in the मतदाता सूची tab
+      for (const [k, n] of [['done', w.done], ['coming', w.coming], ['absent', w.absent], ['none', left]]) {
+        const td = el('td', `c-${k}${n ? ' go' : ''}`, n);
+        if (n) td.addEventListener('click', () => openVoters(v.slug, w === sum ? '' : w.ward, k));
+        tr.append(td);
+      }
       const bar = el('tr', 'mrow'), td = el('td'); td.colSpan = 6;
       const m = el('div', 'meter');
       for (const k of ['done', 'coming', 'absent']) { const i = el('i', k); i.style.width = `${(100 * w[k]) / (w.total || 1)}%`; m.append(i); }
@@ -341,6 +425,7 @@ function showMarks(r) {
   if (v.backup) $('restore').textContent = `↺ ${fmt(v.backup.at)} को हटाए गए ${v.backup.n} निशान वापस लाएं`;
   document.querySelectorAll('.marks button').forEach((b) => { b.querySelector('b').textContent = v.marks[b.dataset.s]; b.disabled = !v.marks[b.dataset.s]; });
   $('clearAll').disabled = !(v.marks.done + v.marks.coming + v.marks.absent);
+  voterCounts();
 }
 async function clearMarks(status) {
   const slug = $('mkVillage').value, v = progress.find((x) => x.slug === slug);
@@ -361,6 +446,63 @@ $('restore').addEventListener('click', async () => {
 document.querySelectorAll('.marks button').forEach((b) => b.addEventListener('click', () => clearMarks(b.dataset.s)));
 $('clearAll').addEventListener('click', () => clearMarks('all'));
 $('mkVillage').addEventListener('change', () => showMarks({}));
+
+// ---------- voters by mark: पूरा हुआ / आ रहे हैं / उपलब्ध नहीं / बाकी (no mark yet), 100 at a time ----------
+const vs = { status: 'done', rows: [], loaded: false, seq: 0 };
+function voterCounts() {   // the numbers on the four buttons, and the ward choices, from the progress figures
+  const v = progress.find((x) => x.slug === $('vsVillage').value);
+  if (!v) return;
+  const keep = $('vsWard').value;
+  $('vsWard').length = 1;
+  for (const w of v.wards) $('vsWard').add(new Option(`वार्ड ${w.ward}`, w.ward));
+  $('vsWard').value = v.wards.some((w) => String(w.ward) === keep) ? keep : '';
+  const ws = $('vsWard').value ? v.wards.filter((w) => String(w.ward) === $('vsWard').value) : v.wards;
+  const n = { done: 0, coming: 0, absent: 0, none: 0 };
+  for (const w of ws) { n.done += w.done; n.coming += w.coming; n.absent += w.absent; n.none += w.total - w.done - w.coming - w.absent; }
+  document.querySelectorAll('#vsStatus button').forEach((b) => {
+    b.querySelector('b').textContent = n[b.dataset.s];
+    b.classList.toggle('on', b.dataset.s === vs.status);
+  });
+}
+async function loadVoters(more) {
+  const seq = ++vs.seq, offset = more ? vs.rows.length : 0;
+  vs.loaded = true;
+  $('vsMore').disabled = true; $('vsMsg').textContent = '';
+  if (!more) $('vsList').replaceChildren(el('div', 'empty', 'लोड हो रहा है…'));
+  const r = await api({ action: 'marked', village: $('vsVillage').value, ward: $('vsWard').value, status: vs.status, offset });
+  if (seq !== vs.seq) return;   // a newer choice was made meanwhile
+  $('vsMore').disabled = false;
+  if (r.error) { $('vsMsg').textContent = errText(r); if (!more) $('vsList').innerHTML = ''; return; }
+  vs.rows = more ? vs.rows.concat(r.rows) : r.rows;
+  if (!more) $('vsList').innerHTML = '';
+  if (!vs.rows.length) $('vsList').append(el('div', 'empty', vs.status === 'none' ? 'सब पर्चियों पर निशान लग गए हैं' : 'इस रंग का कोई निशान नहीं'));
+  for (const x of r.rows) $('vsList').append(voterRow(x));
+  $('vsMore').classList.toggle('hidden', !r.more);
+  if (r.more) $('vsMore').textContent = `और दिखाएं (${r.total - vs.rows.length} बाकी)`;
+}
+function voterRow(x) {
+  const row = el('div', 'voter'), no = el('div', 'no'), body = el('div');
+  no.append(el('b', null, x.box), `वार्ड ${x.ward}`);
+  const nm = el('div', 'nm', x.hname || x.name);
+  if (x.hname && x.name) nm.append(el('span', null, x.name));
+  body.append(nm, el('div', 'info', [x.hrel && `${x.rel || 'पिता/पति'}: ${x.hrel}`, x.house && `मकान ${x.house}`,
+    x.age && `आयु ${x.age}`, x.sex].filter(Boolean).join(' · ')));
+  if (vs.status !== 'none' && (x.by || x.at)) body.append(el('div', `info by c-${vs.status}`, `${MARK_NAME[vs.status]} · ${x.by || '—'}, ${fmt(x.at)}`));
+  row.append(no, body);
+  return row;
+}
+function openVoters(slug, ward, status) {   // from a number in the progress table
+  $('vsVillage').value = slug; vs.status = status;
+  voterCounts();
+  $('vsWard').value = ward; voterCounts();
+  showTab('voters'); loadVoters();
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll('#vsStatus button').forEach((b) => b.addEventListener('click', () => { vs.status = b.dataset.s; voterCounts(); loadVoters(); }));
+$('vsVillage').addEventListener('change', () => { $('vsWard').value = ''; voterCounts(); loadVoters(); });
+$('vsWard').addEventListener('change', () => { voterCounts(); loadVoters(); });
+$('vsMore').addEventListener('click', () => loadVoters(true));
+$('vsReload').addEventListener('click', () => { refresh(); loadVoters(); });
 
 // what a user may do besides searching by name (the server checks these on every request)
 const PERM_NAME = { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट' };
@@ -396,6 +538,7 @@ function showPassword(u, pw) {
   $('newPw').classList.remove('hidden');
   $('newPw').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
+$('closePw').addEventListener('click', () => $('newPw').classList.add('hidden'));
 $('copyPw').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText($('newPwText').textContent); $('copyPw').textContent = 'कॉपी हो गया ✓'; }
   catch (e) { $('copyPw').textContent = 'पासवर्ड चुनकर कॉपी करें'; }
