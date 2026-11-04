@@ -81,6 +81,7 @@
   .progpop .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
   .progpop h2 { font-size: 18px; margin: 0; }
   .progpop .head button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 5px 10px; font-size: 13px; }
+  .progpop #progClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
   .progpop .vh { font-size: 15px; font-weight: 700; margin: 12px 0 4px; }
   .progpop .note { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
   .prog { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -222,10 +223,10 @@
   <video id="howVideo" src="/demo.mp4" controls playsinline preload="none"></video>
 </div>
 
-<div id="progPop" class="progpop hidden" role="dialog" aria-label="वार्ड अनुसार प्रगति">
+<div id="progPop" class="progpop hidden" role="dialog" aria-label="वोटर रिपोर्ट">
   <div class="card">
-    <div class="head"><h2>वार्ड अनुसार प्रगति</h2>
-      <span><button id="progReload" type="button">ताज़ा करें</button> <button id="progClose" type="button">✕ बंद करें</button></span></div>
+    <div class="head"><h2>वोटर रिपोर्ट</h2>
+      <span><button id="progReload" type="button">↻ रिफ्रेश</button> <button id="progClose" type="button" aria-label="बंद करें">✕</button></span></div>
     <div id="progBody"></div>
     <div class="note" id="progNote"></div>
   </div>
@@ -244,7 +245,7 @@
 <section id="app" class="hidden">
   <header>
     <div class="titlebar"><b><span class="appname">मतदाता खोज · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">प्रगति</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
