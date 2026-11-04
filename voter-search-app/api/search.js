@@ -8,10 +8,55 @@
 // Voters struck off the roll (del 'E' | 'S' | 'R') are found and shown, tagged, but never in a mark filter or ward slips.
 // Every search checks that the password behind the token is still active and that this phone holds its newest
 // session, so retiring or logging in on another phone takes effect at once.
-const { village, redis, whoIs, MARKS, markKey, marksFor, allMarks, today, send, route } = require('./_lib.js');
+//
+// Daily limit (users only; admins have none): what counts is one *search*, not one request. The server hands out a
+// search id with the first answer ({searchId, left}); the phone sends it back with every request that belongs to the
+// same search and drops it when the search box is cleared. A request carries on the current search, for free, when its
+// id is this person's current one, the search has lasted under SEARCH_STEPS requests and SEARCH_MINUTES, and it is:
+// a family list or another page, the same name typed further or shortened (or a father's name added), or the same
+// ward listed again. Anything else starts a new search, which counts 1 and is refused ('limit') once the person has
+// used dailyLimit() today. A ward's slips (all) always count 1. The id is made and checked here, so a phone can't
+// skip counting.
+const crypto = require('crypto');
+const { village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, pipeline, send, route } = require('./_lib.js');
 const { load, search, family, publicFields } = require('./_search.js');
 
-const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 120;   // 10 slips at a time
+const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
+const SEARCH_STEPS = 25, SEARCH_MINUTES = 10;
+
+const fold = (s) => String(s || '').toLowerCase().replace(/\s+/g, '');
+const follows = (a, b) => a.startsWith(b) || b.startsWith(a);   // "mangi" ↔ "mangilal"; '' follows anything
+
+// Counts this request against the person's limits: {searchId, left} to send back, or {error}.
+async function countSearch(user, b, named) {
+  const minuteKey = `rate:${user.id}:${Math.floor(Date.now() / 60000)}`;
+  const dayKey = `searches:${user.id}:${today()}`, findKey = `find:${user.id}`;
+  const [, perMinute, curRaw, usedRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
+    ['GET', findKey], ['GET', dayKey]]);
+  if (perMinute > PER_MINUTE) return { error: 'slow_down' };
+  if (user.admin) return {};
+
+  let cur = null;
+  try { cur = curRaw && JSON.parse(curRaw); } catch (e) { /* start a new search */ }
+  const q = { name: fold(b.name), rel: fold(b.rel), ward: String(b.ward || '') };
+  const now = Date.now(), limit = dailyLimit(user);
+  let used = Number(usedRaw) || 0;
+  const goesOn = !b.all && cur && b.searchId && b.searchId === cur.id && cur.n < SEARCH_STEPS
+    && now - cur.start < SEARCH_MINUTES * 60e3
+    && (b.family ? true : named ? follows(q.name, cur.name) && follows(q.rel, cur.rel) : !cur.name && !cur.rel && q.ward === cur.ward);
+  const cmds = [];
+  let next = cur;
+  if (goesOn) next = { ...cur, n: cur.n + 1, ...(b.family ? {} : q) };
+  else {
+    if (used >= limit) return { error: 'limit', left: 0 };
+    used++;
+    cmds.push(['SET', dayKey, 0, 'EX', 3 * 86400, 'NX'], ['INCR', dayKey]);
+    if (!b.all) next = { id: crypto.randomBytes(8).toString('base64url'), n: 1, start: now, ...q };
+  }
+  if (next) cmds.push(['SET', findKey, JSON.stringify(next), 'EX', SEARCH_MINUTES * 60]);
+  if (cmds.length) await pipeline(cmds);
+  return { searchId: next ? next.id : '', left: limit - used };
+}
 
 async function withMarks(slug, list) {
   const results = list.map(publicFields);
@@ -27,30 +72,25 @@ module.exports = route(async (req, res, b) => {
   if (!user) return send(res, 401, { error: 'login' });
   if (user.status !== 'ok') return send(res, 403, { error: user.status });   // retired, opened on another phone, other village
 
-  const minuteKey = `rate:${user.id}:${Math.floor(Date.now() / 60000)}`;
-  const n = await redis('INCR', minuteKey);
-  if (n === 1) await redis('EXPIRE', minuteKey, 120);
-  if (n > PER_MINUTE) return send(res, 429, { error: 'slow_down' });
-  if (!user.admin) {   // searches per person per day, shown on the admin page
-    const dayKey = `searches:${user.id}:${today()}`;
-    if (await redis('INCR', dayKey) === 1) await redis('EXPIRE', dayKey, 3 * 86400);
-  }
+  const named = !!(String(b.name || '').trim() || String(b.rel || '').trim());
+  if (!named && !b.family && b.ward && !b.all && !user.perms.includes('ward')) return send(res, 403, { error: 'no_ward_list' });
+  if (b.all && !user.perms.includes('wardPdf')) return send(res, 403, { error: 'no_pdf' });
+  const use = await countSearch(user, b, named);
+  if (use.error) return send(res, 429, use);
+  const left = { searchId: use.searchId, left: use.left };
 
   // every voter of one ward, in box order, to print or save that ward's slips
   if (b.all) {
-    if (!user.perms.includes('wardPdf')) return send(res, 403, { error: 'no_pdf' });
     const rows = load(v.slug).rows.filter((r) => String(r.ward) === String(b.ward) && !r.del).sort((x, y) => x.box - y.box);
     if (!rows.length) return send(res, 404, { error: 'no_ward' });
-    return send(res, 200, { total: rows.length, results: rows.map(publicFields) });
+    return send(res, 200, { total: rows.length, results: rows.map(publicFields), ...left });
   }
 
   if (b.family) {
     const results = await withMarks(v.slug, family(v.slug, b.family).slice(0, MAX_FAMILY));
-    return send(res, 200, { total: results.length, results, perms: user.perms });
+    return send(res, 200, { total: results.length, results, perms: user.perms, ...left });
   }
 
-  const named = String(b.name || '').trim() || String(b.rel || '').trim();
-  if (!named && b.ward && !user.perms.includes('ward')) return send(res, 403, { error: 'no_ward_list' });
   let hits = search(v.slug, b);
   const filter = String(b.mark || '');
   if (filter === 'none' || MARKS.includes(filter)) {
@@ -70,5 +110,5 @@ module.exports = route(async (req, res, b) => {
     page = rest.slice(0, PAGE);
     more = rest.length > PAGE;
   }
-  send(res, 200, { total, more, results: await withMarks(v.slug, page), wards: load(v.slug).wards, perms: user.perms });
+  send(res, 200, { total, more, results: await withMarks(v.slug, page), wards: load(v.slug).wards, perms: user.perms, ...left });
 });

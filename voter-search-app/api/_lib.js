@@ -18,20 +18,29 @@ const DB_TOKEN = findEnv(['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN']);
 const KEY_PREFIX = process.env.KEY_PREFIX ?? 'rv:';
 
 // Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
-async function redis(name, key, ...args) {
-  const cmd = [name, KEY_PREFIX + key, ...args];
+const prefixed = ([name, key, ...args]) => [name, KEY_PREFIX + key, ...args].map(String);
+async function dbPost(path, body) {
   if (!DB_URL || !DB_TOKEN) {
     const seen = Object.keys(process.env).filter((k) => /KV|REDIS|UPSTASH/.test(k)).join(', ') || 'none';
     throw new Error(`database not connected (database variables found: ${seen})`);
   }
-  const r = await fetch(DB_URL, {
+  const r = await fetch(DB_URL + path, {
     method: 'POST',
     headers: { Authorization: `Bearer ${DB_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(cmd.map(String)),
+    body: JSON.stringify(body),
   });
-  const j = await r.json();
+  return r.json();
+}
+async function redis(...cmd) {
+  const j = await dbPost('', prefixed(cmd));
   if (j.error) throw new Error(j.error);
   return j.result;
+}
+// several commands in one round trip (Upstash's /pipeline): [[name, key, ...args], ...] → their results, in order
+async function pipeline(cmds) {
+  const j = await dbPost('/pipeline', cmds.map(prefixed));
+  if (!Array.isArray(j)) throw new Error(j.error || 'pipeline');
+  return j.map((x) => { if (x.error) throw new Error(x.error); return x.result; });
 }
 
 // Villages built into the app (by app-build/encrypt.mjs): slug → {name, title, ps, zp, pollTime, wards, voters}
@@ -157,6 +166,11 @@ const DEFAULT_PERMS = ['print'];   // for new users, and users added before perm
 const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
 // today's date in India, for the per-person daily search count
 const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+// Searches a user may start per day (see api/search.js for what one search is): their own limit if their admin set one
+// (user field "limit"), else DAILY_SEARCHES, plus any extra the admin gave for today (field "extra" = "<day>:<n>").
+const DAILY_SEARCHES = 200;
+const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
+const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
 
 // Status marks put on voters, one Redis hash per village "mark:<village>": field "<ward>:<box>",
 // value "<status>|<time>|<who's id>|<who's name>" (older marks have only "<status>|<time>" or "<status>").
@@ -179,5 +193,6 @@ async function allMarks(slug) {   // "<ward>:<box>" → parsed mark, for every m
   return out;
 }
 
-module.exports = { MARKS, markKey, parseMark, marksFor, allMarks, PERMS, DEFAULT_PERMS, permsOf, today, village, villageList, redis, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+module.exports = { MARKS, markKey, parseMark, marksFor, allMarks, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
+  village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };

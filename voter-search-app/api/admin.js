@@ -1,7 +1,8 @@
 // POST {token, action, ...}   token = from logging in (api/unlock) as the superadmin or a village admin
 // The superadmin manages everything. A village admin sees and manages only the users of their assigned villages.
 //   action "list" [, village]          → {me: {role, name, villages, marked}, users: [...], admins: [...] (superadmin only),
-//                                         progress}   users carry perms, searchesToday and marked (slips with their marks)
+//                                         progress}   users carry perms, searchesToday, limit (today's, with any extra),
+//                                         ownLimit ('' = default), extraToday and marked (slips with their marks)
 //   action "add", village, name, phone → {user, password}   new user of one village (must be one of the admin's villages)
 //   action "add_admin", name, phone, villages: [slug, ...] → {user, password}            (superadmin only)
 //   action "villages", id, villages: [slug, ...]           → {user}   change an admin's villages (superadmin only)
@@ -10,6 +11,8 @@
 //   action "logout", id         → {ok}               (ends the person's current session; they can log in again)
 //   action "phone",  id, phone  → {user}             (add or change the person's WhatsApp number; "" removes it)
 //   action "perms",  id, perms  → {user}             (what a user may do: any of 'mark', 'ward', 'wardPdf', 'print')
+//   action "limit",  id, limit  → {user}             (searches a user may start per day; 0 or '' = the default)
+//   action "extra",  id [, n]   → {user}             (n more searches, default 100, for today only)
 //   action "clearMarks", village, status → {progress}   (removes every 'done' | 'coming' | 'absent' mark of the village,
 //                                                       or 'all' of them; the removed marks are kept as a backup first)
 //   action "restoreMarks", village       → {progress}   (puts back the marks removed by that village's last clearMarks)
@@ -21,7 +24,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { load } = require('./_search.js');
-const { village, villageList, MARKS, PERMS, permsOf, allMarks, today, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
+const { village, villageList, MARKS, PERMS, permsOf, allMarks, today, DAILY_SEARCHES, extraToday, dailyLimit, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
@@ -75,6 +78,8 @@ async function freshPassword() {
 
 const view = (u) => ({
   perms: u.role === 'user' ? permsOf(u) : PERMS.slice(),
+  limit: u.role === 'user' ? dailyLimit(u) : null, ownLimit: Number(u.limit) || '', extraToday: extraToday(u),
+  defaultLimit: DAILY_SEARCHES,
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
@@ -197,6 +202,20 @@ module.exports = route(async (req, res, b) => {
     if (user.role !== 'user') return send(res, 400, { error: 'not_user' });   // admins can always do everything
     const perms = PERMS.filter((p) => Array.isArray(b.perms) && b.perms.includes(p));
     await redis('HSET', `user:${user.id}`, 'perms', perms.join(','));
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'limit' || b.action === 'extra') {
+    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });   // admins have no limit
+    if (b.action === 'limit') {
+      const n = b.limit === '' || b.limit == null ? 0 : parseInt(b.limit, 10);
+      if (!(n >= 0 && n <= 5000)) return send(res, 400, { error: 'bad_limit' });
+      await redis('HSET', `user:${user.id}`, 'limit', n ? String(n) : '');
+    } else {
+      const n = parseInt(b.n, 10) || 100;
+      if (!(n > 0 && n <= 5000)) return send(res, 400, { error: 'bad_limit' });
+      await redis('HSET', `user:${user.id}`, 'extra', `${today()}:${extraToday(user) + n}`);
+    }
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

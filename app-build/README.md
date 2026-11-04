@@ -25,6 +25,15 @@ only receive the cards that match a search. Every search checks that the user's 
 
   New users (and users added before these boxes existed) start with only **पर्ची प्रिंट**. A change reaches the
   person's phone on their next search, or within a minute. Admins and the superadmin can always do everything.
+- **Daily search limit (users only):** each user may start 200 searches a day (Indian time), or the number their admin
+  types under **रोज़ की खोज सीमा** (in the new-password box when the person is added, or under their name later; empty =
+  200). **+100 आज के लिए** adds 100 for today only. One search is everything from typing a name until the search box is
+  cleared: typing more letters or deleting some, adding the father's name, changing the ward or mark filter, the next
+  pages and **परिवार** all count once. The server hands out the search id and checks it (same person, the same name
+  typed further or shorter, at most 25 requests and 10 minutes), so a phone can't avoid counting. A whole ward listed
+  with no name counts once per ward, and a ward's slips count once each time. At the limit the phone shows
+  "आज की खोज सीमा पूरी हो गई"; under 20 left, the count line shows "आज N खोज बाकी". Anyone (admins too) is also
+  held to 60 requests a minute.
 
 To add a user the admin must pick the **village** from the dropdown (only their own villages are listed).
 
@@ -79,7 +88,8 @@ Log in with the superadmin password or a village admin's password (or log into a
 
 ## Search page
 - **Search** by name or father/husband name (Hindi or English), box number with a ward chosen, `3/25` (ward 3, box 25)
-  or Voter ID. Choosing only a ward lists the whole ward in box order, 10 at a time (people allowed to).
+  or Voter ID. The search starts once typing pauses (0.6 s) or on Enter, needs at least two letters, and isn't sent
+  again when nothing changed. Choosing only a ward lists the whole ward in box order, 10 at a time (people allowed to).
 - **Filter by mark** (once a ward is chosen): सभी, सिर्फ़ बिना निशान वाले, पूरा हुआ, आ रहे हैं, उपलब्ध नहीं. Marking slips
   while going through the unmarked list doesn't skip anyone on the next page.
 - **परिवार** on a slip opens everyone else at the same house number in that ward, as full slips.
@@ -107,8 +117,8 @@ shows above the tabs, whichever tab made it.
   coloured bar and a total row. It refreshes every minute. Tapping a number opens those voters in मतदाता सूची.
 - **मतदाता सूची**: pick the village and a ward (or सभी वार्ड), then **पूरा हुआ**, **आ रहे हैं**, **उपलब्ध नहीं** or **बाकी**
   (no mark yet) to list those voters in ward and box order, 100 at a time, with who set the mark and when.
-- Each person shows **आज N खोज** (searches today) and how many slips carry their marks; 500 or more searches in a day
-  get a yellow badge (a sign the list is being copied).
+- Each person shows **आज N / L खोज** (searches today out of their daily limit) and how many slips carry their marks; a
+  person who has used up today's limit gets a yellow **आज की खोज सीमा पूरी** badge.
 - **पर्चियों के निशान हटाएं**: pick the village, then remove all marks of one colour, or all of them. After clearing,
   **↺ … निशान वापस लाएं** puts them back; only the most recent clear of each village can be undone.
 

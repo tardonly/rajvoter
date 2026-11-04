@@ -92,6 +92,10 @@
   .perms { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13.5px; }
   .perms label { display: flex; align-items: center; gap: 5px; }
   .perms input { width: 17px; height: 17px; margin: 0; }
+  .limit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; font-size: 13.5px; }
+  .limit input { width: 76px; padding: 6px 8px; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; }
+  .limit button { padding: 6px 10px; font-size: 13px; }
+  .limit .note { color: var(--muted); font-size: 12.5px; }
 
   /* tabs along the top of the panel; on a phone they scroll sideways */
   .tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
@@ -109,6 +113,7 @@
   .newpw .permsbox { margin-top: 12px; padding-top: 10px; border-top: 1px solid #bfdbfe; }
   .newpw .permsbox .ph { font-size: 14px; font-weight: 600; }
   .newpw .perms { font-size: 15px; gap: 8px 16px; }
+  .newpw .limit { font-size: 15px; margin-top: 12px; }
   /* voters by mark */
   .pick select { flex: 1; min-width: 0; }
   .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 4px; }
@@ -259,7 +264,7 @@
 </div>
 <footer class="footer">
   <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
-  <a href="mailto:contact@digyai.com">contact@digyai.com</a>
+  <a href="mailto:ram@digyai.com">ram@digyai.com</a>
   <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
   <span>Mon–Sat, 10:00–19:00 IST</span>
 </footer>
@@ -283,7 +288,7 @@ const MSG = {
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
   phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
-  no_backup: 'वापस लाने के लिए कुछ नहीं है',
+  no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
 };
 // 919876543210 → "+91 98765 43210"
 const showPhone = (p) => (/^91\d{10}$/.test(p) ? `+91 ${p.slice(2, 7)} ${p.slice(7)}` : p ? `+${p}` : '');
@@ -516,7 +521,6 @@ $('vsReload').addEventListener('click', () => { refresh(); loadVoters(); });
 
 // what a user may do besides searching by name (the server checks these on every request)
 const PERM_NAME = { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट' };
-const HEAVY = 500;   // searches in a day that get a yellow badge: a sign the list is being copied
 function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
   for (const [p, label] of Object.entries(PERM_NAME)) {
@@ -536,6 +540,32 @@ function permBoxes(u, msg = 'listMsg', saved) {
   return box;
 }
 
+// How many searches a user may start per day (one search lasts from typing a name until the box is cleared). Empty
+// = the default. "+100 आज के लिए" adds 100 for today only, e.g. on polling day.
+function limitBox(u, msg = 'listMsg', saved) {
+  const box = el('div', 'limit'), inp = el('input'), save = el('button', 'btn ghost', 'सहेजें'), more = el('button', 'btn ghost', '+100 आज के लिए');
+  inp.type = 'number'; inp.min = 1; inp.max = 5000; inp.inputMode = 'numeric';
+  inp.value = u.ownLimit || ''; inp.placeholder = String(u.defaultLimit);
+  save.type = more.type = 'button';
+  const note = el('span', 'note');
+  const show = () => { note.textContent = (u.ownLimit ? '' : `(खाली = ${u.defaultLimit})`) + (u.extraToday ? ` · आज +${u.extraToday}` : ''); };
+  show();
+  async function send(payload, btn) {
+    btn.disabled = true;
+    const r = await api({ id: u.id, ...payload });
+    btn.disabled = false;
+    if (r.error) { $(msg).textContent = errText(r); return; }
+    $(msg).textContent = '';
+    Object.assign(u, r.user); inp.value = u.ownLimit || ''; show();
+    if (saved) saved();
+  }
+  save.addEventListener('click', () => send({ action: 'limit', limit: inp.value.trim() }, save));
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save.click(); } });
+  more.addEventListener('click', () => send({ action: 'extra', n: 100 }, more));
+  box.append('रोज़ की खोज सीमा:', inp, save, more, note);
+  return box;
+}
+
 // ---------- new password box ----------
 let shareTo = '', shareLink = '', shareTitle = '';   // phone number the WhatsApp button sends to ('' = WhatsApp asks for a contact)
 function showPassword(u, pw) {
@@ -546,10 +576,11 @@ function showPassword(u, pw) {
   $('newPwText').textContent = pw;
   $('sharePw').textContent = shareTo ? `WhatsApp पर भेजें (${showPhone(shareTo)})` : 'WhatsApp पर भेजें';
   $('sharePw').classList.toggle('wa', !!shareTo);
-  // a new user starts with only पर्ची प्रिंट: their other permissions can be ticked right here
+  // a new user starts with only पर्ची प्रिंट and the default search limit: both can be changed right here
   const isUser = u.role === 'user' && u.perms;
   $('newPwPerms').classList.toggle('hidden', !isUser);
-  $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', 'यह व्यक्ति क्या कर सकता है:'), permBoxes(u, 'newPwMsg', refresh)] : []));
+  $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', 'यह व्यक्ति क्या कर सकता है:'), permBoxes(u, 'newPwMsg', refresh),
+    limitBox(u, 'newPwMsg', refresh)] : []));
   $('newPwMsg').textContent = '';
   $('newPw').classList.remove('hidden');
   $('newPw').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -640,7 +671,7 @@ function person(u) {
   if (isAdmin) for (const s of u.villages) nm.append(el('span', 'badge vil', vName(s)));
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (u.kicks) nm.append(el('span', 'badge warn', `एक साथ दो फ़ोन: ${u.kicks} बार`));
-  if (!isAdmin && u.searchesToday >= HEAVY) nm.append(el('span', 'badge warn', `आज ${u.searchesToday} खोज`));
+  if (!isAdmin && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', 'आज की खोज सीमा पूरी'));
   const info = el('div', 'info', `बनाया: ${fmt(u.created)} · आखिरी इस्तेमाल: ${fmt(u.lastSeen)}` + (u.retired ? ` · बंद किया: ${fmt(u.retiredAt)}` : ''));
   const sess = el('div', 'info', u.loggedIn
     ? `अभी लॉगिन: ${u.sessionDevice || '—'} · IP ${u.sessionIp || '—'} · ${fmt(u.sessionAt)} से`
@@ -653,9 +684,9 @@ function person(u) {
     if (v !== null) act({ action: 'phone', id: u.id, phone: v });
   });
   ph.append(edit);
-  const use = el('div', 'info', isAdmin ? `${u.marked} पर्चियों पर इनके निशान` : `आज ${u.searchesToday} खोज · ${u.marked} पर्चियों पर इनके निशान`);
+  const use = el('div', 'info', isAdmin ? `${u.marked} पर्चियों पर इनके निशान` : `आज ${u.searchesToday} / ${u.limit} खोज · ${u.marked} पर्चियों पर इनके निशान`);
   row.append(nm, ph, info, sess, use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u));
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u));
 
   const actions = el('div', 'actions');
   if (isAdmin) {   // superadmin: change which villages this admin looks after

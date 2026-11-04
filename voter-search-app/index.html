@@ -210,7 +210,7 @@
 
 <footer class="footer">
   <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
-  <a href="mailto:contact@digyai.com">contact@digyai.com</a>
+  <a href="mailto:ram@digyai.com">ram@digyai.com</a>
   <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
   <span>Mon–Sat, 10:00–19:00 IST</span>
 </footer>
@@ -247,6 +247,7 @@ const MSG = {
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है, इसलिए यहाँ से लॉग आउट हो गया। एक पासवर्ड एक समय पर एक ही फ़ोन पर चलता है।',
   too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
   slow_down: 'बहुत तेज़ खोज — एक मिनट रुककर कोशिश करें',
+  limit: 'आज की खोज सीमा पूरी हो गई — कल फिर खोजें या एडमिन से बात करें',
   offline: 'इंटरनेट नहीं है — इंटरनेट चालू करें',
   server: 'सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें',
   no_village: 'यह गाँव नहीं मिला — पता (लिंक) जाँचें',
@@ -282,6 +283,7 @@ function showLoading(msg) {
 function signOut(msg) {
   if (msg === MSG.other_village) return showLock(msg);   // keep an admin's login for their own villages
   store.del(tokKey);
+  searchId = ''; searchesLeft = null;
   $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('qMark').value = ''; $('count').textContent = '';
   showLock(msg);
 }
@@ -292,7 +294,7 @@ function showApp(name, admin, villages, perms) {
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
   IS_ADMIN = !!admin; wardButton();
   $('lock').classList.add('hidden'); $('app').classList.remove('hidden');
-  search();
+  search(false, true);
 }
 
 $('showPw').addEventListener('change', (e) => { $('pw').type = e.target.checked ? 'text' : 'password'; });
@@ -318,7 +320,15 @@ $('lockBtn').addEventListener('click', () => {
 });
 
 // ---------- search ----------
-let seq = 0, shown = 0, total = 0, lastBox = 0;
+let seq = 0, shown = 0, total = 0, lastBox = 0, lastAsked = '', timer;   // lastAsked: the search already on screen, not sent again
+// The server counts searches per day, not requests: it gives this phone a search id, sent back with every request of the
+// same search (more letters, the next page, परिवार). Clearing the search box drops it, so the next name is a new search.
+let searchId = '', searchesLeft = null;
+function counted(r) {
+  if (r.searchId) searchId = r.searchId;
+  if (r.left != null) searchesLeft = r.left;
+}
+const leftNote = () => (searchesLeft != null && searchesLeft < 20 ? ` · आज ${searchesLeft} खोज बाकी` : '');
 function hint() {
   $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
@@ -326,21 +336,31 @@ function hint() {
     (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') + '</div>';
 }
 const FILTER = { none: 'बिना निशान वाले', done: '✓ पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
-async function search(more = false) {
+// a name with one letter matches nearly everyone: wait for a second one (a box number like 5 is fine)
+const tooShort = (s) => s && !/^\d+$/.test(s) && s.replace(/\s/g, '').length < 2;
+async function search(more = false, force = false) {
+  clearTimeout(timer);
   const q = { name: $('qName').value.trim(), rel: $('qRel').value.trim(), ward: $('qWard').value, mark: $('qMark').value };
   const named = !!(q.name || q.rel);
+  const asked = [q.name, q.rel, q.ward, q.ward ? q.mark : ''].join('|');
+  if (!more && !force && asked === lastAsked) return;   // same search as the one on screen (e.g. a space typed and removed)
+  lastAsked = asked;
   $('count').classList.remove('bad');
   wardButton();
   $('qMark').classList.toggle('hidden', !q.ward);   // filter by mark once a ward is chosen
   if (!q.ward) q.mark = '';
+  if (tooShort(q.name) || tooShort(q.rel)) { ++seq; $('results').innerHTML = '';
+    $('count').textContent = 'कम से कम दो अक्षर लिखें'; $('more').classList.add('hidden'); return; }
   if (!named && !q.ward) { ++seq; hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }   // ++seq: drop a search still on its way
   if (!named && !can('ward')) { ++seq; $('results').innerHTML = '';
     $('count').textContent = MSG.no_ward_list; $('more').classList.add('hidden'); return; }
   const mine = ++seq;
   if (!more) $('count').textContent = 'खोज रहे हैं…';
   // a whole ward pages on from the last box shown, so slips marked meanwhile don't shift the list
-  const r = await api('search', { ...q, offset: more ? shown : 0, after: more ? lastBox : 0, token: token() });
+  const r = await api('search', { ...q, offset: more ? shown : 0, after: more ? lastBox : 0, searchId, token: token() });
+  counted(r);
   if (mine !== seq) return;                       // a newer search has started
+  if (r.error) lastAsked = '';                    // let the same search be tried again
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   if (r.perms) updatePerms(r.perms);
@@ -353,8 +373,8 @@ async function search(more = false) {
   if (r.results.length) lastBox = r.results[r.results.length - 1].box;
   const which = q.mark ? `${FILTER[q.mark]} ` : '';
   const found = named ? `${total} ${which}मतदाता मिले` : `वार्ड ${q.ward} · ${q.mark ? which : 'सभी '}${total} मतदाता, बॉक्स क्रम में`;
-  $('count').textContent = total ? found + (total > shown ? ` · ${shown} दिखाए` : '')
-    : q.mark ? `वार्ड ${q.ward} में ${which}कोई मतदाता नहीं` : 'कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें';
+  $('count').textContent = (total ? found + (total > shown ? ` · ${shown} दिखाए` : '')
+    : q.mark ? `वार्ड ${q.ward} में ${which}कोई मतदाता नहीं` : 'कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें') + leftNote();
   $('more').classList.toggle('hidden', !r.more);
 }
 // the admin can change what this person may do at any time; the next answer from the server says so
@@ -362,7 +382,7 @@ function updatePerms(p) {
   if (IS_ADMIN || p.join() === PERMS.join()) return;
   PERMS = p;
   wardButton();
-  if (shown) search();   // redraw the slips with the right buttons
+  if (shown) search(false, true);   // redraw the slips with the right buttons
 }
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -437,7 +457,8 @@ async function toggleFamily(r, d, btn) {
   const open = d.nextElementSibling && d.nextElementSibling.classList.contains('family') ? d.nextElementSibling : null;
   if (open) { open.remove(); btn.classList.remove('on'); btn.textContent = 'परिवार'; return; }
   btn.disabled = true; btn.textContent = 'ला रहे हैं…';
-  const x = await api('search', { family: `${r.ward}:${r.box}`, token: token() });
+  const x = await api('search', { family: `${r.ward}:${r.box}`, searchId, token: token() });
+  counted(x);
   btn.disabled = false; btn.textContent = 'परिवार';
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
   if (x.error) { alert(MSG[x.error] || MSG.server); return; }
@@ -508,14 +529,21 @@ $('wardPrint').addEventListener('click', async () => {
   if (!w) return;
   btn.disabled = true; btn.textContent = 'पर्चियाँ आ रही हैं…';
   const r = await api('search', { token: token(), ward: w, all: true });
+  counted(r);
   btn.disabled = false; wardButton();
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   printSlips(r.results, `पर्चियाँ ${VILLAGE.name} वार्ड ${w} (${r.total})`);
 });
 
-let timer;
-for (const id of ['qName', 'qRel']) $(id).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => search(), 300); });
+// typing searches once the person pauses (fewer requests to the server); Enter searches at once
+for (const id of ['qName', 'qRel']) {
+  $(id).addEventListener('input', () => {
+    if (!$('qName').value.trim() && !$('qRel').value.trim()) searchId = '';   // box cleared: the next name is a new search
+    clearTimeout(timer); timer = setTimeout(() => search(), 600);
+  });
+  $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); search(); $(id).blur(); } });
+}
 $('qWard').addEventListener('change', () => search());
 $('qMark').addEventListener('change', () => search());
 $('more').addEventListener('click', () => search(true));

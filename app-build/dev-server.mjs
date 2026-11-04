@@ -23,7 +23,13 @@ const alive = (k) => { if (expiry.has(k) && expiry.get(k) < Date.now()) { kv.del
 function redis([cmd, ...a]) {
   switch (cmd.toUpperCase()) {
     case 'GET': return alive(a[0]) ? kv.get(a[0]) : null;
-    case 'SET': kv.set(a[0], a[1]); return 'OK';
+    case 'SET': {   // SET key value [EX seconds] [NX]
+      const opt = a.slice(2).map((x) => String(x).toUpperCase());
+      if (opt.includes('NX') && alive(a[0])) return null;
+      kv.set(a[0], a[1]); expiry.delete(a[0]);
+      if (opt.includes('EX')) expiry.set(a[0], Date.now() + Number(a[2 + opt.indexOf('EX') + 1]) * 1000);
+      return 'OK';
+    }
     case 'DEL': return kv.delete(a[0]) ? 1 : 0;
     case 'INCR': { const n = Number(alive(a[0]) ? kv.get(a[0]) : 0) + 1; kv.set(a[0], String(n)); return n; }
     case 'EXPIRE': expiry.set(a[0], Date.now() + Number(a[1]) * 1000); return 1;
@@ -57,6 +63,10 @@ http.createServer(async (req, res) => {
   if (url.pathname === '/__redis') {
     try { res.end(JSON.stringify({ result: redis(JSON.parse(raw)) })); }
     catch (e) { res.end(JSON.stringify({ error: e.message })); }
+    return;
+  }
+  if (url.pathname === '/__redis/pipeline') {
+    res.end(JSON.stringify(JSON.parse(raw).map((c) => { try { return { result: redis(c) }; } catch (e) { return { error: e.message }; } })));
     return;
   }
   const api = url.pathname.match(/^\/api\/([a-z]+)$/);
