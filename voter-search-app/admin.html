@@ -101,7 +101,10 @@
     background: #fff; color: var(--ink); white-space: nowrap; }
   .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   .pane:not(.on) { display: none; }
-  .newpw .x { border: 0; background: none; font-size: 18px; color: var(--muted); padding: 0 4px; }
+  .modal { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center;
+    padding: calc(60px + env(safe-area-inset-top)) 16px 16px; background: rgba(17,24,39,.45); overflow-y: auto; }
+  .modal .card { width: 100%; max-width: 480px; margin: 0; }
+  .modal .x, .newpw .x { border: 0; background: none; font-size: 18px; color: var(--muted); padding: 0 4px; }
   .newpw { margin: 0 0 14px; }
   .newpw .permsbox { margin-top: 12px; padding-top: 10px; border-top: 1px solid #bfdbfe; }
   .newpw .permsbox .ph { font-size: 14px; font-weight: 600; }
@@ -155,9 +158,8 @@
       <span class="row"><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
 
     <nav class="tabs" id="tabs" role="tablist">
-      <button type="button" data-tab="add">नया व्यक्ति</button>
+      <button type="button" data-tab="people">व्यक्ति</button>
       <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
-      <button type="button" data-tab="people">सभी पासवर्ड</button>
       <button type="button" data-tab="prog">प्रगति</button>
       <button type="button" data-tab="voters">मतदाता सूची</button>
       <button type="button" data-tab="clear">निशान हटाएं</button>
@@ -176,17 +178,6 @@
       <div class="note">यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।</div>
     </div>
 
-    <div class="card pane" data-tab="add">
-      <h2>नया व्यक्ति जोड़ें</h2>
-      <form id="addForm" class="stack" autocomplete="off">
-        <select id="newVillage" required><option value="">गाँव चुनें</option></select>
-        <input id="newName" type="text" placeholder="व्यक्ति का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
-        <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
-        <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
-      </form>
-      <div class="msg" id="addMsg"></div>
-    </div>
-
     <div class="card pane" data-tab="admins" id="adminCard">
       <h2>नया एडमिन जोड़ें</h2>
       <p class="sub">एडमिन सिर्फ़ अपने गाँवों में लोग जोड़ और बंद कर सकता है।</p>
@@ -202,7 +193,7 @@
     </div>
 
     <div class="card pane" data-tab="people">
-      <h2>सभी पासवर्ड</h2>
+      <div class="bar2"><h2>व्यक्ति</h2><button class="btn" id="openAdd" type="button">+ नया व्यक्ति</button></div>
       <div class="filter">
         <button type="button" data-f="on" class="on">चालू</button>
         <button type="button" data-f="off">बंद</button>
@@ -252,6 +243,20 @@
   </section>
 
 </div>
+
+<!-- popup: add a person -->
+<div class="modal hidden" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+  <div class="card">
+    <div class="bar2"><h2 id="addTitle">नया व्यक्ति जोड़ें</h2><button class="x" id="closeAdd" type="button" aria-label="बंद करें">✕</button></div>
+    <form id="addForm" class="stack" autocomplete="off">
+      <select id="newVillage" required><option value="">गाँव चुनें</option></select>
+      <input id="newName" type="text" placeholder="व्यक्ति का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
+      <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
+      <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
+    </form>
+    <div class="msg" id="addMsg"></div>
+  </div>
+</div>
 <footer class="footer">
   <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
   <a href="mailto:contact@digyai.com">contact@digyai.com</a>
@@ -298,7 +303,7 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 // ---------- login ----------
 function showLogin(msg) {
   token = null; me = null; users = []; admins = [];
-  $('list').innerHTML = ''; $('adminList').innerHTML = ''; $('newPw').classList.add('hidden');
+  $('list').innerHTML = ''; $('adminList').innerHTML = ''; $('newPw').classList.add('hidden'); $('addModal').classList.add('hidden');
   $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
   $('loginMsg').textContent = msg || '';
 }
@@ -311,7 +316,7 @@ async function openPanel() {
   if (SLUG && villages[SLUG]) document.title = `एडमिन · ${vName(SLUG)} · मतदाता खोज`;
   setup(); showMarks(r);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
-  showTab(saved.get('adminTab') || 'add');   // after the panel shows, so the chosen tab can be scrolled into sight
+  showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
 }
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -361,7 +366,7 @@ const saved = {
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
 };
 function showTab(name) {
-  const btn = document.querySelector(`.tabs button[data-tab="${name}"]:not(.hidden)`) ? name : 'add';
+  const btn = document.querySelector(`.tabs button[data-tab="${name}"]:not(.hidden)`) ? name : 'people';
   document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === btn));
   document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.dataset.tab === btn));
   const bar = $('tabs'), on = bar.querySelector('button.on');   // keep the chosen tab in sight on a narrow phone
@@ -560,7 +565,18 @@ $('sharePw').addEventListener('click', () => {
   location.href = `https://wa.me/${shareTo}?text=` + encodeURIComponent(text);   // opens the chat with that number directly
 });
 
-// ---------- add a person / an admin ----------
+// ---------- add a person (in a popup) / an admin ----------
+function openAdd() {
+  $('addMsg').textContent = '';
+  if ($('fVillage').value) $('newVillage').value = $('fVillage').value;   // the village the list is showing
+  $('addModal').classList.remove('hidden');
+  $('newName').focus();
+}
+const closeAdd = () => $('addModal').classList.add('hidden');
+$('openAdd').addEventListener('click', openAdd);
+$('closeAdd').addEventListener('click', closeAdd);
+$('addModal').addEventListener('click', (e) => { if (e.target === $('addModal')) closeAdd(); });   // tap outside the box
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAdd(); });
 $('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('newName').value.trim(), village = $('newVillage').value;
@@ -571,6 +587,7 @@ $('addForm').addEventListener('submit', async (e) => {
   $('addBtn').disabled = false;
   if (r.error) { $('addMsg').textContent = errText(r); return; }
   $('newName').value = ''; $('newPhone').value = '';
+  closeAdd();
   showPassword(r.user, r.password);
   refresh();
 });
@@ -600,7 +617,7 @@ function render() {
   const fv = $('fVillage').value;
   const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv));
   const list = $('list'); list.innerHTML = '';
-  if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? 'कोई बंद पासवर्ड नहीं' : 'अभी कोई पासवर्ड नहीं — ऊपर नाम लिखकर बनाएं'));
+  if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? 'कोई बंद पासवर्ड नहीं' : 'अभी कोई व्यक्ति नहीं — "+ नया व्यक्ति" से जोड़ें'));
   for (const u of shown) list.append(person(u));
   const al = $('adminList'); al.innerHTML = '';
   if (me.role === 'super') {

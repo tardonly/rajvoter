@@ -68,7 +68,7 @@ lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).
-- **नया व्यक्ति जोड़ें:** choose the village, type the person's name → you get their password once → Copy or send by
+- **+ नया व्यक्ति** (व्यक्ति tab): choose the village, type the person's name → you get their password once → Copy or send by
   WhatsApp (the message has that village's link). The same box has the person's permission ticks (they start with only
   पर्ची प्रिंट), so you can set what they may do right away.
 - **नया एडमिन जोड़ें** (superadmin only): name + tick the villages → the admin's password, sent with the `/admin` link.
@@ -96,7 +96,8 @@ Log in with the superadmin password or a village admin's password (or log into a
 
 ## Admin page extras
 The admin page is split into tabs along the top (they scroll sideways on a phone, and the phone reopens the last one):
-**नया व्यक्ति**, **एडमिन** (superadmin only), **सभी पासवर्ड**, **प्रगति**, **मतदाता सूची**, **निशान हटाएं**. A new password
+**व्यक्ति** (everyone's passwords, with a **+ नया व्यक्ति** button that opens the add form in a popup), **एडमिन**
+(superadmin only), **प्रगति**, **मतदाता सूची**, **निशान हटाएं**. A new password
 shows above the tabs, whichever tab made it.
 - **प्रगति** (वार्ड अनुसार प्रगति): for each of your villages and wards, the total, ✓ पूरा, आ रहे, नहीं and बाकी, with a
   coloured bar and a total row. It refreshes every minute. Tapping a number opens those voters in मतदाता सूची.
