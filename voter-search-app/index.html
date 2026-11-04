@@ -12,8 +12,10 @@
 <link rel="icon" href="/icon-192.png">
 <title>मतदाता खोज</title>
 <script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
 </script>
+<script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 <style>
   :root {
@@ -296,12 +298,14 @@
 'use strict';
 // The village comes from the address: raj-voter.vercel.app/<village>. Its details (name, पंचायत समिति / जिला परिषद
 // निर्वाचन क्षेत्र, polling time, wards) come from the server in VILLAGE once the page opens.
-const SLUG = decodeURIComponent(location.pathname.split('/')[1] || '').toLowerCase().replace(/\.html$/, '').replace(/^index$/, '');
+// raj-voter.vercel.app/demo: pick a village; /demo/<village> (e.g. /demo/riri): its first 2 wards for anyone to try,
+// no password, 10 searches per phone in all, read-only. Inside the app (and to the server) that village is "demo-riri".
+const [, PART1 = '', PART2 = ''] = location.pathname.split('/').map((p) => decodeURIComponent(p).toLowerCase());
+const SLUG = PART1 === 'demo' && PART2 ? `demo-${PART2}` : PART1.replace(/\.html$/, '').replace(/^index$/, '');
 // On the start page (no village, or an unknown one) you log in first, then see the villages your password opens.
 let HOME = !SLUG;
-// raj-voter.vercel.app/demo: pick a village; /demo-<village> (e.g. /demo-riri): its first 2 wards for anyone to try,
-// no password, 10 searches per phone in all, read-only
 const DEMO_PICK = 'demo', DEMO = SLUG === DEMO_PICK || SLUG.startsWith('demo-');
+const pageOf = (slug) => (slug.startsWith('demo-') ? `/demo/${slug.slice(5)}` : `/${slug}`);   // a village's address
 const WHATSAPP = '917888924374';
 const waLink = (gaon) => `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`नमस्ते, मुझे गाँव ${gaon} के लिए मतदाता खोज ऐप चाहिए।`)}`;
 let VILLAGE = null;
@@ -734,7 +738,7 @@ function showVillages() {
   if (q) list = list.map((v) => [villageScore(q, v), v]).filter(([sc]) => sc != null).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
   const box = $('villages'); box.innerHTML = '';
   for (const v of list) {
-    const a = el('a', null, v.name); a.href = `/${v.slug}`; a.append(el('small', null, v.title));
+    const a = el('a', null, v.name); a.href = pageOf(v.slug); a.append(el('small', null, v.title));
     const where = [v.panchayatSamiti && `पंचायत समिति ${v.panchayatSamiti}`, v.district && `ज़िला ${v.district}`].filter(Boolean).join(' · ');
     if (where) a.append(el('small', null, where));
     box.append(a);
@@ -809,9 +813,9 @@ function setVillage(v) {
   document.title = `मतदाता खोज · ${v.name}`;
   $('lockSub').textContent = `${v.title} · वार्ड ${v.wards.length > 1 ? `${v.wards[0]}–${v.wards[v.wards.length - 1]}` : v.wards[0]}`;
   $('vName').textContent = v.name;
-  $('adminBtn').href = `/${v.slug}/admin`;
+  $('adminBtn').href = '/admin';   // one admin page for every village (the old /<village>/admin redirects there)
   for (const w of v.wards) $('qWard').add(new Option(`वार्ड ${w}`, w));
-  const m = document.createElement('link'); m.rel = 'manifest'; m.href = `/${v.slug}/manifest.webmanifest`;
+  const m = document.createElement('link'); m.rel = 'manifest'; m.href = `/api/manifest?village=${v.slug}`;
   document.head.append(m);
 }
 

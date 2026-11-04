@@ -8,8 +8,10 @@
 <link rel="icon" href="/icon-192.png">
 <title>एडमिन · मतदाता खोज</title>
 <script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
 </script>
+<script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 <style>
   :root { --bg: #f3f4f6; --card: #fff; --ink: #111; --muted: #6b7280; --line: #d1d5db; --accent: #1f4e8c; --bad: #b91c1c; --ok: #15803d; }
@@ -305,8 +307,8 @@
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
-// Opened as /<village>/admin that village is picked by default; /admin opens with every village.
-const SLUG = location.pathname.split('/')[2] === 'admin' ? decodeURIComponent(location.pathname.split('/')[1]).toLowerCase() : '';
+// One admin page, /admin, for every village this admin looks after: it always opens with all of them (the old
+// /<village>/admin addresses redirect here, so everyone sees the same people in the same place).
 // the login is shared with the search pages (an admin login is kept under "tok:admin")
 const store = {
   get() { try { return localStorage.getItem('tok:admin') || sessionStorage.getItem('tok:admin'); } catch (e) { return null; } },
@@ -365,7 +367,6 @@ async function openPanel() {
   if (r.error) return showLogin(errText(r));
   me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; progress = r.progress || [];
   for (const v of r.villageList || []) villages[v.slug] = v;
-  if (SLUG && villages[SLUG]) document.title = `एडमिन · ${vName(SLUG)} · मतदाता खोज`;
   setup(); showMarks(r);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
@@ -389,7 +390,7 @@ $('logout').addEventListener('click', () => {
 function setup() {
   const mine = me.villages.filter((s) => villages[s]);
   $('meText').textContent = me.role === 'super' ? 'सुपर एडमिन · सभी गाँव' : `${me.name} · ${mine.map(vName).join(', ')}`;
-  const pick = mine.includes(SLUG) ? SLUG : mine.length === 1 ? mine[0] : '';
+  const pick = mine.length === 1 ? mine[0] : '';
   for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id), `${pick || mine[0] || ''}|`);
   for (const id of ['newVillage', 'fVillage', 'candVillage']) {
     const sel = $(id);

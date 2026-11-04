@@ -58,7 +58,7 @@ def parse(path):
             agerow = row(50, 64, -15, 120)
             age = next((int(m2[1]) for s in agerow for m2 in [re.search(r'आजच:\s*(\d+)', s['t'])] if m2), None)
             sext = ' '.join(s['t'] for s in agerow if s['x'] - bx > 50)
-            sex = 'पुरुष' if 'पचरष' in sext else 'स्त्री' if re.search(r'^सल|सब', sext) else 'तृतीय लिंग' if sext.strip() else ''
+            sex = 'पुरुष' if re.search(r'^प.?रष', sext.strip()) else 'स्त्री' if sext.strip().startswith('स') else 'तृतीय लिंग' if sext.strip() else ''
             mark = ''.join(s['t'] for s in cell if s['f'] == 'TimesNewRoman,Bold' and -12 < s['x'] - bx < 0 and abs(s['y'] - by) < 3)
             cards.append(dict(page=pi + 1, box=int(v['t']), section=section, mohalla=mohalla, epic=epic, nameSkel=name,
                               rel=rel, relSkel=relname, house=house, age=age, sex=sex, sexRaw=sext, mark=mark,

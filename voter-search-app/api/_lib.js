@@ -45,7 +45,7 @@ async function pipeline(cmds) {
 
 // Villages built into the app (by app-build/encrypt.mjs): slug → {name, title, ps, zp, pollTime, wards, voters}
 const VILLAGES = require('./_villages.json');
-// The marketing demo: /demo lists every village; /demo-<village> (e.g. /demo-riri) opens the voters of that village's
+// The marketing demo: /demo lists every village; /demo/<village> (e.g. /demo/riri, called "demo-riri" here) opens the voters of that village's
 // first DEMO.wards wards with no password. Each phone keeps a random device id and logs in with it; it gets DEMO.searches
 // searches in all (whichever demo villages they are in), and one internet address at most DEMO.perIp a day (so clearing
 // the browser doesn't give more). The demo is read-only: no marks are shown or set (its marks would live apart, under

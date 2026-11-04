@@ -8,7 +8,7 @@ only receive the cards that match a search. Every search checks that the user's 
 |---|---|
 | `/` | login; then the villages that password opens (a person with one village goes straight to it) |
 | `/<village>` | search for that village (login needed) |
-| `/<village>/admin` or `/admin` | admin page |
+| `/admin` | the one admin page: every user of every village the admin looks after (the old `/<village>/admin` redirects here) |
 
 ## Who can do what
 - **Superadmin** — the `ADMIN_PASSWORD` set in Vercel. Opens every village. Creates **village admins** and chooses
@@ -42,7 +42,7 @@ only receive the cards that match a search. Every search checks that the user's 
 To add a user the admin must pick the **village** from the dropdown (only their own villages are listed).
 
 ## Demo (for marketing)
-`raj-voter.vercel.app/demo` lists every village in the app; picking one opens `/demo-<village>` (e.g. `/demo-riri`): that
+`raj-voter.vercel.app/demo` lists every village in the app; picking one opens `/demo/<village>` (e.g. `/demo/riri`; the old `/demo-riri` redirects there): that
 village's voter list, **wards 1–2 only**, for anyone, with no password, to try the search. **गाँव बदलें** goes back to the
 list. Each phone keeps a random device id and gets **10 searches in all**, across all demo villages (counted the same way
 as above, by the server); one internet address

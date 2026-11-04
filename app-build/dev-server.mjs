@@ -1,5 +1,7 @@
 // Local test server that behaves like Vercel for this app: serves voter-search-app/, runs api/*.js,
-// applies the village rewrites from vercel.json (/<village>, /<village>/admin, /<village>/manifest.webmanifest),
+// applies the village rewrites from vercel.json (/<village>, /demo/<village>, /<village>/manifest.webmanifest) and its
+// redirects (the old per-village admin address /<village>/admin → /admin, the old demo address /demo-<village> →
+// /demo/<village>),
 // and stands in for the Upstash Redis database with an in-memory store (wiped on restart).
 // Usage:  ADMIN_PASSWORD=some-test-password node app-build/dev-server.mjs   → http://127.0.0.1:8765
 import http from 'node:http';
@@ -55,10 +57,13 @@ http.createServer(async (req, res) => {
 
   // same rewrites as vercel.json, used only when no file matches
   const seg = url.pathname.match(/^\/([a-z0-9-]+)(\/admin|\/manifest\.webmanifest)?$/);
-  if (url.pathname === '/admin') url.pathname = '/admin.html';
+  if (seg && seg[1] !== 'api' && seg[2] === '/admin') { res.writeHead(307, { Location: '/admin' }); return res.end(); }
+  if (seg && !seg[2] && seg[1].startsWith('demo-')) { res.writeHead(307, { Location: `/demo/${seg[1].slice(5)}` }); return res.end(); }
+  if (/^\/demo\/[a-z0-9-]+$/.test(url.pathname)) url.pathname = '/index.html';   // a demo village: /demo/<village>
+  else if (url.pathname === '/admin') url.pathname = '/admin.html';
   else if (seg && seg[1] !== 'api' && !existsSync(join(root, url.pathname))) {
     if (seg[2] === '/manifest.webmanifest') { url.pathname = '/api/manifest'; url.searchParams.set('village', seg[1]); }
-    else url.pathname = seg[2] ? '/admin.html' : '/index.html';
+    else url.pathname = '/index.html';
   }
 
   if (url.pathname === '/__redis') {

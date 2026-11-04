@@ -14,18 +14,30 @@
       "includeFiles": "api/_data/**"
     }
   },
+  "redirects": [
+    {
+      "source": "/((?!api/)[a-z0-9-]+)/admin",
+      "destination": "/admin",
+      "permanent": false
+    },
+    {
+      "source": "/demo-:village([a-z0-9-]+)",
+      "destination": "/demo/:village",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/admin",
       "destination": "/admin.html"
     },
     {
-      "source": "/:village([a-z0-9-]+)/manifest.webmanifest",
-      "destination": "/api/manifest?village=:village"
+      "source": "/demo/:village([a-z0-9-]+)",
+      "destination": "/index.html"
     },
     {
-      "source": "/((?!api/)[a-z0-9-]+)/admin",
-      "destination": "/admin.html"
+      "source": "/:village([a-z0-9-]+)/manifest.webmanifest",
+      "destination": "/api/manifest?village=:village"
     },
     {
       "source": "/:village([a-z0-9-]+)",
@@ -64,7 +76,7 @@
       ]
     },
     {
-      "source": "/:village([a-z0-9-]+)",
+      "source": "/demo/:village([a-z0-9-]+)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -73,7 +85,7 @@
       ]
     },
     {
-      "source": "/((?!api/)[a-z0-9-]+)/admin",
+      "source": "/:village([a-z0-9-]+)",
       "headers": [
         {
           "key": "Cache-Control",
