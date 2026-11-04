@@ -108,6 +108,13 @@
   .pbtn { justify-self: start; align-self: start; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
 
+  /* struck off the roll (E / S / R in the list's supplement) */
+  .slip.gone { border-color: #9ca3af; background: #f3f4f6; color: #4b5563; }
+  .slip.gone .boxno { border-color: #9ca3af; }
+  .slip.gone .line > div:first-child b { text-decoration: line-through; text-decoration-thickness: 1px; }
+  .slip.gone .time { background: #9ca3af; }
+  .slip .gonebar { background: #4b5563; color: #fff; font-weight: 700; font-size: 14px; padding: 4px 8px; }
+
   /* marks set by an admin, seen by everyone */
   .slip .bar { display: none; color: #fff; font-weight: 700; font-size: 14px; padding: 4px 8px; }
   .slip[data-mark] .bar { display: block; }
@@ -245,7 +252,7 @@ const MSG = {
   no_village: 'यह गाँव नहीं मिला — पता (लिंक) जाँचें',
   other_village: 'यह पासवर्ड इस गाँव का नहीं है',
   not_admin: 'यह काम सिर्फ़ एडमिन कर सकते हैं',
-  not_found: 'यह मतदाता नहीं मिला',
+  not_found: 'यह मतदाता नहीं मिला', deleted: 'यह मतदाता सूची से हटाया गया है — निशान नहीं लग सकता',
   no_mark: 'निशान लगाने की अनुमति नहीं है — एडमिन से पूछें',
   no_pdf: 'पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें',
   no_ward_list: 'पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें',
@@ -362,15 +369,17 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 function kv(label, value) { const f = document.createDocumentFragment(); f.append(label, el('b', null, value)); return f; }
 
 const MARKS = { done: '✓ पूरा हुआ', coming: 'आ रहे हैं', absent: 'उपलब्ध नहीं' };
+// voters struck off the roll in the list's supplement: still found, shown greyed with the reason, no marks or printing
+const DELETED = { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend
 
 // One slip. forPrint leaves out the buttons and the mark; inFamily leaves out the परिवार button.
 function slip(r, forPrint, inFamily) {
   const [bhag, ...rest] = String(r.kendra || '').split('-');
   const d = el('div', 'slip');
-  if (!forPrint) d.dataset.key = `${r.ward}:${r.box}`;
+  if (!forPrint && !r.del) d.dataset.key = `${r.ward}:${r.box}`;
   const head = el('div', 'head');
   const tools = el('div', 'tools');
-  if (!forPrint && can('print')) {
+  if (!forPrint && can('print') && !r.del) {
     const pb = el('button', 'pbtn', 'प्रिंट / PDF'); pb.type = 'button';
     pb.addEventListener('click', () => printSlips([r], `पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`));
     tools.append(pb);
@@ -402,6 +411,11 @@ function slip(r, forPrint, inFamily) {
   const k = el('div', 'kendra'); k.append('मतदान केन्द्र : ', el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
   d.append(head, idl, l1, l2, k, el('div', 'time', VILLAGE.pollTime));
   if (forPrint) return d;
+  if (r.del) {
+    d.classList.add('gone');
+    d.prepend(el('div', 'gonebar', `✕ सूची से हटाया गया (${r.del}${DELETED[r.del] ? ` – ${DELETED[r.del]}` : ''})`));
+    return d;
+  }
 
   d.prepend(el('div', 'bar'));
   if (can('mark')) {   // admins, and users their admin allowed to mark; everyone sees the bar

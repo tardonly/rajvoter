@@ -84,6 +84,9 @@ Log in with the superadmin password or a village admin's password (or log into a
   while going through the unmarked list doesn't skip anyone on the next page.
 - **परिवार** on a slip opens everyone else at the same house number in that ward, as full slips.
 - **अ+** (top right) makes the slips and search boxes bigger; the phone remembers it.
+- Voters struck off in the list's supplement (E death, S shifted, R repeated) are still found, shown greyed with
+  "✕ सूची से हटाया गया (E – मृत्यु)" and their names crossed out. They can't be marked or printed and aren't counted in
+  progress, the mark filters or a ward's slips.
 
 ## Slips and voter marks
 - **प्रिंट / PDF** on a slip: prints that one slip in the top-left corner of an A4 page. To download instead, choose

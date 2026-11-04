@@ -14,7 +14,9 @@ module.exports = route(async (req, res, b) => {
   if (!user.perms.includes('mark')) return send(res, 403, { error: 'no_mark' });
 
   const key = markKey(b);
-  if (!load(v.slug).rows.some((r) => markKey(r) === key)) return send(res, 404, { error: 'not_found' });
+  const row = load(v.slug).rows.find((r) => markKey(r) === key);
+  if (!row) return send(res, 404, { error: 'not_found' });
+  if (row.del && b.mark) return send(res, 400, { error: 'deleted' });   // struck off the roll: nothing to mark
   const mark = String(b.mark || '');
   if (mark && !MARKS.includes(mark)) return send(res, 400, { error: 'bad_mark' });
 

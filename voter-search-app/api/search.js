@@ -5,6 +5,7 @@
 // A ward with no name lists the whole ward in box order (only for people allowed 'ward'); it pages with after = the last
 // box shown, so marking slips while going through a filtered list doesn't skip anyone. A name search pages through its
 // best 250 matches. mark filters by status mark: 'none' (no mark yet) | 'done' | 'coming' | 'absent'.
+// Voters struck off the roll (del 'E' | 'S' | 'R') are found and shown, tagged, but never in a mark filter or ward slips.
 // Every search checks that the password behind the token is still active and that this phone holds its newest
 // session, so retiring or logging in on another phone takes effect at once.
 const { village, redis, whoIs, MARKS, markKey, marksFor, allMarks, today, send, route } = require('./_lib.js');
@@ -38,7 +39,7 @@ module.exports = route(async (req, res, b) => {
   // every voter of one ward, in box order, to print or save that ward's slips
   if (b.all) {
     if (!user.perms.includes('wardPdf')) return send(res, 403, { error: 'no_pdf' });
-    const rows = load(v.slug).rows.filter((r) => String(r.ward) === String(b.ward)).sort((x, y) => x.box - y.box);
+    const rows = load(v.slug).rows.filter((r) => String(r.ward) === String(b.ward) && !r.del).sort((x, y) => x.box - y.box);
     if (!rows.length) return send(res, 404, { error: 'no_ward' });
     return send(res, 200, { total: rows.length, results: rows.map(publicFields) });
   }
@@ -54,7 +55,7 @@ module.exports = route(async (req, res, b) => {
   const filter = String(b.mark || '');
   if (filter === 'none' || MARKS.includes(filter)) {
     const marks = await allMarks(v.slug);
-    hits = hits.filter((r) => ((marks[markKey(r)] || {}).m || 'none') === filter);
+    hits = hits.filter((r) => !r.del && ((marks[markKey(r)] || {}).m || 'none') === filter);
   }
   const total = hits.length;
   let page, more;

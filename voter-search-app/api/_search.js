@@ -20,6 +20,7 @@ function load(slug) {     // slug must already be checked against the village li
     const o = {};
     for (const f in F) o[f] = r[F[f]];
     o.kendra = data.kendra[o.ward];
+    o.del = o.del || '';   // 'E' death, 'S' shifted, 'R' repeated: struck off the final roll, still shown (tagged)
     o._nEn = normEn(o.name); o._rEn = normEn(o.relname); o._nHi = normHi(o.hname); o._rHi = normHi(o.hrel);
     o._epic = String(o.epic || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
     return o;
@@ -113,7 +114,7 @@ function family(slug, key) {
   return rows.filter((r) => r.ward === ward && r.house === me.house).sort((a, b) => a.box - b.box);
 }
 
-const publicFields = ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra }) =>
-  ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra });
+const publicFields = ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra, del }) =>
+  ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra, del });
 
 module.exports = { load, search, family, publicFields };

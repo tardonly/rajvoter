@@ -1,6 +1,8 @@
 # Step 3 of analysing a village: combine <work>/cards.json and the names (<work>/names/w*.json) into the village's
 # Excel files (Adsar layout), and check every ward against its cover page totals.
 #   final roll per ward = main list − boxes in the deletion supplement, with corrections applied, + additions
+# The deleted main-list voters stay in the files, in box order, with their mark in the last column (E death, S shifted,
+# R repeated); the app shows them tagged as struck off. The cover check counts only the voters on the roll.
 # <work>/booths.json maps booth number → Matdan Kendra text read from the cover page, e.g.
 #   {"72": "72-राजकीय उच्च माध्यमिक विद्यालय डालमाण (बांया भाग)"}
 # Usage:  .venv/bin/python app-build/analyse/build_xlsx.py <village folder> <work folder> <FILE PREFIX, e.g. DALMAN>
@@ -13,8 +15,8 @@ BOOTH = json.load(open(os.path.join(T, 'booths.json')))
 cards = json.load(open(os.path.join(T, 'cards.json')))
 
 HEAD_FONT, HEAD_FILL = Font(bold=True, color='FFFFFFFF'), PatternFill('solid', fgColor='FF2F5597')
-VCOLS = ['Box Number', 'Voter ID', 'Name', 'Relative Name', 'Relation', 'House', 'Age', 'Gender', 'Ward', 'Matdan Kendra']
-VW = [12, 19, 24, 24, 10, 9, 7, 9, 7, 42]
+VCOLS = ['Box Number', 'Voter ID', 'Name', 'Relative Name', 'Relation', 'House', 'Age', 'Gender', 'Ward', 'Matdan Kendra', 'Deleted']
+VW = [12, 19, 24, 24, 10, 9, 7, 9, 7, 42, 9]
 HCOLS = ['Ward', 'Box Number', 'नाम (हिंदी)', 'पिता/माता/पति का नाम (हिंदी)', 'Name', 'Relative Name', 'PDF Page']
 HW = [7, 12, 22, 26, 24, 24, 10]
 
@@ -35,12 +37,14 @@ for f, v in sorted(cards.items(), key=lambda kv: int(kv[1]['info']['ward'])):
     main = {c['box']: c for c in cs if c['section'] == 'main'}
     for c in cs:
         if c['section'] == 'correction': main[c['box']] = c
-    deleted = {c['box'] for c in cs if c['section'] == 'deletion'}
+    deleted = {c['box']: c['mark'] or 'S' for c in cs if c['section'] == 'deletion'}   # box → E / S / R
     final = [c for b, c in sorted(main.items()) if b not in deleted] + [c for c in cs if c['section'] == 'addition']
+    listed = sorted(main.values(), key=lambda c: c['box']) + [c for c in cs if c['section'] == 'addition']   # with the deleted
     vrows, hrows = [], []
-    for c in final:
+    for c in listed:
         n = names[(c['section'], c['box'])]
-        vrows.append([c['box'], c['epic'] or None, n['name'], n['relname'], c['rel'], c['house'], c['age'], c['sex'], w, kendra])
+        gone = deleted.get(c['box']) if c['section'] == 'main' else None
+        vrows.append([c['box'], c['epic'] or None, n['name'], n['relname'], c['rel'], c['house'], c['age'], c['sex'], w, kendra, gone])
         hrows.append([w, c['box'], n['hname'], n['hrel'], n['name'], n['relname'], c['page']])
     wb = openpyxl.Workbook()
     sheet(wb.active, VCOLS, VW, vrows); wb.active.title = 'Voter List'
@@ -51,10 +55,11 @@ for f, v in sorted(cards.items(), key=lambda kv: int(kv[1]['info']['ward'])):
     ok = (sx['पुरुष'], sx['स्त्री'], len(final)) == (info['male'], info['female'], info['total'])
     report.append(f"ward {w}: {len(final)} voters ({sx['पुरुष']} M, {sx['स्त्री']} F) cover {info['total']} ({info['male']} M, {info['female']} F) "
                   f"{'OK' if ok else 'MISMATCH'} · booth {kendra} · +{sum(c['section'] == 'addition' for c in final)} added, "
-                  f"-{len(deleted)} deleted {sorted(deleted)}, corrected {[c['box'] for c in cs if c['section'] == 'correction']}")
+                  f"-{len(deleted)} deleted (kept, tagged), corrected {[c['box'] for c in cs if c['section'] == 'correction']}")
 
 wb = openpyxl.Workbook()
 sheet(wb.active, VCOLS, VW, allv); wb.active.title = 'All Wards'
 sheet(wb.create_sheet('Hindi Check'), HCOLS, HW, allh)
 wb.save(os.path.join(folder, f'{PREFIX}-All Wards.xlsx'))
-print('\n'.join(report)); print(f'total {len(allv)} voters')
+gone = sum(1 for r in allv if r[-1])
+print('\n'.join(report)); print(f'total {len(allv) - gone} voters on the roll, +{gone} struck off (kept, tagged)')

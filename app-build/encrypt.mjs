@@ -37,7 +37,7 @@ for (const slug of folders.sort()) {
   if (!existsSync(join(root, slug, 'voters.json'))) { console.log(`${slug}: skipped (no voters.json yet)`); continue; }
   const plain = readFileSync(join(root, slug, 'voters.json'));
   const data = JSON.parse(plain);
-  const ward = data.fields.indexOf('ward');
+  const ward = data.fields.indexOf('ward'), del = data.fields.indexOf('del');
   const wards = [...new Set(data.rows.map((r) => r[ward]))].sort((a, b) => a - b);
 
   const iv = randomBytes(12);
@@ -47,10 +47,11 @@ for (const slug of folders.sort()) {
     JSON.stringify({ v: 3, iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), ct: ct.toString('base64') }));
   villages[slug] = {
     name: meta.name, title: meta.title || `ग्राम पंचायत ${meta.name}`, ps: meta.ps ?? '', zp: meta.zp ?? '',
-    pollTime: meta.pollTime || 'मतदान समय : प्रातः 7 से सायं 5 बजे तक', wards, voters: data.rows.length,
+    pollTime: meta.pollTime || 'मतदान समय : प्रातः 7 से सायं 5 बजे तक', wards,
+    voters: data.rows.filter((r) => !(del >= 0 && r[del])).length, deleted: del >= 0 ? data.rows.filter((r) => r[del]).length : 0,
     panchayatSamiti: meta.panchayatSamiti || '', district: meta.district || '',   // shown in the village list
   };
-  console.log(`${slug}: ${data.rows.length} voters, wards ${wards.join(', ')}`);
+  console.log(`${slug}: ${villages[slug].voters} voters (+${villages[slug].deleted} struck off), wards ${wards.join(', ')}`);
 }
 
 // remove data of villages whose folder is gone

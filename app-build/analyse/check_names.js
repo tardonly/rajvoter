@@ -13,7 +13,7 @@ let bad = 0;
 const say = (...a) => { bad++; console.log(...a); };
 for (const c of want) {
   if (c.section === 'deletion') continue;   // the deletion supplement repeats main-list cards; no names needed
-  if (c.section === 'main' && c.mark) continue;   // deleted (E/S/R) or replaced by a correction (#): not on the final roll
+  if (c.section === 'main' && c.mark === '#') continue;   // replaced by its correction card (deleted E/S/R cards are kept, tagged)
   const n = got.get(key(c));
   if (!n) { say(`MISSING  page ${c.page} box ${c.box} (${c.section})`); continue; }
   for (const f of ['hname', 'hrel', 'name', 'relname']) if (!String(n[f] || '').trim()) say(`EMPTY    box ${c.box} ${f}`);

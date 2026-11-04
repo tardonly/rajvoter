@@ -43,7 +43,10 @@ Read page 1 of **every** ward PDF first (from the page image; its text layer may
 
 ### Files to produce
 1. **One Excel per ward** `<VILLAGE>-Ward No-NNN.xlsx` and **`<VILLAGE>-All Wards.xlsx`** with two sheets:
-   - `All Wards`: `Box Number | Voter ID | Name | Relative Name | Relation | House | Age | Gender | Ward | Matdan Kendra`
+   - `All Wards`: `Box Number | Voter ID | Name | Relative Name | Relation | House | Age | Gender | Ward | Matdan Kendra |
+     Deleted` — Deleted is empty, or the main-list voter's mark from the deletion supplement (E death, S shifted,
+     R repeated). Deleted voters stay in the files in box order; the app shows them greyed, tagged "सूची से हटाया गया",
+     and leaves them out of counts, progress, marks and ward slips.
      — Name / Relative Name in English (Roman) spelling, Relation as printed (`पिता` / `पति` / `माता` …),
      Gender as printed (`पुरुष` / `स्त्री`), Ward and Matdan Kendra from that ward's cover page (see above).
    - `Hindi Check`: `Ward | Box Number | नाम (हिंदी) | पिता/माता/पति का नाम (हिंदी) | Name | Relative Name | PDF Page`.
@@ -65,7 +68,8 @@ Read page 1 of **every** ward PDF first (from the page image; its text layer may
   after the main list, usually without a Voter ID), घटक 2 विलोपन सूची (deletions: the main-list box number with a mark
   E = death, S = shifted, R = repetition; those main cards are also stamped DELETED), घटक 3 संशोधन सूची (corrections:
   a main-list box number with the corrected details), and a last summary page.
-- **Final roll per ward = main list − deleted boxes, with corrections applied, + additions.** It must equal the cover's
+- **Final roll per ward = main list − deleted boxes, with corrections applied, + additions** (the deleted ones are
+  still listed, tagged). It must equal the cover's
   पुरुष / स्त्री / कुल counts exactly; the cover's अंतिम क्रम संख्या = last addition's box number.
 - The text layer is exact for box numbers, Voter IDs, house, age, gender, relation and the section headings, but the
   Hindi names come out without most vowel signs (मांगी लाल → मरपगल लरल, ू often as ब, े as क, ी as ल, ड as र), so
@@ -81,8 +85,8 @@ keeps the expensive part (names) so the village can be rebuilt; images and cards
    (`img/w<ward>_pNN.png`) and `img/w<ward>_manifest.json` (the cards on each page, in order, with the PDF letters).
    It prints each ward's booth, ps, zp, cover total and card counts per section; check that ps/zp agree.
 2. Read the names from the images into `names/w<ward>.json`:
-   `[{"page", "box", "section", "hname", "hrel", "name", "relname"}]` for every card on the final roll: main cards
-   with no mark (a main card marked E/S/R is deleted, # is replaced by its correction), additions and corrections.
+   `[{"page", "box", "section", "hname", "hrel", "name", "relname"}]` for every main card (deleted E/S/R ones too: they
+   are kept and shown tagged; only a `#` card, replaced by its correction, is skipped), addition and correction.
    One subagent per ward works well (≈15 pages each). `node app-build/analyse/check_names.js <work> <ward>` flags
    missing entries and names that don't fit the PDF letters; every CHECK line must be re-looked at on the image.
 3. Write `<work>/booths.json` (`{"72": "72-…"}` from the cover pages), then

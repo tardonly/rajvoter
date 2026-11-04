@@ -18,9 +18,30 @@
    10,
    11
   ],
-  "voters": 3561,
+  "voters": 3291,
+  "deleted": 270,
   "panchayatSamiti": "श्रीडूंगरगढ़",
   "district": "बीकानेर"
+ },
+ "baijasar-rajalwara": {
+  "name": "बैजासर",
+  "title": "ग्राम पंचायत बैजासर",
+  "ps": 4,
+  "zp": 5,
+  "pollTime": "मतदान समय : प्रातः 7 से सायं 5 बजे तक",
+  "wards": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "voters": 1867,
+  "deleted": 806,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
  },
  "dalman": {
   "name": "डालमाण",
@@ -38,6 +59,7 @@
    7
   ],
   "voters": 2089,
+  "deleted": 20,
   "panchayatSamiti": "सरदारशहर",
   "district": "चुरू"
  }

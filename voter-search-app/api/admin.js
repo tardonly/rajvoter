@@ -45,12 +45,15 @@ async function markSummary(slug, all) {
   all ||= await allMarks(slug);
   const zero = () => Object.fromEntries(MARKS.map((m) => [m, 0]));
   const marks = zero(), perWard = {};
+  const onRoll = new Set();
   for (const r of load(slug).rows) {
     perWard[r.ward] ||= { ward: r.ward, total: 0, ...zero() };
+    if (r.del) continue;   // struck off the roll: not counted
     perWard[r.ward].total++;
+    onRoll.add(`${r.ward}:${r.box}`);
   }
   for (const [key, { m }] of Object.entries(all)) {
-    if (!MARKS.includes(m)) continue;
+    if (!MARKS.includes(m) || !onRoll.has(key)) continue;
     marks[m]++;
     const w = perWard[key.split(':')[0]];
     if (w) w[m]++;
@@ -119,7 +122,7 @@ module.exports = route(async (req, res, b) => {
       const m = all[`${r.ward}:${r.box}`];
       return b.status === 'none' ? !(m && MARKS.includes(m.m)) : !!m && m.m === b.status;
     };
-    const hits = load(b.village).rows.filter((r) => (!b.ward || String(r.ward) === String(b.ward)) && want(r))
+    const hits = load(b.village).rows.filter((r) => !r.del && (!b.ward || String(r.ward) === String(b.ward)) && want(r))
       .sort((x, y) => x.ward - y.ward || x.box - y.box);
     const offset = Math.max(0, Number(b.offset) || 0);
     const rows = hits.slice(offset, offset + LIST_PAGE).map(({ ward, box, hname, name, hrel, relname, rel, house, age, sex }) => {
