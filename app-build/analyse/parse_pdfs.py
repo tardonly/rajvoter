@@ -26,7 +26,7 @@ def parse(path):
                 zp=nums(r'नज॰ प॰ सदसज ननरररचन क[कन]त : (\d+)'),
                 ps=nums(r'पप॰ स॰ सदसज ननरररचन क[कन]त : (\d+)'), booth=nums(r'\n(\d+) - [^\n]*\n'))
     # counts block after the booth line: start, end?, ..., male, female, third, total (order seen in text)
-    m = re.search(r'\n\d+ - [^\n]*\n(\d+)\n(\d+)\nततलज ललग\n(\d+)\n(\d+)\n(\d+)\n(\d+)', cover)
+    m = re.search(r'\n\d+ - (?:[^\n]*\n){1,3}?(\d+)\n(\d+)\n[^\d\n]+\n(\d+)\n(\d+)\n(\d+)\n(\d+)', cover)
     if m: info.update(last=int(m[1]), first=int(m[2]), male=int(m[3]), female=int(m[4]), third=int(m[5]), total=int(m[6]))
     cards, section, mohalla = [], 'main', ''
     for pi in range(1, d.page_count):
