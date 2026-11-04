@@ -47,8 +47,8 @@ Read page 1 of **every** ward PDF first (from the page image; its text layer may
      — Name / Relative Name in English (Roman) spelling, Relation as printed (`पिता` / `पति` / `माता` …),
      Gender as printed (`पुरुष` / `स्त्री`), Ward and Matdan Kendra from that ward's cover page (see above).
    - `Hindi Check`: `Ward | Box Number | नाम (हिंदी) | पिता/माता/पति का नाम (हिंदी) | Name | Relative Name | PDF Page`.
-2. **`village.json`** from the cover page. Only `name`, `title`, `ps`, `zp` and `pollTime` are used by the app; the rest
-   are kept for reference:
+2. **`village.json`** from the cover page. The app uses `name`, `title`, `ps`, `zp`, `pollTime`, and `panchayatSamiti` + `district`
+   (shown in the village list); the rest are kept for reference:
    ```json
    { "name": "डालमाण", "title": "ग्राम पंचायत डालमाण", "ps": 12, "zp": 6,
      "pollTime": "मतदान समय : प्रातः 7 से सायं 5 बजे तक",
@@ -81,7 +81,8 @@ keeps the expensive part (names) so the village can be rebuilt; images and cards
    (`img/w<ward>_pNN.png`) and `img/w<ward>_manifest.json` (the cards on each page, in order, with the PDF letters).
    It prints each ward's booth, ps, zp, cover total and card counts per section; check that ps/zp agree.
 2. Read the names from the images into `names/w<ward>.json`:
-   `[{"page", "box", "section", "hname", "hrel", "name", "relname"}]` for every card except section "deletion".
+   `[{"page", "box", "section", "hname", "hrel", "name", "relname"}]` for every card on the final roll: main cards
+   with no mark (a main card marked E/S/R is deleted, # is replaced by its correction), additions and corrections.
    One subagent per ward works well (≈15 pages each). `node app-build/analyse/check_names.js <work> <ward>` flags
    missing entries and names that don't fit the PDF letters; every CHECK line must be re-looked at on the image.
 3. Write `<work>/booths.json` (`{"72": "72-…"}` from the cover pages), then

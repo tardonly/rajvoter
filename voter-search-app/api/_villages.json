@@ -18,7 +18,9 @@
    10,
    11
   ],
-  "voters": 3561
+  "voters": 3561,
+  "panchayatSamiti": "श्रीडूंगरगढ़",
+  "district": "बीकानेर"
  },
  "dalman": {
   "name": "डालमाण",
@@ -35,6 +37,8 @@
    6,
    7
   ],
-  "voters": 2089
+  "voters": 2089,
+  "panchayatSamiti": "सरदारशहर",
+  "district": "चुरू"
  }
 }

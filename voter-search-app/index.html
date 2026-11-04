@@ -524,6 +524,8 @@ function myVillages(list) {
   const box = $('villages'); box.innerHTML = '';
   for (const v of list) {
     const a = el('a', null, v.name); a.href = `/${v.slug}`; a.append(el('small', null, v.title));
+    const where = [v.panchayatSamiti && `पंचायत समिति ${v.panchayatSamiti}`, v.district && `ज़िला ${v.district}`].filter(Boolean).join(' · ');
+    if (where) a.append(el('small', null, where));
     box.append(a);
   }
 }

@@ -39,7 +39,7 @@ const VILLAGES = require('./_villages.json');
 const village = (slug) => (typeof slug === 'string' && Object.hasOwn(VILLAGES, slug) ? { slug, ...VILLAGES[slug] } : null);
 // all villages, or only the given slugs (the villages one login may open)
 const villageList = (slugs) => Object.entries(VILLAGES).filter(([slug]) => !slugs || slugs.includes(slug))
-  .map(([slug, v]) => ({ slug, name: v.name, title: v.title }));
+  .map(([slug, v]) => ({ slug, name: v.name, title: v.title, panchayatSamiti: v.panchayatSamiti || '', district: v.district || '' }));
 
 function dataKey() {
   const k = process.env.DATA_KEY;

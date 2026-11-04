@@ -42,7 +42,8 @@ voter-search-app/         the website + API that Vercel runs
 ```json
 { "name": "आडसर", "title": "ग्राम पंचायत आडसर", "ps": 3, "zp": 35, "pollTime": "मतदान समय : प्रातः 7 से सायं 5 बजे तक" }
 ```
-`ps` / `zp` are the पंचायत समिति / जिला परिषद निर्वाचन क्षेत्र numbers printed on the slips. Folder names must be
+`ps` / `zp` are the पंचायत समिति / जिला परिषद निर्वाचन क्षेत्र numbers printed on the slips. Optional `panchayatSamiti`
+and `district` (e.g. `"सरदारशहर"`, `"चुरू"`) are shown under the village's name in the अपना गाँव चुनें list. Folder names must be
 lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 
 ## Adding a village

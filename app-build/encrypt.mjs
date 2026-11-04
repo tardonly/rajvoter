@@ -48,6 +48,7 @@ for (const slug of folders.sort()) {
   villages[slug] = {
     name: meta.name, title: meta.title || `ग्राम पंचायत ${meta.name}`, ps: meta.ps ?? '', zp: meta.zp ?? '',
     pollTime: meta.pollTime || 'मतदान समय : प्रातः 7 से सायं 5 बजे तक', wards, voters: data.rows.length,
+    panchayatSamiti: meta.panchayatSamiti || '', district: meta.district || '',   // shown in the village list
   };
   console.log(`${slug}: ${data.rows.length} voters, wards ${wards.join(', ')}`);
 }
