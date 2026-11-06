@@ -50,8 +50,8 @@
   .lockbox { position: relative; }
   .lockbox > .langbtn { position: absolute; top: 10px; right: 10px; }
   /* buying searches with UPI (api/buy.js) */
-  .demolink.buylink { border-color: #86efac; background: #f0fdf4; color: #15803d; }
-  .demolink.buylink small { color: #166534; }
+  .demolink.buylink { border-color: #15803d; background: #16a34a; color: #fff; font-size: 17px; }
+  .demolink.buylink small { color: #dcfce7; }
   #buyPop .card { max-width: 440px; }
   .buyform { display: grid; gap: 8px; text-align: left; }
   .buyform input, .buyform select { width: 100%; padding: 10px 12px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
@@ -331,7 +331,7 @@
       <button class="btn" id="unlockBtn" type="submit">खोलें</button>
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
-    <a id="buyLink" class="demolink buylink hidden" href="#">🛒 पासवर्ड खरीदें · ₹1 प्रति खोज<small>UPI से भुगतान करें, मंज़ूरी के बाद पासवर्ड यहीं मिलेगा</small></a>
+    <a id="buyLink" class="demolink buylink hidden" href="#">🛒 खुद पासवर्ड बनाएं · ₹1 प्रति खोज<small>UPI से भुगतान करें, पासवर्ड तुरंत मिलेगा</small></a>
     <a id="demoLink" class="demolink hidden" href="/demo">पासवर्ड नहीं है? डेमो देखें →<small>बिना पासवर्ड, असली मतदाता सूची में 10 खोज</small></a>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
@@ -501,8 +501,8 @@ const STATIC_EN = {
   'पंचायत समिति': 'Panchayat samiti', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
   'नाम / Name / मकान नं. / Voter ID': 'Name / नाम / House no. / Voter ID', 'पिता / पति का नाम': 'Father\'s / husband\'s name',
   'निशान से छाँटें': 'Filter by mark',
-  '🛒 पासवर्ड खरीदें · ₹1 प्रति खोज': '🛒 Buy a password · ₹1 per search',
-  'UPI से भुगतान करें, मंज़ूरी के बाद पासवर्ड यहीं मिलेगा': 'Pay by UPI; once approved, your password appears here',
+  '🛒 खुद पासवर्ड बनाएं · ₹1 प्रति खोज': '🛒 Get your own password · ₹1 per search',
+  'UPI से भुगतान करें, पासवर्ड तुरंत मिलेगा': 'Pay by UPI and get the password at once',
   'खोज खरीदें': 'Buy searches', '🛒 खोज खरीदें': '🛒 Buy searches', '🛒 और खोज खरीदें': '🛒 Buy more searches', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
   'सिर्फ़ ✓ वोट दिया': 'Only ✓ voted', 'सिर्फ़ आ रहे हैं': 'Only coming', 'सिर्फ़ वोटर नहीं है': 'Only not a voter',
 };
@@ -573,7 +573,8 @@ const MSG = {
   no_list: L('मतदाता सूची देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter list — ask your admin'),
   no_pdf: L('पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें', 'You may not print a whole ward\'s slips — ask your admin'),
   no_ward_list: L('पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें', 'You may not list a whole ward — search by name'),
-  credits: L('खरीदी गई सभी खोज इस्तेमाल हो गईं — और खोज खरीदें', 'All your bought searches are used — buy more'),
+  credits: L('खरीदी गई सभी खोज इस्तेमाल हो गईं — भुगतान की जाँच बाकी हो तो मंज़ूरी के बाद बाकी खोज जुड़ जाएंगी, या और खोज खरीदें',
+    'All your bought searches are used — if your payment is still being checked, the rest are added once it is approved; or buy more'),
 };
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
 // What this login may do besides searching by name (admins: everything); the server checks these on every request.
@@ -1330,9 +1331,10 @@ function demoBar() {
   bar.classList.remove('hidden');
 }
 
-// ---------- buying searches with UPI (api/buy.js): choose village and pack, pay, type the UTR, wait for approval ----------
-// No payment gateway: the superadmin sees the request on the admin page, checks the money arrived with that UTR and
-// approves it; this page then shows the new password (or that the searches were added to the buyer's earlier one).
+// ---------- buying searches with UPI (api/buy.js): choose village and pack, pay, type the UTR, get a password ----------
+// No payment gateway and no admin needed to sign up: sending the UTR gives a password with a few trial searches at once;
+// the superadmin checks the money arrived with that UTR on the admin page and approves it, which adds the rest of the
+// pack (or, for a buyer with an earlier bought password, adds the pack to that one).
 // The request is kept on the phone ("buy"), so closing the page and coming back shows where it stands.
 let BUY = null, buyTimer;   // BUY: {upi, payee, packs, villages}; upi '' = buying is off (UPI_ID not set)
 const buyStore = {
@@ -1393,8 +1395,10 @@ async function buyForm(pre = {}) {
     buyPay(d);
   });
   body.replaceChildren(f);
-  $('buyNote').textContent = L('एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त। खरीदी खोज कभी खत्म नहीं होतीं। ' +
+  $('buyNote').textContent = L(`UTR भेजते ही पासवर्ड और ${info.trial} खोज तुरंत मिलेंगी; बाकी भुगतान की जाँच के बाद जुड़ जाएंगी। ` +
+    'एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त। खरीदी खोज कभी खत्म नहीं होतीं। ' +
     'उसी गाँव और मोबाइल नंबर से दोबारा खरीदें तो खोज आपके पुराने पासवर्ड में जुड़ जाती हैं।',
+    `Once you send the UTR you get a password with ${info.trial} searches at once; the rest are added after the payment is checked. ` +
     'One search = typing a name until the box is cleared; family and more pages are free. Bought searches never expire. ' +
     'Buying again for the same village and mobile number adds them to your earlier password.');
 }
@@ -1432,8 +1436,8 @@ function buyPay(d) {
     buyWait(saved);
   });
   $('buyBody').replaceChildren(box, f);
-  $('buyNote').textContent = L('पैसे सिर्फ़ ऊपर लिखे UPI ID पर भेजें। गलत UTR वाली खरीद मंज़ूर नहीं होगी।',
-    'Send the money only to the UPI ID above. A purchase with a wrong UTR is not approved.');
+  $('buyNote').textContent = L('पैसे सिर्फ़ ऊपर लिखे UPI ID पर भेजें। गलत UTR वाली खरीद मंज़ूर नहीं होगी और उसका पासवर्ड बंद हो जाएगा।',
+    'Send the money only to the UPI ID above. A purchase with a wrong UTR is not approved, and its password is switched off.');
   showQr(link);
 }
 function showQr(text) {   // the QR library loads only when someone buys
@@ -1463,8 +1467,25 @@ async function buyWait(saved) {
   const fresh = el('button', 'buyback', L('नई खरीद', 'New purchase'));
   fresh.type = 'button';
   fresh.addEventListener('click', () => { buyStore.del(); buyForm({ village: r.village, name: r.name }); });
+  const pwBox = () => {   // the buyer's password, with copy and open buttons
+    const open = el('button', 'btn', L('खोज खोलें', 'Open the search')), copy = el('button', 'buyback', L('पासवर्ड कॉपी करें', 'Copy password'));
+    open.type = copy.type = 'button';
+    open.addEventListener('click', () => buyLogin(r.village, r.password));
+    copy.addEventListener('click', async () => { if (await copyText(r.password)) copy.textContent = L('कॉपी हो गया ✓', 'Copied ✓'); });
+    return [el('div', 'buypw', r.password), copy, open];
+  };
+  if (r.status === 'pending' && r.password) {
+    const [pw, copy, open] = pwBox();
+    box.append(el('div', 'amt', '✓'), el('b', null, L('आपका पासवर्ड:', 'Your password:')), pw, copy,
+      el('div', 'k', L(`अभी ${r.trial} खोज चालू हैं। बाकी ${r.amount - r.trial} खोज आपके भुगतान (UTR ${r.utr}) की जाँच के बाद इसी पासवर्ड में जुड़ जाएंगी।`,
+        `${r.trial} searches work now. The other ${r.amount - r.trial} are added to this password once your payment (UTR ${r.utr}) is checked.`)),
+      el('div', 'k', L('यह पासवर्ड लिख लें: दूसरे फ़ोन पर इसी से खुलेगा।', 'Write this password down: it opens the search on another phone too.')), open);
+    body.replaceChildren(box);
+    return;
+  }
   if (r.status === 'pending') {
     box.append(el('div', 'amt', '⏳'), el('b', null, L('भुगतान की जाँच हो रही है', 'Your payment is being checked')), el('div', 'k', `${what} · UTR ${r.utr}`),
+      ...(r.topup ? [el('div', 'k', L('मंज़ूरी के बाद ये खोज आपके पुराने पासवर्ड में जुड़ जाएंगी।', 'Once approved, these searches are added to your earlier password.'))] : []),
       el('div', 'k', L('आमतौर पर कुछ ही मिनट लगते हैं। यह पेज बंद कर सकते हैं — दोबारा खोलने पर यहीं पता चलेगा।',
         'This usually takes a few minutes. You can close this page — open it again to see the result here.')));
     body.replaceChildren(box);
@@ -1480,17 +1501,14 @@ async function buyWait(saved) {
     $('buyNote').textContent = L('पैसे कट गए हों तो नीचे दिए WhatsApp नंबर पर UTR के साथ संपर्क करें।', 'If money was taken, contact the WhatsApp number below with the UTR.');
     return;
   }
-  const open = el('button', 'btn', L('खोज खोलें', 'Open the search'));
-  open.type = 'button';
   if (r.password) {
-    open.addEventListener('click', () => buyLogin(r.village, r.password));
-    const copy = el('button', 'buyback', L('पासवर्ड कॉपी करें', 'Copy password'));
-    copy.type = 'button';
-    copy.addEventListener('click', async () => { if (await copyText(r.password)) copy.textContent = L('कॉपी हो गया ✓', 'Copied ✓'); });
+    const [pw, copy, open] = pwBox();
     box.append(el('div', 'amt', '✓'), el('b', null, L('भुगतान मंज़ूर — आपका पासवर्ड:', 'Payment approved — your password:')),
-      el('div', 'buypw', r.password), copy, el('div', 'k', L(`${what}. यह पासवर्ड लिख लें: दूसरे फ़ोन पर इसी से खुलेगा।`,
+      pw, copy, el('div', 'k', L(`${what}. यह पासवर्ड लिख लें: दूसरे फ़ोन पर इसी से खुलेगा।`,
         `${what}. Write this password down: it opens the search on another phone too.`)), open);
   } else {
+    const open = el('button', 'btn', L('खोज खोलें', 'Open the search'));
+    open.type = 'button';
     open.addEventListener('click', () => { buyStore.del(); location.href = `/${r.village}`; });
     box.append(el('div', 'amt', '✓'), el('b', null, L('भुगतान मंज़ूर', 'Payment approved')),
       el('div', 'k', L(`${what} आपके पुराने पासवर्ड में जुड़ गईं।`, `${what} were added to your earlier password.`)), open);

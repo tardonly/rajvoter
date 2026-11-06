@@ -153,17 +153,22 @@ deployment (e.g. to S3) first.
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the variables take effect.
 
 ## Buying searches with UPI (no payment gateway)
-Once `UPI_ID` is set in Vercel (and the app redeployed), the login screen offers **🛒 पासवर्ड खरीदें · ₹1 प्रति खोज**:
+Once `UPI_ID` is set in Vercel (and the app redeployed), the login screen offers a green
+**🛒 खुद पासवर्ड बनाएं · ₹1 प्रति खोज** button, so people sign up by themselves without an admin:
 - The buyer picks the village, types name and WhatsApp number and a pack (₹50 / 100 / 200 / 500 / 800 / 1000 = that many
   searches), pays with the **UPI ऐप से भुगतान करें** button (phones) or the QR (laptops), then types the payment's
-  12-digit **UTR** and waits on that screen (the phone remembers it; closing and reopening shows where it stands).
-- The superadmin sees it in the admin page's **भुगतान** tab (the number of waiting payments is on the tab). Check in your
-  UPI app that that amount arrived with that UTR, then **✓ पैसे आ गए — स्वीकार करें**: the buyer's screen shows their new
-  password at once (and the admin page shows it too, with WhatsApp to their number). **✕ अस्वीकार** asks for a reason
-  the buyer sees, and lets that UTR be sent again (e.g. it was typed wrong).
+  12-digit **UTR**. Their password appears at once with **10 trial searches**; the rest of the pack is added when the
+  superadmin approves the payment.
+- The superadmin sees it in the admin page's **भुगतान** tab (the number of waiting payments is on the tab; a trial in use
+  is tagged "10 खोज से चालू"). Check in your UPI app that that amount arrived with that UTR, then
+  **✓ पैसे आ गए — स्वीकार करें** adds the rest of the searches. **✕ अस्वीकार** asks for a reason the buyer sees, switches
+  the trial password off and lets that UTR be sent again (e.g. it was typed wrong). Self-made logins are tagged
+  "बनाया: खुद, UPI से खरीदकर" in the people list.
+- A made-up UTR therefore gets at most 10 free searches, and one internet address gets at most 3 trial passwords a day;
+  after that its buyers wait on the screen until the payment is approved (then the password appears there).
 - Bought searches never expire and replace the daily limit (one search = typing a name until the box is cleared, as
-  everywhere). Buying again for the same village and mobile number adds the searches to that password; a user with
-  bought searches sees how many are left under the search box, and a **🛒 और खोज खरीदें** button.
+  everywhere). Buying again for the same village and mobile number adds the searches to that password on approval (no
+  second trial); a user with bought searches sees how many are left under the search box, and a **🛒 और खोज खरीदें** button.
 - Each UTR can be used once; one internet address can send at most 10 requests in 15 minutes.
 
 ## Admin page

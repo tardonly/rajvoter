@@ -115,6 +115,24 @@ function newPassword() {  // 3 groups of 4 from an unambiguous alphabet (no 0/o/
   return `${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8)}`;
 }
 
+// a new login: fields = role and village(s) [and more]; by / byName = who made it (an admin's id and name, or 'upi' for
+// one bought on the login page) → {id, password}. The password is returned once; only its hash is stored.
+async function freshPassword() {   // a new password no one has yet
+  for (;;) {
+    const pw = newPassword();
+    if (!(await redis('GET', `pw:${pwHash(pw)}`))) return pw;
+  }
+}
+async function newLogin(fields, name, phone, by, byName) {
+  const id = crypto.randomBytes(5).toString('hex');
+  const password = await freshPassword(), hash = pwHash(password);
+  await redis('HSET', `user:${id}`, ...fields, 'name', name, 'phone', phone, 'created', new Date().toISOString(),
+    'retired', '0', 'hash', hash, 'by', by, 'byName', byName);
+  await redis('SET', `pw:${hash}`, id);
+  await redis('SADD', 'users', id);
+  return { id, password };
+}
+
 async function getUser(id) {
   const arr = await redis('HGETALL', `user:${id}`);
   if (!arr || !arr.length) return null;
@@ -256,4 +274,4 @@ async function getCand(id) {
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
   PACKS, credits, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
-  whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };
+  whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

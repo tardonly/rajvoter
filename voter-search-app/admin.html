@@ -306,8 +306,8 @@
     </div>
     <div class="card pane" data-tab="buys">
       <div class="bar2"><h2>भुगतान</h2><button class="btn ghost" id="buysReload" type="button">ताज़ा करें</button></div>
-      <p class="sub">UPI से खरीदी गई खोज (₹1 = 1 खोज)। अपने UPI ऐप में देखें कि इस UTR से उतने रुपये आए हैं, फिर स्वीकार करें:
-        खरीदार को उसी समय अपने फ़ोन पर पासवर्ड मिल जाता है।</p>
+      <p class="sub">UPI से खरीदी गई खोज (₹1 = 1 खोज)। UTR भेजते ही खरीदार को पासवर्ड और 10 खोज मिल जाती हैं। अपने UPI ऐप में
+        देखें कि इस UTR से उतने रुपये आए हैं: स्वीकार करने पर बाकी खोज जुड़ जाती हैं, अस्वीकार करने पर पासवर्ड बंद हो जाता है।</p>
       <div class="filter" id="buyFilter">
         <button type="button" data-b="pending" class="on">जाँच बाकी</button>
         <button type="button" data-b="all">सभी</button>
@@ -364,8 +364,8 @@ const STATIC_EN = {
   'बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।': 'A button clears all marks of that colour in that village, on everyone\'s phone.',
   'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया व्यक्ति जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village',
   'व्यक्ति का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'भुगतान': 'Payments', 'जाँच बाकी': 'To check',
-  'UPI से खरीदी गई खोज (₹1 = 1 खोज)। अपने UPI ऐप में देखें कि इस UTR से उतने रुपये आए हैं, फिर स्वीकार करें:\n        खरीदार को उसी समय अपने फ़ोन पर पासवर्ड मिल जाता है।':
-    'Searches bought with UPI (₹1 = 1 search). Check in your UPI app that this much arrived with this UTR, then approve: the buyer gets the password on their phone at once.', 'पासवर्ड बनाएं': 'Make password',
+  'UPI से खरीदी गई खोज (₹1 = 1 खोज)। UTR भेजते ही खरीदार को पासवर्ड और 10 खोज मिल जाती हैं। अपने UPI ऐप में\n        देखें कि इस UTR से उतने रुपये आए हैं: स्वीकार करने पर बाकी खोज जुड़ जाती हैं, अस्वीकार करने पर पासवर्ड बंद हो जाता है।':
+    'Searches bought with UPI (₹1 = 1 search). On sending the UTR the buyer gets a password with 10 searches at once. Check in your UPI app that this much arrived with this UTR: approving adds the rest of the searches, rejecting switches the password off.', 'पासवर्ड बनाएं': 'Make password',
 };
 (function translatePage() {
   for (const b of document.querySelectorAll('[data-lang]')) {
@@ -934,6 +934,7 @@ function person(u) {
   // who made this login: the admin's current name when they are in the list, else the name kept when it was made
   if (u.by) {
     const maker = u.by === me.id ? L('आप', 'you') : u.by === 'admin' ? L('सुपर एडमिन', 'Super admin')
+      : u.by === 'upi' ? L('खुद, UPI से खरीदकर', 'themselves, bought with UPI')
       : (admins.find((x) => x.id === u.by) || {}).name || who(u.byName);
     nm.append(el('span', 'badge by', `${L('बनाया', 'Made by')}: ${maker}`));
   }
@@ -1023,6 +1024,8 @@ function buyRow(x) {
   nm.append(el('span', `badge ${x.status === 'approved' ? 'on' : x.status === 'rejected' ? 'off' : 'warn'}`, BUY_STATUS[x.status]),
     el('span', 'badge vil', vName(x.village)));
   if (x.topup === '1') nm.append(el('span', 'badge by', L('पुराने पासवर्ड में जोड़ी', 'added to earlier password')));
+  const trial = Number(x.trial) || 0;
+  if (trial && x.status === 'pending') nm.append(el('span', 'badge by', L(`${trial} खोज से चालू`, `in use with ${trial} searches`)));
   const utr = el('div', 'info'); utr.append('UTR ', el('span', 'utr', x.utr));
   const info = el('div', 'info', `📱 ${showPhone(x.phone)} · ${fmt(x.at)}`
     + (x.decidedAt ? ` · ${BUY_STATUS[x.status]}: ${fmt(x.decidedAt)}` : '') + (x.reason ? ` · ${x.reason}` : ''));
@@ -1032,17 +1035,19 @@ function buyRow(x) {
     const no = el('button', 'btn danger', L('✕ अस्वीकार', '✕ Reject'));
     ok.type = no.type = 'button';
     ok.addEventListener('click', async () => {
-      if (!confirm(L(`क्या आपके UPI में UTR ${x.utr} से ₹${x.amount} आ गए हैं?\n${x.name} को ${x.amount} खोज मिल जाएंगी।`,
-        `Did ₹${x.amount} arrive in your UPI with UTR ${x.utr}?\n${x.name} gets ${x.amount} searches.`))) return;
+      if (!confirm(L(`क्या आपके UPI में UTR ${x.utr} से ₹${x.amount} आ गए हैं?\n${x.name} को ${trial ? `बाकी ${x.amount - trial}` : x.amount} खोज मिल जाएंगी।`,
+        `Did ₹${x.amount} arrive in your UPI with UTR ${x.utr}?\n${x.name} gets ${trial ? `the other ${x.amount - trial}` : x.amount} searches.`))) return;
       ok.disabled = no.disabled = true;
       const r = await api({ action: 'buy_approve', buy: x.id });
       if (r.error) { ok.disabled = no.disabled = false; $('buyMsg').textContent = errText(r); return; }
-      $('buyMsg').textContent = r.topup ? L(`${x.name} के पुराने पासवर्ड में ${x.amount} खोज जोड़ दी गईं`, `${x.amount} searches added to ${x.name}'s earlier password`) : '';
+      $('buyMsg').textContent = r.topup ? L(`${x.name} के पुराने पासवर्ड में ${x.amount} खोज जोड़ दी गईं`, `${x.amount} searches added to ${x.name}'s earlier password`)
+        : trial ? L(`${x.name} के पासवर्ड में बाकी ${x.amount - trial} खोज जोड़ दी गईं`, `The other ${x.amount - trial} searches were added to ${x.name}'s password`) : '';
       if (r.password) showPassword(r.user, r.password);
       refresh();
     });
     no.addEventListener('click', async () => {
-      const reason = prompt(L('अस्वीकार करने का कारण (खरीदार को दिखेगा):', 'Reason for rejecting (the buyer sees it):'),
+      const reason = prompt(L(`अस्वीकार करने का कारण (खरीदार को दिखेगा)${trial ? '। उसका पासवर्ड बंद हो जाएगा' : ''}:`,
+        `Reason for rejecting (the buyer sees it)${trial ? '. Their password stops working' : ''}:`),
         L('इस UTR से भुगतान नहीं मिला', 'No payment arrived with this UTR'));
       if (reason === null) return;
       ok.disabled = no.disabled = true;
