@@ -220,11 +220,29 @@ const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 1
 const DAILY_SEARCHES = 500;
 const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
-// Prepaid searches, bought with UPI (api/buy.js, approved on the admin page): a user with field "credits" may start that
-// many searches in all instead of a daily limit; they never expire and are counted for good under "paid:<id>".
+// Prepaid searches (api/buy.js): a user who signed up by themselves (field "self") or has field "credits" may start that
+// many searches in all (free ones from signing up plus bought ones) instead of a daily limit; they never expire and are
+// counted for good under "paid:<id>".  Users made by an admin have a daily limit instead.
 // ₹1 per search; the packs a buyer may choose:
 const PACKS = [50, 100, 200, 500, 800, 1000];
 const credits = (u) => Number(u && u.credits) || 0;
+const isPrepaid = (u) => !!u && u.role === 'user' && !u.demo && (u.self === '1' || credits(u) > 0);
+// free searches for a login made by signing up: the first 10 sign-ups that have bought nothing yet get 10 each, the next
+// 10 get 2, and after that none (set "free" in api/buy.js holds those logins; buying takes a login out of it)
+const FREE_TIERS = [{ upTo: 10, searches: 10 }, { upTo: 20, searches: 2 }];
+// every login with this mobile number (normPhone form): [{id, role, village, villages, retired, self}]
+async function phoneLogins(phone) {
+  if (!phone) return [];
+  const ids = (await redis('SMEMBERS', 'users')) || [];
+  if (!ids.length) return [];
+  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'village', 'villages', 'retired', 'self']));
+  return ids.map((id, i) => {
+    const [ph, role, vil, vils, retired, self] = rows[i] || [];
+    if (ph !== phone) return null;
+    return { id, role, village: vil, villages: role === 'admin' ? String(vils || '').split(',').filter(Boolean) : [vil].filter(Boolean),
+      retired, self };
+  }).filter(Boolean);
+}
 const paidKey = (id) => `paid:${id}`;
 async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
@@ -272,6 +290,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  PACKS, credits, paidKey, creditsLeft, normPhone,
+  PACKS, FREE_TIERS, credits, isPrepaid, phoneLogins, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

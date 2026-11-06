@@ -306,8 +306,8 @@
     </div>
     <div class="card pane" data-tab="buys">
       <div class="bar2"><h2>भुगतान</h2><button class="btn ghost" id="buysReload" type="button">ताज़ा करें</button></div>
-      <p class="sub">UPI से खरीदी गई खोज (₹1 = 1 खोज)। UTR भेजते ही खरीदार को पासवर्ड और 10 खोज मिल जाती हैं। अपने UPI ऐप में
-        देखें कि इस UTR से उतने रुपये आए हैं: स्वीकार करने पर बाकी खोज जुड़ जाती हैं, अस्वीकार करने पर पासवर्ड बंद हो जाता है।</p>
+      <p class="sub">UPI से खरीदी गई खोज (₹1 = 1 खोज)। UTR भेजते ही खरीदार को 10 खोज मिल जाती हैं। अपने UPI ऐप में देखें
+        कि इस UTR से उतने रुपये आए हैं: स्वीकार करने पर बाकी खोज जुड़ जाती हैं, अस्वीकार करने पर वे 10 खोज वापस हो जाती हैं।</p>
       <div class="filter" id="buyFilter">
         <button type="button" data-b="pending" class="on">जाँच बाकी</button>
         <button type="button" data-b="all">सभी</button>
@@ -364,8 +364,8 @@ const STATIC_EN = {
   'बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।': 'A button clears all marks of that colour in that village, on everyone\'s phone.',
   'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया व्यक्ति जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village',
   'व्यक्ति का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'भुगतान': 'Payments', 'जाँच बाकी': 'To check',
-  'UPI से खरीदी गई खोज (₹1 = 1 खोज)। UTR भेजते ही खरीदार को पासवर्ड और 10 खोज मिल जाती हैं। अपने UPI ऐप में\n        देखें कि इस UTR से उतने रुपये आए हैं: स्वीकार करने पर बाकी खोज जुड़ जाती हैं, अस्वीकार करने पर पासवर्ड बंद हो जाता है।':
-    'Searches bought with UPI (₹1 = 1 search). On sending the UTR the buyer gets a password with 10 searches at once. Check in your UPI app that this much arrived with this UTR: approving adds the rest of the searches, rejecting switches the password off.', 'पासवर्ड बनाएं': 'Make password',
+  'UPI से खरीदी गई खोज (₹1 = 1 खोज)। UTR भेजते ही खरीदार को 10 खोज मिल जाती हैं। अपने UPI ऐप में देखें\n        कि इस UTR से उतने रुपये आए हैं: स्वीकार करने पर बाकी खोज जुड़ जाती हैं, अस्वीकार करने पर वे 10 खोज वापस हो जाती हैं।':
+    'Searches bought with UPI (₹1 = 1 search). On sending the UTR the buyer gets 10 searches at once. Check in your UPI app that this much arrived with this UTR: approving adds the rest of the searches, rejecting takes those 10 back.', 'पासवर्ड बनाएं': 'Make password',
 };
 (function translatePage() {
   for (const b of document.querySelectorAll('[data-lang]')) {
@@ -730,7 +730,7 @@ function showPassword(u, pw) {
   const isUser = u.role === 'user' && u.perms;
   $('newPwPerms').classList.toggle('hidden', !isUser);
   $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', L('यह व्यक्ति क्या कर सकता है:', 'What this person may do:')), permBoxes(u, 'newPwMsg', refresh),
-    ...(u.credits ? [] : [limitBox(u, 'newPwMsg', refresh)])] : []));   // bought searches have no daily limit
+    ...(u.prepaid ? [] : [limitBox(u, 'newPwMsg', refresh)])] : []));   // bought searches have no daily limit
   $('newPwMsg').textContent = '';
   $('newPw').classList.remove('hidden');
   $('newPw').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -910,9 +910,9 @@ function useMeter(u) {
   const box = el('div', 'usage'), text = el('div', 'usetext'), bar = el('div', 'usebar'), fill = el('div');
   bar.append(fill); box.append(text, bar);
   box.update = () => {   // bought searches (credits) count for good; everyone else's per day
-    const paid = u.credits > 0, limit = paid ? u.credits : u.limit, used = (paid ? u.paidUsed : u.searchesToday) || 0;
+    const paid = u.prepaid, limit = paid ? u.credits : u.limit, used = (paid ? u.paidUsed : u.searchesToday) || 0;
     const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0, left = Math.max(0, limit - used);
-    text.textContent = paid ? L(`खरीदी खोज: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Bought searches: ${used} / ${limit} (${pct}%) · ${left} left`)
+    text.textContent = paid ? L(`खोज (मुफ़्त + खरीदी): ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches (free + bought): ${used} / ${limit} (${pct}%) · ${left} left`)
       : L(`आज की खोज: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches today: ${used} / ${limit} (${pct}%) · ${left} left`);
     fill.style.width = pct + '%';
     const share = limit ? used / limit : 0;
@@ -928,13 +928,14 @@ function person(u) {
   if (isAdmin) for (const s of u.villages) nm.append(el('span', 'badge vil', vName(s)));
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
-  if (u.credits) nm.append(el('span', 'badge paid', L(`₹ ${u.credits} खोज खरीदीं`, `₹ ${u.credits} searches bought`)));
-  if (!isAdmin && !u.credits && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की खोज सीमा पूरी', 'Today\'s search limit used up')));
+  if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ खरीदार · कुल ${u.credits} खोज`, `₹ buyer · ${u.credits} searches in all`)
+    : L(`${u.credits} खोज · अभी कुछ नहीं खरीदा`, `${u.credits} searches · nothing bought yet`)));
+  if (!isAdmin && !u.prepaid && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की खोज सीमा पूरी', 'Today\'s search limit used up')));
   if (!isAdmin && candOf(u.cand)) nm.append(el('span', 'badge cand', `${L('उम्मीदवार', 'Candidate')} ${candOf(u.cand).name}`));
   // who made this login: the admin's current name when they are in the list, else the name kept when it was made
   if (u.by) {
     const maker = u.by === me.id ? L('आप', 'you') : u.by === 'admin' ? L('सुपर एडमिन', 'Super admin')
-      : u.by === 'upi' ? L('खुद, UPI से खरीदकर', 'themselves, bought with UPI')
+      : u.by === 'self' ? L('खुद, मोबाइल नंबर से', 'themselves, with their mobile number')
       : (admins.find((x) => x.id === u.by) || {}).name || who(u.byName);
     nm.append(el('span', 'badge by', `${L('बनाया', 'Made by')}: ${maker}`));
   }
@@ -955,7 +956,7 @@ function person(u) {
   const use = el('div', 'info', L(`${u.marked} पर्चियों पर इनके निशान`, `Their marks on ${u.marked} slips`));
   const meter = isAdmin ? null : useMeter(u);
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.credits ? [] : [limitBox(u, 'listMsg', meter.update)]),
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
@@ -1023,9 +1024,8 @@ function buyRow(x) {
   const nm = el('div', 'name', x.name);
   nm.append(el('span', `badge ${x.status === 'approved' ? 'on' : x.status === 'rejected' ? 'off' : 'warn'}`, BUY_STATUS[x.status]),
     el('span', 'badge vil', vName(x.village)));
-  if (x.topup === '1') nm.append(el('span', 'badge by', L('पुराने पासवर्ड में जोड़ी', 'added to earlier password')));
   const trial = Number(x.trial) || 0;
-  if (trial && x.status === 'pending') nm.append(el('span', 'badge by', L(`${trial} खोज से चालू`, `in use with ${trial} searches`)));
+  if (trial && x.status === 'pending') nm.append(el('span', 'badge by', L(`${trial} खोज अभी दी गईं`, `${trial} searches given at once`)));
   const utr = el('div', 'info'); utr.append('UTR ', el('span', 'utr', x.utr));
   const info = el('div', 'info', `📱 ${showPhone(x.phone)} · ${fmt(x.at)}`
     + (x.decidedAt ? ` · ${BUY_STATUS[x.status]}: ${fmt(x.decidedAt)}` : '') + (x.reason ? ` · ${x.reason}` : ''));
@@ -1040,14 +1040,13 @@ function buyRow(x) {
       ok.disabled = no.disabled = true;
       const r = await api({ action: 'buy_approve', buy: x.id });
       if (r.error) { ok.disabled = no.disabled = false; $('buyMsg').textContent = errText(r); return; }
-      $('buyMsg').textContent = r.topup ? L(`${x.name} के पुराने पासवर्ड में ${x.amount} खोज जोड़ दी गईं`, `${x.amount} searches added to ${x.name}'s earlier password`)
-        : trial ? L(`${x.name} के पासवर्ड में बाकी ${x.amount - trial} खोज जोड़ दी गईं`, `The other ${x.amount - trial} searches were added to ${x.name}'s password`) : '';
-      if (r.password) showPassword(r.user, r.password);
+      $('buyMsg').textContent = L(`${x.name} के खाते में ${trial ? `बाकी ${x.amount - trial}` : x.amount} खोज जोड़ दी गईं`,
+        `${trial ? `The other ${x.amount - trial}` : x.amount} searches were added to ${x.name}'s login`);
       refresh();
     });
     no.addEventListener('click', async () => {
-      const reason = prompt(L(`अस्वीकार करने का कारण (खरीदार को दिखेगा)${trial ? '। उसका पासवर्ड बंद हो जाएगा' : ''}:`,
-        `Reason for rejecting (the buyer sees it)${trial ? '. Their password stops working' : ''}:`),
+      const reason = prompt(L(`अस्वीकार करने का कारण (खरीदार को दिखेगा)${trial ? `। अभी दी गई ${trial} खोज वापस हो जाएंगी` : ''}:`,
+        `Reason for rejecting (the buyer sees it)${trial ? `. The ${trial} searches given at once are taken back` : ''}:`),
         L('इस UTR से भुगतान नहीं मिला', 'No payment arrived with this UTR'));
       if (reason === null) return;
       ok.disabled = no.disabled = true;

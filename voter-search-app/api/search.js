@@ -20,7 +20,7 @@
 // day: the answer is then 'demo_limit'. A user with bought searches (credits, see PACKS in _lib.js) has those in all
 // instead of a daily limit: the answer is then 'credits' once they are used up.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, credits, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
+const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
 const { load, search, family, publicFields } = require('./_search.js');
 
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
@@ -33,7 +33,7 @@ const follows = (a, b) => a.startsWith(b) || b.startsWith(a);   // "mangi" ↔ "
 async function countSearch(req, user, b, named) {
   const minuteKey = `rate:${user.id}:${Math.floor(Date.now() / 60000)}`;
   // a demo phone's searches are counted for good (30 days), not per day; its internet address is counted per day
-  const prepaid = !user.admin && credits(user) > 0;   // bought searches: counted for good, not per day
+  const prepaid = isPrepaid(user);   // signed-up / bought searches: counted for good, not per day
   const dayKey = user.demo ? `searches:${user.id}` : prepaid ? paidKey(user.id) : `searches:${user.id}:${today()}`, findKey = `find:${user.id}`;
   const ipKey = `demo-ip:${clientIp(req)}:${today()}`;
   const [, perMinute, curRaw, usedRaw, ipRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],

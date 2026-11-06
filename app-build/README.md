@@ -152,23 +152,27 @@ deployment (e.g. to S3) first.
      (optional) = the payee name shown in the UPI app, default `Voter Search`
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the variables take effect.
 
-## Buying searches with UPI (no payment gateway)
-Once `UPI_ID` is set in Vercel (and the app redeployed), the login screen offers a green
-**🛒 खुद पासवर्ड बनाएं · ₹1 प्रति खोज** button, so people sign up by themselves without an admin:
-- The buyer picks the village, types name and WhatsApp number and a pack (₹50 / 100 / 200 / 500 / 800 / 1000 = that many
-  searches), pays with the **UPI ऐप से भुगतान करें** button (phones) or the QR (laptops), then types the payment's
-  12-digit **UTR**. Their password appears at once with **10 trial searches**; the rest of the pack is added when the
-  superadmin approves the payment.
-- The superadmin sees it in the admin page's **भुगतान** tab (the number of waiting payments is on the tab; a trial in use
-  is tagged "10 खोज से चालू"). Check in your UPI app that that amount arrived with that UTR, then
-  **✓ पैसे आ गए — स्वीकार करें** adds the rest of the searches. **✕ अस्वीकार** asks for a reason the buyer sees, switches
-  the trial password off and lets that UTR be sent again (e.g. it was typed wrong). Self-made logins are tagged
-  "बनाया: खुद, UPI से खरीदकर" in the people list.
-- A made-up UTR therefore gets at most 10 free searches, and one internet address gets at most 3 trial passwords a day;
-  after that its buyers wait on the screen until the payment is approved (then the password appears there).
-- Bought searches never expire and replace the daily limit (one search = typing a name until the box is cleared, as
-  everywhere). Buying again for the same village and mobile number adds the searches to that password on approval (no
-  second trial); a user with bought searches sees how many are left under the search box, and a **🛒 और खोज खरीदें** button.
+## Signing up with a mobile number, and buying searches with UPI (no payment gateway)
+The login page asks only for the **mobile number** first:
+- A number that already has a login for that village (or, on the start page, any login) gets the password box, with
+  "पासवर्ड याद नहीं? अपने एडमिन से पूछें". Admins without a number use **एडमिन? सीधे पासवर्ड से खोलें**.
+- A new number types a name (on the start page it also picks the village) and gets its **own login at once**: the
+  password is shown to write down, and the person goes straight into the village. Free searches for such a sign-up:
+  **10** while fewer than 10 signed-up logins have bought nothing, then **2** until there are 20, then **0**
+  (`FREE_TIERS` in `api/_lib.js`; a login leaves that count when it buys). A number that signed up before (in any
+  village) gets no free searches again. One internet address can sign up 3 times a day.
+- Signed-up logins have no daily limit: free plus bought searches, which never expire. When none are left the
+  **🛒 खोज खरीदें** window opens by itself (after logging in, or on the next search).
+
+Buying (only once `UPI_ID` is set in Vercel and the app redeployed; for signed-up logins, not for admin-made ones):
+- The person picks a pack (₹50 / 100 / 200 / 500 / 800 / 1000 = that many searches), pays with the
+  **UPI ऐप से भुगतान करें** button (phones) or the QR (laptops), and types the payment's 12-digit **UTR**. **10 searches
+  are added at once**; the rest when the superadmin approves (3 such early top-ups per internet address a day).
+- The superadmin sees it in the admin page's **भुगतान** tab (the number waiting is on the tab). Check in your UPI app
+  that that amount arrived with that UTR, then **✓ पैसे आ गए — स्वीकार करें** adds the rest. **✕ अस्वीकार** asks for a
+  reason the buyer sees, takes the 10 early searches back and lets that UTR be sent again.
+- In the people list, signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches
+  (free + bought) instead of a daily limit.
 - Each UTR can be used once; one internet address can send at most 10 requests in 15 minutes.
 
 ## Admin page

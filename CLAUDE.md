@@ -37,7 +37,7 @@ Read page 1 of **every** ward PDF first (from the page image; its text layer may
 | मतदान बूथ की संख्या एवं पता | 73 - राजकीय उच्च माध्यमिक विद्यालय डालमाण ( दांया भाग) | `Matdan Kendra` for every voter of that ward |
 
 - **Matdan Kendra** is written `<booth no>-<booth address>`, no spaces around the first `-` and tidy brackets:
-  `73-राजकीय उच्च माध्यमिक विद्यालय डालमाण (दांया भाग)`. The slip splits it at the first `-` into भाग सं. and the
+  `73-राजकीय उच्च माध्यमिक विद्यालय डालमाण (दांया भाग)`. The slip splits it at the first `-` into बूथ सं. and the
   polling station name. Different wards often share a booth; copy each ward's own cover page.
 - The district, पंचायत समिति, ग्रामपंचायत, ps and zp should be the **same on every ward's cover page**. The app keeps
   one ps / zp per village, so if any ward differs, stop and tell the user which wards and what values.
