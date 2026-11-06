@@ -49,6 +49,28 @@
     color: var(--accent); font-weight: 600; white-space: nowrap; }
   .lockbox { position: relative; }
   .lockbox > .langbtn { position: absolute; top: 10px; right: 10px; }
+  /* buying searches with UPI (api/buy.js) */
+  .demolink.buylink { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+  .demolink.buylink small { color: #166534; }
+  #buyPop .card { max-width: 440px; }
+  .buyform { display: grid; gap: 8px; text-align: left; }
+  .buyform input, .buyform select { width: 100%; padding: 10px 12px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
+  .buyform .k, .paybox .k { font-size: 14px; color: var(--muted); }
+  .packs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .packs button { padding: 8px 4px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; font-size: 17px; font-weight: 700; line-height: 1.25; }
+  .packs button small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+  .packs button.on { border-color: #16a34a; background: #f0fdf4; color: #15803d; }
+  .paybox { text-align: center; display: grid; gap: 6px; margin-bottom: 12px; }
+  .paybox .amt { font-size: 30px; font-weight: 800; line-height: 1.1; }
+  .paybox a.btn { display: block; text-decoration: none; }
+  #buyQr { display: flex; justify-content: center; min-height: 10px; }
+  #buyQr img, #buyQr canvas { border: 6px solid #fff; }
+  .paybox .upi { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; word-break: break-all; }
+  .paybox .upi button, .buyback { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 10px; font-size: 13px; color: var(--accent); font-weight: 600; }
+  .buyback { justify-self: start; }
+  .buypw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; font-weight: 700; user-select: all; word-break: break-all; }
+  .buyerr { color: var(--bad); font-size: 14px; min-height: 18px; }
+  #buyMore { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: #16a34a; color: #fff; font-weight: 600; }
   .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .homeacts button { padding: 11px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
   .homeacts .share { background: #16a34a; border-color: #16a34a; color: #fff; }
@@ -309,6 +331,7 @@
       <button class="btn" id="unlockBtn" type="submit">खोलें</button>
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
+    <a id="buyLink" class="demolink buylink hidden" href="#">🛒 पासवर्ड खरीदें · ₹1 प्रति खोज<small>UPI से भुगतान करें, मंज़ूरी के बाद पासवर्ड यहीं मिलेगा</small></a>
     <a id="demoLink" class="demolink hidden" href="/demo">पासवर्ड नहीं है? डेमो देखें →<small>बिना पासवर्ड, असली मतदाता सूची में 10 खोज</small></a>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
@@ -335,6 +358,15 @@
       <div class="sharesave"><a href="/promo-phone.mp4" download="matdata-khoj-phone.mp4">⬇ वीडियो (फ़ोन)</a><a href="/promo-laptop.mp4" download="matdata-khoj-laptop.mp4">⬇ वीडियो (लैपटॉप)</a></div>
     </div>
     <div class="note" id="shareNote"></div>
+  </div>
+</div>
+
+<div id="buyPop" class="progpop hidden" role="dialog" aria-label="खोज खरीदें">
+  <div class="card">
+    <div class="head"><h2>🛒 खोज खरीदें</h2>
+      <span><button id="buyClose" type="button" aria-label="बंद करें">✕</button></span></div>
+    <div id="buyBody"></div>
+    <div class="note" id="buyNote"></div>
   </div>
 </div>
 
@@ -408,7 +440,8 @@
         <option value="absent">सिर्फ़ वोटर नहीं है</option>
       </select>
     </div>
-    <div class="countrow"><div id="count"></div><button id="wardPrint" class="hidden" type="button"></button></div>
+    <div class="countrow"><div id="count"></div><span><button id="buyMore" class="hidden" type="button">🛒 और खोज खरीदें</button>
+      <button id="wardPrint" class="hidden" type="button"></button></span></div>
   </header>
   <main>
     <div id="results"></div>
@@ -467,7 +500,10 @@ const STATIC_EN = {
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव खोजें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
   'नाम / Name / मकान नं. / Voter ID': 'Name / नाम / House no. / Voter ID', 'पिता / पति का नाम': 'Father\'s / husband\'s name',
-  'निशान से छाँटें': 'Filter by mark', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
+  'निशान से छाँटें': 'Filter by mark',
+  '🛒 पासवर्ड खरीदें · ₹1 प्रति खोज': '🛒 Buy a password · ₹1 per search',
+  'UPI से भुगतान करें, मंज़ूरी के बाद पासवर्ड यहीं मिलेगा': 'Pay by UPI; once approved, your password appears here',
+  'खोज खरीदें': 'Buy searches', '🛒 खोज खरीदें': '🛒 Buy searches', '🛒 और खोज खरीदें': '🛒 Buy more searches', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
   'सिर्फ़ ✓ वोट दिया': 'Only ✓ voted', 'सिर्फ़ आ रहे हैं': 'Only coming', 'सिर्फ़ वोटर नहीं है': 'Only not a voter',
 };
 function translatePage() {
@@ -537,6 +573,7 @@ const MSG = {
   no_list: L('मतदाता सूची देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter list — ask your admin'),
   no_pdf: L('पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें', 'You may not print a whole ward\'s slips — ask your admin'),
   no_ward_list: L('पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें', 'You may not list a whole ward — search by name'),
+  credits: L('खरीदी गई सभी खोज इस्तेमाल हो गईं — और खोज खरीदें', 'All your bought searches are used — buy more'),
 };
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
 // What this login may do besides searching by name (admins: everything); the server checks these on every request.
@@ -573,7 +610,7 @@ function showApp(name, admin, villages, perms, cand) {
   $('who').textContent = (name ? `${L('उपयोगकर्ता', 'User')}: ${who(name)}` : '') + (cand ? ` · ${L('उम्मीदवार', 'Candidate')}: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
-  IS_ADMIN = !!admin; wardButton(); progButton(); listButton();
+  IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); buyMoreButton();
   if (DEMO) {   // ← वापस: back to the start page; गाँव बदलें: back to the demo's villages
     $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); $('switchBtn').href = '/demo'; demoBar();
   }
@@ -747,6 +784,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
+  PREPAID = !!r.prepaid; if (r.left != null) searchesLeft = r.left;
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
 });
 $('lockBtn').addEventListener('click', () => {
@@ -758,13 +796,15 @@ $('lockBtn').addEventListener('click', () => {
 let seq = 0, shown = 0, total = 0, lastBox = 0, lastAsked = '', timer;   // lastAsked: the search already on screen, not sent again
 // The server counts searches per day, not requests: it gives this phone a search id, sent back with every request of the
 // same search (more letters, the next page, परिवार). Clearing the search box drops it, so the next name is a new search.
-let searchId = '', searchesLeft = null;
+let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: searches bought with UPI, counted for good
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
   if (r.left != null) searchesLeft = r.left;
   if (DEMO) demoBar();
+  buyMoreButton();
 }
-const leftNote = () => (!DEMO && searchesLeft != null && searchesLeft < 20 ? L(` · आज ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left today`) : '');
+const leftNote = () => (PREPAID && searchesLeft != null ? L(` · ${searchesLeft} खरीदी खोज बाकी`, ` · ${searchesLeft} bought searches left`)
+  : !DEMO && searchesLeft != null && searchesLeft < 20 ? L(` · आज ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left today`) : '');
 function hint() {
   $('results').innerHTML = '<div class="hint">' + L('नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
@@ -1290,6 +1330,196 @@ function demoBar() {
   bar.classList.remove('hidden');
 }
 
+// ---------- buying searches with UPI (api/buy.js): choose village and pack, pay, type the UTR, wait for approval ----------
+// No payment gateway: the superadmin sees the request on the admin page, checks the money arrived with that UTR and
+// approves it; this page then shows the new password (or that the searches were added to the buyer's earlier one).
+// The request is kept on the phone ("buy"), so closing the page and coming back shows where it stands.
+let BUY = null, buyTimer;   // BUY: {upi, payee, packs, villages}; upi '' = buying is off (UPI_ID not set)
+const buyStore = {
+  get() { try { return JSON.parse(store.get('buy')) || null; } catch (e) { return null; } },
+  set(x) { store.set('buy', JSON.stringify(x), true); },
+  del() { store.del('buy'); },
+};
+const BUY_ERR = {
+  no_village: L('गाँव चुनें', 'Choose a village'), name: L('अपना नाम लिखें', 'Type your name'),
+  phone: L('10 अंकों का मोबाइल नंबर लिखें', 'Type a 10-digit mobile number'), amount: L('कितनी खोज चाहिए, चुनें', 'Choose how many searches'),
+  utr: L('UTR 12 अंकों का होता है — UPI ऐप में भुगतान की जानकारी में देखें', 'The UTR has 12 digits — see the payment details in your UPI app'),
+  utr_used: L('यह UTR पहले ही भेजा जा चुका है', 'This UTR has already been sent'), buy_off: L('अभी खरीदना बंद है', 'Buying is off for now'),
+  too_many: L('बहुत बार कोशिश — 15 मिनट बाद फिर करें', 'Too many tries — try again in 15 minutes'),
+};
+async function buyInfo() {
+  if (!BUY) { const r = await api('buy', { action: 'info' }); if (!r.error) BUY = r; }
+  return BUY;
+}
+const buyVillage = (slug) => (BUY && BUY.villages.find((v) => v.slug === slug)) || { slug, name: slug };
+function buyMoreButton() { $('buyMore').classList.toggle('hidden', !(PREPAID && BUY && BUY.upi)); }
+function buyOpen() {
+  $('buyPop').classList.remove('hidden');
+  const saved = buyStore.get();
+  if (saved) buyWait(saved); else buyForm();
+}
+function buyClose() { $('buyPop').classList.add('hidden'); clearTimeout(buyTimer); }
+async function buyForm(pre = {}) {
+  clearTimeout(buyTimer);
+  const body = $('buyBody');
+  $('buyNote').textContent = '';
+  const info = await buyInfo();
+  if (!info || !info.upi) { body.replaceChildren(el('div', 'lempty', BUY_ERR.buy_off)); return; }
+  const f = el('form', 'buyform'), vsel = el('select'), name = el('input'), phone = el('input'), packs = el('div', 'packs');
+  vsel.setAttribute('aria-label', L('गाँव', 'Village'));
+  vsel.add(new Option(L('गाँव चुनें', 'Choose a village'), ''));
+  for (const v of [...info.villages].sort((a, b) => vn(a).localeCompare(vn(b), LOCALE))) {
+    vsel.add(new Option(`${vn(v)}${v.panchayatSamiti ? ` · ${L('पंचायत समिति', 'Panchayat samiti')} ${v.panchayatSamiti}` : ''}`, v.slug));
+  }
+  vsel.value = pre.village || (VILLAGE && !DEMO && VILLAGE.slug) || '';
+  name.placeholder = L('आपका नाम', 'Your name'); name.maxLength = 60; name.value = pre.name || '';
+  phone.type = 'tel'; phone.inputMode = 'numeric'; phone.maxLength = 14; phone.value = pre.phone || '';
+  phone.placeholder = L('WhatsApp मोबाइल नंबर', 'WhatsApp mobile number');
+  let amount = pre.amount || 0;
+  for (const n of info.packs) {
+    const b = el('button', n === amount ? 'on' : null, `₹${n}`); b.type = 'button';
+    b.append(el('small', null, L(`${n} खोज`, `${n} searches`)));
+    b.addEventListener('click', () => { amount = n; packs.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); });
+    packs.append(b);
+  }
+  const err = el('div', 'buyerr'), go = el('button', 'btn', L('आगे — भुगतान करें', 'Next — pay'));
+  go.type = 'submit';
+  f.append(vsel, name, phone, el('div', 'k', L('कितनी खोज चाहिए? ₹1 = 1 खोज', 'How many searches? ₹1 = 1 search')), packs, err, go);
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const d = { village: vsel.value, name: name.value.trim(), phone: phone.value.trim(), amount };
+    const bad = !d.village ? 'no_village' : !d.name ? 'name' : d.phone.replace(/\D/g, '').length < 10 ? 'phone' : !d.amount ? 'amount' : '';
+    if (bad) { err.textContent = BUY_ERR[bad]; return; }
+    buyPay(d);
+  });
+  body.replaceChildren(f);
+  $('buyNote').textContent = L('एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त। खरीदी खोज कभी खत्म नहीं होतीं। ' +
+    'उसी गाँव और मोबाइल नंबर से दोबारा खरीदें तो खोज आपके पुराने पासवर्ड में जुड़ जाती हैं।',
+    'One search = typing a name until the box is cleared; family and more pages are free. Bought searches never expire. ' +
+    'Buying again for the same village and mobile number adds them to your earlier password.');
+}
+function buyPay(d) {
+  const v = buyVillage(d.village);
+  const link = `upi://pay?pa=${encodeURIComponent(BUY.upi)}&pn=${encodeURIComponent(BUY.payee)}&am=${d.amount}.00&cu=INR` +
+    `&tn=${encodeURIComponent(`Voter Search ${d.village}`)}`;
+  const box = el('div', 'paybox'), app = el('a', 'btn', L('UPI ऐप से भुगतान करें', 'Pay with a UPI app')), qr = el('div');
+  app.href = link; qr.id = 'buyQr';
+  const upi = el('div', 'upi', `UPI: ${BUY.upi} `), copy = el('button', null, L('कॉपी', 'Copy'));
+  copy.type = 'button';
+  copy.addEventListener('click', async () => { copy.textContent = (await copyText(BUY.upi)) ? '✓' : BUY.upi; });
+  upi.append(copy);
+  box.append(el('div', 'k', L('इतने रुपये भेजें', 'Pay')), el('div', 'amt', `₹${d.amount}`),
+    el('div', 'k', L(`${d.amount} खोज · ${vn(v)}`, `${d.amount} searches · ${vn(v)}`)), app,
+    el('div', 'k', L('या यह QR किसी भी UPI ऐप से स्कैन करें', 'or scan this QR with any UPI app')), qr, upi);
+  const f = el('form', 'buyform'), utr = el('input'), err = el('div', 'buyerr');
+  const send = el('button', 'btn', L('भुगतान हो गया — भेजें', 'I have paid — send')), back = el('button', 'buyback', L('← बदलें', '← Change'));
+  utr.inputMode = 'numeric'; utr.maxLength = 16; utr.autocomplete = 'off';
+  utr.placeholder = L('UTR / ट्रांज़ैक्शन नंबर (12 अंक)', 'UTR / transaction no. (12 digits)');
+  send.type = 'submit'; back.type = 'button';
+  back.addEventListener('click', () => buyForm(d));
+  f.append(el('div', 'k', L('भुगतान के बाद उसका UTR यहाँ लिखें (UPI ऐप में भुगतान की जानकारी में मिलेगा):',
+    'After paying, type its UTR here (you find it in the payment details of your UPI app):')), utr, err, send, back);
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const u = utr.value.replace(/\s/g, '');
+    if (!/^\d{12}$/.test(u)) { err.textContent = BUY_ERR.utr; return; }
+    send.disabled = true;
+    const r = await api('buy', { action: 'request', ...d, utr: u });
+    send.disabled = false;
+    if (r.error) { err.textContent = BUY_ERR[r.error] || MSG[r.error] || MSG.server; return; }
+    const saved = { id: r.id, key: r.key, village: d.village };
+    buyStore.set(saved);
+    buyWait(saved);
+  });
+  $('buyBody').replaceChildren(box, f);
+  $('buyNote').textContent = L('पैसे सिर्फ़ ऊपर लिखे UPI ID पर भेजें। गलत UTR वाली खरीद मंज़ूर नहीं होगी।',
+    'Send the money only to the UPI ID above. A purchase with a wrong UTR is not approved.');
+  showQr(link);
+}
+function showQr(text) {   // the QR library loads only when someone buys
+  const draw = () => {
+    const box = $('buyQr');
+    if (!box || !window.QRCode) return;
+    box.innerHTML = '';
+    new QRCode(box, { text, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+  };
+  if (window.QRCode) return draw();
+  const sc = document.createElement('script');
+  sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  sc.onload = draw;
+  document.head.append(sc);
+}
+async function buyWait(saved) {
+  clearTimeout(buyTimer);
+  const body = $('buyBody');
+  $('buyNote').textContent = '';
+  await buyInfo();
+  const r = await api('buy', { action: 'status', id: saved.id, key: saved.key });
+  if (r.error === 'not_found') { buyStore.del(); return buyForm(); }
+  const again = () => { buyTimer = setTimeout(() => { if (!$('buyPop').classList.contains('hidden')) buyWait(saved); }, 15000); };
+  if (r.error) { body.replaceChildren(el('div', 'lempty', MSG[r.error] || MSG.server)); return again(); }
+  const v = buyVillage(r.village), box = el('div', 'paybox');
+  const what = L(`₹${r.amount} · ${r.amount} खोज · ${vn(v)}`, `₹${r.amount} · ${r.amount} searches · ${vn(v)}`);
+  const fresh = el('button', 'buyback', L('नई खरीद', 'New purchase'));
+  fresh.type = 'button';
+  fresh.addEventListener('click', () => { buyStore.del(); buyForm({ village: r.village, name: r.name }); });
+  if (r.status === 'pending') {
+    box.append(el('div', 'amt', '⏳'), el('b', null, L('भुगतान की जाँच हो रही है', 'Your payment is being checked')), el('div', 'k', `${what} · UTR ${r.utr}`),
+      el('div', 'k', L('आमतौर पर कुछ ही मिनट लगते हैं। यह पेज बंद कर सकते हैं — दोबारा खोलने पर यहीं पता चलेगा।',
+        'This usually takes a few minutes. You can close this page — open it again to see the result here.')));
+    body.replaceChildren(box);
+    return again();
+  }
+  if (r.status === 'rejected') {
+    const retry = el('button', 'btn', L('फिर से कोशिश करें', 'Try again'));
+    retry.type = 'button';
+    retry.addEventListener('click', () => { buyStore.del(); buyForm({ village: r.village, name: r.name, amount: r.amount }); });
+    box.append(el('div', 'amt', '✕'), el('b', null, L('यह भुगतान नहीं मिला', 'This payment was not found')), el('div', 'k', `${what} · UTR ${r.utr}`),
+      ...(r.reason ? [el('div', null, r.reason)] : []), retry);
+    body.replaceChildren(box);
+    $('buyNote').textContent = L('पैसे कट गए हों तो नीचे दिए WhatsApp नंबर पर UTR के साथ संपर्क करें।', 'If money was taken, contact the WhatsApp number below with the UTR.');
+    return;
+  }
+  const open = el('button', 'btn', L('खोज खोलें', 'Open the search'));
+  open.type = 'button';
+  if (r.password) {
+    open.addEventListener('click', () => buyLogin(r.village, r.password));
+    const copy = el('button', 'buyback', L('पासवर्ड कॉपी करें', 'Copy password'));
+    copy.type = 'button';
+    copy.addEventListener('click', async () => { if (await copyText(r.password)) copy.textContent = L('कॉपी हो गया ✓', 'Copied ✓'); });
+    box.append(el('div', 'amt', '✓'), el('b', null, L('भुगतान मंज़ूर — आपका पासवर्ड:', 'Payment approved — your password:')),
+      el('div', 'buypw', r.password), copy, el('div', 'k', L(`${what}. यह पासवर्ड लिख लें: दूसरे फ़ोन पर इसी से खुलेगा।`,
+        `${what}. Write this password down: it opens the search on another phone too.`)), open);
+  } else {
+    open.addEventListener('click', () => { buyStore.del(); location.href = `/${r.village}`; });
+    box.append(el('div', 'amt', '✓'), el('b', null, L('भुगतान मंज़ूर', 'Payment approved')),
+      el('div', 'k', L(`${what} आपके पुराने पासवर्ड में जुड़ गईं।`, `${what} were added to your earlier password.`)), open);
+  }
+  box.append(fresh);
+  body.replaceChildren(box);
+}
+async function buyLogin(slug, password) {   // straight into the village with the new password, remembered on this phone
+  const r = await api('unlock', { village: slug, password });
+  if (r.error) { $('buyNote').textContent = MSG[r.error] || MSG.server; return; }
+  store.set(`tok:${slug}`, r.token, true);
+  buyStore.del();
+  location.href = `/${slug}`;
+}
+$('buyLink').addEventListener('click', (e) => { e.preventDefault(); buyOpen(); });
+$('buyMore').addEventListener('click', buyOpen);
+$('buyClose').addEventListener('click', buyClose);
+$('buyPop').addEventListener('click', (e) => { if (e.target === $('buyPop')) buyClose(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') buyClose(); });
+// buying is offered once the server says it is on (UPI_ID set); a purchase still waiting opens by itself
+if (!DEMO) {
+  buyInfo().then((b) => {
+    if (!b || !b.upi) return;
+    $('buyLink').classList.remove('hidden');
+    buyMoreButton();
+    if (buyStore.get()) buyOpen();
+  });
+}
+
 // ---------- open straight in if this phone is remembered, after checking the password is still active ----------
 async function openVillage(v) {
   setVillage(v);
@@ -1301,6 +1531,7 @@ async function openVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
+  PREPAID = !!r.prepaid;
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
 }
 

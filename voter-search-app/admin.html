@@ -61,6 +61,10 @@
   .badge.warn { background: #fef3c7; color: #92400e; }
   .badge.vil { background: #e0e7ff; color: #1f4e8c; }
   .badge.by { background: #f3f4f6; color: #374151; }
+  .badge.paid { background: #dcfce7; color: #166534; }
+  /* searches bought with UPI */
+  .buyamt { font-size: 18px; font-weight: 700; margin: 2px 0; }
+  .utr { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 16px; color: var(--ink); letter-spacing: .5px; user-select: all; }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   .actions button { padding: 6px 10px; font-size: 13px; }
   .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
@@ -209,6 +213,7 @@
       <button type="button" data-tab="prog">प्रगति</button>
       <button type="button" data-tab="voters">मतदाता सूची</button>
       <button type="button" data-tab="clear">निशान हटाएं</button>
+      <button type="button" data-tab="buys" class="hidden" id="buyTab">भुगतान</button>
     </nav>
 
     <!-- a new password, from any tab (new person, new admin, नया पासवर्ड) -->
@@ -299,6 +304,17 @@
       <button class="btn ghost full hidden" id="restore" type="button"></button>
       <div class="msg" id="marksMsg"></div>
     </div>
+    <div class="card pane" data-tab="buys">
+      <div class="bar2"><h2>भुगतान</h2><button class="btn ghost" id="buysReload" type="button">ताज़ा करें</button></div>
+      <p class="sub">UPI से खरीदी गई खोज (₹1 = 1 खोज)। अपने UPI ऐप में देखें कि इस UTR से उतने रुपये आए हैं, फिर स्वीकार करें:
+        खरीदार को उसी समय अपने फ़ोन पर पासवर्ड मिल जाता है।</p>
+      <div class="filter" id="buyFilter">
+        <button type="button" data-b="pending" class="on">जाँच बाकी</button>
+        <button type="button" data-b="all">सभी</button>
+      </div>
+      <div id="buyList"></div>
+      <div class="msg" id="buyMsg"></div>
+    </div>
   </section>
 
 </div>
@@ -347,7 +363,9 @@ const STATIC_EN = {
   'बाकी': 'Remaining', 'और दिखाएं': 'Show more', 'पर्चियों के निशान हटाएं': 'Clear the marks on the slips',
   'बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।': 'A button clears all marks of that colour in that village, on everyone\'s phone.',
   'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया व्यक्ति जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village',
-  'व्यक्ति का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'पासवर्ड बनाएं': 'Make password',
+  'व्यक्ति का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'भुगतान': 'Payments', 'जाँच बाकी': 'To check',
+  'UPI से खरीदी गई खोज (₹1 = 1 खोज)। अपने UPI ऐप में देखें कि इस UTR से उतने रुपये आए हैं, फिर स्वीकार करें:\n        खरीदार को उसी समय अपने फ़ोन पर पासवर्ड मिल जाता है।':
+    'Searches bought with UPI (₹1 = 1 search). Check in your UPI app that this much arrived with this UTR, then approve: the buyer gets the password on their phone at once.', 'पासवर्ड बनाएं': 'Make password',
 };
 (function translatePage() {
   for (const b of document.querySelectorAll('[data-lang]')) {
@@ -387,6 +405,7 @@ const MSG = EN ? {
   no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
+  no_buy: 'Purchase not found', buy_done: 'This purchase was already decided',
 } : {
   wrong: 'पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
   not_admin: 'यह एडमिन पासवर्ड नहीं है', retired: 'यह पासवर्ड बंद कर दिया गया है',
@@ -397,6 +416,7 @@ const MSG = EN ? {
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
+  no_buy: 'यह खरीद नहीं मिली', buy_done: 'इस खरीद पर पहले ही फ़ैसला हो चुका है',
 };
 // 919876543210 → "+91 98765 43210"
 const showPhone = (p) => (/^91\d{10}$/.test(p) ? `+91 ${p.slice(2, 7)} ${p.slice(7)}` : p ? `+${p}` : '');
@@ -477,6 +497,8 @@ function setup() {
   $('backLink').classList.toggle('hidden', !mine.length);
   $('backLink').href = mine.length === 1 ? `/${mine[0]}` : '/';
   $('adminTab').classList.toggle('hidden', me.role !== 'super');
+  $('buyTab').classList.toggle('hidden', me.role !== 'super');
+  loadBuys();
   if (me.role === 'super') $('admVillages').replaceChildren(villageChecks([]));
   render();
 }
@@ -510,6 +532,7 @@ async function refresh() {
   const r = await api({ action: 'list' });
   if (r.error) { $('listMsg').textContent = errText(r); return; }
   $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; render(); showMarks(r);
+  loadBuys();
 }
 $('reload').addEventListener('click', refresh);
 // polling day: keep the numbers fresh while the page is open
@@ -707,7 +730,7 @@ function showPassword(u, pw) {
   const isUser = u.role === 'user' && u.perms;
   $('newPwPerms').classList.toggle('hidden', !isUser);
   $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', L('यह व्यक्ति क्या कर सकता है:', 'What this person may do:')), permBoxes(u, 'newPwMsg', refresh),
-    limitBox(u, 'newPwMsg', refresh)] : []));
+    ...(u.credits ? [] : [limitBox(u, 'newPwMsg', refresh)])] : []));   // bought searches have no daily limit
   $('newPwMsg').textContent = '';
   $('newPw').classList.remove('hidden');
   $('newPw').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -776,9 +799,9 @@ $('addAdminForm').addEventListener('submit', async (e) => {
   refresh();
 });
 
-document.querySelectorAll('.filter button').forEach((b) => b.addEventListener('click', () => {
+document.querySelectorAll('.filter button[data-f]').forEach((b) => b.addEventListener('click', () => {
   filter = b.dataset.f;
-  document.querySelectorAll('.filter button').forEach((x) => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.filter button[data-f]').forEach((x) => x.classList.toggle('on', x === b));
   render();
 }));
 $('fVillage').addEventListener('change', render);
@@ -886,13 +909,14 @@ async function act(payload, ask) {
 function useMeter(u) {
   const box = el('div', 'usage'), text = el('div', 'usetext'), bar = el('div', 'usebar'), fill = el('div');
   bar.append(fill); box.append(text, bar);
-  box.update = () => {
-    const used = u.searchesToday || 0, pct = u.limit ? Math.min(100, Math.round((used / u.limit) * 100)) : 0;
-    text.textContent = L(`आज की खोज: ${used} / ${u.limit} (${pct}%) · ${Math.max(0, u.limit - used)} बाकी`,
-      `Searches today: ${used} / ${u.limit} (${pct}%) · ${Math.max(0, u.limit - used)} left`);
+  box.update = () => {   // bought searches (credits) count for good; everyone else's per day
+    const paid = u.credits > 0, limit = paid ? u.credits : u.limit, used = (paid ? u.paidUsed : u.searchesToday) || 0;
+    const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0, left = Math.max(0, limit - used);
+    text.textContent = paid ? L(`खरीदी खोज: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Bought searches: ${used} / ${limit} (${pct}%) · ${left} left`)
+      : L(`आज की खोज: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches today: ${used} / ${limit} (${pct}%) · ${left} left`);
     fill.style.width = pct + '%';
-    const share = u.limit ? used / u.limit : 0;
-    box.className = 'usage' + (share > 0.8 || used >= u.limit ? ' high' : share >= 0.5 ? ' mid' : '');
+    const share = limit ? used / limit : 0;
+    box.className = 'usage' + (share > 0.8 || used >= limit ? ' high' : share >= 0.5 ? ' mid' : '');
   };
   box.update();
   return box;
@@ -904,7 +928,8 @@ function person(u) {
   if (isAdmin) for (const s of u.villages) nm.append(el('span', 'badge vil', vName(s)));
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
-  if (!isAdmin && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की खोज सीमा पूरी', 'Today\'s search limit used up')));
+  if (u.credits) nm.append(el('span', 'badge paid', L(`₹ ${u.credits} खोज खरीदीं`, `₹ ${u.credits} searches bought`)));
+  if (!isAdmin && !u.credits && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की खोज सीमा पूरी', 'Today\'s search limit used up')));
   if (!isAdmin && candOf(u.cand)) nm.append(el('span', 'badge cand', `${L('उम्मीदवार', 'Candidate')} ${candOf(u.cand).name}`));
   // who made this login: the admin's current name when they are in the list, else the name kept when it was made
   if (u.by) {
@@ -929,7 +954,7 @@ function person(u) {
   const use = el('div', 'info', L(`${u.marked} पर्चियों पर इनके निशान`, `Their marks on ${u.marked} slips`));
   const meter = isAdmin ? null : useMeter(u);
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), limitBox(u, 'listMsg', meter.update),
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.credits ? [] : [limitBox(u, 'listMsg', meter.update)]),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
@@ -971,6 +996,72 @@ function person(u) {
   row.append(actions);
   return row;
 }
+
+// ---------- searches bought with UPI (api/buy.js, superadmin only): check the money arrived with that UTR, then approve.
+// Approving makes the buyer's password (shown here too, to send on WhatsApp) or adds the searches to their earlier one.
+let buys = [], buyFilter = 'pending';
+const BUY_STATUS = EN ? { pending: 'To check', approved: 'Approved', rejected: 'Rejected' }
+  : { pending: 'जाँच बाकी', approved: 'स्वीकार', rejected: 'अस्वीकार' };
+async function loadBuys() {
+  if (!me || me.role !== 'super') return;
+  const r = await api({ action: 'buys' });
+  if (r.error) { $('buyMsg').textContent = errText(r); return; }
+  buys = r.buys;
+  renderBuys();
+}
+function renderBuys() {
+  const waiting = buys.filter((x) => x.status === 'pending').length;
+  $('buyTab').textContent = L('भुगतान', 'Payments') + (waiting ? ` (${waiting})` : '');
+  const shown = buys.filter((x) => buyFilter === 'all' || x.status === 'pending');
+  const list = $('buyList'); list.innerHTML = '';
+  if (!shown.length) list.append(el('div', 'empty', buyFilter === 'pending' ? L('कोई भुगतान जाँच के लिए बाकी नहीं', 'No payments waiting') : L('अभी कोई खरीद नहीं', 'No purchases yet')));
+  for (const x of shown) list.append(buyRow(x));
+}
+function buyRow(x) {
+  const row = el('div', 'person');
+  const nm = el('div', 'name', x.name);
+  nm.append(el('span', `badge ${x.status === 'approved' ? 'on' : x.status === 'rejected' ? 'off' : 'warn'}`, BUY_STATUS[x.status]),
+    el('span', 'badge vil', vName(x.village)));
+  if (x.topup === '1') nm.append(el('span', 'badge by', L('पुराने पासवर्ड में जोड़ी', 'added to earlier password')));
+  const utr = el('div', 'info'); utr.append('UTR ', el('span', 'utr', x.utr));
+  const info = el('div', 'info', `📱 ${showPhone(x.phone)} · ${fmt(x.at)}`
+    + (x.decidedAt ? ` · ${BUY_STATUS[x.status]}: ${fmt(x.decidedAt)}` : '') + (x.reason ? ` · ${x.reason}` : ''));
+  row.append(nm, el('div', 'buyamt', `₹${x.amount} · ${L(`${x.amount} खोज`, `${x.amount} searches`)}`), utr, info);
+  if (x.status === 'pending') {
+    const acts = el('div', 'actions'), ok = el('button', 'btn', L('✓ पैसे आ गए — स्वीकार करें', '✓ Money arrived — approve'));
+    const no = el('button', 'btn danger', L('✕ अस्वीकार', '✕ Reject'));
+    ok.type = no.type = 'button';
+    ok.addEventListener('click', async () => {
+      if (!confirm(L(`क्या आपके UPI में UTR ${x.utr} से ₹${x.amount} आ गए हैं?\n${x.name} को ${x.amount} खोज मिल जाएंगी।`,
+        `Did ₹${x.amount} arrive in your UPI with UTR ${x.utr}?\n${x.name} gets ${x.amount} searches.`))) return;
+      ok.disabled = no.disabled = true;
+      const r = await api({ action: 'buy_approve', buy: x.id });
+      if (r.error) { ok.disabled = no.disabled = false; $('buyMsg').textContent = errText(r); return; }
+      $('buyMsg').textContent = r.topup ? L(`${x.name} के पुराने पासवर्ड में ${x.amount} खोज जोड़ दी गईं`, `${x.amount} searches added to ${x.name}'s earlier password`) : '';
+      if (r.password) showPassword(r.user, r.password);
+      refresh();
+    });
+    no.addEventListener('click', async () => {
+      const reason = prompt(L('अस्वीकार करने का कारण (खरीदार को दिखेगा):', 'Reason for rejecting (the buyer sees it):'),
+        L('इस UTR से भुगतान नहीं मिला', 'No payment arrived with this UTR'));
+      if (reason === null) return;
+      ok.disabled = no.disabled = true;
+      const r = await api({ action: 'buy_reject', buy: x.id, reason });
+      if (r.error) { ok.disabled = no.disabled = false; $('buyMsg').textContent = errText(r); return; }
+      $('buyMsg').textContent = '';
+      loadBuys();
+    });
+    acts.append(ok, no);
+    row.append(acts);
+  }
+  return row;
+}
+document.querySelectorAll('#buyFilter button').forEach((b) => b.addEventListener('click', () => {
+  buyFilter = b.dataset.b;
+  document.querySelectorAll('#buyFilter button').forEach((x) => x.classList.toggle('on', x === b));
+  renderBuys();
+}));
+$('buysReload').addEventListener('click', loadBuys);
 
 // ---------- start: open straight in if this device is logged in (the village names come with the list) ----------
 if (token) { $('login').classList.add('hidden'); openPanel(); }   // no login form flashing while the saved login is checked

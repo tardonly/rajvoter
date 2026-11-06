@@ -17,9 +17,10 @@
 // ward listed again. Anything else starts a new search, which counts 1 and is refused ('limit') once the person has
 // used dailyLimit() today. A ward's slips (all) always count 1. The id is made and checked here, so a phone can't
 // skip counting. A demo phone (see DEMO in _lib.js) gets DEMO.searches in all, and its internet address DEMO.perIp a
-// day: the answer is then 'demo_limit'.
+// day: the answer is then 'demo_limit'. A user with bought searches (credits, see PACKS in _lib.js) has those in all
+// instead of a daily limit: the answer is then 'credits' once they are used up.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, clientIp, pipeline, send, route } = require('./_lib.js');
+const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, credits, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
 const { load, search, family, publicFields } = require('./_search.js');
 
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
@@ -32,7 +33,8 @@ const follows = (a, b) => a.startsWith(b) || b.startsWith(a);   // "mangi" ↔ "
 async function countSearch(req, user, b, named) {
   const minuteKey = `rate:${user.id}:${Math.floor(Date.now() / 60000)}`;
   // a demo phone's searches are counted for good (30 days), not per day; its internet address is counted per day
-  const dayKey = user.demo ? `searches:${user.id}` : `searches:${user.id}:${today()}`, findKey = `find:${user.id}`;
+  const prepaid = !user.admin && credits(user) > 0;   // bought searches: counted for good, not per day
+  const dayKey = user.demo ? `searches:${user.id}` : prepaid ? paidKey(user.id) : `searches:${user.id}:${today()}`, findKey = `find:${user.id}`;
   const ipKey = `demo-ip:${clientIp(req)}:${today()}`;
   const [, perMinute, curRaw, usedRaw, ipRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
     ['GET', findKey], ['GET', dayKey], ['GET', ipKey]]);
@@ -42,7 +44,7 @@ async function countSearch(req, user, b, named) {
   let cur = null;
   try { cur = curRaw && JSON.parse(curRaw); } catch (e) { /* start a new search */ }
   const q = { name: fold(b.name), rel: fold(b.rel), ward: String(b.ward || '') };
-  const now = Date.now(), limit = user.demo ? DEMO.searches : dailyLimit(user);
+  const now = Date.now(), limit = user.demo ? DEMO.searches : prepaid ? credits(user) : dailyLimit(user);
   let used = Number(usedRaw) || 0;
   const goesOn = !b.all && cur && b.searchId && b.searchId === cur.id && cur.n < SEARCH_STEPS
     && now - cur.start < SEARCH_MINUTES * 60e3
@@ -51,9 +53,10 @@ async function countSearch(req, user, b, named) {
   let next = cur;
   if (goesOn) next = { ...cur, n: cur.n + 1, ...(b.family ? {} : q) };
   else {
-    if (used >= limit || (user.demo && Number(ipRaw) >= DEMO.perIp)) return { error: user.demo ? 'demo_limit' : 'limit', left: 0 };
+    if (used >= limit || (user.demo && Number(ipRaw) >= DEMO.perIp)) return { error: user.demo ? 'demo_limit' : prepaid ? 'credits' : 'limit', left: 0 };
     used++;
-    cmds.push(['SET', dayKey, 0, 'EX', (user.demo ? 30 : 3) * 86400, 'NX'], ['INCR', dayKey]);
+    if (!prepaid) cmds.push(['SET', dayKey, 0, 'EX', (user.demo ? 30 : 3) * 86400, 'NX']);
+    cmds.push(['INCR', dayKey]);
     if (user.demo) cmds.push(['SET', ipKey, 0, 'EX', 86400, 'NX'], ['INCR', ipKey]);
     if (!b.all) next = { id: crypto.randomBytes(8).toString('base64url'), n: 1, start: now, ...q };
   }

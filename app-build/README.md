@@ -148,7 +148,23 @@ deployment (e.g. to S3) first.
 3. **Add two environment variables** (Project → Settings → Environment Variables):
    - `DATA_KEY` = the text in `app-build/DATA_KEY.txt`
    - `ADMIN_PASSWORD` = the superadmin password (long, not shared with anyone)
+   - `UPI_ID` (optional) = the UPI ID buyers pay, e.g. `yourname@fam`: turns on buying searches (see below); `UPI_NAME`
+     (optional) = the payee name shown in the UPI app, default `Voter Search`
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the variables take effect.
+
+## Buying searches with UPI (no payment gateway)
+Once `UPI_ID` is set in Vercel (and the app redeployed), the login screen offers **🛒 पासवर्ड खरीदें · ₹1 प्रति खोज**:
+- The buyer picks the village, types name and WhatsApp number and a pack (₹50 / 100 / 200 / 500 / 800 / 1000 = that many
+  searches), pays with the **UPI ऐप से भुगतान करें** button (phones) or the QR (laptops), then types the payment's
+  12-digit **UTR** and waits on that screen (the phone remembers it; closing and reopening shows where it stands).
+- The superadmin sees it in the admin page's **भुगतान** tab (the number of waiting payments is on the tab). Check in your
+  UPI app that that amount arrived with that UTR, then **✓ पैसे आ गए — स्वीकार करें**: the buyer's screen shows their new
+  password at once (and the admin page shows it too, with WhatsApp to their number). **✕ अस्वीकार** asks for a reason
+  the buyer sees, and lets that UTR be sent again (e.g. it was typed wrong).
+- Bought searches never expire and replace the daily limit (one search = typing a name until the box is cleared, as
+  everywhere). Buying again for the same village and mobile number adds the searches to that password; a user with
+  bought searches sees how many are left under the search box, and a **🛒 और खोज खरीदें** button.
+- Each UTR can be used once; one internet address can send at most 10 requests in 15 minutes.
 
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).

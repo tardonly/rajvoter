@@ -202,6 +202,23 @@ const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 1
 const DAILY_SEARCHES = 500;
 const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
+// Prepaid searches, bought with UPI (api/buy.js, approved on the admin page): a user with field "credits" may start that
+// many searches in all instead of a daily limit; they never expire and are counted for good under "paid:<id>".
+// ₹1 per search; the packs a buyer may choose:
+const PACKS = [50, 100, 200, 500, 800, 1000];
+const credits = (u) => Number(u && u.credits) || 0;
+const paidKey = (id) => `paid:${id}`;
+async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
+// "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
+function normPhone(s) {
+  const d = String(s || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length === 10 && /^[6-9]/.test(d)) return '91' + d;
+  if (d.length === 11 && d.startsWith('0')) return normPhone(d.slice(1));
+  if (d.length === 12 && d.startsWith('91')) return normPhone(d.slice(2));
+  if (!d.startsWith('91') && d.length >= 11 && d.length <= 15) return d;   // other countries, already with code
+  return null;
+}
 
 // Status marks put on voters, one Redis hash per village and group: field "<ward>:<box>",
 // value "<status>|<time>|<who's id>|<who's name>" (older marks have only "<status>|<time>" or "<status>").
@@ -237,5 +254,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
+  PACKS, credits, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, getUser, clientIp, deviceName, blocked, failed, send, route };

@@ -24,6 +24,11 @@
 //   action "cand_set", id, cand      → {user}   puts a user of the candidate's village in that group ('' = no candidate)
 //   action "move", id, village       → {user}   moves a user to another village (both must be the admin's): their
 //                                               candidate is cleared and their phone is logged out
+//   action "buys"                    → {buys}   searches bought with UPI (api/buy.js), newest first     (superadmin only)
+//   action "buy_approve", buy        → {buy, user, password | topup}   the money arrived: a new password with that many
+//                                               searches, or added to the buyer's earlier bought password of that
+//                                               village with the same mobile number                    (superadmin only)
+//   action "buy_reject", buy [, reason] → {buy}   the money did not arrive; frees the UTR                (superadmin only)
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
 //   backup: {n, at} | null}]   one entry per village of this admin and per candidate of it (cand '' = the village's own
 //   marks): how many slips carry each mark, overall and per ward.
@@ -32,19 +37,10 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
+const { getBuy } = require('./_buy.js');
+const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, paidKey, normPhone, redis, pwHash, whoIs, newPassword, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
-// "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
-function normPhone(s) {
-  const d = String(s || '').replace(/\D/g, '');
-  if (!d) return '';
-  if (d.length === 10 && /^[6-9]/.test(d)) return '91' + d;
-  if (d.length === 11 && d.startsWith('0')) return normPhone(d.slice(1));
-  if (d.length === 12 && d.startsWith('91')) return normPhone(d.slice(2));
-  if (!d.startsWith('91') && d.length >= 11 && d.length <= 15) return d;   // other countries, already with code
-  return null;
-}
 // a village people and candidates can be added to: not a demo village ("demo-riri")
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 // list of village slugs from the request → only real villages, no repeats; null when none
@@ -66,7 +62,7 @@ const view = (u) => ({
   defaultLimit: DAILY_SEARCHES,
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
-  by: u.by || '', byName: u.byName || '',   // who made this login (admin id 'admin' = the superadmin); older logins: ''
+  by: u.by || '', byName: u.byName || '', credits: credits(u),   // credits: searches bought with UPI (0 = daily limit)   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
@@ -85,6 +81,16 @@ module.exports = route(async (req, res, b) => {
   const isSuper = me.role === 'super';
   const mayUse = (slug) => me.villages.includes(slug);
   const now = new Date().toISOString();
+  // a new login made by this admin: fields = role and village(s) [and more]; → {id, password}
+  async function newLogin(fields, name, phone) {
+    const id = crypto.randomBytes(5).toString('hex');
+    const password = await freshPassword(), hash = pwHash(password);
+    await redis('HSET', `user:${id}`, ...fields, 'name', name, 'phone', phone, 'created', now, 'retired', '0', 'hash', hash,
+      'by', me.id, 'byName', me.name);
+    await redis('SET', `pw:${hash}`, id);
+    await redis('SADD', 'users', id);
+    return { id, password };
+  }
 
   if (b.action === 'list') {
     const ids = (await redis('SMEMBERS', 'users')) || [];
@@ -97,7 +103,8 @@ module.exports = route(async (req, res, b) => {
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
     const day = today();
     const searches = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, Number(await redis('GET', `searches:${id}:${day}`)) || 0])));
-    const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, marked: marked[u.id] || 0 });
+    const paid = Object.fromEntries(await Promise.all(all.filter((u) => credits(u)).map(async (u) => [u.id, Number(await redis('GET', paidKey(u.id))) || 0])));
+    const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0, marked: marked[u.id] || 0 });
     const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
     return send(res, 200, { me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins,
@@ -191,13 +198,45 @@ module.exports = route(async (req, res, b) => {
       if (!vs) return send(res, 400, { error: 'no_village' });
       fields = ['role', 'admin', 'villages', vs.join(',')];
     }
-    const id = crypto.randomBytes(5).toString('hex');
-    const password = await freshPassword(), hash = pwHash(password);
-    await redis('HSET', `user:${id}`, ...fields, 'name', name, 'phone', phone, 'created', now, 'retired', '0', 'hash', hash,
-      'by', me.id, 'byName', me.name);
-    await redis('SET', `pw:${hash}`, id);
-    await redis('SADD', 'users', id);
+    const { id, password } = await newLogin(fields, name, phone);
     return send(res, 200, { user: view(await getUser(id)), password });
+  }
+
+  // ---------- searches bought with UPI (api/buy.js): the superadmin checks the money arrived, then approves ----------
+  if (b.action === 'buys') {
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const ids = (await redis('SMEMBERS', 'buys')) || [];
+    const buys = (await Promise.all(ids.map(getBuy))).filter(Boolean).sort((x, y) => (x.at < y.at ? 1 : -1)).slice(0, 300)
+      .map(({ keyHash, ...x }) => ({ ...x, amount: Number(x.amount) }));
+    return send(res, 200, { buys });
+  }
+  if (b.action === 'buy_approve' || b.action === 'buy_reject') {
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const x = await getBuy(b.buy);
+    if (!x) return send(res, 404, { error: 'no_buy' });
+    if (x.status !== 'pending') return send(res, 409, { error: 'buy_done' });
+    if (b.action === 'buy_reject') {
+      const reason = String(b.reason || '').trim().slice(0, 200);
+      await redis('HSET', `buy:${x.id}`, 'status', 'rejected', 'reason', reason, 'decidedAt', now, 'decidedBy', me.name);
+      await redis('DEL', `utr:${x.utr}`);   // the UTR may be sent again (e.g. it was typed wrong)
+      return send(res, 200, { buy: { ...x, status: 'rejected', reason } });
+    }
+    const amount = Number(x.amount);
+    // the buyer's earlier bought password for this village and mobile number gets the searches added
+    const ids = (await redis('SMEMBERS', 'users')) || [];
+    const earlier = (await Promise.all(ids.map(getUser))).find((u) => u && u.role === 'user' && u.village === x.village
+      && u.phone === x.phone && u.retired !== '1' && credits(u) > 0);
+    let id, password = null;
+    if (earlier) {
+      id = earlier.id;
+      await redis('HINCRBY', `user:${id}`, 'credits', amount);
+      await redis('HSET', `buy:${x.id}`, 'topup', '1');
+    } else {
+      ({ id, password } = await newLogin(['role', 'user', 'village', x.village, 'credits', amount], x.name, x.phone));
+      await redis('SET', `buypw:${x.id}`, password, 'EX', 3 * 86400);   // for the buyer's page to show, 3 days
+    }
+    await redis('HSET', `buy:${x.id}`, 'status', 'approved', 'userId', id, 'decidedAt', now, 'decidedBy', me.name);
+    return send(res, 200, { buy: { ...x, status: 'approved', userId: id }, user: view(await getUser(id)), password, topup: !!earlier });
   }
 
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
