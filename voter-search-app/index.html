@@ -188,7 +188,11 @@
   .fields { display: grid; gap: 6px; }
   .fields input, .fields select { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .fields input:focus, .fields select:focus { outline: none; border-color: var(--accent); }
-  .row2 { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+  .row2 { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
+  /* ↺ रीसेट: empties every search box and filter */
+  #qReset { padding: 0 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--accent);
+    font-size: 15px; font-weight: 600; white-space: nowrap; }
+  #qReset:active { background: #f3f4f6; }
   .row2 select { width: auto; }
   #count { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
   .demobar { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa;
@@ -287,6 +291,7 @@
     header > * { max-width: 1240px; margin-left: auto; margin-right: auto; }
     .fields { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; }
     .row2 { display: contents; }
+    #qReset { order: 1; }   /* after the mark filter, at the end of the line */
     main { max-width: 1272px; padding: 14px 16px 28px; }
     #results, .family { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; align-items: start; }
     html.big #results, html.big .family { grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); }
@@ -446,6 +451,7 @@
       <div class="row2">
         <input id="qRel" type="search" placeholder="पिता / पति का नाम" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
         <select id="qWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
+        <button id="qReset" type="button" title="खोज साफ़ करें">↺ रीसेट</button>
       </div>
       <select id="qMark" class="hidden" aria-label="निशान से छाँटें">
         <option value="">सभी मतदाता</option>
@@ -514,7 +520,7 @@ const STATIC_EN = {
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव खोजें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
   'नाम / Name / मकान नं. / Voter ID': 'Name / नाम / House no. / Voter ID', 'पिता / पति का नाम': 'Father\'s / husband\'s name',
-  'निशान से छाँटें': 'Filter by mark',
+  'निशान से छाँटें': 'Filter by mark', '↺ रीसेट': '↺ Reset', 'खोज साफ़ करें': 'Clear the search',
   'आगे': 'Next', '← नंबर बदलें': '← Change number', 'एडमिन? सीधे पासवर्ड से खोलें': 'Admin? Open with the password',
   'आपका नाम': 'Your name', 'गाँव': 'Village',
   'खोज खरीदें': 'Buy searches', '🛒 खोज खरीदें': '🛒 Buy searches', '🛒 और खोज खरीदें': '🛒 Buy more searches', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
@@ -530,7 +536,7 @@ function translatePage() {
   document.documentElement.lang = 'en';
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n; (n = w.nextNode());) { const t = n.nodeValue.trim(); if (STATIC_EN[t]) n.nodeValue = n.nodeValue.replace(t, STATIC_EN[t]); }
-  for (const a of ['placeholder', 'aria-label']) {
+  for (const a of ['placeholder', 'aria-label', 'title']) {
     for (const e of document.querySelectorAll(`[${a}]`)) { const t = e.getAttribute(a); if (STATIC_EN[t]) e.setAttribute(a, STATIC_EN[t]); }
   }
 }
@@ -1182,6 +1188,13 @@ for (const id of ['qName', 'qRel']) {
   $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); search(); $(id).blur(); } });
 }
 $('qWard').addEventListener('change', () => search());
+// ↺ रीसेट: every box and filter empty again, back to the hint; the next name is a new search
+$('qReset').addEventListener('click', () => {
+  $('qName').value = ''; $('qRel').value = ''; $('qWard').value = ''; $('qMark').value = '';
+  searchId = '';
+  search();
+  $('qName').focus();
+});
 $('qMark').addEventListener('change', () => search());
 $('more').addEventListener('click', () => search(true));
 
