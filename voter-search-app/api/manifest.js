@@ -21,13 +21,13 @@ module.exports = (req, res) => {
   const u = new URL(req.url || '/', 'http://localhost');
   const pick = u.searchParams.get('page');
   let body;
-  if (pick === 'home') body = app('मतदाता खोज', 'मतदाता खोज', '/');
-  else if (pick === 'demo') body = app('मतदाता खोज - डेमो', 'मतदाता खोज डेमो', '/demo');
+  if (pick === 'home') body = app('Voter Search', 'Voter Search', '/');
+  else if (pick === 'demo') body = app('Voter Search - Demo', 'Voter Search Demo', '/demo');
   else {
     const v = village(u.searchParams.get('village') || u.pathname.split('/')[1]);
     if (!v) { res.statusCode = 404; return res.end('not found'); }
     const page = v.demo ? `/demo/${v.slug.slice(DEMO.prefix.length)}` : `/${v.slug}`;   // a demo village lives at /demo/<village>
-    body = app(`मतदाता खोज - ${v.title}`, `मतदाता खोज ${v.name}`, page);
+    body = app(`Voter Search - ${v.title}`, `Voter Search ${v.name}`, page);
   }
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');

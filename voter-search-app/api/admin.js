@@ -1,6 +1,6 @@
 // POST {token, action, ...}   token = from logging in (api/unlock) as the superadmin or a village admin
 // The superadmin manages everything. A village admin sees and manages only the users of their assigned villages.
-//   action "list" [, village]          → {me: {role, name, villages, marked}, users: [...], admins: [...] (superadmin only),
+//   action "list" [, village]          → {me: {id, role, name, villages, marked}, users: [...], admins: [...] (superadmin only),
 //                                         progress}   users carry perms, searchesToday, limit (today's, with any extra),
 //                                         ownLimit ('' = default), extraToday and marked (slips with their marks)
 //   action "add", village, name, phone → {user, password}   new user of one village (must be one of the admin's villages)
@@ -66,6 +66,7 @@ const view = (u) => ({
   defaultLimit: DAILY_SEARCHES,
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
+  by: u.by || '', byName: u.byName || '',   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
@@ -99,7 +100,7 @@ module.exports = route(async (req, res, b) => {
     const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, marked: marked[u.id] || 0 });
     const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
-    return send(res, 200, { me: { role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins,
+    return send(res, 200, { me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }
@@ -192,7 +193,8 @@ module.exports = route(async (req, res, b) => {
     }
     const id = crypto.randomBytes(5).toString('hex');
     const password = await freshPassword(), hash = pwHash(password);
-    await redis('HSET', `user:${id}`, ...fields, 'name', name, 'phone', phone, 'created', now, 'retired', '0', 'hash', hash);
+    await redis('HSET', `user:${id}`, ...fields, 'name', name, 'phone', phone, 'created', now, 'retired', '0', 'hash', hash,
+      'by', me.id, 'byName', me.name);
     await redis('SET', `pw:${hash}`, id);
     await redis('SADD', 'users', id);
     return send(res, 200, { user: view(await getUser(id)), password });

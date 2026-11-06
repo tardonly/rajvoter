@@ -7,10 +7,10 @@
 <meta name="theme-color" content="#c2185b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="मतदाता खोज">
+<meta name="apple-mobile-web-app-title" content="Voter Search">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="icon" href="/icon-192.png">
-<title>मतदाता खोज</title>
+<title>Voter Search</title>
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
@@ -44,6 +44,11 @@
   .demolink { display: block; margin-top: 14px; padding: 11px; border-radius: 10px; border: 1.5px solid #fdba74;
     background: #fff7ed; color: #9a3412; font-size: 16px; font-weight: 600; text-decoration: none; }
   .demolink small { display: block; font-size: 12.5px; font-weight: 500; color: #c2410c; margin-top: 2px; }
+  /* हिंदी / English: the whole app in either language, remembered on this phone */
+  .langbtn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px;
+    color: var(--accent); font-weight: 600; white-space: nowrap; }
+  .lockbox { position: relative; }
+  .lockbox > .langbtn { position: absolute; top: 10px; right: 10px; }
   .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .homeacts button { padding: 11px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
   .homeacts .share { background: #16a34a; border-color: #16a34a; color: #fff; }
@@ -290,8 +295,9 @@
 
 <section id="lock" class="loading">
   <div class="lockbox">
+    <button class="langbtn" data-lang type="button"></button>
     <img src="/icon-192.png" alt="">
-    <h1>मतदाता खोज</h1>
+    <h1>Voter Search</h1>
     <p id="lockSub"></p>
     <form id="lockForm" autocomplete="off">
       <!-- only for people used to "mobile + password" logins: never sent or checked -->
@@ -369,9 +375,9 @@
 
 <section id="home" class="hidden">
   <div class="lockbox">
-    <div class="homebar"><a id="homeAdmin" class="hidden" href="/admin">एडमिन</a><button id="homeOut" type="button">लॉग आउट</button></div>
+    <div class="homebar"><button class="langbtn" data-lang type="button"></button><a id="homeAdmin" class="hidden" href="/admin">एडमिन</a><button id="homeOut" type="button">लॉग आउट</button></div>
     <img src="/icon-192.png" alt="">
-    <h1>मतदाता खोज</h1>
+    <h1>Voter Search</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
     <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ वीडियो देखें</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
     <div class="vfind hidden" id="vFind">
@@ -385,8 +391,8 @@
 
 <section id="app" class="hidden">
   <header>
-    <div class="titlebar"><b><span class="appname">मतदाता खोज · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+    <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
+      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -433,9 +439,67 @@ let HOME = !SLUG;
 const DEMO_PICK = 'demo', DEMO = SLUG === DEMO_PICK || SLUG.startsWith('demo-');
 const pageOf = (slug) => (slug.startsWith('demo-') ? `/demo/${slug.slice(5)}` : `/${slug}`);   // a village's address
 const WHATSAPP = '917888924374';
-const waLink = (gaon) => `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(`नमस्ते, मुझे गाँव ${gaon} के लिए मतदाता खोज ऐप चाहिए।`)}`;
+const waLink = (gaon) => `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(L(`नमस्ते, मुझे गाँव ${gaon} के लिए Voter Search ऐप चाहिए।`,
+  `Hello, I would like the Voter Search app for the village ${gaon}.`))}`;
 let VILLAGE = null;
 const $ = (id) => document.getElementById(id);
+// Language: Hindi (default) or English, switched with the हिंदी / English button and remembered on this phone.
+// L(hindi, english) picks the text; the page's fixed text is translated once from STATIC_EN below.
+const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch (e) { return false; } })();
+const L = (hi, en) => (EN ? en : hi);
+const LOCALE = L('hi-IN', 'en-IN');
+const STATIC_EN = {
+  '📲 ऐप इंस्टॉल करें': '📲 Install the app', 'ऐप इंस्टॉल करें': 'Install the app',
+  'जिस नंबर पर पासवर्ड व्हाट्सऐप पर आया था': 'The number your password came to on WhatsApp',
+  'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
+  'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
+  'पासवर्ड नहीं है? डेमो देखें →': 'No password? Try the demo →',
+  'बिना पासवर्ड, असली मतदाता सूची में 10 खोज': 'No password needed: 10 searches in a real voter list',
+  '▶ वीडियो देखें': '▶ Watch the video', '↗ शेयर करें': '↗ Share', '↗ शेयर': '↗ Share', 'शेयर करें': 'Share',
+  'ऐप कैसे काम करता है': 'How the app works', 'वीडियो': 'Video', '📱 फ़ोन': '📱 Phone', '💻 लैपटॉप': '💻 Laptop', 'बंद करें': 'Close',
+  'WhatsApp स्टेटस पर लगाएं': 'Post on WhatsApp status', 'ऐप का वीडियो और लिंक, फिर "My status" चुनें': 'The app\'s video and link, then choose "My status"',
+  'WhatsApp पर भेजें': 'Send on WhatsApp', 'किसी चैट या ग्रुप में ऐप का लिंक': 'The app\'s link in a chat or group',
+  'दूसरे ऐप में शेयर करें': 'Share in another app', 'लिंक कॉपी करें': 'Copy link',
+  '⬇ वीडियो (फ़ोन)': '⬇ Video (phone)', '⬇ वीडियो (लैपटॉप)': '⬇ Video (laptop)',
+  'आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।': 'The icon opens this page without the browser. Internet is still needed.',
+  'वोटर रिपोर्ट': 'Voter report', '↻ रिफ्रेश': '↻ Refresh', 'मतदाता सूची': 'Voter list', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
+  'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
+  'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव खोजें / Village': '🔍 Search village / गाँव',
+  'पंचायत समिति': 'Panchayat samiti', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
+  'नाम / Name / मकान नं. / Voter ID': 'Name / नाम / House no. / Voter ID', 'पिता / पति का नाम': 'Father\'s / husband\'s name',
+  'निशान से छाँटें': 'Filter by mark', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
+  'सिर्फ़ ✓ वोट दिया': 'Only ✓ voted', 'सिर्फ़ आ रहे हैं': 'Only coming', 'सिर्फ़ वोटर नहीं है': 'Only not a voter',
+};
+function translatePage() {
+  for (const b of document.querySelectorAll('[data-lang]')) {
+    b.textContent = 'short' in b.dataset ? L('EN', 'हिं') : L('🌐 English', '🌐 हिंदी');
+    b.title = L('Switch to English', 'हिंदी में देखें');
+    b.addEventListener('click', () => { try { localStorage.setItem('lang', EN ? 'hi' : 'en'); } catch (e) {} location.reload(); });
+  }
+  if (!EN) return;
+  document.documentElement.lang = 'en';
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode());) { const t = n.nodeValue.trim(); if (STATIC_EN[t]) n.nodeValue = n.nodeValue.replace(t, STATIC_EN[t]); }
+  for (const a of ['placeholder', 'aria-label']) {
+    for (const e of document.querySelectorAll(`[${a}]`)) { const t = e.getAttribute(a); if (STATIC_EN[t]) e.setAttribute(a, STATIC_EN[t]); }
+  }
+}
+translatePage();
+// Village names in English come from the web address (tithawata-peeran → Tithawata Peeran); the voter data keeps
+// both spellings of each name, the relation and gender only in Hindi.
+const enName = (slug) => String(slug || '').replace(/^demo-/, '').replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase());
+const vn = (v) => (EN && v.slug ? enName(v.slug) : v.name);
+const vt = (v) => (EN && v.slug ? `${v.slug.startsWith('demo-') ? 'Demo · ' : ''}Gram Panchayat ${enName(v.slug)}` : v.title);
+const REL_EN = { 'पिता': 'Father', 'पति': 'Husband', 'माता': 'Mother', 'पत्नी': 'Wife', 'अन्य': 'Other' };
+const SEX_EN = { 'पुरुष': 'Male', 'स्त्री': 'Female', 'महिला': 'Female', 'अन्य': 'Other' };
+const relWord = (r) => (EN ? REL_EN[r] || r : r);
+const sexWord = (s) => (EN ? SEX_EN[s] || s : s);
+const NAME_EN = { 'सुपर एडमिन': 'Super admin', 'डेमो': 'Demo' };   // names the server gives to logins without a person
+const who = (s) => (EN ? NAME_EN[s] || s : s);
+const pollTime = () => {
+  const t = VILLAGE.pollTime, m = EN && /प्रातः\s*(\d+)\s*से\s*सायं\s*(\d+)/.exec(t);
+  return m ? `Polling time: ${m[1]} AM to ${m[2]} PM` : t;
+};
 const store = {  // localStorage can be blocked (private mode); then the user just logs in each time
   get(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } },
   set(k, v, keep) { try { (keep ? localStorage : sessionStorage).setItem(k, v); } catch (e) {} },
@@ -450,26 +514,29 @@ let tokKey = `tok:${SLUG}`;
 const token = () => { if (DEMO) return store.get('tok:demo'); tokKey = store.get(`tok:${SLUG}`) ? `tok:${SLUG}` : 'tok:admin'; return store.get(tokKey); };
 
 const MSG = {
-  wrong: 'पासवर्ड गलत है',
-  retired: 'यह पासवर्ड बंद कर दिया गया है — एडमिन से नया पासवर्ड लें',
-  login: 'दोबारा लॉगिन करें',
-  logged_out: 'आपको लॉग आउट कर दिया गया है — दोबारा लॉगिन करें',
-  other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है, इसलिए यहाँ से लॉग आउट हो गया। एक पासवर्ड एक समय पर एक ही फ़ोन पर चलता है।',
-  too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
-  slow_down: 'बहुत तेज़ खोज — एक मिनट रुककर कोशिश करें',
-  limit: 'आज की खोज सीमा पूरी हो गई — कल फिर खोजें या एडमिन से बात करें',
-  demo_limit: 'डेमो की खोज पूरी हो गईं — अपने गाँव के लिए यह ऐप लेने को ऊपर अपने गाँव का नाम लिखकर WhatsApp करें',
-  offline: 'इंटरनेट नहीं है — इंटरनेट चालू करें',
-  server: 'सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें',
-  no_village: 'यह गाँव नहीं मिला — पता (लिंक) जाँचें',
-  other_village: 'यह पासवर्ड इस गाँव का नहीं है',
-  not_admin: 'यह काम सिर्फ़ एडमिन कर सकते हैं',
-  not_found: 'यह मतदाता नहीं मिला', deleted: 'यह मतदाता सूची से हटाया गया है — निशान नहीं लग सकता',
-  no_mark: 'निशान लगाने की अनुमति नहीं है — एडमिन से पूछें',
-  no_progress: 'प्रगति देखने की अनुमति नहीं है — एडमिन से पूछें',
-  no_list: 'मतदाता सूची देखने की अनुमति नहीं है — एडमिन से पूछें',
-  no_pdf: 'पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें',
-  no_ward_list: 'पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें',
+  wrong: L('पासवर्ड गलत है', 'Wrong password'),
+  retired: L('यह पासवर्ड बंद कर दिया गया है — एडमिन से नया पासवर्ड लें', 'This password has been switched off — ask your admin for a new one'),
+  login: L('दोबारा लॉगिन करें', 'Please log in again'),
+  logged_out: L('आपको लॉग आउट कर दिया गया है — दोबारा लॉगिन करें', 'You have been logged out — please log in again'),
+  other_device: L('यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है, इसलिए यहाँ से लॉग आउट हो गया। एक पासवर्ड एक समय पर एक ही फ़ोन पर चलता है।',
+    'This password was opened on another phone, so it was logged out here. A password works on one phone at a time.'),
+  too_many: L('बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें', 'Too many wrong passwords — try again in 15 minutes'),
+  slow_down: L('बहुत तेज़ खोज — एक मिनट रुककर कोशिश करें', 'Searching too fast — wait a minute and try again'),
+  limit: L('आज की खोज सीमा पूरी हो गई — कल फिर खोजें या एडमिन से बात करें', 'Today\'s search limit is used up — search again tomorrow or talk to your admin'),
+  demo_limit: L('डेमो की खोज पूरी हो गईं — अपने गाँव के लिए यह ऐप लेने को ऊपर अपने गाँव का नाम लिखकर WhatsApp करें',
+    'The demo searches are used up — to get this app for your village, type its name above and send it on WhatsApp'),
+  offline: L('इंटरनेट नहीं है — इंटरनेट चालू करें', 'No internet — please switch on the internet'),
+  server: L('सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें', 'Server problem — try again in a little while'),
+  no_village: L('यह गाँव नहीं मिला — पता (लिंक) जाँचें', 'Village not found — check the address (link)'),
+  other_village: L('यह पासवर्ड इस गाँव का नहीं है', 'This password is not for this village'),
+  not_admin: L('यह काम सिर्फ़ एडमिन कर सकते हैं', 'Only admins can do this'),
+  not_found: L('यह मतदाता नहीं मिला', 'Voter not found'),
+  deleted: L('यह मतदाता सूची से हटाया गया है — निशान नहीं लग सकता', 'This voter was struck off the list — no mark can be set'),
+  no_mark: L('निशान लगाने की अनुमति नहीं है — एडमिन से पूछें', 'You may not set marks — ask your admin'),
+  no_progress: L('प्रगति देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the report — ask your admin'),
+  no_list: L('मतदाता सूची देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter list — ask your admin'),
+  no_pdf: L('पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें', 'You may not print a whole ward\'s slips — ask your admin'),
+  no_ward_list: L('पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें', 'You may not list a whole ward — search by name'),
 };
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
 // What this login may do besides searching by name (admins: everything); the server checks these on every request.
@@ -503,7 +570,7 @@ function signOut(msg) {
 }
 function showApp(name, admin, villages, perms, cand) {
   PERMS = perms || [];
-  $('who').textContent = (name ? `उपयोगकर्ता: ${name}` : '') + (cand ? ` · उम्मीदवार: ${cand}` : '');
+  $('who').textContent = (name ? `${L('उपयोगकर्ता', 'User')}: ${who(name)}` : '') + (cand ? ` · ${L('उम्मीदवार', 'Candidate')}: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
   IS_ADMIN = !!admin; wardButton(); progButton(); listButton();
@@ -543,7 +610,8 @@ document.addEventListener('keydown', (e) => {
 
 // ---------- share: the promo video with the site's link (never the demo's), for WhatsApp status, a chat or any app ----------
 const SITE = 'https://raj-voter.vercel.app/';   // the live site, also from test and preview copies
-const SHARE_LINE = 'मतदाता खोज — अपने गाँव की मतदाता सूची, फ़ोन और लैपटॉप पर। नाम लिखते ही पर्ची, वोट के निशान और वार्ड रिपोर्ट।';
+const SHARE_LINE = L('Voter Search — अपने गाँव की मतदाता सूची, फ़ोन और लैपटॉप पर। नाम लिखते ही पर्ची, वोट के निशान और वार्ड रिपोर्ट।',
+  'Voter Search — your village\'s voter list on phone and laptop. Type a name for the slip, vote marks and a ward report.');
 const SHARE_TEXT = `${SHARE_LINE}\n${SITE}`;
 const PROMO = '/promo-phone.mp4';   // upright, as WhatsApp status shows it
 let promoFile = null;
@@ -572,24 +640,25 @@ function shareOpen() {
 function shareClose() { $('sharePop').classList.add('hidden'); }
 async function shareStatus() {
   const note = $('shareNote');
-  note.textContent = 'वीडियो तैयार हो रहा है…';
+  note.textContent = L('वीडियो तैयार हो रहा है…', 'Getting the video ready…');
   const file = await promoLoad();
   if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-    note.textContent = 'WhatsApp चुनें, फिर सबसे ऊपर "My status" (मेरा स्टेटस)।';
+    note.textContent = L('WhatsApp चुनें, फिर सबसे ऊपर "My status" (मेरा स्टेटस)।', 'Choose WhatsApp, then "My status" at the top.');
     try { await navigator.share({ files: [file], text: SHARE_TEXT }); return; } catch (e) {
       if (e.name === 'AbortError') { note.textContent = ''; return; }
-      if (e.name === 'NotAllowedError') { note.textContent = 'वीडियो तैयार है — बटन एक बार फिर दबाएं।'; return; }
+      if (e.name === 'NotAllowedError') { note.textContent = L('वीडियो तैयार है — बटन एक बार फिर दबाएं।', 'The video is ready — press the button once more.'); return; }
     }
   }
   // no sharing of files here (most laptops): save the video and copy the text, to post it from WhatsApp
   const a = el('a'); a.href = PROMO; a.download = 'matdata-khoj.mp4'; document.body.append(a); a.click(); a.remove();
   const copied = await copyText(SHARE_TEXT);
-  note.textContent = `वीडियो डाउनलोड हो रहा है। WhatsApp में Status → ＋ से यह वीडियो लगाएं${copied ? ' और कैप्शन में लिंक पेस्ट करें (कॉपी हो गया है)' : ''}।`;
+  note.textContent = L(`वीडियो डाउनलोड हो रहा है। WhatsApp में Status → ＋ से यह वीडियो लगाएं${copied ? ' और कैप्शन में लिंक पेस्ट करें (कॉपी हो गया है)' : ''}।`,
+    `The video is downloading. In WhatsApp, add it with Status → ＋${copied ? ' and paste the link into the caption (it is copied)' : ''}.`);
 }
 $('shStatus').addEventListener('click', shareStatus);
 $('shWa').addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(SHARE_TEXT)}`, '_blank', 'noopener'));
-$('shMore').addEventListener('click', () => navigator.share({ title: 'मतदाता खोज', text: SHARE_LINE, url: SITE }).catch(() => {}));
-$('shCopy').addEventListener('click', async () => { $('shareNote').textContent = (await copyText(SITE)) ? 'लिंक कॉपी हो गया' : SITE; });
+$('shMore').addEventListener('click', () => navigator.share({ title: 'Voter Search', text: SHARE_LINE, url: SITE }).catch(() => {}));
+$('shCopy').addEventListener('click', async () => { $('shareNote').textContent = (await copyText(SITE)) ? L('लिंक कॉपी हो गया', 'Link copied') : SITE; });
 $('shareClose').addEventListener('click', shareClose);
 $('sharePop').addEventListener('click', (e) => { if (e.target === $('sharePop')) shareClose(); });
 
@@ -614,18 +683,31 @@ const DEVICE = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator
 // no install button when opened from the icon, nor on iPhone and iPad: no page there can ask to be installed (only
 // Share → Add to Home Screen by hand, in every browser)
 document.documentElement.classList.toggle('noinstall', IN_APP || DEVICE === 'ios');
-const STEPS = {
+const STEPS = EN ? {
+  android: ['Android phone (Chrome)', [
+    'Tap the menu <b>⋮</b> at the top right',
+    'Choose <b>Add to Home screen</b> or <b>Install app</b>',
+    'Tap <b>Install</b> — the Voter Search icon appears on your home screen']],
+  laptop: ['Laptop / computer (Chrome or Edge)', [
+    'Chrome: click the install icon <b>⊕</b> at the right of the address bar, or menu <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>',
+    'Edge: menu <b>…</b> → <b>Apps</b> → <b>Install this site as an app</b>',
+    'Click <b>Install</b> — the app opens in its own window, its icon in the Start menu / Dock']],
+  mac: ['Mac (Safari)', [
+    'In the menu at the top choose <b>File</b> → <b>Add to Dock…</b> (macOS 14 Sonoma or newer)',
+    'Click <b>Add</b> — the Voter Search icon appears in the Dock',
+    'On an older Mac: open this page in Chrome and install it the laptop way']],
+} : {
   android: ['Android फ़ोन (Chrome)', [
     'ऊपर दाईं ओर मेनू <b>⋮</b> दबाएं',
     '<b>Add to Home screen</b> या <b>Install app</b> (होम स्क्रीन में जोड़ें) चुनें',
-    '<b>Install</b> दबाएं — होम स्क्रीन पर मतदाता खोज का आइकन आ जाएगा']],
+    '<b>Install</b> दबाएं — होम स्क्रीन पर Voter Search का आइकन आ जाएगा']],
   laptop: ['लैपटॉप / कंप्यूटर (Chrome या Edge)', [
     'Chrome: पता बार में दाईं ओर इंस्टॉल आइकन <b>⊕</b> दबाएं, या मेनू <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>',
     'Edge: मेनू <b>…</b> → <b>Apps</b> → <b>Install this site as an app</b>',
     '<b>Install</b> दबाएं — ऐप अपनी अलग विंडो में खुलेगा, आइकन Start मेनू / Dock में']],
   mac: ['Mac (Safari)', [
     'ऊपर मेनू में <b>File</b> → <b>Add to Dock…</b> चुनें (macOS 14 Sonoma या नया)',
-    '<b>Add</b> दबाएं — Dock में मतदाता खोज का आइकन आ जाएगा',
+    '<b>Add</b> दबाएं — Dock में Voter Search का आइकन आ जाएगा',
     'पुराने Mac पर: यह पेज Chrome में खोलें और लैपटॉप वाले तरीके से इंस्टॉल करें']],
 };
 const stepsHtml = (k) => `<h3>${STEPS[k][0]}</h3><ol>${STEPS[k][1].map((s) => `<li>${s}</li>`).join('')}</ol>`;
@@ -636,7 +718,8 @@ async function installOpen() {
     return;
   }
   const mine = DEVICE === 'firefox'
-    ? '<h3>Firefox</h3><ol><li>Firefox में ऐप इंस्टॉल नहीं होता: यह पेज <b>Chrome</b> या <b>Edge</b> में खोलें</li><li>फिर से <b>📲 ऐप इंस्टॉल करें</b> दबाएं</li></ol>'
+    ? L('<h3>Firefox</h3><ol><li>Firefox में ऐप इंस्टॉल नहीं होता: यह पेज <b>Chrome</b> या <b>Edge</b> में खोलें</li><li>फिर से <b>📲 ऐप इंस्टॉल करें</b> दबाएं</li></ol>',
+      '<h3>Firefox</h3><ol><li>Firefox cannot install apps: open this page in <b>Chrome</b> or <b>Edge</b></li><li>Press <b>📲 Install the app</b> again</li></ol>')
     : stepsHtml(DEVICE);
   $('installBody').innerHTML = mine;   // this device's steps only
   $('installPop').classList.remove('hidden');
@@ -654,7 +737,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const password = $('pw').value.trim();
   if (!password) return;
-  $('unlockBtn').disabled = true; showLock('खुल रहा है…', true);
+  $('unlockBtn').disabled = true; showLock(L('खुल रहा है…', 'Opening…'), true);
   const r = await api('unlock', HOME ? { password, village: '', home: true } : { password });
   $('unlockBtn').disabled = false;
   if (r.error === 'other_village' && r.village) return otherVillage(r);
@@ -681,14 +764,19 @@ function counted(r) {
   if (r.left != null) searchesLeft = r.left;
   if (DEMO) demoBar();
 }
-const leftNote = () => (!DEMO && searchesLeft != null && searchesLeft < 20 ? ` · आज ${searchesLeft} खोज बाकी` : '');
+const leftNote = () => (!DEMO && searchesLeft != null && searchesLeft < 20 ? L(` · आज ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left today`) : '');
 function hint() {
-  $('results').innerHTML = '<div class="hint">नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
+  $('results').innerHTML = '<div class="hint">' + L('नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
     'मकान नंबर (जैसे <b>512</b>, चाहें तो वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।' +
-    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : '') + '</div>';
+    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : ''),
+    'Type a name or the father\'s / husband\'s name, in English or Hindi.<br>' +
+    'Spelling need not be exact, e.g. <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>.<br>' +
+    'You can also search by house number (e.g. <b>512</b>, with a ward if you like) or Voter ID (e.g. <b>XHE1102649</b>).' +
+    (can('ward') ? '<br>Choose only a ward to see all its voters in box order.' : '')) + '</div>';
 }
-const FILTER = { none: 'बिना निशान वाले', done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
+const FILTER = EN ? { none: 'unmarked', done: '✓ voted', coming: 'coming', absent: 'not a voter' }
+  : { none: 'बिना निशान वाले', done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // a name with one letter matches nearly everyone: wait for a second one (a house number like 5 is fine)
 const tooShort = (s) => s && !/^\d+$/.test(s) && s.replace(/\s/g, '').length < 2;
 async function search(more = false, force = false) {
@@ -703,12 +791,12 @@ async function search(more = false, force = false) {
   $('qMark').classList.toggle('hidden', !q.ward || DEMO);   // filter by mark once a ward is chosen (not in the demo)
   if (!q.ward || DEMO) q.mark = '';
   if (tooShort(q.name) || tooShort(q.rel)) { ++seq; $('results').innerHTML = '';
-    $('count').textContent = 'कम से कम दो अक्षर लिखें'; $('more').classList.add('hidden'); return; }
+    $('count').textContent = L('कम से कम दो अक्षर लिखें', 'Type at least two letters'); $('more').classList.add('hidden'); return; }
   if (!named && !q.ward) { ++seq; hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }   // ++seq: drop a search still on its way
   if (!named && !can('ward')) { ++seq; $('results').innerHTML = '';
     $('count').textContent = MSG.no_ward_list; $('more').classList.add('hidden'); return; }
   const mine = ++seq;
-  if (!more) $('count').textContent = 'खोज रहे हैं…';
+  if (!more) $('count').textContent = L('खोज रहे हैं…', 'Searching…');
   // a whole ward pages on from the last box shown, so slips marked meanwhile don't shift the list
   const r = await api('search', { ...q, offset: more ? shown : 0, after: more ? lastBox : 0, searchId, token: token() });
   counted(r);
@@ -725,9 +813,11 @@ async function search(more = false, force = false) {
   shown += r.results.length;
   if (r.results.length) lastBox = r.results[r.results.length - 1].box;
   const which = q.mark ? `${FILTER[q.mark]} ` : '';
-  const found = named ? `${total} ${which}मतदाता मिले` : `वार्ड ${q.ward} · ${q.mark ? which : 'सभी '}${total} मतदाता, बॉक्स क्रम में`;
-  $('count').textContent = (total ? found + (total > shown ? ` · ${shown} दिखाए` : '')
-    : q.mark ? `वार्ड ${q.ward} में ${which}कोई मतदाता नहीं` : 'कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें') + leftNote();
+  const found = EN ? (named ? `${total} ${which}voter${total === 1 ? '' : 's'} found` : `Ward ${q.ward} · ${q.mark ? which : 'all '}${total} voters, in box order`)
+    : named ? `${total} ${which}मतदाता मिले` : `वार्ड ${q.ward} · ${q.mark ? which : 'सभी '}${total} मतदाता, बॉक्स क्रम में`;
+  $('count').textContent = (total ? found + (total > shown ? L(` · ${shown} दिखाए`, ` · ${shown} shown`) : '')
+    : q.mark ? L(`वार्ड ${q.ward} में ${which}कोई मतदाता नहीं`, `No ${which}voters in ward ${q.ward}`)
+    : L('कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें', 'No voter found — try another spelling')) + leftNote();
   $('more').classList.toggle('hidden', !r.more);
 }
 // the admin can change what this person may do at any time; the next answer from the server says so
@@ -741,9 +831,9 @@ function updatePerms(p) {
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function kv(label, value) { const f = document.createDocumentFragment(); f.append(label, el('b', null, value)); return f; }
 
-const MARKS = { done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
+const MARKS = EN ? { done: '✓ Voted', coming: 'Coming', absent: 'Not a voter' } : { done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // voters struck off the roll in the list's supplement: still found, shown greyed with the reason, no marks or printing
-const DELETED = { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend; X: no reason known
+const DELETED = EN ? { E: 'death', S: 'shifted', R: 'repeated', O: 'other reason' } : { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend; X: no reason known
 
 // One slip. forPrint leaves out the buttons and the mark; inFamily leaves out the परिवार button.
 function slip(r, forPrint, inFamily) {
@@ -753,41 +843,44 @@ function slip(r, forPrint, inFamily) {
   const head = el('div', 'head');
   const tools = el('div', 'tools');
   if (!forPrint && can('print') && !r.del) {
-    const pb = el('button', 'pbtn', 'प्रिंट / PDF'); pb.type = 'button';
-    pb.addEventListener('click', () => printSlips([r], `पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`));
+    const pb = el('button', 'pbtn', L('प्रिंट / PDF', 'Print / PDF')); pb.type = 'button';
+    pb.addEventListener('click', () => printSlips([r], L(`पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`, `Slip ${vn(VILLAGE)} ward ${r.ward} box ${r.box}`)));
     tools.append(pb);
   }
   if (!forPrint && !inFamily && String(r.house || '').trim()) {
-    const fb = el('button', 'fam', 'परिवार'); fb.type = 'button';
+    const fb = el('button', 'fam', L('परिवार', 'Family')); fb.type = 'button';
     fb.addEventListener('click', () => toggleFamily(r, d, fb));
     tools.append(fb);
   }
   head.append(tools);
   const meta = el('div', 'meta');
   const [ps, zp] = (VILLAGE.seats || {})[r.ward] || [VILLAGE.ps, VILLAGE.zp];   // some wards have other numbers
-  const m1 = el('div'); m1.append(el('span', null, `पं.सं. ${ps}`), el('span', null, `जि.प. ${zp}`));
-  const m2 = el('div'); m2.append(el('span', null, `वार्ड नं. : ${r.ward}`), el('span', null, `भाग सं. ${bhag.trim()}`));
+  const m1 = el('div'); m1.append(el('span', null, `${L('पं.सं.', 'P.S.')} ${ps}`), el('span', null, `${L('जि.प.', 'Z.P.')} ${zp}`));
+  const m2 = el('div'); m2.append(el('span', null, `${L('वार्ड नं. :', 'Ward no.:')} ${r.ward}`), el('span', null, `${L('भाग सं.', 'Part no.')} ${bhag.trim()}`));
   meta.append(m1, m2); head.append(meta);
 
   const idl = el('div', 'idline');
-  idl.append(el('div', 'boxno', r.box), r.epic ? el('div', 'epic', r.epic) : el('div', 'epic none', 'Voter ID नहीं'));
+  idl.append(el('div', 'boxno', r.box), r.epic ? el('div', 'epic', r.epic) : el('div', 'epic none', L('Voter ID नहीं', 'No Voter ID')));
 
   const l1 = el('div', 'line');
-  const n = el('div'); n.append(el('span', 'k', 'नाम: '), el('b', null, r.hname), el('span', 'en', r.name));
-  const h = el('div', 'r'); h.append(kv('मकान संख्या:', r.house || '—'));
+  // in English the English spelling comes first and the Hindi one beside it (each falls back on the other)
+  const [nm1, nm2] = EN ? [r.name || r.hname, r.name ? r.hname : ''] : [r.hname, r.name];
+  const [rl1, rl2] = EN ? [r.relname || r.hrel, r.relname ? r.hrel : ''] : [r.hrel, r.relname];
+  const n = el('div'); n.append(el('span', 'k', L('नाम: ', 'Name: ')), el('b', null, nm1), el('span', 'en', nm2));
+  const h = el('div', 'r'); h.append(kv(L('मकान संख्या:', 'House no.:'), r.house || '—'));
   l1.append(n, h);
 
   const l2 = el('div', 'line');
-  const p = el('div'); p.append(el('span', 'k', `${r.rel} का नाम: `), el('b', null, r.hrel), el('span', 'en', r.relname));
-  const ag = el('div', 'r'); ag.append(kv('आयु:', r.age)); const g = el('span', 'g'); g.append(kv('लिंग:', r.sex)); ag.append(g);
+  const p = el('div'); p.append(el('span', 'k', L(`${r.rel} का नाम: `, `${relWord(r.rel)}'s name: `)), el('b', null, rl1), el('span', 'en', rl2));
+  const ag = el('div', 'r'); ag.append(kv(L('आयु:', 'Age:'), r.age)); const g = el('span', 'g'); g.append(kv(L('लिंग:', 'Gender:'), sexWord(r.sex))); ag.append(g);
   l2.append(p, ag);
 
-  const k = el('div', 'kendra'); k.append('मतदान केन्द्र : ', el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
-  d.append(head, idl, l1, l2, k, el('div', 'time', VILLAGE.pollTime));
+  const k = el('div', 'kendra'); k.append(L('मतदान केन्द्र : ', 'Polling station: '), el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
+  d.append(head, idl, l1, l2, k, el('div', 'time', pollTime()));
   if (forPrint) return d;
   if (r.del) {
     d.classList.add('gone');
-    d.prepend(el('div', 'gonebar', `✕ सूची से हटाया गया${r.del === 'X' ? '' : ` (${r.del}${DELETED[r.del] ? ` – ${DELETED[r.del]}` : ''})`}`));
+    d.prepend(el('div', 'gonebar', `✕ ${L('सूची से हटाया गया', 'Struck off the list')}${r.del === 'X' ? '' : ` (${r.del}${DELETED[r.del] ? ` – ${DELETED[r.del]}` : ''})`}`));
     return d;
   }
 
@@ -810,29 +903,30 @@ function slip(r, forPrint, inFamily) {
 // everyone else at the same house number in the ward, opened under the slip
 async function toggleFamily(r, d, btn) {
   const open = d.nextElementSibling && d.nextElementSibling.classList.contains('family') ? d.nextElementSibling : null;
-  if (open) { open.remove(); btn.classList.remove('on'); btn.textContent = 'परिवार'; return; }
-  btn.disabled = true; btn.textContent = 'ला रहे हैं…';
+  if (open) { open.remove(); btn.classList.remove('on'); btn.textContent = L('परिवार', 'Family'); return; }
+  btn.disabled = true; btn.textContent = L('ला रहे हैं…', 'Loading…');
   const x = await api('search', { family: `${r.ward}:${r.box}`, searchId, token: token() });
   counted(x);
-  btn.disabled = false; btn.textContent = 'परिवार';
+  btn.disabled = false; btn.textContent = L('परिवार', 'Family');
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
   if (x.error) { alert(MSG[x.error] || MSG.server); return; }
   const others = x.results.filter((v) => v.box !== r.box);
   const box = el('div', 'family');
-  box.append(el('div', 'fh', others.length ? `मकान नं. ${r.house} · वार्ड ${r.ward} · इसी मकान के और ${others.length} मतदाता`
-    : `मकान नं. ${r.house} पर और कोई मतदाता नहीं`));
+  box.append(el('div', 'fh', others.length ? L(`मकान नं. ${r.house} · वार्ड ${r.ward} · इसी मकान के और ${others.length} मतदाता`,
+    `House no. ${r.house} · ward ${r.ward} · ${others.length} more voter${others.length === 1 ? '' : 's'} in this house`)
+    : L(`मकान नं. ${r.house} पर और कोई मतदाता नहीं`, `No other voter at house no. ${r.house}`)));
   for (const v of others) box.append(slip(v, false, true));
   d.after(box);
-  btn.classList.add('on'); btn.textContent = 'परिवार छुपाएं';
+  btn.classList.add('on'); btn.textContent = L('परिवार छुपाएं', 'Hide family');
 }
 
 // ---------- status marks (set by admins and people allowed to; everyone sees the bar, who set it and when) ----------
-const when = (iso) => new Date(iso).toLocaleString('hi-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+const when = (iso) => new Date(iso).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 function showMark(d, m, by, at) {
   if (MARKS[m]) d.dataset.mark = m; else delete d.dataset.mark;
   const bar = d.querySelector('.bar');
   bar.textContent = MARKS[m] || '';
-  if (MARKS[m] && (by || at)) bar.append(el('small', null, [by, at && when(at)].filter(Boolean).join(', ')));
+  if (MARKS[m] && (by || at)) bar.append(el('small', null, [who(by), at && when(at)].filter(Boolean).join(', ')));
   d.querySelectorAll('.marks button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
 }
 // Demo marks are kept only on this phone (never sent to the server), so a visitor can try the buttons without
@@ -842,7 +936,7 @@ async function setMark(r, d, m) {
   const before = [d.dataset.mark || '', d.dataset.by || '', d.dataset.at || ''];
   const mark = before[0] === m ? '' : m;         // tapping the lit button again removes the mark
   if (DEMO) {
-    const all = demoMarks(), key = `${r.ward}:${r.box}`, at = new Date().toISOString(), by = 'डेमो (सिर्फ़ इस फ़ोन पर)';
+    const all = demoMarks(), key = `${r.ward}:${r.box}`, at = new Date().toISOString(), by = L('डेमो (सिर्फ़ इस फ़ोन पर)', 'Demo (only on this phone)');
     if (mark) all[key] = [mark, by, at]; else delete all[key];
     store.set('demoMarks', JSON.stringify(all), true);
     r.mark = mark;
@@ -891,20 +985,21 @@ function progButton() {
   if (!ok) progClose();
 }
 async function progLoad() {
-  $('progNote').textContent = 'आ रहा है…';
+  $('progNote').textContent = L('आ रहा है…', 'Loading…');
   const r = await api('progress', { token: token() });
   if (r.error) { $('progNote').textContent = MSG[r.error] || MSG.server; return; }
   const body = $('progBody'); body.innerHTML = '';
   for (const g of r.progress) {
-    if (r.progress.length > 1) body.append(el('div', 'vh', g.candName ? `उम्मीदवार ${g.candName}` : 'आम निशान'));
-    else if (g.candName) body.append(el('div', 'vh', `उम्मीदवार ${g.candName}`));
+    if (r.progress.length > 1) body.append(el('div', 'vh', g.candName ? `${L('उम्मीदवार', 'Candidate')} ${g.candName}` : L('आम निशान', 'Common marks')));
+    else if (g.candName) body.append(el('div', 'vh', `${L('उम्मीदवार', 'Candidate')} ${g.candName}`));
     const t = el('table', 'prog');
-    t.innerHTML = '<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ वोट दिया</th><th class="c-coming">आ रहे</th><th class="c-absent">वोटर नहीं</th><th>बाकी</th></tr></thead>';
+    t.innerHTML = L('<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ वोट दिया</th><th class="c-coming">आ रहे</th><th class="c-absent">वोटर नहीं</th><th>बाकी</th></tr></thead>',
+      '<thead><tr><th>Ward</th><th>Total</th><th class="c-done">✓ Voted</th><th class="c-coming">Coming</th><th class="c-absent">Not voter</th><th>Left</th></tr></thead>');
     const tb = el('tbody'), sum = { total: 0, done: 0, coming: 0, absent: 0 };
     for (const w of g.wards) for (const k of Object.keys(sum)) sum[k] += w[k];
     for (const w of [...g.wards, sum]) {
       const tr = el('tr', w === sum ? 'sum' : null);
-      tr.append(el('td', null, w === sum ? 'कुल' : `वार्ड ${w.ward}`), el('td', null, w.total));
+      tr.append(el('td', null, w === sum ? L('कुल', 'Total') : `${L('वार्ड', 'Ward')} ${w.ward}`), el('td', null, w.total));
       // with the "list" permission a tap on a number opens those voters in the मतदाता सूची (own group's marks only)
       const tap = can('list') && !(IS_ADMIN && g.candName);   // an admin's list is the village's own marks
       for (const [k, n] of [['done', w.done], ['coming', w.coming], ['absent', w.absent], ['none', w.total - w.done - w.coming - w.absent]]) {
@@ -918,7 +1013,8 @@ async function progLoad() {
     }
     t.append(tb); body.append(t);
   }
-  $('progNote').textContent = `${new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' })} तक · खुला रहने पर हर मिनट अपने-आप ताज़ा होता है`;
+  const now = new Date().toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+  $('progNote').textContent = L(`${now} तक · खुला रहने पर हर मिनट अपने-आप ताज़ा होता है`, `As of ${now} · refreshes itself every minute while open`);
 }
 function progClose() { $('progPop').classList.add('hidden'); }
 $('progBtn').addEventListener('click', () => { $('progPop').classList.remove('hidden'); progLoad(); });
@@ -930,7 +1026,7 @@ setInterval(() => { if (!document.hidden && !$('progPop').classList.contains('hi
 
 // ---------- मतदाता सूची: voters by mark (वोट दिया / आ रहे हैं / वोटर नहीं है / बाकी), 100 at a time, as on the admin
 // page; for admins and people with the "list" permission (not in the demo) ----------
-const MARK_NAME = { done: 'वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
+const MARK_NAME = EN ? { done: 'Voted', coming: 'Coming', absent: 'Not a voter' } : { done: 'वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 const ls = { status: 'done', rows: [], seq: 0 };
 function listButton() {
   const ok = !DEMO && can('list');
@@ -940,7 +1036,7 @@ function listButton() {
 function listCounts(wards) {   // the numbers on the four buttons and the ward choices, from the server's per-ward counts
   const keep = $('listWard').value;
   $('listWard').length = 1;
-  for (const w of wards) $('listWard').add(new Option(`वार्ड ${w.ward}`, w.ward));
+  for (const w of wards) $('listWard').add(new Option(`${L('वार्ड', 'Ward')} ${w.ward}`, w.ward));
   $('listWard').value = wards.some((w) => String(w.ward) === keep) ? keep : '';
   const n = { done: 0, coming: 0, absent: 0, none: 0 };
   for (const w of wards) {
@@ -954,14 +1050,16 @@ function listCounts(wards) {   // the numbers on the four buttons and the ward c
 }
 function listRow(x) {
   const row = el('div', 'voter'), no = el('div', 'no'), body = el('div');
-  no.append(el('b', null, x.box), `वार्ड ${x.ward}`);
-  const nm = el('div', 'nm', x.hname || x.name);
-  if (x.hname && x.name) nm.append(el('span', null, x.name));
-  body.append(nm, el('div', 'info', [x.hrel && `${x.rel || 'पिता/पति'}: ${x.hrel}`, x.house && `मकान ${x.house}`,
-    x.age && `आयु ${x.age}`, x.sex].filter(Boolean).join(' · ')));
+  no.append(el('b', null, x.box), `${L('वार्ड', 'Ward')} ${x.ward}`);
+  const [a, b] = EN ? [x.name, x.hname] : [x.hname, x.name];
+  const nm = el('div', 'nm', a || b);
+  if (a && b) nm.append(el('span', null, b));
+  const rel = (EN && x.relname) || x.hrel;
+  body.append(nm, el('div', 'info', [rel && `${x.rel ? relWord(x.rel) : L('पिता/पति', 'Father/husband')}: ${rel}`, x.house && `${L('मकान', 'House')} ${x.house}`,
+    x.age && `${L('आयु', 'Age')} ${x.age}`, sexWord(x.sex)].filter(Boolean).join(' · ')));
   if (ls.status !== 'none' && (x.by || x.at)) {
-    const at = x.at ? new Date(x.at).toLocaleString('hi-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-    body.append(el('div', `info c-${ls.status}`, [MARK_NAME[ls.status], x.by, at].filter(Boolean).join(' · ')));
+    const at = x.at ? new Date(x.at).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    body.append(el('div', `info c-${ls.status}`, [MARK_NAME[ls.status], who(x.by), at].filter(Boolean).join(' · ')));
   }
   row.append(no, body);
   return row;
@@ -969,7 +1067,7 @@ function listRow(x) {
 async function listLoad(more) {
   const seq = ++ls.seq, offset = more ? ls.rows.length : 0;
   $('listMore').disabled = true; $('listNote').textContent = '';
-  if (!more) $('listBody').replaceChildren(el('div', 'lempty', 'आ रहा है…'));
+  if (!more) $('listBody').replaceChildren(el('div', 'lempty', L('आ रहा है…', 'Loading…')));
   const r = await api('progress', { token: token(), status: ls.status, ward: $('listWard').value, offset });
   if (seq !== ls.seq) return;   // a newer choice was made meanwhile
   $('listMore').disabled = false;
@@ -977,15 +1075,15 @@ async function listLoad(more) {
   listCounts(r.wards);
   ls.rows = more ? ls.rows.concat(r.rows) : r.rows;
   if (!more) $('listBody').innerHTML = '';
-  if (!ls.rows.length) $('listBody').append(el('div', 'lempty', ls.status === 'none' ? 'सब पर्चियों पर निशान लग गए हैं' : 'इस रंग का कोई निशान नहीं'));
+  if (!ls.rows.length) $('listBody').append(el('div', 'lempty', ls.status === 'none' ? L('सब पर्चियों पर निशान लग गए हैं', 'Every slip has a mark') : L('इस रंग का कोई निशान नहीं', 'No marks of this colour')));
   for (const x of r.rows) $('listBody').append(listRow(x));
   $('listMore').classList.toggle('hidden', !r.more);
-  if (r.more) $('listMore').textContent = `और दिखाएं (${r.total - ls.rows.length} बाकी)`;
+  if (r.more) $('listMore').textContent = L(`और दिखाएं (${r.total - ls.rows.length} बाकी)`, `Show more (${r.total - ls.rows.length} left)`);
 }
 function listOpen(ward, status) {
   progClose();
   if (status) ls.status = status;
-  if (ward !== undefined) { if (![...$('listWard').options].some((o) => o.value === String(ward))) $('listWard').add(new Option(`वार्ड ${ward}`, ward)); $('listWard').value = ward; }
+  if (ward !== undefined) { if (![...$('listWard').options].some((o) => o.value === String(ward))) $('listWard').add(new Option(`${L('वार्ड', 'Ward')} ${ward}`, ward)); $('listWard').value = ward; }
   $('listPop').classList.remove('hidden');
   listLoad();
 }
@@ -1002,18 +1100,18 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') listClose(
 function wardButton() {
   const w = $('qWard').value;
   $('wardPrint').classList.toggle('hidden', !can('wardPdf') || !w);
-  $('wardPrint').textContent = `वार्ड ${w} की सभी पर्चियाँ · प्रिंट / PDF`;
+  $('wardPrint').textContent = L(`वार्ड ${w} की सभी पर्चियाँ · प्रिंट / PDF`, `All slips of ward ${w} · Print / PDF`);
 }
 $('wardPrint').addEventListener('click', async () => {
   const w = $('qWard').value, btn = $('wardPrint');
   if (!w) return;
-  btn.disabled = true; btn.textContent = 'पर्चियाँ आ रही हैं…';
+  btn.disabled = true; btn.textContent = L('पर्चियाँ आ रही हैं…', 'Loading the slips…');
   const r = await api('search', { token: token(), ward: w, all: true });
   counted(r);
   btn.disabled = false; wardButton();
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
-  printSlips(r.results, `पर्चियाँ ${VILLAGE.name} वार्ड ${w} (${r.total})`);
+  printSlips(r.results, L(`पर्चियाँ ${VILLAGE.name} वार्ड ${w} (${r.total})`, `Slips ${vn(VILLAGE)} ward ${w} (${r.total})`));
 });
 
 // typing searches once the person pauses (fewer requests to the server); Enter searches at once
@@ -1044,13 +1142,14 @@ function myVillages(list) {
   $('homeAdmin').classList.toggle('hidden', DEMO || savedLogin() !== 'tok:admin');   // superadmin and village admins
   $('homeOut').classList.toggle('hidden', DEMO);
   $('demoActs').classList.toggle('hidden', !DEMO);   // the demo's villages: the video and a share button
-  $('homeMsg').textContent = DEMO ? `डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} खोज बाकी`
-    : list.length ? 'अपना गाँव चुनें' : 'इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें';
+  $('homeMsg').textContent = DEMO ? L(`डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} खोज बाकी`,
+    `Demo: choose a village · the first 2 wards of each · ${searchesLeft} searches left`)
+    : list.length ? L('अपना गाँव चुनें', 'Choose your village') : L('इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें', 'This password opens no village — ask your admin');
   homeList = list;
   const many = list.length > 5;
   $('vFind').classList.toggle('hidden', !many);
   const sams = [...new Set(list.map((v) => v.panchayatSamiti).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'hi'));
-  $('vPs').replaceChildren(new Option('सभी पंचायत समिति', ''), ...sams.map((p) => new Option(`पंचायत समिति ${p}`, p)));
+  $('vPs').replaceChildren(new Option(L('सभी पंचायत समिति', 'All panchayat samitis'), ''), ...sams.map((p) => new Option(`${L('पंचायत समिति', 'Panchayat samiti')} ${p}`, p)));
   $('vPs').classList.toggle('hidden', sams.length < 2);
   const keep = store.get('vPs');
   $('vPs').value = sams.includes(keep) ? keep : '';
@@ -1064,12 +1163,13 @@ function showVillages() {
   if (q) list = list.map((v) => [villageScore(q, v), v]).filter(([sc]) => sc != null).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
   const box = $('villages'); box.innerHTML = '';
   for (const v of list) {
-    const a = el('a', null, v.name); a.href = pageOf(v.slug); a.append(el('small', null, v.title));
-    const where = [v.panchayatSamiti && `पंचायत समिति ${v.panchayatSamiti}`, v.district && `ज़िला ${v.district}`].filter(Boolean).join(' · ');
+    const a = el('a', null, vn(v)); a.href = pageOf(v.slug); a.append(el('small', null, EN ? `${vt(v)} · ${v.name}` : v.title));
+    const where = [v.panchayatSamiti && `${L('पंचायत समिति', 'Panchayat samiti')} ${v.panchayatSamiti}`, v.district && `${L('ज़िला', 'District')} ${v.district}`].filter(Boolean).join(' · ');
     if (where) a.append(el('small', null, where));
     box.append(a);
   }
-  $('vCount').textContent = list.length ? `${list.length} गाँव` : 'कोई गाँव नहीं मिला — स्पेलिंग बदलकर देखें';
+  $('vCount').textContent = list.length ? L(`${list.length} गाँव`, `${list.length} village${list.length === 1 ? '' : 's'}`)
+    : L('कोई गाँव नहीं मिला — स्पेलिंग बदलकर देखें', 'No village found — try another spelling');
 }
 $('vSearch').addEventListener('input', showVillages);
 $('vPs').addEventListener('change', () => { store.set('vPs', $('vPs').value, true); showVillages(); });
@@ -1117,7 +1217,7 @@ function savedLogin() {
 }
 function homeLock(msg, info) {
   $('home').classList.add('hidden');
-  $('lockSub').textContent = 'अपना पासवर्ड डालें';
+  $('lockSub').textContent = L('अपना पासवर्ड डालें', 'Enter your password');
   $('demoLink').classList.remove('hidden');   // the start page offers the demo to anyone without a password
   $('homeActs').classList.remove('hidden');   // and a short video of the app in use, and a share button
   showLock(msg, info);
@@ -1130,17 +1230,18 @@ $('homeOut').addEventListener('click', () => {
 });
 // a password of another village: point to that village's page
 function otherVillage(r) {
-  showLock(`यह पासवर्ड ${r.villageName || r.village} का है। `);
-  const a = el('a', null, `${r.villageName || r.village} की खोज खोलें →`); a.href = `/${r.village}`;
+  const name = EN ? enName(r.village) : r.villageName || r.village;
+  showLock(L(`यह पासवर्ड ${name} का है। `, `This password is for ${name}. `));
+  const a = el('a', null, L(`${name} की खोज खोलें →`, `Open ${name}'s search →`)); a.href = `/${r.village}`;
   $('lockMsg').append(a);
 }
 function setVillage(v) {
   VILLAGE = v;
-  document.title = `मतदाता खोज · ${v.name}`;
-  $('lockSub').textContent = `${v.title} · वार्ड ${v.wards.length > 1 ? `${v.wards[0]}–${v.wards[v.wards.length - 1]}` : v.wards[0]}`;
-  $('vName').textContent = v.name;
+  document.title = `Voter Search · ${vn(v)}`;
+  $('lockSub').textContent = `${vt(v)} · ${L('वार्ड', v.wards.length > 1 ? 'wards' : 'ward')} ${v.wards.length > 1 ? `${v.wards[0]}–${v.wards[v.wards.length - 1]}` : v.wards[0]}`;
+  $('vName').textContent = vn(v);
   $('adminBtn').href = '/admin';   // one admin page for every village (the old /<village>/admin redirects there)
-  for (const w of v.wards) $('qWard').add(new Option(`वार्ड ${w}`, w));
+  for (const w of v.wards) $('qWard').add(new Option(`${L('वार्ड', 'Ward')} ${w}`, w));
   setManifest(`village=${v.slug}`);
 }
 
@@ -1154,7 +1255,7 @@ function deviceId() {
   return d;
 }
 async function demoLogin() {
-  showLoading('डेमो खुल रहा है…');
+  showLoading(L('डेमो खुल रहा है…', 'Opening the demo…'));
   const r = await api('unlock', { device: deviceId() });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   store.set('tok:demo', r.token, true);
@@ -1166,24 +1267,26 @@ async function demoLogin() {
 function demoBar() {
   const bar = $('demoBar');
   if (!bar.firstChild) {
-    const form = el('form'), gaon = el('input'), send = el('button', null, 'WhatsApp करें');
-    gaon.id = 'demoGaon'; gaon.placeholder = 'अपने गाँव का नाम लिखें'; gaon.autocomplete = 'off';
+    const form = el('form'), gaon = el('input'), send = el('button', null, L('WhatsApp करें', 'Send on WhatsApp'));
+    gaon.id = 'demoGaon'; gaon.placeholder = L('अपने गाँव का नाम लिखें', 'Your village\'s name'); gaon.autocomplete = 'off';
     send.type = 'submit';
     form.append(gaon, send);
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const name = gaon.value.trim();
-      if (!name) { gaon.focus(); gaon.placeholder = 'पहले अपने गाँव का नाम लिखें'; return; }
+      if (!name) { gaon.focus(); gaon.placeholder = L('पहले अपने गाँव का नाम लिखें', 'First type your village\'s name'); return; }
       window.open(waLink(name), '_blank', 'noopener');
     });
-    const acts = el('div', 'homeacts'), how = el('button', null, '▶ वीडियो देखें'), share = el('button', 'share', '↗ शेयर करें');
+    const acts = el('div', 'homeacts'), how = el('button', null, L('▶ वीडियो देखें', '▶ Watch the video')), share = el('button', 'share', L('↗ शेयर करें', '↗ Share'));
     how.type = share.type = 'button';
     how.addEventListener('click', howOpen); share.addEventListener('click', shareOpen);
     acts.append(how, share);
-    bar.append(el('div'), el('div', 'ask', 'अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:'), form, acts);
+    bar.append(el('div'), el('div', 'ask', L('अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:',
+      'Want this app for your village? Type its name and send it on WhatsApp:')), form, acts);
   }
-  bar.firstChild.replaceChildren(el('b', null, 'डेमो'), ` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में खोजकर देखें`,
-    searchesLeft != null ? ` · ${searchesLeft} खोज बाकी` : '');
+  bar.firstChild.replaceChildren(el('b', null, L('डेमो', 'Demo')), L(` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में खोजकर देखें`,
+    ` · try a search in the real voter list of the first ${VILLAGE.wards.length} wards of ${vn(VILLAGE)}`),
+    searchesLeft != null ? L(` · ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left`) : '');
   bar.classList.remove('hidden');
 }
 
@@ -1193,7 +1296,7 @@ async function openVillage(v) {
   const tok = token();
   if (DEMO && !tok) return demoLogin();
   if (!tok) return showLock('');
-  showLoading('जाँच रहे हैं…');
+  showLoading(L('जाँच रहे हैं…', 'Checking…'));
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
@@ -1204,7 +1307,7 @@ async function openVillage(v) {
 (async () => {
   if (SLUG === DEMO_PICK) return demoLogin();   // the demo's start: pick a village
   if (SLUG) {
-    showLoading('खुल रहा है…');
+    showLoading(L('खुल रहा है…', 'Opening…'));
     const info = await api('info', {});
     if (!info.error) return openVillage(info.village);
     if (info.error !== 'no_village') return showLock(MSG[info.error] || MSG.server);
@@ -1219,7 +1322,7 @@ async function openVillage(v) {
   let saved = null;
   try { saved = JSON.parse(store.get('villages')); } catch (e) {}
   if (Array.isArray(saved) && saved.length) myVillages(saved);
-  else showLoading('जाँच रहे हैं…');
+  else showLoading(L('जाँच रहे हैं…', 'Checking…'));
   if (saved && saved.length === 1) return;
   const r = await api('check', { village: '', token: store.get(k) });
   if (r.error) return saved ? undefined : homeLock(MSG[r.error] || MSG.server);   // offline: keep the saved list

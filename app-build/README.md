@@ -156,6 +156,8 @@ Log in with the superadmin password or a village admin's password (or log into a
   WhatsApp (the message has that village's link). The same box has the person's permission ticks (they start with only
   पर्ची प्रिंट), so you can set what they may do right away.
 - **नया एडमिन जोड़ें** (superadmin only): name + tick the villages → the admin's password, sent with the `/admin` link.
+- Each person shows **बनाया: …** (made by): the admin who created that password ("आप" for yourself). Passwords made
+  before this tag existed have none.
 - **बंद करें:** that password stops working; the person is logged out on their next search.
 - **नया पासवर्ड:** new password for the same person (e.g. they forgot it); the old one stops working.
 - **लॉग आउट करें:** ends the person's current session; they can log in again with the same password.
@@ -169,6 +171,9 @@ Log in with the superadmin password or a village admin's password (or log into a
   while going through the unmarked list doesn't skip anyone on the next page.
 - **परिवार** on a slip opens everyone else at the same house number in that ward, as full slips.
 - **अ+** (top right) makes the slips and search boxes bigger; the phone remembers it.
+- **🌐 English / हिंदी** (top right, also on the login screen and the admin page) switches the whole app's language; the
+  phone remembers it. In English the slips show the English spelling of each name first (the Hindi one beside it);
+  polling-station addresses and samiti / district names stay as printed (Hindi).
 - Voters struck off in the list's supplement (E death, S shifted, R repeated) are still found, shown greyed with
   "✕ सूची से हटाया गया (E – मृत्यु)" and their names crossed out. They can't be marked or printed and aren't counted in
   progress, the mark filters or a ward's slips.
