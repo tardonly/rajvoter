@@ -150,6 +150,8 @@ deployment (e.g. to S3) first.
    - `ADMIN_PASSWORD` = the superadmin password (long, not shared with anyone)
    - `UPI_ID` (optional) = the UPI ID buyers pay, e.g. `yourname@fam`: turns on buying searches (see below); `UPI_NAME`
      (optional) = the payee name shown in the UPI app, default `Voter Search`
+   - `AUTO_APPROVE_KEY` (optional) = a long random text: lets the payment-email script approve purchases by itself
+     (see "Approving purchases from payment emails" below)
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the variables take effect.
 
 ## Signing up with a mobile number, and buying searches with UPI (no payment gateway)
@@ -174,6 +176,25 @@ Buying (only once `UPI_ID` is set in Vercel and the app redeployed; for signed-u
 - In the people list, signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches
   (free + bought) instead of a daily limit.
 - Each UTR can be used once; one internet address can send at most 10 requests in 15 minutes.
+
+### Approving purchases from payment emails (optional)
+`app-build/payment-emails.gs` is a Google Apps Script for the Gmail account that gets the UPI app's "money received"
+emails (e.g. FamPay's). Every minute it reads new ones, takes the amount and the UTR, and sends them to the app: a
+purchase with that UTR and **the same amount** is approved at once (the buyer's searches are added; the admin page shows
+"📧 ईमेल: ₹50 आए · ईमेल से अपने आप"). It also works when the email comes before the buyer types the UTR (kept 7 days).
+A different amount is not approved; the purchase stays in the भुगतान tab marked "रकम अलग है" for you to decide.
+Only emails that Gmail confirms really came from `SENDER_DOMAIN` (DKIM) count, so a forged email approves nothing.
+1. Make a long random key (e.g. `openssl rand -hex 24`) and add it in Vercel as `AUTO_APPROVE_KEY`; redeploy.
+2. Signed in to that Gmail, open https://script.google.com → **New project**, paste `payment-emails.gs` in place of
+   the sample code, and save.
+3. Open one real "money received" email and check its **From** address: set `SENDER_DOMAIN` at the top of the script
+   to the part after `@` (e.g. `fampay.in`). If your app's URL is not `raj-voter.vercel.app`, change `APP_URL`.
+4. **Project Settings (⚙) → Script properties → Add**: `AUTO_APPROVE_KEY` = the same key as in Vercel.
+5. Choose **testLatest** and press **Run** (allow the Gmail permissions it asks for). The log lists the latest
+   emails with `trusted sender: true` and the `utr` and `amount` it read. If a value is wrong or missing, the email's
+   wording differs: send the email text to whoever maintains the app to adjust `parse()`.
+6. Choose **install** and press **Run** once: from then on `checkPayments` runs every minute (Triggers ⏰ shows it).
+Approving by hand in the भुगतान tab still works as before.
 
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).

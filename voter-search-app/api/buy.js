@@ -15,15 +15,22 @@
 //   POST {action: 'request', token, amount, utr} → {id, key, trial}   key = the buyer's secret for 'status'
 //   POST {action: 'status', id, key} → {status: 'pending' | 'approved' | 'rejected', village, amount, name, utr, at,
 //     trial, reason (when rejected)}
+//   POST {action: 'auto', key, payments: [{utr, amount}]} → {results: [{utr, result}]}   payments seen in the payment
+//     emails of the UPI account (app-build/payment-emails.gs, a Google Apps Script on that Gmail); key = the
+//     AUTO_APPROVE_KEY environment variable. A request with that UTR and the same amount is approved at once
+//     (result 'approved'), also when the buyer sends the UTR after the email came; a different amount is left for
+//     the superadmin ('amount_differs'); 'waiting' = no request with that UTR yet. Off until AUTO_APPROVE_KEY is set.
 // A UTR can be used once (a rejected request frees it). 10 requests / lookups per internet address in 15 minutes;
 // 3 sign-ups and 3 trials per internet address a day.
 // Keys: "buy:<id>" (hash: village, name, phone, amount, utr, at, status, keyHash, userId, trial, reason, decidedAt,
-// decidedBy), set "buys" (all ids), "utr:<utr>" → id, set "free" (signed-up logins that have not bought yet),
+// decidedBy ('email' when approved by a payment email), paidAmount (from the email)), set "buys" (all ids),
+// "utr:<utr>" → id, "utrpaid:<utr>" → amount seen in a payment email (7 days), set "free" (signed-up logins that have
+// not bought yet),
 // "signups:<ip>:<day>" / "trials:<ip>:<day>" → how many today from that address.
 const crypto = require('crypto');
 const { PACKS, FREE_TIERS, isPrepaid, phoneLogins, village, villageList, normPhone, newLogin, today, clientIp, redis,
-  newSession, makeToken, deviceName, permsOf, whoIs, blocked, failed, send, route } = require('./_lib.js');
-const { getBuy } = require('./_buy.js');
+  newSession, makeToken, deviceName, permsOf, whoIs, sameText, blocked, failed, send, route } = require('./_lib.js');
+const { getBuy, emailPaid } = require('./_buy.js');
 
 const TRIAL = 10;          // searches a buyer may start at once, before the superadmin has checked the payment
 const PER_DAY = 3;         // sign-ups, and trials, per internet address a day
@@ -99,7 +106,27 @@ module.exports = route(async (req, res, b) => {
       'utr', utr, 'at', new Date().toISOString(), 'status', 'pending', 'keyHash', hashKey(key), 'userId', user.id, 'trial', trial);
     await redis('SADD', 'buys', id);
     if (trial) await redis('HINCRBY', `user:${user.id}`, 'credits', trial);
-    return send(res, 200, { id, key, trial });
+    const paid = await redis('GET', `utrpaid:${utr}`);   // the payment email came before the buyer typed the UTR
+    const result = paid ? await emailPaid(await getBuy(id), paid) : '';
+    return send(res, 200, { id, key, trial, approved: result === 'approved' });
+  }
+
+  if (b.action === 'auto') {
+    const secret = String(process.env.AUTO_APPROVE_KEY || '').trim();
+    if (await blocked(req, 'auto')) return send(res, 429, { error: 'too_many' });
+    if (!secret || !sameText(String(b.key || ''), secret)) {
+      await failed(req, 'auto');
+      return send(res, 401, { error: 'wrong' });
+    }
+    const results = [];
+    for (const p of (Array.isArray(b.payments) ? b.payments : []).slice(0, 50)) {
+      const utr = String((p && p.utr) || '').replace(/\D/g, ''), amount = Number(p && p.amount);
+      if (!/^\d{12}$/.test(utr) || !(amount > 0)) { results.push({ utr, result: 'bad' }); continue; }
+      await redis('SET', `utrpaid:${utr}`, amount, 'EX', 7 * 86400);
+      const x = await getBuy(await redis('GET', `utr:${utr}`));
+      results.push({ utr, result: x ? await emailPaid(x, amount) : 'waiting' });
+    }
+    return send(res, 200, { results });
   }
 
   if (b.action === 'status') {

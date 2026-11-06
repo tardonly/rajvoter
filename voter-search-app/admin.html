@@ -1025,10 +1025,15 @@ function buyRow(x) {
   nm.append(el('span', `badge ${x.status === 'approved' ? 'on' : x.status === 'rejected' ? 'off' : 'warn'}`, BUY_STATUS[x.status]),
     el('span', 'badge vil', vName(x.village)));
   const trial = Number(x.trial) || 0;
+  // what the payment email (app-build/payment-emails.gs) said came in with this UTR
+  if (x.paidAmount) nm.append(el('span', Number(x.paidAmount) === x.amount ? 'badge on' : 'badge warn',
+    Number(x.paidAmount) === x.amount ? L(`📧 ईमेल: ₹${x.paidAmount} आए`, `📧 Email: ₹${x.paidAmount} arrived`)
+      : L(`📧 ईमेल में ₹${x.paidAmount} — रकम अलग है`, `📧 Email says ₹${x.paidAmount} — a different amount`)));
   if (trial && x.status === 'pending') nm.append(el('span', 'badge by', L(`${trial} खोज अभी दी गईं`, `${trial} searches given at once`)));
   const utr = el('div', 'info'); utr.append('UTR ', el('span', 'utr', x.utr));
   const info = el('div', 'info', `📱 ${showPhone(x.phone)} · ${fmt(x.at)}`
-    + (x.decidedAt ? ` · ${BUY_STATUS[x.status]}: ${fmt(x.decidedAt)}` : '') + (x.reason ? ` · ${x.reason}` : ''));
+    + (x.decidedAt ? ` · ${BUY_STATUS[x.status]}: ${fmt(x.decidedAt)}` : '')
+    + (x.decidedBy === 'email' ? L(' · ईमेल से अपने आप', ' · by the payment email') : '') + (x.reason ? ` · ${x.reason}` : ''));
   row.append(nm, el('div', 'buyamt', `₹${x.amount} · ${L(`${x.amount} खोज`, `${x.amount} searches`)}`), utr, info);
   if (x.status === 'pending') {
     const acts = el('div', 'actions'), ok = el('button', 'btn', L('✓ पैसे आ गए — स्वीकार करें', '✓ Money arrived — approve'));

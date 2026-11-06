@@ -37,7 +37,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { getBuy } = require('./_buy.js');
+const { getBuy, approveBuy } = require('./_buy.js');
 const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, paidKey, normPhone, redis, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
@@ -207,12 +207,8 @@ module.exports = route(async (req, res, b) => {
       if (Number(x.trial)) await redis('HINCRBY', `user:${x.userId}`, 'credits', -Number(x.trial));
       return send(res, 200, { buy: { ...x, status: 'rejected', reason } });
     }
-    const id = x.userId;   // the buyer got the trial searches at once (api/buy.js): the rest of the pack goes on now
-    await redis('HINCRBY', `user:${id}`, 'credits', Number(x.amount) - (Number(x.trial) || 0));
-    await redis('HSET', `user:${id}`, 'bought', '1');
-    await redis('SREM', 'free', id);   // a login that bought no longer counts against the free sign-ups (FREE_TIERS)
-    await redis('HSET', `buy:${x.id}`, 'status', 'approved', 'decidedAt', now, 'decidedBy', me.name);
-    return send(res, 200, { buy: { ...x, status: 'approved' }, user: view(await getUser(id)) });
+    await approveBuy(x, me.name);
+    return send(res, 200, { buy: { ...x, status: 'approved' }, user: view(await getUser(x.userId)) });
   }
 
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
