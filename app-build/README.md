@@ -209,8 +209,9 @@ longer count for the free sign-up tiers.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit; admin-made
 logins show their daily limit and, once they have bought some, their bought searches as well.
 
-**Paying online by UPI (JaduPe):** with `JADUPE_TOKEN` set, the buy window has **💳 ₹X UPI से अभी भुगतान करें** above
-the WhatsApp button (`api/pay.js`). It makes a request (gw `jadupe`, sent to the superadmin) and a JaduPe transaction
+**Paying online by UPI (JaduPe):** with `JADUPE_TOKEN` set, the buy window has only **💳 ₹X UPI से अभी भुगतान करें**
+instead of the WhatsApp button (`api/pay.js`); if JaduPe refuses (e.g. "Please complete KYC and wait for admin
+approval"), the window says so and shows the WhatsApp button after all. It makes a request (gw `jadupe`, sent to the superadmin) and a JaduPe transaction
 for the pack's price, and opens JaduPe's payment page, which comes back to `/<village>?pay=<request id>`; the app then
 shows whether the payment came and the searches were added. The searches are added by themselves when JaduPe says the
 transaction is **completed** for at least the pack's price (within ₹1): checked when the person comes back, when

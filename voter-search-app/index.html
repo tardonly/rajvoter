@@ -70,8 +70,6 @@
   .buyback { justify-self: start; }
   .paybox .wabtn { display: block; width: 100%; background: #16a34a; }   /* WhatsApp green */
   .paybox .upibtn { display: block; width: 100%; }
-  .paybox .wabtn.alt { background: #fff; color: #15803d; border: 1.5px solid #16a34a; }
-  .paybox .or { font-size: 13px; color: var(--muted); }
   .packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 6px 0 4px; }
   .pack { display: grid; gap: 1px; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 8px 6px; color: var(--ink); }
   .pack b { font-size: 15px; }
@@ -1650,8 +1648,10 @@ function buyUpi([n, rs]) {
     const r = await api('pay', { action: 'start', token: token(), n });
     if (r.link) { location.href = r.link; return; }
     a.disabled = false;
-    a.textContent = r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
-      : L('⚠ भुगतान पेज नहीं खुला — दोबारा दबाएं या WhatsApp से मंगाएं', '⚠ Could not open the payment page — tap again or ask on WhatsApp');
+    if (r.error === 'too_many') { a.textContent = L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow'); return; }
+    // UPI not working right now (e.g. JaduPe refused): ask the admin on WhatsApp instead
+    a.replaceWith(el('div', 'k', L('⚠ अभी UPI से भुगतान नहीं हो पा रहा — एडमिन को भुगतान करके WhatsApp पर भेजें:',
+      '⚠ UPI payment is not working right now — pay the admin and send this on WhatsApp:')), buyWhatsApp('btn wabtn', [n, rs]));
   });
   return a;
 }
@@ -1659,8 +1659,9 @@ function buyOpen() {
   delete $('buyPop').dataset.go;
   $('buyTitle').textContent = L('🛒 और खोज', '🛒 More searches');
   const box = el('div', 'paybox'), packs = el('div', 'packs');
-  const waCls = ONLINE ? 'btn wabtn alt' : 'btn wabtn';   // with UPI here, WhatsApp to the admin is the other way
-  let pick = PACKS[0], wa = buyWhatsApp(waCls, pick), upi = ONLINE ? buyUpi(pick) : null;
+  // with UPI here, only that; else (no JaduPe token on the server) WhatsApp to the admin
+  const payBtn = (pk) => (ONLINE ? buyUpi(pk) : buyWhatsApp('btn wabtn', pk));
+  let pick = PACKS[0], pay = payBtn(pick);
   for (const pk of PACKS) {
     const b = el('button', `pack${pk === pick ? ' on' : ''}`); b.type = 'button';
     const price = el('span');   // ₹1 a search, struck through, then the pack's price; the saving below
@@ -1671,19 +1672,18 @@ function buyOpen() {
     b.addEventListener('click', () => {
       pick = pk;
       packs.querySelectorAll('.pack').forEach((x) => x.classList.toggle('on', x === b));
-      const w = buyWhatsApp(waCls, pick); wa.replaceWith(w); wa = w;
-      if (upi) { const u = buyUpi(pick); upi.replaceWith(u); upi = u; }
+      const w = payBtn(pick); pay.replaceWith(w); pay = w;
     });
     packs.append(b);
   }
   const none = searchesLeft === 0 && !BOUGHT;
   box.append(el('b', null, !none ? L('और खोज चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी खोज इस्तेमाल हो गईं', 'All your searches are used')
     : L('आज की सभी खोज इस्तेमाल हो गईं', 'All of today\'s searches are used')),
-    el('div', 'k', ONLINE ? L('कितनी खोज चाहिए, चुनें और UPI से भुगतान करें — खोज अपने आप जुड़ जाएंगी। या एडमिन को भुगतान करके WhatsApp पर भेजें।',
-      'Choose how many searches and pay by UPI — they are added by themselves. Or pay the admin and send it on WhatsApp.')
+    el('div', 'k', ONLINE ? L('कितनी खोज चाहिए, चुनें और UPI से भुगतान करें — खोज अपने आप जुड़ जाएंगी।',
+      'Choose how many searches and pay by UPI — they are added by themselves.')
       : L('कितनी खोज चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे खोज जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
         'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
-    packs, ...(upi ? [upi, el('div', 'or', L('या', 'or'))] : []), wa);
+    packs, pay);
   $('buyBody').replaceChildren(box);
   $('buyNote').textContent = L('खरीदी खोज कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की खोज पूरी होने के बाद इस्तेमाल होती हैं') + '। एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
     'Bought searches never expire' + (PREPAID ? '' : ' — they are used once the day\'s searches are used') + '. One search = typing a name until the box is cleared; family and more pages are free.');
