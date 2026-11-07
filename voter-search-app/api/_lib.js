@@ -256,6 +256,21 @@ async function adminPhone(u) {
   admins.sort((a, b) => a.villages.length - b.villages.length);
   return admins.length ? admins[0].phone : '';
 }
+// search packs a person can ask for: [searches, ₹] (the same list is in index.html and admin.html)
+const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
+// A request for a pack (api/signup.js 'request'), key req:<id>, id = 8 digits: the WhatsApp message to the admin carries
+// only <site>/<id>, which opens the admin page; the admin logs in and sees who asked (api/admin.js 'req_get'). Fields:
+// user, village, n, rs, created, status 'open' | 'done', and once approved doneAt, doneN, doneBy, doneByName.
+// reqopen:<user>:<n> → that person's open request for that pack, so asking again sends the same link.
+const isReqId = (id) => /^\d{8}$/.test(String(id || ''));
+async function getReq(id) {
+  if (!isReqId(id)) return null;
+  const arr = await redis('HGETALL', `req:${id}`);
+  if (!arr || !arr.length) return null;
+  const r = { id };
+  for (let i = 0; i < arr.length; i += 2) r[arr[i]] = arr[i + 1];
+  return r;
+}
 const paidKey = (id) => `paid:${id}`;
 async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
@@ -303,6 +318,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE_TIERS, credits, isPrepaid, phoneLogins, adminPhone, paidKey, creditsLeft, normPhone,
+  FREE_TIERS, credits, isPrepaid, phoneLogins, adminPhone, PACKS, isReqId, getReq, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

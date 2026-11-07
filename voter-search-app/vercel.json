@@ -32,6 +32,10 @@
       "destination": "/admin.html"
     },
     {
+      "source": "/:req(\\d{8})",
+      "destination": "/admin.html"
+    },
+    {
       "source": "/demo/:village([a-z0-9-]+)",
       "destination": "/index.html"
     },

@@ -26,6 +26,11 @@
 //                                               candidate is cleared and their phone is logged out
 //   action "credits_add", id, n      → {user}   n more searches (1–10000) for a login made by signing up (api/signup.js),
 //                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
+//   action "req_get", rid            → {req}    a pack request (api/signup.js 'request') of a person this admin manages:
+//                                               {id, user, village, n, rs, created, status 'open' | 'done', doneAt, doneN,
+//                                               doneByName}; someone else's → not_found
+//   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
+//                                               a done request → already_done with {req}
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
 //   backup: {n, at} | null}]   one entry per village of this admin and per candidate of it (cand '' = the village's own
 //   marks): how many slips carry each mark, overall and per ward.
@@ -34,7 +39,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, paidKey, normPhone, redis, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
+const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, getReq, paidKey, normPhone, redis, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
@@ -181,6 +186,25 @@ module.exports = route(async (req, res, b) => {
     }
     const { id, password } = await newLogin(fields, name, phone);
     return send(res, 200, { user: view(await getUser(id)), password });
+  }
+
+  if (b.action === 'req_get' || b.action === 'req_approve') {
+    const r = await getReq(b.rid), u = r ? await getUser(r.user) : null;
+    if (!u || !(isSuper || (u.role === 'user' && mayUse(u.village)))) return send(res, 404, { error: 'not_found' });
+    const out = ({ id, user: uid, village: v, n, rs, created, status, doneAt, doneN, doneByName }) =>
+      ({ id, user: uid, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0, doneByName: doneByName || '' });
+    if (b.action === 'req_get') return send(res, 200, { req: out(r) });
+    if (r.status === 'done') return send(res, 409, { error: 'already_done', req: out(r) });
+    if (!isPrepaid(u)) return send(res, 400, { error: 'not_prepaid' });
+    const n = parseInt(b.n, 10);
+    if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
+    if (!(await redis('SET', `reqlock:${r.id}`, me.id, 'NX'))) return send(res, 409, { error: 'already_done', req: out(await getReq(r.id)) });
+    await redis('HINCRBY', `user:${u.id}`, 'credits', n);
+    await redis('HSET', `user:${u.id}`, 'bought', '1');
+    await redis('SREM', 'free', u.id);
+    await redis('HSET', `req:${r.id}`, 'status', 'done', 'doneAt', now, 'doneN', n, 'doneBy', me.id, 'doneByName', me.name);
+    await redis('DEL', `reqopen:${u.id}:${r.n}`);
+    return send(res, 200, { req: out(await getReq(r.id)), user: view(await getUser(u.id)) });
   }
 
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
