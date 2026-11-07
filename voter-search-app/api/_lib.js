@@ -254,21 +254,27 @@ async function phoneLogins(phone) {
       retired, self };
   }).filter(Boolean);
 }
-// the WhatsApp number a signed-up person asks for more searches: the admin who made the login, else an admin of its
-// village (the one with the fewest villages), else '' (the app then uses its own number)
-async function adminPhone(u) {
+// whom a signed-up person asks for more searches (the WhatsApp number, and whose 🔔 the request goes to): the one who
+// made the login, i.e. the superadmin, or a village admin while still active, with a number and looking after the
+// village; for a login the person made themself (or whose admin is gone): an admin of the village, the one with the
+// fewest villages; with none, the superadmin. → {id, phone}; the superadmin is {id: 'admin', phone: ''} (the app then
+// uses its own number)
+const SUPER = { id: 'admin', phone: '' };
+async function adminFor(u) {
+  if (u.by === 'admin') return SUPER;
   const ids = (await redis('SMEMBERS', 'users')) || [];
-  if (!ids.length) return '';
+  if (!ids.length) return SUPER;
   const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'villages', 'retired', 'samitis']));
   const admins = ids.map((id, i) => {
     const [phone, role, vils, retired, sams] = rows[i] || [];
     return role === 'admin' && retired !== '1' && phone ? { id, phone, villages: adminVillages(vils, sams) } : null;
   }).filter(Boolean).filter((a) => a.villages.includes(u.village));
   const own = admins.find((a) => a.id === u.by);
-  if (own) return own.phone;
+  if (own) return own;
   admins.sort((a, b) => a.villages.length - b.villages.length);
-  return admins.length ? admins[0].phone : '';
+  return admins[0] || SUPER;
 }
+const adminPhone = async (u) => (await adminFor(u)).phone;
 // search packs a person can ask for: [searches, ₹] (the same list is in index.html and admin.html)
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // A request for a pack (api/signup.js 'request'), key req:<id>, id = 8 digits: the WhatsApp message to the admin carries
@@ -343,6 +349,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE_TIERS, credits, isPrepaid, phoneLogins, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, normPhone,
+  FREE_TIERS, credits, isPrepaid, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

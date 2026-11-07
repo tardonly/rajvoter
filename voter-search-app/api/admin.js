@@ -27,7 +27,8 @@
 //                                               candidate is cleared and their phone is logged out
 //   action "credits_add", id, n      → {user}   n more searches (1–10000) for a login made by signing up (api/signup.js),
 //                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
-//   (in "list": reqs = those requests of this admin's people, open ones first, plus the ones approved or rejected in the last 30 days,
+//   (in "list": reqs = those requests of this admin's people that were sent to them (to, see adminFor in _lib.js; the
+//    superadmin sees every one, with toName), open ones first, plus the ones approved or rejected in the last 30 days,
 //    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with खोज जोड़ें)
 //   and collected: [{by, name, rs, n, count, settled, due}] payments collected so far by each admin (all time), what they
 //   handed over to the superadmin and what is still due; a village admin gets only their own row
@@ -139,7 +140,9 @@ module.exports = route(async (req, res, b) => {
       for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
       const u = mine.get(r.user);   // a person of my villages, asking from one of my villages
       if (!u || !mayUse(r.village) || (r.status !== 'open' && !(r.doneAt > since))) return null;
-      return { ...reqView(r), name: u.name, phone: u.phone || '' };
+      if (!isSuper && r.to && r.to !== me.id && r.doneBy !== me.id) return null;   // sent to someone else
+      const to = r.to === 'admin' ? 'सुपर एडमिन' : r.to ? (all.find((x) => x.id === r.to) || {}).name || '' : '';
+      return { ...reqView(r), name: u.name, phone: u.phone || '', toName: isSuper ? to : '' };
     }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
       : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
     // payments collected so far, per admin (pay:* in _lib.js), and what each has handed over; a village admin sees only

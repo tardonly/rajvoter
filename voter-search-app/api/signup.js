@@ -7,12 +7,13 @@
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
 //   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free}
 //   POST {action: 'signup', village, phone, name} → {password, token, name, phone, villages, list, perms, prepaid, left, adminPhone}
-//   POST {action: 'request', token, village, n} → {id}   a signed-up login asks for a pack of n searches (PACKS in _lib.js):
-//     the request is kept (req:<id>, see getReq) and its id goes in the WhatsApp message as <site>/<id>; the person's
-//     open request for the same pack is reused. 20 new requests a day per login.
+//   POST {action: 'request', token, village, n} → {id, phone}   a signed-up login asks for a pack of n searches (PACKS in
+//     _lib.js): the request is kept (req:<id>, see getReq) with to = the admin it goes to (adminFor in _lib.js), and its
+//     id goes in the WhatsApp message to phone ('' = the app's own number) as <site>/<id>; the person's open request for
+//     the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { PACKS, newReqId, getReq, whoIs, isPrepaid, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
+const { PACKS, adminFor, newReqId, getReq, whoIs, isPrepaid, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -70,15 +71,20 @@ module.exports = route(async (req, res, b) => {
     const pk = PACKS.find(([n]) => n === Number(b.n));
     if (!pk) return send(res, 400, { error: 'bad_credits' });
     const openKey = `reqopen:${me.id}:${pk[0]}`, old = await getReq(await redis('GET', openKey));
-    if (old && old.status === 'open' && old.user === me.id) return send(res, 200, { id: old.id });
+    const to = await adminFor(me);
+    if (old && old.status === 'open' && old.user === me.id) {
+      if (old.to !== to.id) await redis('HSET', `req:${old.id}`, 'to', to.id);   // e.g. their admin has changed since
+      return send(res, 200, { id: old.id, phone: to.phone });
+    }
     const k = `reqs:${me.id}:${today()}`;
     if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
     await redis('EXPIRE', k, 86400);
     const id = await newReqId();
-    await redis('HSET', `req:${id}`, 'user', me.id, 'village', me.village, 'n', pk[0], 'rs', pk[1], 'created', new Date().toISOString(), 'status', 'open');
+    await redis('HSET', `req:${id}`, 'user', me.id, 'village', me.village, 'n', pk[0], 'rs', pk[1], 'created', new Date().toISOString(), 'status', 'open',
+      'to', to.id);
     await redis('SET', openKey, id);
     await redis('SADD', 'reqs', id);   // every request, for the admin page's list (api/admin.js "list")
-    return send(res, 200, { id });
+    return send(res, 200, { id, phone: to.phone });
   }
   send(res, 400, { error: 'action' });
 });

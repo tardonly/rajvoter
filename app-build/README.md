@@ -168,9 +168,11 @@ The login page asks only for the **mobile number** first:
 More searches: the **🛒 और खोज खरीदें** window offers packs (`PACKS` in `index.html`, `admin.html` and `api/_lib.js`;
 the ₹1-a-search price is shown struck through beside the pack price, with the saving): 100 searches
 ₹100, 200 ₹200, 500 ₹400, 800 ₹650, 1000 ₹800. The person picks one, pays the admin, and the **💬 WhatsApp** button
-opens a chat with that person's admin: the village admin who made the login, else the village's admin with the fewest
-villages, using the mobile number on the admin's login (so give every village admin a number); with no such admin, the
-app's number (`WHATSAPP` in `index.html`); the window closes once WhatsApp opens. The message has the person's name,
+opens a chat with that person's admin: whoever made the login (the superadmin, or a village admin who is still active,
+has a number and looks after the village), else — for a self sign-up — the village's admin with the fewest villages,
+using the mobile number on the admin's login (so give every village admin a number); with no such admin, the
+superadmin, i.e. the app's number (`WHATSAPP` in `index.html`). The request is kept as sent to that admin (`to`), and
+only that admin sees it under 🔔 (the superadmin sees all, with "भेजा: <name>"); the window closes once WhatsApp opens. The message has the person's name,
 mobile number, village, the pack and a link `/<request id>` (8 digits): the request is made only when that button is
 tapped (picking a pack makes none) and kept on the server
 (`req:<id>`, `api/signup.js` "request"; asking for the same pack again sends the same request) and the link itself

@@ -589,7 +589,8 @@ function reqList() {
     b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n} खोज · ₹${r.rs}`, `Asked: ${r.n} searches · ₹${r.rs}`)
       : r.status === 'rejected' ? L(`माँगी: ${r.n} खोज · अस्वीकार — ${r.doneByName}`, `Asked: ${r.n} searches · rejected — ${r.doneByName}`)
       : L(`₹${r.doneRs} वसूले — ${r.doneByName}${r.hand ? ' (हाथ से जोड़ी)' : ''}`, `₹${r.doneRs} collected — ${r.doneByName}${r.hand ? ' (added by hand)' : ''}`)),
-      el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`));
+      el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`
+        + (r.toName ? L(` · भेजा: ${r.toName}`, ` · sent to: ${r.toName}`) : '')));
     b.addEventListener('click', () => {
       const u = users.find((x) => x.id === r.user);
       $('apTitle').textContent = L('✅ खोज मंज़ूरी', '✅ Approve searches');

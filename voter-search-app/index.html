@@ -1621,6 +1621,7 @@ function buyWhatsApp(cls, [n, rs]) {
     }
     const phone = MY_PHONE ? `+${MY_PHONE.slice(0, 2)} ${MY_PHONE.slice(2)}` : '';
     const link = `${location.origin}/${r.id}`;
+    if (r.phone != null) ADMIN_PHONE = r.phone;   // whom the server sent the request to ('' = the superadmin: our number)
     const url = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
       `नमस्ते, मुझे Voter Search में ${n} खोज चाहिए (₹${rs})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
       `Hello, I would like ${n} searches in Voter Search (₹${rs}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\n${link}`));
