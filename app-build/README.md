@@ -148,59 +148,26 @@ deployment (e.g. to S3) first.
 3. **Add two environment variables** (Project → Settings → Environment Variables):
    - `DATA_KEY` = the text in `app-build/DATA_KEY.txt`
    - `ADMIN_PASSWORD` = the superadmin password (long, not shared with anyone)
-   - `UPI_ID` (optional) = the UPI ID buyers pay, e.g. `yourname@fam`: turns on buying searches (see below); `UPI_NAME`
-     (optional) = the payee name shown in the UPI app, default `Voter Search`
-   - `AUTO_APPROVE_KEY` (optional) = a long random text: lets the payment-email script approve purchases by itself
-     (see "Approving purchases from payment emails" below)
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the variables take effect.
 
-## Signing up with a mobile number, and buying searches with UPI (no payment gateway)
+## Signing up with a mobile number, and getting more searches
 The login page asks only for the **mobile number** first:
 - A number that already has a login for that village (or, on the start page, any login) gets the password box, with
   "पासवर्ड याद नहीं? अपने एडमिन से पूछें". Admins without a number use **एडमिन? सीधे पासवर्ड से खोलें**.
-- A new number types a name (on the start page it also picks the village) and gets its **own login at once**: the
-  password is shown to write down, and the person goes straight into the village. Free searches for such a sign-up:
-  **10** while fewer than 10 signed-up logins have bought nothing, then **2** until there are 20, then **0**
-  (`FREE_TIERS` in `api/_lib.js`; a login leaves that count when it buys). A number that signed up before (in any
-  village) gets no free searches again. One internet address can sign up 3 times a day.
-- Signed-up logins have no daily limit: free plus bought searches, which never expire. When none are left the
-  **🛒 खोज खरीदें** window opens by itself (after logging in, or on the next search).
+- A new number types a name (on the start page it also picks the village) and gets its **own login at once**
+  (`api/signup.js`): the password is shown to write down, and the person goes straight into the village. Free searches
+  for such a sign-up: **10** while fewer than 10 signed-up logins have not been given paid searches, then **2** until
+  there are 20, then **0** (`FREE_TIERS` in `api/_lib.js`). A number that signed up before (in any village) gets no
+  free searches again. One internet address can sign up 3 times a day.
+- Signed-up logins have no daily limit: their searches (free + paid) never run out by date. When none are left, the
+  **🛒 और खोज** window opens by itself (after logging in, or on the next search); the **🛒 और खोज खरीदें** button opens
+  it any time.
 
-Asking on WhatsApp (works with or without `UPI_ID`): the **🛒 खोज खरीदें** window has a **💬 WhatsApp करके खोज मंगाएं**
-button (the only option while `UPI_ID` is not set) that opens a chat with the app's number (`WHATSAPP` in `index.html`)
-with the person's name, mobile number and village filled in. The superadmin then adds searches to that login in the
-admin page's people list: **खोज जोड़ें: +50 / +100 / +500** or any number (signed-up logins only; it counts as a purchase
-for the free sign-up tiers).
-
-Buying with UPI (only once `UPI_ID` is set in Vercel and the app redeployed; for signed-up logins, not for admin-made ones):
-- The person picks a pack (₹50 / 100 / 200 / 500 / 800 / 1000 = that many searches), pays with the
-  **UPI ऐप से भुगतान करें** button (phones) or the QR (laptops), and types the payment's 12-digit **UTR**. **10 searches
-  are added at once**; the rest when the superadmin approves (3 such early top-ups per internet address a day).
-- The superadmin sees it in the admin page's **भुगतान** tab (the number waiting is on the tab). Check in your UPI app
-  that that amount arrived with that UTR, then **✓ पैसे आ गए — स्वीकार करें** adds the rest. **✕ अस्वीकार** asks for a
-  reason the buyer sees, takes the 10 early searches back and lets that UTR be sent again.
-- In the people list, signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches
-  (free + bought) instead of a daily limit.
-- Each UTR can be used once; one internet address can send at most 10 requests in 15 minutes.
-
-### Approving purchases from payment emails (optional)
-`app-build/payment-emails.gs` is a Google Apps Script for the Gmail account that gets the UPI app's "money received"
-emails (e.g. FamPay's). Every minute it reads new ones, takes the amount and the UTR, and sends them to the app: a
-purchase with that UTR and **the same amount** is approved at once (the buyer's searches are added; the admin page shows
-"📧 ईमेल: ₹50 आए · ईमेल से अपने आप"). It also works when the email comes before the buyer types the UTR (kept 7 days).
-A different amount is not approved; the purchase stays in the भुगतान tab marked "रकम अलग है" for you to decide.
-Only emails that Gmail confirms really came from `SENDER_DOMAIN` (DKIM) count, so a forged email approves nothing.
-1. Make a long random key (e.g. `openssl rand -hex 24`) and add it in Vercel as `AUTO_APPROVE_KEY`; redeploy.
-2. Signed in to that Gmail, open https://script.google.com → **New project**, paste `payment-emails.gs` in place of
-   the sample code, and save.
-3. Open one real "money received" email and check its **From** address: set `SENDER_DOMAIN` at the top of the script
-   to the part after `@` (e.g. `fampay.in`). If your app's URL is not `raj-voter.vercel.app`, change `APP_URL`.
-4. **Project Settings (⚙) → Script properties → Add**: `AUTO_APPROVE_KEY` = the same key as in Vercel.
-5. Choose **testLatest** and press **Run** (allow the Gmail permissions it asks for). The log lists the latest
-   emails with `trusted sender: true` and the `utr` and `amount` it read. If a value is wrong or missing, the email's
-   wording differs: send the email text to whoever maintains the app to adjust `parse()`.
-6. Choose **install** and press **Run** once: from then on `checkPayments` runs every minute (Triggers ⏰ shows it).
-Approving by hand in the भुगतान tab still works as before.
+More searches (₹1 a search, paid to the admin): that window's **💬 WhatsApp पर खोज मंगाएं** button opens a chat with
+the app's number (`WHATSAPP` in `index.html`) with the person's name, mobile number and village filled in. Once paid,
+an admin (the superadmin, or the village's admin) adds them in the admin page's people list: **खोज जोड़ें: +50 / +100 /
++500** or any number. Those logins are tagged "₹ भुगतान किया" and no longer count for the free sign-up tiers.
+Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit.
 
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).

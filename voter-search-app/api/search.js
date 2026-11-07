@@ -17,7 +17,7 @@
 // ward listed again. Anything else starts a new search, which counts 1 and is refused ('limit') once the person has
 // used dailyLimit() today. A ward's slips (all) always count 1. The id is made and checked here, so a phone can't
 // skip counting. A demo phone (see DEMO in _lib.js) gets DEMO.searches in all, and its internet address DEMO.perIp a
-// day: the answer is then 'demo_limit'. A user with bought searches (credits, see PACKS in _lib.js) has those in all
+// day: the answer is then 'demo_limit'. A signed-up user (isPrepaid in _lib.js) has their credits in all
 // instead of a daily limit: the answer is then 'credits' once they are used up.
 const crypto = require('crypto');
 const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');

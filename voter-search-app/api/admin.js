@@ -24,13 +24,8 @@
 //   action "cand_set", id, cand      → {user}   puts a user of the candidate's village in that group ('' = no candidate)
 //   action "move", id, village       → {user}   moves a user to another village (both must be the admin's): their
 //                                               candidate is cleared and their phone is logged out
-//   action "credits_add", id, n      → {user}   n more searches (1–10000) for a signed-up login, e.g. paid on WhatsApp;
-//                                               counts as a purchase (FREE_TIERS)                    (superadmin only)
-//   action "buys"                    → {buys}   searches bought with UPI (api/buy.js), newest first     (superadmin only)
-//   action "buy_approve", buy        → {buy, user}   the money arrived: the rest of the pack (beyond the trial searches
-//                                               the buyer got at once) is added to their login     (superadmin only)
-//   action "buy_reject", buy [, reason] → {buy}   the money did not arrive: frees the UTR and takes the trial searches
-//                                               back                                                (superadmin only)
+//   action "credits_add", id, n      → {user}   n more searches (1–10000) for a login made by signing up (api/signup.js),
+//                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
 //   backup: {n, at} | null}]   one entry per village of this admin and per candidate of it (cand '' = the village's own
 //   marks): how many slips carry each mark, overall and per ward.
@@ -39,7 +34,6 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { getBuy, approveBuy } = require('./_buy.js');
 const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, paidKey, normPhone, redis, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
@@ -57,7 +51,7 @@ const view = (u) => ({
   defaultLimit: DAILY_SEARCHES,
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
-  by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), bought: u.bought === '1', self: u.self === '1',   // credits: searches bought with UPI (0 = daily limit)   // who made this login (admin id 'admin' = the superadmin); older logins: ''
+  by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
@@ -189,30 +183,6 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { user: view(await getUser(id)), password });
   }
 
-  // ---------- searches bought with UPI (api/buy.js): the superadmin checks the money arrived, then approves ----------
-  if (b.action === 'buys') {
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
-    const ids = (await redis('SMEMBERS', 'buys')) || [];
-    const buys = (await Promise.all(ids.map(getBuy))).filter(Boolean).sort((x, y) => (x.at < y.at ? 1 : -1)).slice(0, 300)
-      .map(({ keyHash, ...x }) => ({ ...x, amount: Number(x.amount) }));
-    return send(res, 200, { buys });
-  }
-  if (b.action === 'buy_approve' || b.action === 'buy_reject') {
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
-    const x = await getBuy(b.buy);
-    if (!x) return send(res, 404, { error: 'no_buy' });
-    if (x.status !== 'pending') return send(res, 409, { error: 'buy_done' });
-    if (b.action === 'buy_reject') {
-      const reason = String(b.reason || '').trim().slice(0, 200);
-      await redis('HSET', `buy:${x.id}`, 'status', 'rejected', 'reason', reason, 'decidedAt', now, 'decidedBy', me.name);
-      await redis('DEL', `utr:${x.utr}`);   // the UTR may be sent again (e.g. it was typed wrong)
-      if (Number(x.trial)) await redis('HINCRBY', `user:${x.userId}`, 'credits', -Number(x.trial));
-      return send(res, 200, { buy: { ...x, status: 'rejected', reason } });
-    }
-    await approveBuy(x, me.name);
-    return send(res, 200, { buy: { ...x, status: 'approved' }, user: view(await getUser(x.userId)) });
-  }
-
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
   const user = b.id ? await getUser(String(b.id)) : null;
   if (!user || !(isSuper || (user.role === 'user' && mayUse(user.village)))) return send(res, 404, { error: 'not_found' });
@@ -254,7 +224,6 @@ module.exports = route(async (req, res, b) => {
   }
 
   if (b.action === 'credits_add') {
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
     if (!isPrepaid(user)) return send(res, 400, { error: 'not_prepaid' });   // admin-made logins have a daily limit
     const n = parseInt(b.n, 10);
     if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
