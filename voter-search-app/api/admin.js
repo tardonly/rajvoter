@@ -26,14 +26,16 @@
 //                                               candidate is cleared and their phone is logged out
 //   action "credits_add", id, n      → {user}   n more searches (1–10000) for a login made by signing up (api/signup.js),
 //                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
-//   (in "list": reqs = those requests of this admin's people, open ones first, plus the ones approved in the last 30 days,
+//   (in "list": reqs = those requests of this admin's people, open ones first, plus the ones approved or rejected in the last 30 days,
 //    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with खोज जोड़ें)
 //   and for the superadmin collected: [{by, name, rs, n, count}] payments collected so far by each admin (all time)
 //   action "req_get", rid            → {req}    a pack request (api/signup.js 'request') of a person this admin manages:
 //                                               {id, user, village, n, rs, created, status 'open' | 'done', doneAt, doneN,
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
-//                                               a done request → already_done with {req}
+//                                               a done or rejected request → already_done with {req}
+//   action "req_reject", rid         → {req}    closes an open request without searches (status 'rejected', doneAt,
+//                                               doneByName = who rejected it)
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
 //   backup: {n, at} | null}]   one entry per village of this admin and per candidate of it (cand '' = the village's own
 //   marks): how many slips carry each mark, overall and per ward.
@@ -129,9 +131,9 @@ module.exports = route(async (req, res, b) => {
       const r = { id }, arr = reqRows[i] || [];
       for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
       const u = mine.get(r.user);
-      if (!u || (r.status === 'done' && !(r.doneAt > since))) return null;
+      if (!u || (r.status !== 'open' && !(r.doneAt > since))) return null;
       return { ...reqView(r), name: u.name, phone: u.phone || '' };
-    }).filter(Boolean).sort((a, b) => (a.status !== b.status ? (a.status === 'open' ? -1 : 1)
+    }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
       : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
     // superadmin: payments collected so far, per admin (pay:* in _lib.js)
     let collected;
@@ -238,11 +240,17 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { user: view(await getUser(id)), password });
   }
 
-  if (b.action === 'req_get' || b.action === 'req_approve') {
+  if (b.action === 'req_get' || b.action === 'req_approve' || b.action === 'req_reject') {
     const r = await getReq(b.rid), u = r ? await getUser(r.user) : null;
     if (!u || !(isSuper || (u.role === 'user' && mayUse(u.village)))) return send(res, 404, { error: 'not_found' });
     if (b.action === 'req_get') return send(res, 200, { req: reqView(r) });
-    if (r.status === 'done') return send(res, 409, { error: 'already_done', req: reqView(r) });
+    if (r.status !== 'open') return send(res, 409, { error: 'already_done', req: reqView(r) });
+    if (b.action === 'req_reject') {   // e.g. no payment came: closed without searches, kept in the list as rejected
+      if (!(await redis('SET', `reqlock:${r.id}`, me.id, 'NX'))) return send(res, 409, { error: 'already_done', req: reqView(await getReq(r.id)) });
+      await redis('HSET', `req:${r.id}`, 'status', 'rejected', 'doneAt', now, 'doneBy', me.id, 'doneByName', me.name);
+      await redis('DEL', `reqopen:${u.id}:${r.n}`);
+      return send(res, 200, { req: reqView(await getReq(r.id)) });
+    }
     if (!isPrepaid(u)) return send(res, 400, { error: 'not_prepaid' });
     const n = parseInt(b.n, 10);
     if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });

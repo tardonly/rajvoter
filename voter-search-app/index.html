@@ -68,7 +68,7 @@
   .paybox a.btn { display: block; text-decoration: none; }
   .buyback { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 10px; font-size: 13px; color: var(--accent); font-weight: 600; }
   .buyback { justify-self: start; }
-  .paybox a.wabtn { background: #16a34a; }   /* WhatsApp green */
+  .paybox .wabtn { display: block; width: 100%; background: #16a34a; }   /* WhatsApp green */
   .packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 6px 0 4px; }
   .pack { display: grid; gap: 1px; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 8px 6px; color: var(--ink); }
   .pack b { font-size: 15px; }
@@ -1590,32 +1590,33 @@ function buyMoreButton() {
 // search packs: [searches, ₹]. The same list is in admin.html, which shows the price when the admin approves.
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // WhatsApp to this login's admin (else the app's number) asking for a pack, with this login's name, number and village
-// and the request's link <site>/<id>: the request is kept on the server (api/signup.js 'request'; asking for the same
-// pack again sends the same one) and the link opens the admin page at it, so it shows nothing about the person itself.
-// The request is made when the pack is picked, so the tap opens WhatsApp straight away; the window then closes.
+// and the request's link <site>/<id>: the request is made on the server only when the button is tapped (api/signup.js
+// 'request'; asking for the same pack again sends the same one) and the link opens the admin page at it, so it shows
+// nothing about the person itself. A tab is opened at once (a tap may open one; after waiting for the server it may
+// not), then sent to WhatsApp; the window then closes.
 function buyWhatsApp(cls, [n, rs]) {
-  const a = el('a', cls, L('⏳ …', '⏳ …'));
-  a.target = '_blank'; a.rel = 'noopener';
-  const load = async () => {
-    a.removeAttribute('href'); a.textContent = L('⏳ …', '⏳ …');
+  const label = L(`💬 ${n} खोज (₹${rs}) WhatsApp पर मंगाएं`, `💬 Ask for ${n} searches (₹${rs}) on WhatsApp`);
+  const a = el('button', cls, label); a.type = 'button';
+  a.addEventListener('click', async () => {
+    if (a.disabled) return;
+    const tab = window.open('', '_blank');
+    a.disabled = true; a.textContent = L('⏳ …', '⏳ …');
     const r = await api('signup', { action: 'request', token: token(), n });
+    a.disabled = false; a.textContent = label;
     if (!r.id) {
+      if (tab) tab.close();
       a.textContent = r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
         : L('⚠ अनुरोध नहीं बना — दोबारा दबाएं', '⚠ Could not make the request — tap again');
       return;
     }
     const phone = MY_PHONE ? `+${MY_PHONE.slice(0, 2)} ${MY_PHONE.slice(2)}` : '';
     const link = `${location.origin}/${r.id}`;
-    a.textContent = L(`💬 ${n} खोज (₹${rs}) WhatsApp पर मंगाएं`, `💬 Ask for ${n} searches (₹${rs}) on WhatsApp`);
-    a.href = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
+    const url = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
       `नमस्ते, मुझे Voter Search में ${n} खोज चाहिए (₹${rs})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
       `Hello, I would like ${n} searches in Voter Search (₹${rs}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\n${link}`));
-  };
-  a.addEventListener('click', (e) => {
-    if (!a.href) { e.preventDefault(); if (!a.textContent.startsWith('⏳')) load(); return; }
-    setTimeout(buyClose, 0);   // WhatsApp opens; the window is done
+    buyClose();
+    if (tab) { tab.opener = null; tab.location.href = url; } else location.href = url;
   });
-  load();
   return a;
 }
 function buyOpen() {

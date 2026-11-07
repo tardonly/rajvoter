@@ -169,18 +169,20 @@ the ₹1-a-search price is shown struck through beside the pack price, with the 
 opens a chat with that person's admin: the village admin who made the login, else the village's admin with the fewest
 villages, using the mobile number on the admin's login (so give every village admin a number); with no such admin, the
 app's number (`WHATSAPP` in `index.html`); the window closes once WhatsApp opens. The message has the person's name,
-mobile number, village, the pack and a link `/<request id>` (8 digits): the request is kept on the server
+mobile number, village, the pack and a link `/<request id>` (8 digits): the request is made only when that button is
+tapped (picking a pack makes none) and kept on the server
 (`req:<id>`, `api/signup.js` "request"; asking for the same pack again sends the same request) and the link itself
 shows nothing about the person. Opening it shows the admin login (only an admin password gets in; a person's own
 password is refused), then the **✅ खोज मंज़ूरी** popup: the person with **📞 कॉल करें** and WhatsApp buttons to follow
 up, their searches so far, the pack asked for and what the payment should be. The admin picks or changes the number to
 match the payment and taps **✓ भुगतान मिल गया — N खोज जोड़ें**; a WhatsApp button then tells the person. A request
 can be approved once: opening its link later shows "यह अनुरोध मंज़ूर हो चुका है" with how many, by whom and when, and
-nothing to do. An admin of another village gets "not in your list" (the server checks too). Older messages with
+nothing to do. **✕ अस्वीकार करें** (tap twice) closes a request without searches, e.g. when no payment came; its link then
+shows "अस्वीकार किया जा चुका है" and a WhatsApp button can tell the person. An admin of another village gets "not in your list" (the server checks too). Older messages with
 `/admin#add=<mobile>&n=<searches>&v=<village>` still open the same popup.
 The **🔔** button at the top of the admin page shows how many requests are waiting (red number, refreshed every
-minute) and lists the admin's requests: waiting ones first, then those approved in the last 30 days with the ₹
-collected and which admin collected it; tapping one opens the approval popup. Every approval records the payment
+minute) and lists the admin's requests: waiting ones first, then those approved (with the ₹ collected and which admin collected
+it) or rejected in the last 30 days; tapping one opens the approval popup. Every approval records the payment
 (the pack's price, else ₹1 a search); searches added by hand with **खोज जोड़ें** are recorded too, as "हाथ से जोड़ी".
 The superadmin also sees **💰 कुल वसूली**: the total collected, and per admin the ₹, number of payments and searches
 (all time, `pay:*` keys). Searches can also be added by hand in

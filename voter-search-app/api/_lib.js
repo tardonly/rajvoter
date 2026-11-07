@@ -260,7 +260,8 @@ async function adminPhone(u) {
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // A request for a pack (api/signup.js 'request'), key req:<id>, id = 8 digits: the WhatsApp message to the admin carries
 // only <site>/<id>, which opens the admin page; the admin logs in and sees who asked (api/admin.js 'req_get'). Fields:
-// user, village, n, rs, created, status 'open' | 'done', and once approved doneAt, doneN, doneBy, doneByName.
+// user, village, n, rs, created, status 'open' | 'done' | 'rejected', and once approved or rejected doneAt, doneBy,
+// doneByName (approved: also doneN, doneRs).
 // reqopen:<user>:<n> → that person's open request for that pack, so asking again sends the same link.
 // what a number of searches costs: the pack's price, else ₹1 a search
 const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
