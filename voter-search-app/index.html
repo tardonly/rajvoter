@@ -1595,8 +1595,8 @@ function buyWhatsApp(cls, [n, rs]) {
   const phone = MY_PHONE ? `+${MY_PHONE.slice(0, 2)} ${MY_PHONE.slice(2)}` : '';
   const link = `${location.origin}/admin#add=${MY_PHONE}&n=${n}&v=${SLUG}`;
   a.href = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
-    `नमस्ते, मुझे Voter Search में ${n} खोज चाहिए (₹${rs})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\nभुगतान मिलने पर यहाँ से खोज जोड़ें:\n${link}`,
-    `Hello, I would like ${n} searches in Voter Search (₹${rs}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\nAfter the payment, add them here:\n${link}`));
+    `नमस्ते, मुझे Voter Search में ${n} खोज चाहिए (₹${rs})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
+    `Hello, I would like ${n} searches in Voter Search (₹${rs}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\n${link}`));
   a.target = '_blank'; a.rel = 'noopener';
   return a;
 }
