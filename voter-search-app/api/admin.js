@@ -26,6 +26,9 @@
 //                                               candidate is cleared and their phone is logged out
 //   action "credits_add", id, n      → {user}   n more searches (1–10000) for a login made by signing up (api/signup.js),
 //                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
+//   (in "list": reqs = those requests of this admin's people, open ones first, plus the ones approved in the last 30 days,
+//    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with खोज जोड़ें)
+//   and for the superadmin collected: [{by, name, rs, n, count}] payments collected so far by each admin (all time)
 //   action "req_get", rid            → {req}    a pack request (api/signup.js 'request') of a person this admin manages:
 //                                               {id, user, village, n, rs, created, status 'open' | 'done', doneAt, doneN,
 //                                               doneByName}; someone else's → not_found
@@ -39,7 +42,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, getReq, paidKey, normPhone, redis, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
+const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, packPrice, newReqId, getReq, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
@@ -63,6 +66,12 @@ const view = (u) => ({
   logins: Number(u.logins || 0), kicks: Number(u.kicks || 0),
 });
 
+// a pack request as the admin page sees it
+const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand }) =>
+  ({ id, user, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
+    doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1' });
+const REQ_DONE_DAYS = 30;   // approved requests stay in the list this long
+
 module.exports = route(async (req, res, b) => {
   if (!process.env.ADMIN_PASSWORD) return send(res, 500, { error: 'server', detail: 'ADMIN_PASSWORD not set' });
   if (await blocked(req, 'admin')) return send(res, 429, { error: 'too_many' });
@@ -77,6 +86,24 @@ module.exports = route(async (req, res, b) => {
   const now = new Date().toISOString();
   // a new login made by this admin: fields = role and village(s) [and more]; → {id, password}
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
+  // n bought searches for person u, paid to this admin: the searches, and the payment recorded in request r (none: a
+  // hand-added one, which gets its own request, already approved) and in the pay:* totals (see _lib.js)
+  async function paidIn(u, n, r) {
+    const rs = packPrice(n);
+    await redis('HINCRBY', `user:${u.id}`, 'credits', n);
+    await redis('HSET', `user:${u.id}`, 'bought', '1');
+    await redis('SREM', 'free', u.id);
+    const id = r ? r.id : await newReqId();
+    if (!r) {
+      await redis('HSET', `req:${id}`, 'user', u.id, 'village', u.village, 'n', n, 'rs', rs, 'created', now, 'hand', '1');
+      await redis('SADD', 'reqs', id);
+    }
+    await redis('HSET', `req:${id}`, 'status', 'done', 'doneAt', now, 'doneN', n, 'doneRs', rs, 'doneBy', me.id, 'doneByName', me.name);
+    await redis('HINCRBY', 'pay:rs', me.id, rs);
+    await redis('HINCRBY', 'pay:n', me.id, n);
+    await redis('HINCRBY', 'pay:count', me.id, 1);
+    await redis('HSET', 'pay:name', me.id, me.name);
+  }
 
   if (b.action === 'list') {
     const ids = (await redis('SMEMBERS', 'users')) || [];
@@ -93,7 +120,30 @@ module.exports = route(async (req, res, b) => {
     const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0, marked: marked[u.id] || 0 });
     const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
-    return send(res, 200, { me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins,
+    // pack requests of the people this admin manages: every open one, and those approved in the last REQ_DONE_DAYS
+    const mine = new Map(all.filter((u) => u.role === 'user' && mayUse(u.village)).map((u) => [u.id, u]));
+    const reqIds = (await redis('SMEMBERS', 'reqs')) || [];
+    const reqRows = reqIds.length ? await pipeline(reqIds.map((id) => ['HGETALL', `req:${id}`])) : [];
+    const since = new Date(Date.now() - REQ_DONE_DAYS * 864e5).toISOString();
+    const reqs = reqIds.map((id, i) => {
+      const r = { id }, arr = reqRows[i] || [];
+      for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
+      const u = mine.get(r.user);
+      if (!u || (r.status === 'done' && !(r.doneAt > since))) return null;
+      return { ...reqView(r), name: u.name, phone: u.phone || '' };
+    }).filter(Boolean).sort((a, b) => (a.status !== b.status ? (a.status === 'open' ? -1 : 1)
+      : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
+    // superadmin: payments collected so far, per admin (pay:* in _lib.js)
+    let collected;
+    if (isSuper) {
+      const [rsH, nH, cH, nameH] = await pipeline(['pay:rs', 'pay:n', 'pay:count', 'pay:name'].map((k) => ['HGETALL', k]));
+      const h = (arr) => { const o = {}; for (let k = 0; k < (arr || []).length; k += 2) o[arr[k]] = arr[k + 1]; return o; };
+      const rsO = h(rsH), nO = h(nH), cO = h(cH), nameO = h(nameH);
+      const nameOf = (id) => (id === 'admin' ? 'सुपर एडमिन' : (all.find((u) => u.id === id) || {}).name || nameO[id] || id);
+      collected = Object.keys(rsO).map((id) => ({ by: id, name: nameOf(id), rs: Number(rsO[id]) || 0, n: Number(nO[id]) || 0, count: Number(cO[id]) || 0 }))
+        .sort((a, b) => b.rs - a.rs);
+    }
+    return send(res, 200, { me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }
@@ -191,20 +241,15 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'req_get' || b.action === 'req_approve') {
     const r = await getReq(b.rid), u = r ? await getUser(r.user) : null;
     if (!u || !(isSuper || (u.role === 'user' && mayUse(u.village)))) return send(res, 404, { error: 'not_found' });
-    const out = ({ id, user: uid, village: v, n, rs, created, status, doneAt, doneN, doneByName }) =>
-      ({ id, user: uid, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0, doneByName: doneByName || '' });
-    if (b.action === 'req_get') return send(res, 200, { req: out(r) });
-    if (r.status === 'done') return send(res, 409, { error: 'already_done', req: out(r) });
+    if (b.action === 'req_get') return send(res, 200, { req: reqView(r) });
+    if (r.status === 'done') return send(res, 409, { error: 'already_done', req: reqView(r) });
     if (!isPrepaid(u)) return send(res, 400, { error: 'not_prepaid' });
     const n = parseInt(b.n, 10);
     if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
-    if (!(await redis('SET', `reqlock:${r.id}`, me.id, 'NX'))) return send(res, 409, { error: 'already_done', req: out(await getReq(r.id)) });
-    await redis('HINCRBY', `user:${u.id}`, 'credits', n);
-    await redis('HSET', `user:${u.id}`, 'bought', '1');
-    await redis('SREM', 'free', u.id);
-    await redis('HSET', `req:${r.id}`, 'status', 'done', 'doneAt', now, 'doneN', n, 'doneBy', me.id, 'doneByName', me.name);
+    if (!(await redis('SET', `reqlock:${r.id}`, me.id, 'NX'))) return send(res, 409, { error: 'already_done', req: reqView(await getReq(r.id)) });
+    await paidIn(u, n, r);
     await redis('DEL', `reqopen:${u.id}:${r.n}`);
-    return send(res, 200, { req: out(await getReq(r.id)), user: view(await getUser(u.id)) });
+    return send(res, 200, { req: reqView(await getReq(r.id)), user: view(await getUser(u.id)) });
   }
 
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
@@ -251,9 +296,7 @@ module.exports = route(async (req, res, b) => {
     if (!isPrepaid(user)) return send(res, 400, { error: 'not_prepaid' });   // admin-made logins have a daily limit
     const n = parseInt(b.n, 10);
     if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
-    await redis('HINCRBY', `user:${user.id}`, 'credits', n);
-    await redis('HSET', `user:${user.id}`, 'bought', '1');
-    await redis('SREM', 'free', user.id);
+    await paidIn(user, n, null);
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

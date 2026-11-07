@@ -177,7 +177,13 @@ up, their searches so far, the pack asked for and what the payment should be. Th
 match the payment and taps **✓ भुगतान मिल गया — N खोज जोड़ें**; a WhatsApp button then tells the person. A request
 can be approved once: opening its link later shows "यह अनुरोध मंज़ूर हो चुका है" with how many, by whom and when, and
 nothing to do. An admin of another village gets "not in your list" (the server checks too). Older messages with
-`/admin#add=<mobile>&n=<searches>&v=<village>` still open the same popup. Searches can also be added by hand in
+`/admin#add=<mobile>&n=<searches>&v=<village>` still open the same popup.
+The **🔔** button at the top of the admin page shows how many requests are waiting (red number, refreshed every
+minute) and lists the admin's requests: waiting ones first, then those approved in the last 30 days with the ₹
+collected and which admin collected it; tapping one opens the approval popup. Every approval records the payment
+(the pack's price, else ₹1 a search); searches added by hand with **खोज जोड़ें** are recorded too, as "हाथ से जोड़ी".
+The superadmin also sees **💰 कुल वसूली**: the total collected, and per admin the ₹, number of payments and searches
+(all time, `pay:*` keys). Searches can also be added by hand in
 the people list: **खोज जोड़ें** with the pack sizes or any number. Those logins are tagged "₹ भुगतान किया" and no
 longer count for the free sign-up tiers.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit.

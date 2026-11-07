@@ -12,8 +12,7 @@
 //     open request for the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const crypto = require('crypto');
-const { PACKS, getReq, whoIs, isPrepaid, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
+const { PACKS, newReqId, getReq, whoIs, isPrepaid, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -75,10 +74,10 @@ module.exports = route(async (req, res, b) => {
     const k = `reqs:${me.id}:${today()}`;
     if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
     await redis('EXPIRE', k, 86400);
-    let id;
-    do id = String(crypto.randomInt(10000000, 100000000)); while (await getReq(id));
+    const id = await newReqId();
     await redis('HSET', `req:${id}`, 'user', me.id, 'village', me.village, 'n', pk[0], 'rs', pk[1], 'created', new Date().toISOString(), 'status', 'open');
     await redis('SET', openKey, id);
+    await redis('SADD', 'reqs', id);   // every request, for the admin page's list (api/admin.js "list")
     return send(res, 200, { id });
   }
   send(res, 400, { error: 'action' });

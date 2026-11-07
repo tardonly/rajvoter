@@ -262,6 +262,17 @@ const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // only <site>/<id>, which opens the admin page; the admin logs in and sees who asked (api/admin.js 'req_get'). Fields:
 // user, village, n, rs, created, status 'open' | 'done', and once approved doneAt, doneN, doneBy, doneByName.
 // reqopen:<user>:<n> → that person's open request for that pack, so asking again sends the same link.
+// what a number of searches costs: the pack's price, else ₹1 a search
+const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
+async function newReqId() {   // 8 digits no request has yet
+  let id;
+  do id = String(crypto.randomInt(10000000, 100000000)); while (await getReq(id));
+  return id;
+}
+// Payments: each approved request (and each hand-added "खोज जोड़ें" on the admin page, which gets an approved request of
+// its own with hand: '1') records doneRs = the ₹ collected and doneBy / doneByName = the admin who collected it;
+// pay:rs, pay:n, pay:count (hashes, admin id → total ₹, searches, payments) and pay:name (admin id → name) add them up
+// for the superadmin.
 const isReqId = (id) => /^\d{8}$/.test(String(id || ''));
 async function getReq(id) {
   if (!isReqId(id)) return null;
@@ -318,6 +329,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE_TIERS, credits, isPrepaid, phoneLogins, adminPhone, PACKS, isReqId, getReq, paidKey, creditsLeft, normPhone,
+  FREE_TIERS, credits, isPrepaid, phoneLogins, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

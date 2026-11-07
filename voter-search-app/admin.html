@@ -144,6 +144,22 @@
   #apBody .price { font-size: 15px; }
   #apBody .bad { color: var(--bad); font-weight: 600; }
   #apBody a.btn { text-decoration: none; text-align: center; display: inline-block; }
+  .bell { position: relative; padding: 9px 12px; }
+  .bell .bn { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+    background: #dc2626; color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+  #apBody .reqs { display: grid; gap: 8px; max-height: 70vh; overflow-y: auto; }
+  #apBody .req { display: grid; gap: 2px; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    background: #fff; color: var(--ink); font: inherit; cursor: pointer; }
+  #apBody .req.open { border-color: #f59e0b; background: #fffbeb; }
+  #apBody .req .t { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+  #apBody .req .st { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  #apBody .req.open .st { color: #b45309; }
+  #apBody .req.fin .st { color: #15803d; }
+  #apBody .req .sub { margin: 0; }
+  #apBody .paid { border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; }
+  #apBody .paid .pt { font-weight: 700; font-size: 16px; }
+  #apBody .paid .pr { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; border-top: 1px dashed #bbf7d0; padding-top: 4px; }
+  #apBody .paid .pr small { grid-column: 1 / -1; color: var(--muted); }
   #apBody .done { color: #15803d; font-size: 17px; font-weight: 700; }
   .modal .x, .newpw .x { border: 0; background: none; font-size: 18px; color: var(--muted); padding: 0 4px; }
   .newpw { margin: 0 0 14px; }
@@ -211,7 +227,7 @@
 
   <section id="panel" class="hidden">
     <div class="bar"><div><h1>एडमिन</h1><div class="sub" id="meText" style="margin:0"></div></div>
-      <span class="row"><button class="langbtn" data-lang type="button"></button><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
+      <span class="row"><button class="btn ghost bell" id="bell" type="button" title="खोज अनुरोध" aria-label="खोज अनुरोध">🔔<span class="bn hidden" id="bellN"></span></button><button class="langbtn" data-lang type="button"></button><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
 
     <nav class="tabs" id="tabs" role="tablist">
       <button type="button" data-tab="people">व्यक्ति</button>
@@ -394,7 +410,7 @@ const store = {
   set(v) { try { localStorage.setItem('tok:admin', v); } catch (e) {} },
   del() { try { localStorage.removeItem('tok:admin'); sessionStorage.removeItem('tok:admin'); } catch (e) {} },
 };
-let token = store.get(), me = null, users = [], admins = [], filter = 'on', villages = {}, progress = [], cands = [];
+let token = store.get(), me = null, users = [], admins = [], reqs = [], collected = null, filter = 'on', villages = {}, progress = [], cands = [];
 const MSG = EN ? {
   wrong: 'Wrong password', too_many: 'Too many wrong passwords — try again in 15 minutes',
   not_admin: 'This is not an admin password', retired: 'This password has been switched off',
@@ -450,7 +466,7 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 
 // ---------- login ----------
 function showLogin(msg) {
-  token = null; me = null; users = []; admins = [];
+  token = null; me = null; users = []; admins = []; reqs = []; showBell();
   $('list').innerHTML = ''; $('adminList').innerHTML = ''; $('newPw').classList.add('hidden'); $('addModal').classList.add('hidden');
   $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
   $('loginMsg').textContent = msg || '';
@@ -460,7 +476,7 @@ async function openPanel() {
   const r = await api({ action: 'list' });
   if (['wrong', 'retired', 'logged_out', 'other_device'].includes(r.error)) { store.del(); return showLogin(MSG[r.error]); }
   if (r.error) return showLogin(errText(r));
-  me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; progress = r.progress || [];
+  me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; progress = r.progress || []; reqs = r.reqs || []; collected = r.collected || null; showBell();
   for (const v of r.villageList || []) villages[v.slug] = v;
   setup(); showMarks(r);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
@@ -520,9 +536,56 @@ async function approveFromLink() {
   }
   approveView(u, req);
 }
+// 🔔 in the header: how many requests wait for approval; tapping it lists them (open ones first, then the approved ones
+// of the last 30 days, from api/admin.js "list"), and a request opens the approval view
+function showBell() {
+  const open = reqs.filter((r) => r.status === 'open').length;
+  $('bellN').textContent = open > 99 ? '99+' : open;
+  $('bellN').classList.toggle('hidden', !open);
+}
+function reqList() {
+  const body = $('apBody');
+  $('apTitle').textContent = L('🔔 खोज अनुरोध', '🔔 Search requests');
+  $('apModal').classList.remove('hidden');
+  const open = reqs.filter((r) => r.status === 'open').length;
+  const head = el('div', 'sub', reqs.length ? L(`${open} मंज़ूरी बाकी · ${reqs.length - open} मंज़ूर (पिछले 30 दिन)`, `${open} waiting · ${reqs.length - open} approved (last 30 days)`)
+    : L('अभी कोई अनुरोध नहीं।', 'No requests yet.'));
+  const list = el('div', 'reqs');
+  for (const r of reqs) {
+    const b = el('button', `req ${r.status === 'open' ? 'open' : 'fin'}`); b.type = 'button';
+    const t = el('div', 't'); t.append(el('span', null, r.name),
+      el('span', 'st', r.status === 'open' ? L('⏳ बाकी', '⏳ Waiting') : L(`✓ ${r.doneN} जोड़ी गईं`, `✓ ${r.doneN} added`)));
+    b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n} खोज · ₹${r.rs}`, `Asked: ${r.n} searches · ₹${r.rs}`)
+      : L(`₹${r.doneRs} वसूले — ${r.doneByName}${r.hand ? ' (हाथ से जोड़ी)' : ''}`, `₹${r.doneRs} collected — ${r.doneByName}${r.hand ? ' (added by hand)' : ''}`)),
+      el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`));
+    b.addEventListener('click', () => {
+      const u = users.find((x) => x.id === r.user);
+      $('apTitle').textContent = L('✅ खोज मंज़ूरी', '✅ Approve searches');
+      if (u) approveView(u, r, true); else $('apBody').replaceChildren(el('div', 'bad', MSG.not_found));
+    });
+    list.append(b);
+  }
+  body.replaceChildren(head, ...collectedBox(), list);
+}
+// superadmin: money collected so far by each admin (all time; api/admin.js "list" collected)
+function collectedBox() {
+  if (!collected) return [];
+  const box = el('div', 'paid');
+  const total = collected.reduce((t, c) => t + c.rs, 0), n = collected.reduce((t, c) => t + c.n, 0);
+  box.append(el('div', 'pt', L(`💰 कुल वसूली: ₹${total} · ${n} खोज`, `💰 Collected in all: ₹${total} · ${n} searches`)));
+  if (!collected.length) box.append(el('div', 'sub', L('अभी कोई भुगतान नहीं।', 'No payments yet.')));
+  for (const c of collected) {
+    const row = el('div', 'pr');
+    row.append(el('span', null, c.name), el('b', null, `₹${c.rs}`),
+      el('small', null, L(`${c.count} भुगतान · ${c.n} खोज`, `${c.count} payment${c.count === 1 ? '' : 's'} · ${c.n} searches`)));
+    box.append(row);
+  }
+  return [box];
+}
+$('bell').addEventListener('click', reqList);
 // the approval popup for one request: who asked (with call and WhatsApp buttons to follow up), their searches so far,
 // and either the pack to approve or, for a request already approved, when and by whom
-function approveView(u, req) {
+function approveView(u, req, fromList) {
   const body = $('apBody');
   const contact = el('div', 'row');
   if (u.phone) {
@@ -535,12 +598,17 @@ function approveView(u, req) {
     el('div', 'sub', `${showPhone(u.phone)} · ${vName(u.village)}${u.bought ? L(' · पहले भी खरीदा', ' · bought before') : L(' · पहली खरीद', ' · first purchase')}`
       + (req.id ? L(` · अनुरोध #${req.id}, ${fmt(req.created)}`, ` · request #${req.id}, ${fmt(req.created)}`) : '')),
     contact, useMeter(u)];
+  if (fromList) {
+    const back = el('button', 'btn ghost', L('← सभी अनुरोध', '← All requests')); back.type = 'button';
+    back.addEventListener('click', reqList);
+    head.unshift(back);
+  }
   const ask = el('div', 'ask'), askPrice = packPrice(req.n);
   ask.append(L('माँगी: ', 'Asked for: '), el('b', null, L(`${req.n} खोज`, `${req.n} searches`)),
     askPrice != null ? ` · ₹${askPrice}` : L(' · (यह पैक सूची में नहीं)', ' · (not one of the packs)'));
   if (req.status === 'done') {
     body.replaceChildren(...head, ask, el('div', 'done', L(`✓ यह अनुरोध मंज़ूर हो चुका है: ${req.doneN} खोज जोड़ी गईं`, `✓ This request is already approved: ${req.doneN} searches added`)),
-      el('div', 'sub', `${req.doneByName ? `${req.doneByName} · ` : ''}${fmt(req.doneAt)}`));
+      el('div', 'sub', L(`₹${req.doneRs} वसूले — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`, `₹${req.doneRs} collected — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`)));
     return;
   }
   if (!u.prepaid) { body.replaceChildren(...head, el('div', 'bad', MSG.not_prepaid)); return; }
@@ -567,7 +635,7 @@ function approveView(u, req) {
   go.addEventListener('click', async () => {
     go.disabled = true; msg.textContent = '';
     const r = req.id ? await api({ action: 'req_approve', rid: req.id, n }) : await api({ action: 'credits_add', id: u.id, n });
-    if (r.error === 'already_done' && r.req) { await refresh(); return approveView(users.find((x) => x.id === u.id) || u, r.req); }
+    if (r.error === 'already_done' && r.req) { await refresh(); return approveView(users.find((x) => x.id === u.id) || u, r.req, fromList); }
     if (r.error) { msg.textContent = errText(r); go.disabled = false; return; }
     await refresh();
     const fresh = users.find((x) => x.id === u.id) || u;
@@ -579,6 +647,7 @@ function approveView(u, req) {
     tell.target = '_blank'; tell.rel = 'noopener';
     body.replaceChildren(el('div', 'who', u.name),
       el('div', 'done', L(`✓ ${n} खोज जोड़ दी गईं · अब ${left} बाकी`, `✓ ${n} searches added · ${left} left now`)), contact, tell);
+    if (fromList) body.prepend(head[0]);   // ← सभी अनुरोध
     $('listMsg').textContent = L(`✓ ${u.name} को ${n} खोज मिल गईं`, `✓ ${u.name} got ${n} searches`);
   });
   body.replaceChildren(...head, ask, el('div', 'sub', L('भुगतान देखकर संख्या चुनें या बदलें:', 'Check the payment, then pick or change the number:')),
@@ -649,7 +718,7 @@ const checkedIn = (box) => [...box.querySelectorAll('input:checked')].map((c) =>
 async function refresh() {
   const r = await api({ action: 'list' });
   if (r.error) { $('listMsg').textContent = errText(r); return; }
-  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; render(); showMarks(r);
+  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; reqs = r.reqs || []; collected = r.collected || null; showBell(); render(); showMarks(r);
 }
 $('reload').addEventListener('click', refresh);
 // polling day: keep the numbers fresh while the page is open
