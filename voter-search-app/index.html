@@ -1008,8 +1008,8 @@ async function toggleFamily(r, d, btn) {
   box.append(fh);
   const slips = new Map([[r.box, d]]);
   for (const v of others) { const s = slip(v, false, true); slips.set(v.box, s); box.append(s); }
-  if (others.length) {   // वंश वृक्ष: the house's voters arranged by father and husband, above the slips
-    const tb = el('button', 'tbtn', L('🌳 वंश वृक्ष', '🌳 Family tree')); tb.type = 'button';
+  if (others.length) {   // वंशावली: the house's voters arranged by father and husband, above the slips
+    const tb = el('button', 'tbtn', L('🌳 वंशावली', '🌳 Family tree')); tb.type = 'button';
     let tree = null, pb = null;
     tb.addEventListener('click', () => {
       if (tree) { tree.remove(); if (pb) pb.remove(); tree = pb = null; tb.classList.remove('on'); return; }
@@ -1027,7 +1027,7 @@ async function toggleFamily(r, d, btn) {
   btn.classList.add('on'); btn.textContent = L('परिवार छुपाएं', 'Hide family');
 }
 
-// ---------- वंश वृक्ष: who is whose father / husband inside one house, from the names on the slips ----------
+// ---------- वंशावली: who is whose father / husband inside one house, from the names on the slips ----------
 // Every voter names one relative (पिता / पति / माता). That name is looked for among the other voters of the house:
 // same name (spellings folded, endings like कुमार / सिंह / राम allowed to differ) and a believable age (a parent at least
 // 15 years older, or 12 when nobody fits at 15; a husband within 25 years). When two people fit equally well the link is
@@ -1193,13 +1193,13 @@ function treeView(rows, slipOf) {
 }
 function printTree(tree, r) {
   const area = $('printArea'); area.innerHTML = '';
-  const head = el('div', 'fth', L(`${VILLAGE.name} · वार्ड ${r.ward} · मकान नं. ${r.house} · वंश वृक्ष`,
+  const head = el('div', 'fth', L(`${VILLAGE.name} · वार्ड ${r.ward} · मकान नं. ${r.house} · वंशावली`,
     `${vn(VILLAGE)} · ward ${r.ward} · house no. ${r.house} · family tree`));
   const c = tree.cloneNode(true);
   c.querySelectorAll('.fnote').forEach((n, i, all) => { if (i < all.length - 1) n.remove(); });
   area.append(head, c);
   const old = document.title;
-  document.title = L(`वंश वृक्ष ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family tree ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`);
+  document.title = L(`वंशावली ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family tree ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`);
   window.addEventListener('afterprint', () => { document.title = old; area.innerHTML = ''; }, { once: true });
   window.print();
 }
