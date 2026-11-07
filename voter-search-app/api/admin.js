@@ -130,8 +130,8 @@ module.exports = route(async (req, res, b) => {
     const reqs = reqIds.map((id, i) => {
       const r = { id }, arr = reqRows[i] || [];
       for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
-      const u = mine.get(r.user);
-      if (!u || (r.status !== 'open' && !(r.doneAt > since))) return null;
+      const u = mine.get(r.user);   // a person of my villages, asking from one of my villages
+      if (!u || !mayUse(r.village) || (r.status !== 'open' && !(r.doneAt > since))) return null;
       return { ...reqView(r), name: u.name, phone: u.phone || '' };
     }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
       : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
@@ -242,7 +242,7 @@ module.exports = route(async (req, res, b) => {
 
   if (b.action === 'req_get' || b.action === 'req_approve' || b.action === 'req_reject') {
     const r = await getReq(b.rid), u = r ? await getUser(r.user) : null;
-    if (!u || !(isSuper || (u.role === 'user' && mayUse(u.village)))) return send(res, 404, { error: 'not_found' });
+    if (!u || !(isSuper || (u.role === 'user' && mayUse(u.village) && mayUse(r.village)))) return send(res, 404, { error: 'not_found' });
     if (b.action === 'req_get') return send(res, 200, { req: reqView(r) });
     if (r.status !== 'open') return send(res, 409, { error: 'already_done', req: reqView(r) });
     if (b.action === 'req_reject') {   // e.g. no payment came: closed without searches, kept in the list as rejected

@@ -182,7 +182,8 @@ shows "अस्वीकार किया जा चुका है" and a W
 `/admin#add=<mobile>&n=<searches>&v=<village>` still open the same popup.
 The **🔔** button at the top of the admin page shows how many requests are waiting (red number, refreshed every
 minute) and lists the admin's requests: waiting ones first, then those approved (with the ₹ collected and which admin collected
-it) or rejected in the last 30 days; tapping one opens the approval popup. Every approval records the payment
+it) or rejected in the last 30 days; tapping one opens the approval popup; **↻** in the popup fetches them again. A village admin sees only requests made
+from their own villages by people of those villages; the superadmin sees all. Every approval records the payment
 (the pack's price, else ₹1 a search); searches added by hand with **खोज जोड़ें** are recorded too, as "हाथ से जोड़ी".
 The superadmin also sees **💰 कुल वसूली**: the total collected, and per admin the ₹, number of payments and searches
 (all time, `pay:*` keys). Searches can also be added by hand in
