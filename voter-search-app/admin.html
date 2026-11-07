@@ -583,14 +583,16 @@ function reqList() {
   }
   body.replaceChildren(head, ...collectedBox(), list);
 }
-// superadmin: money collected so far by each admin (all time; api/admin.js "list" collected)
+// money collected so far (all time; api/admin.js "list" collected): the superadmin sees each admin, a village admin
+// only their own total
 function collectedBox() {
   if (!collected) return [];
-  const box = el('div', 'paid');
-  const total = collected.reduce((t, c) => t + c.rs, 0), n = collected.reduce((t, c) => t + c.n, 0);
-  box.append(el('div', 'pt', L(`💰 कुल वसूली: ₹${total} · ${n} खोज`, `💰 Collected in all: ₹${total} · ${n} searches`)));
+  const box = el('div', 'paid'), all = me.role === 'super';
+  const total = collected.reduce((t, c) => t + c.rs, 0), n = collected.reduce((t, c) => t + c.n, 0), count = collected.reduce((t, c) => t + c.count, 0);
+  box.append(el('div', 'pt', all ? L(`💰 कुल वसूली: ₹${total} · ${n} खोज`, `💰 Collected in all: ₹${total} · ${n} searches`)
+    : L(`💰 आपकी वसूली: ₹${total} · ${count} भुगतान · ${n} खोज`, `💰 You collected: ₹${total} · ${count} payment${count === 1 ? '' : 's'} · ${n} searches`)));
   if (!collected.length) box.append(el('div', 'sub', L('अभी कोई भुगतान नहीं।', 'No payments yet.')));
-  for (const c of collected) {
+  if (all) for (const c of collected) {
     const row = el('div', 'pr');
     row.append(el('span', null, c.name), el('b', null, `₹${c.rs}`),
       el('small', null, L(`${c.count} भुगतान · ${c.n} खोज`, `${c.count} payment${c.count === 1 ? '' : 's'} · ${c.n} searches`)));

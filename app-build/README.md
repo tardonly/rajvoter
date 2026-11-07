@@ -186,7 +186,7 @@ it) or rejected in the last 30 days; tapping one opens the approval popup; **↻
 from their own villages by people of those villages; the superadmin sees all. Every approval records the payment
 (the pack's price, else ₹1 a search); searches added by hand with **खोज जोड़ें** are recorded too, as "हाथ से जोड़ी".
 The superadmin also sees **💰 कुल वसूली**: the total collected, and per admin the ₹, number of payments and searches
-(all time, `pay:*` keys). Searches can also be added by hand in
+(all time, `pay:*` keys); a village admin sees **💰 आपकी वसूली**, only what they collected themself. Searches can also be added by hand in
 the people list: **खोज जोड़ें** with the pack sizes or any number. Those logins are tagged "₹ भुगतान किया" and no
 longer count for the free sign-up tiers.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit.

@@ -28,7 +28,8 @@
 //                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
 //   (in "list": reqs = those requests of this admin's people, open ones first, plus the ones approved or rejected in the last 30 days,
 //    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with खोज जोड़ें)
-//   and for the superadmin collected: [{by, name, rs, n, count}] payments collected so far by each admin (all time)
+//   and collected: [{by, name, rs, n, count}] payments collected so far by each admin (all time); a village admin gets
+//   only their own row
 //   action "req_get", rid            → {req}    a pack request (api/signup.js 'request') of a person this admin manages:
 //                                               {id, user, village, n, rs, created, status 'open' | 'done', doneAt, doneN,
 //                                               doneByName}; someone else's → not_found
@@ -135,15 +136,15 @@ module.exports = route(async (req, res, b) => {
       return { ...reqView(r), name: u.name, phone: u.phone || '' };
     }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
       : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
-    // superadmin: payments collected so far, per admin (pay:* in _lib.js)
+    // payments collected so far, per admin (pay:* in _lib.js); a village admin sees only their own
     let collected;
-    if (isSuper) {
+    {
       const [rsH, nH, cH, nameH] = await pipeline(['pay:rs', 'pay:n', 'pay:count', 'pay:name'].map((k) => ['HGETALL', k]));
       const h = (arr) => { const o = {}; for (let k = 0; k < (arr || []).length; k += 2) o[arr[k]] = arr[k + 1]; return o; };
       const rsO = h(rsH), nO = h(nH), cO = h(cH), nameO = h(nameH);
       const nameOf = (id) => (id === 'admin' ? 'सुपर एडमिन' : (all.find((u) => u.id === id) || {}).name || nameO[id] || id);
       collected = Object.keys(rsO).map((id) => ({ by: id, name: nameOf(id), rs: Number(rsO[id]) || 0, n: Number(nO[id]) || 0, count: Number(cO[id]) || 0 }))
-        .sort((a, b) => b.rs - a.rs);
+        .filter((c) => isSuper || c.by === me.id).sort((a, b) => b.rs - a.rs);
     }
     return send(res, 200, { me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
