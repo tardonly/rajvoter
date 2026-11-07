@@ -28,8 +28,13 @@
 //                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
 //   (in "list": reqs = those requests of this admin's people, open ones first, plus the ones approved or rejected in the last 30 days,
 //    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with खोज जोड़ें)
-//   and collected: [{by, name, rs, n, count}] payments collected so far by each admin (all time); a village admin gets
-//   only their own row
+//   and collected: [{by, name, rs, n, count, settled, due}] payments collected so far by each admin (all time), what they
+//   handed over to the superadmin and what is still due; a village admin gets only their own row
+//   action "ledger" [, by]            → {ledger}  हिसाब of one admin (by = admin id, superadmin only; a village admin gets
+//                                               their own): {by, name, collected, settled, due, pays: [{id, at, name, phone,
+//                                               village, n, rs, hand}], settles: [{id, at, rs, note, byName}]}, newest first
+//   action "settle_add", by, rs [, note] → {ledger}   superadmin: ₹rs received from that admin
+//   action "settle_remove", by, sid      → {ledger}   superadmin: takes back a handover recorded by mistake
 //   action "req_get", rid            → {req}    a pack request (api/signup.js 'request') of a person this admin manages:
 //                                               {id, user, village, n, rs, created, status 'open' | 'done', doneAt, doneN,
 //                                               doneByName}; someone else's → not_found
@@ -136,14 +141,16 @@ module.exports = route(async (req, res, b) => {
       return { ...reqView(r), name: u.name, phone: u.phone || '' };
     }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
       : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
-    // payments collected so far, per admin (pay:* in _lib.js); a village admin sees only their own
+    // payments collected so far, per admin (pay:* in _lib.js), and what each has handed over; a village admin sees only
+    // their own
     let collected;
     {
-      const [rsH, nH, cH, nameH] = await pipeline(['pay:rs', 'pay:n', 'pay:count', 'pay:name'].map((k) => ['HGETALL', k]));
+      const [rsH, nH, cH, nameH, sH] = await pipeline(['pay:rs', 'pay:n', 'pay:count', 'pay:name', 'pay:settled'].map((k) => ['HGETALL', k]));
       const h = (arr) => { const o = {}; for (let k = 0; k < (arr || []).length; k += 2) o[arr[k]] = arr[k + 1]; return o; };
-      const rsO = h(rsH), nO = h(nH), cO = h(cH), nameO = h(nameH);
+      const rsO = h(rsH), nO = h(nH), cO = h(cH), nameO = h(nameH), sO = h(sH);
       const nameOf = (id) => (id === 'admin' ? 'सुपर एडमिन' : (all.find((u) => u.id === id) || {}).name || nameO[id] || id);
-      collected = Object.keys(rsO).map((id) => ({ by: id, name: nameOf(id), rs: Number(rsO[id]) || 0, n: Number(nO[id]) || 0, count: Number(cO[id]) || 0 }))
+      collected = Object.keys(rsO).map((id) => ({ by: id, name: nameOf(id), rs: Number(rsO[id]) || 0, n: Number(nO[id]) || 0, count: Number(cO[id]) || 0,
+        settled: Number(sO[id]) || 0, due: id === 'admin' ? 0 : (Number(rsO[id]) || 0) - (Number(sO[id]) || 0) }))
         .filter((c) => isSuper || c.by === me.id).sort((a, b) => b.rs - a.rs);
     }
     return send(res, 200, { me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
@@ -259,6 +266,47 @@ module.exports = route(async (req, res, b) => {
     await paidIn(u, n, r);
     await redis('DEL', `reqopen:${u.id}:${r.n}`);
     return send(res, 200, { req: reqView(await getReq(r.id)), user: view(await getUser(u.id)) });
+  }
+
+  // हिसाब: one admin's payments (every approved request and hand-added pack) and the money they handed over to the
+  // superadmin (hash settle:<admin id>: entry id → JSON {id, at, rs, note, byName}; pay:settled adds them up), so the two can be
+  // squared: due = collected − handed over. The superadmin's own collections need no handover.
+  if (b.action === 'ledger' || b.action === 'settle_add' || b.action === 'settle_remove') {
+    const by = isSuper ? String(b.by || '') : me.id;
+    const admin = by === 'admin' ? null : await getUser(by);
+    if (by !== 'admin' && !(admin && admin.role === 'admin')) return send(res, 404, { error: 'not_found' });
+    const sKey = `settle:${by}`;
+    if (b.action !== 'ledger') {
+      if (!isSuper) return send(res, 403, { error: 'super_only' });
+      if (by === 'admin') return send(res, 400, { error: 'action' });
+      if (b.action === 'settle_add') {
+        const rs = parseInt(b.rs, 10);
+        if (!(rs > 0 && rs <= 10000000)) return send(res, 400, { error: 'bad_amount' });
+        const entry = { id: crypto.randomBytes(4).toString('hex'), at: now, rs, note: String(b.note || '').trim().slice(0, 100), byName: me.name };
+        await redis('HSET', sKey, entry.id, JSON.stringify(entry));
+        await redis('HINCRBY', 'pay:settled', by, rs);
+      } else {
+        const sid = String(b.sid || ''), raw = sid && ((await redis('HMGET', sKey, sid)) || [])[0];
+        if (raw && Number(await redis('HDEL', sKey, sid)) === 1) await redis('HINCRBY', 'pay:settled', by, -JSON.parse(raw).rs);
+      }
+    }
+    const reqIds = (await redis('SMEMBERS', 'reqs')) || [];
+    const rows = reqIds.length ? await pipeline(reqIds.map((id) => ['HGETALL', `req:${id}`])) : [];
+    const done = reqIds.map((id, i) => {
+      const r = { id }, arr = rows[i] || [];
+      for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
+      return r;
+    }).filter((r) => r.status === 'done' && r.doneBy === by);
+    const people = new Map(await Promise.all([...new Set(done.map((r) => r.user))].map(async (id) => [id, await getUser(id)])));
+    const pays = done.map((r) => {
+      const u = people.get(r.user) || {};
+      return { id: r.id, at: r.doneAt, name: u.name || '?', phone: u.phone || '', village: r.village, n: Number(r.doneN) || 0, rs: Number(r.doneRs) || 0, hand: r.hand === '1' };
+    }).sort((x, y) => (x.at < y.at ? 1 : -1));
+    const sArr = (await redis('HGETALL', sKey)) || [];
+    const settles = sArr.filter((x, k) => k % 2).map((x) => JSON.parse(x)).sort((x, y) => (x.at < y.at ? 1 : -1));
+    const collectedRs = pays.reduce((t, p) => t + p.rs, 0), settled = settles.reduce((t, x) => t + x.rs, 0);
+    return send(res, 200, { ledger: { by, name: admin ? admin.name : 'सुपर एडमिन', collected: collectedRs, settled,
+      due: by === 'admin' ? 0 : collectedRs - settled, pays, settles } });
   }
 
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone

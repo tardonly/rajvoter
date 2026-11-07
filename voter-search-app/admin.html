@@ -162,6 +162,17 @@
   #apBody .paid .pt { font-weight: 700; font-size: 16px; }
   #apBody .paid .pr { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; border-top: 1px dashed #bbf7d0; padding-top: 4px; }
   #apBody .paid .pr small { grid-column: 1 / -1; color: var(--muted); }
+  #apBody .paid button.pr { border: 0; border-top: 1px dashed #bbf7d0; background: none; font: inherit; color: var(--ink); text-align: left;
+    padding: 4px 0 0; cursor: pointer; }
+  #apBody .paid .pr.owes small, #apBody .owes, #apBody .paid .due { color: #b45309; font-weight: 700; }
+  #apBody .figs { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 8px; font-size: 13px; color: var(--muted); }
+  #apBody .figs b { font-size: 18px; color: var(--ink); }
+  #apBody .figs b.owes { color: #b45309; }
+  #apBody .settle { display: grid; gap: 6px; }
+  #apBody .req.set { background: #eff6ff; border-color: #bfdbfe; cursor: default; }
+  #apBody .req.set .st { color: #1d4ed8; }
+  #apBody div.req { cursor: default; }
+  #apBody .req .rejbtn { justify-self: start; padding: 3px 10px; font-size: 13px; margin-top: 4px; }
   #apBody .rejbtn { color: var(--bad); border-color: #fecaca; }
   #apBody .done { color: #15803d; font-size: 17px; font-weight: 700; }
   #apRefresh { font-size: 20px; }
@@ -424,7 +435,7 @@ const MSG = EN ? {
   phone: 'Mobile number is not right — type a 10-digit number',
   no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
-  bad_credits: 'Type how many searches to add (1 to 10000)', not_prepaid: 'This login has a daily limit instead', already_done: 'This request is already handled',
+  bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login has a daily limit instead', already_done: 'This request is already handled',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
 } : {
   wrong: 'पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
@@ -435,7 +446,7 @@ const MSG = EN ? {
   phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
-  bad_credits: 'कितनी खोज जोड़नी हैं, 1 से 10000 के बीच लिखें', not_prepaid: 'इस खाते की रोज़ की सीमा है', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
+  bad_credits: 'कितनी खोज जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते की रोज़ की सीमा है', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
 };
 // 919876543210 → "+91 98765 43210"
@@ -584,21 +595,94 @@ function reqList() {
   body.replaceChildren(head, ...collectedBox(), list);
 }
 // money collected so far (all time; api/admin.js "list" collected): the superadmin sees each admin, a village admin
-// only their own total
+// only their own total; with what was handed over to the superadmin and what is still due. A tap opens the हिसाब.
 function collectedBox() {
   if (!collected) return [];
   const box = el('div', 'paid'), all = me.role === 'super';
-  const total = collected.reduce((t, c) => t + c.rs, 0), n = collected.reduce((t, c) => t + c.n, 0), count = collected.reduce((t, c) => t + c.count, 0);
+  const sum = (k) => collected.reduce((t, c) => t + c[k], 0), total = sum('rs'), n = sum('n'), count = sum('count');
   box.append(el('div', 'pt', all ? L(`💰 कुल वसूली: ₹${total} · ${n} खोज`, `💰 Collected in all: ₹${total} · ${n} searches`)
     : L(`💰 आपकी वसूली: ₹${total} · ${count} भुगतान · ${n} खोज`, `💰 You collected: ₹${total} · ${count} payment${count === 1 ? '' : 's'} · ${n} searches`)));
+  if (all && sum('due')) box.append(el('div', 'due', L(`एडमिन से आना बाकी: ₹${sum('due')}`, `Still to come from admins: ₹${sum('due')}`)));
   if (!collected.length) box.append(el('div', 'sub', L('अभी कोई भुगतान नहीं।', 'No payments yet.')));
-  if (all) for (const c of collected) {
-    const row = el('div', 'pr');
-    row.append(el('span', null, c.name), el('b', null, `₹${c.rs}`),
-      el('small', null, L(`${c.count} भुगतान · ${c.n} खोज`, `${c.count} payment${c.count === 1 ? '' : 's'} · ${c.n} searches`)));
+  const settledLine = (c) => (c.by === 'admin' ? L('आपके पास', 'with you')
+    : L(`जमा ₹${c.settled} · बाकी ₹${c.due}`, `handed over ₹${c.settled} · due ₹${c.due}`));
+  for (const c of collected) {
+    if (!all && c.by !== me.id) continue;
+    const row = el('button', 'pr'); row.type = 'button';
+    row.append(el('span', null, all ? c.name : L('📒 हिसाब देखें', '📒 See the ledger')), el('b', null, all ? `₹${c.rs}` : '›'),
+      el('small', null, (all ? L(`${c.count} भुगतान · ${c.n} खोज · `, `${c.count} payment${c.count === 1 ? '' : 's'} · ${c.n} searches · `) : '') + settledLine(c)));
+    if (c.due) row.classList.add('owes');
+    row.addEventListener('click', () => ledgerView(c.by));
     box.append(row);
   }
   return [box];
+}
+// हिसाब (api/admin.js "ledger"): every payment one admin collected and every handover to the superadmin, newest first,
+// with the balance still due. The superadmin records a handover here (₹ received, a note) or takes one back.
+async function ledgerView(by, got) {
+  apAgain = () => ledgerView(by);
+  const body = $('apBody'), all = me.role === 'super';
+  $('apTitle').textContent = L('📒 हिसाब', '📒 Ledger');
+  const back = el('button', 'btn ghost', L('← सभी अनुरोध', '← All requests')); back.type = 'button';
+  back.addEventListener('click', reqList);
+  if (!got) { body.replaceChildren(back, el('div', 'sub', L('आ रहा है…', 'Loading…'))); got = await api({ action: 'ledger', by }); }
+  if (got.error) { body.replaceChildren(back, el('div', 'bad', errText(got))); return; }
+  const g = got.ledger, self = g.by === 'admin';
+  const sum = el('div', 'paid');
+  sum.append(el('div', 'pt', g.name));
+  const fig = el('div', 'figs');
+  fig.append(el('div', null, L('वसूली', 'Collected')), el('div', null, L('जमा किया', 'Handed over')), el('div', null, L('बाकी', 'Due')),
+    el('b', null, `₹${g.collected}`), el('b', null, self ? '—' : `₹${g.settled}`), el('b', g.due ? 'owes' : null, self ? '—' : `₹${g.due}`));
+  sum.append(fig);
+  if (self) sum.append(el('div', 'sub', L('आपकी अपनी वसूली — किसी को जमा नहीं करनी।', 'Your own collections — nothing to hand over.')));
+  const parts = [back, sum];
+  if (all && !self) {   // ₹ received from this admin
+    const form = el('div', 'settle'), rs = el('input'), note = el('input'), go = el('button', 'btn full'), msg = el('div', 'msg');
+    rs.type = 'number'; rs.min = 1; rs.inputMode = 'numeric'; rs.placeholder = '₹'; rs.value = g.due > 0 ? g.due : '';
+    note.placeholder = L('नोट (जैसे नकद / UPI)', 'Note (e.g. cash / UPI)'); note.maxLength = 100;
+    go.type = 'button';
+    const show = () => { const v = parseInt(rs.value, 10) || 0; go.disabled = !(v > 0); go.textContent = v > 0 ? L(`✓ ₹${v} मिले — जमा करें`, `✓ Received ₹${v} — record it`) : L('राशि डालें', 'Enter the amount'); };
+    rs.addEventListener('input', show);
+    go.addEventListener('click', async () => {
+      go.disabled = true; msg.textContent = '';
+      const r = await api({ action: 'settle_add', by, rs: parseInt(rs.value, 10), note: note.value });
+      if (r.error) { msg.textContent = errText(r); go.disabled = false; return; }
+      await refresh();
+      ledgerView(by, r);
+    });
+    form.append(el('div', 'sub', L(`${g.name} से पैसे मिले तो यहाँ लिखें:`, `Money received from ${g.name}? Record it here:`)), rs, note, go, msg);
+    parts.push(form);
+    show();
+  }
+  const items = [...g.pays.map((p) => ({ p, at: p.at })), ...g.settles.map((x) => ({ x, at: x.at }))].sort((a, b) => (a.at < b.at ? 1 : -1));
+  const list = el('div', 'reqs');
+  for (const it of items) {
+    const row = el('div', `req ${it.p ? 'fin' : 'set'}`), t = el('div', 't');
+    if (it.p) {
+      const p = it.p;
+      t.append(el('span', null, p.name), el('span', 'st', `+ ₹${p.rs}`));
+      row.append(t, el('div', 'sub', `${showPhone(p.phone)} · ${vName(p.village)} · ${L(`${p.n} खोज`, `${p.n} searches`)}${p.hand ? L(' (हाथ से)', ' (by hand)') : ` · #${p.id}`} · ${fmt(p.at)}`));
+    } else {
+      const x = it.x;
+      t.append(el('span', null, L('सुपर एडमिन को जमा', 'Handed to the superadmin')), el('span', 'st', `− ₹${x.rs}`));
+      row.append(t, el('div', 'sub', [x.note, x.byName, fmt(x.at)].filter(Boolean).join(' · ')));
+      if (all) {   // taken back with a second tap
+        const del = el('button', 'btn ghost rejbtn', L('✕ हटाएं', '✕ Remove')); del.type = 'button';
+        del.addEventListener('click', async () => {
+          if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = L('✕ पक्का? दोबारा दबाएं', '✕ Sure? Tap again'); return; }
+          del.disabled = true;
+          const r = await api({ action: 'settle_remove', by, sid: x.id });
+          if (r.error) { del.textContent = errText(r); return; }
+          await refresh();
+          ledgerView(by, r);
+        });
+        row.append(del);
+      }
+    }
+    list.append(row);
+  }
+  if (!items.length) list.append(el('div', 'sub', L('अभी कुछ नहीं।', 'Nothing yet.')));
+  body.replaceChildren(...parts, list);
 }
 $('bell').addEventListener('click', reqList);
 // the approval popup for one request: who asked (with call and WhatsApp buttons to follow up), their searches so far,
