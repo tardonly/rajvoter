@@ -164,6 +164,11 @@ The login page asks only for the **mobile number** first:
 - Signed-up logins have no daily limit: their searches (free + paid) never run out by date. When none are left, the
   **🛒 और खोज** window opens by itself (after logging in, or on the next search); the **🛒 और खोज खरीदें** button opens
   it any time.
+- Logins made by an admin can buy searches too: they keep their daily limit, and the bought searches are used only
+  once the day's are used up (counted for good under `paid:<id>`, like a sign-up's). The app shows **🛒 और खोज
+  खरीदें** to them as well, opens the window when the day's searches and bought ones are both used up, and the count
+  line says e.g. "आज की खोज पूरी · खरीदी 297 खोज बाकी". On the admin page they get both the limit box and **खोज जोड़ें**,
+  a "₹ खरीदी · N खोज बाकी" badge, and the bought searches used beside today's.
 
 More searches: the **🛒 और खोज खरीदें** window offers packs (`PACKS` in `index.html`, `admin.html` and `api/_lib.js`;
 the ₹1-a-search price is shown struck through beside the pack price, with the saving): 100 searches
@@ -198,7 +203,8 @@ the money, the superadmin records it there (₹ and a note such as cash / UPI; a
 (`settle:<admin id>` and `pay:settled` keys). Searches can also be added by hand in
 the people list: **खोज जोड़ें** with the pack sizes or any number. Those logins are tagged "₹ भुगतान किया" and no
 longer count for the free sign-up tiers.
-Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit.
+Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit; admin-made
+logins show their daily limit and, once they have bought some, their bought searches as well.
 
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).

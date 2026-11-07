@@ -440,7 +440,7 @@ const MSG = EN ? {
   phone: 'Mobile number is not right — type a 10-digit number',
   no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
-  bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login has a daily limit instead', already_done: 'This request is already handled',
+  bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
 } : {
   wrong: 'पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
@@ -451,7 +451,7 @@ const MSG = EN ? {
   phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
-  bad_credits: 'कितनी खोज जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते की रोज़ की सीमा है', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
+  bad_credits: 'कितनी खोज जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में खोज नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
 };
 // 919876543210 → "+91 98765 43210"
@@ -746,7 +746,7 @@ function approveView(u, req, fromList) {
       $('apBody').append(tell);
     }
   });
-  if (!u.prepaid) { body.replaceChildren(...head, el('div', 'bad', MSG.not_prepaid), ...(req.id ? [no] : [])); return; }
+  if (!u.canBuy) { body.replaceChildren(...head, el('div', 'bad', MSG.not_prepaid), ...(req.id ? [no] : [])); return; }
   let n = req.n;
   const packs = el('div', 'packs'), inp = el('input'), price = el('div', 'price'), go = el('button', 'btn full'), msg = el('div', 'msg');
   inp.type = 'number'; inp.min = 1; inp.max = 10000; inp.inputMode = 'numeric';
@@ -1279,7 +1279,8 @@ function useMeter(u) {
     const paid = u.prepaid, limit = paid ? u.credits : u.limit, used = (paid ? u.paidUsed : u.searchesToday) || 0;
     const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0, left = Math.max(0, limit - used);
     text.textContent = paid ? L(`खोज (मुफ़्त + खरीदी): ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches (free + bought): ${used} / ${limit} (${pct}%) · ${left} left`)
-      : L(`आज की खोज: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches today: ${used} / ${limit} (${pct}%) · ${left} left`);
+      : L(`आज की खोज: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches today: ${used} / ${limit} (${pct}%) · ${left} left`)
+        + (u.credits ? L(` · खरीदी: ${u.paidUsed || 0} / ${u.credits} इस्तेमाल`, ` · bought: ${u.paidUsed || 0} / ${u.credits} used`) : '');   // used after the day's
     fill.style.width = pct + '%';
     const share = limit ? used / limit : 0;
     box.className = 'usage' + (share > 0.8 || used >= limit ? ' high' : share >= 0.5 ? ' mid' : '');
@@ -1300,6 +1301,7 @@ function person(u) {
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
   if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} खोज`, `₹ paid · ${u.credits} searches in all`)
     : L(`${u.credits} खोज · अभी कुछ नहीं खरीदा`, `${u.credits} searches · nothing bought yet`)));
+  else if (!isAdmin && u.credits) nm.append(el('span', 'badge paid', L(`₹ खरीदी · ${Math.max(0, u.credits - (u.paidUsed || 0))} खोज बाकी`, `₹ bought · ${Math.max(0, u.credits - (u.paidUsed || 0))} searches left`)));
   if (!isAdmin && !u.prepaid && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की खोज सीमा पूरी', 'Today\'s search limit used up')));
   if (!isAdmin && candOf(u.cand)) nm.append(el('span', 'badge cand', `${L('उम्मीदवार', 'Candidate')} ${candOf(u.cand).name}`));
   // who made this login: the admin's current name when they are in the list, else the name kept when it was made
@@ -1326,8 +1328,8 @@ function person(u) {
   const use = el('div', 'info', L(`${u.marked} पर्चियों पर इनके निशान`, `Their marks on ${u.marked} slips`));
   const meter = isAdmin ? null : useMeter(u);
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [creditsBox(u, refresh)]
-    : [limitBox(u, 'listMsg', meter.update)]),
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
+    ...(u.canBuy ? [creditsBox(u, refresh)] : []),   // a daily limit, and bought searches for after it
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');

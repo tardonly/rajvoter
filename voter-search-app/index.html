@@ -645,7 +645,7 @@ function signOut(msg) {
   if (DEMO) { store.del('tok:demo'); return demoLogin(); }   // a demo phone just gets a fresh demo login
   if (msg === MSG.other_village) return showLock(msg);   // keep an admin's login for their own villages
   store.del(tokKey);
-  searchId = ''; searchesLeft = null;
+  searchId = ''; searchesLeft = null; BOUGHT = null;
   $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('qMark').value = ''; $('count').textContent = '';
   lockStepTo('phone');
   showLock(msg);
@@ -832,7 +832,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  PREPAID = !!r.prepaid; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 });
@@ -846,14 +846,19 @@ let seq = 0, shown = 0, total = 0, lastBox = 0, lastAsked = '', timer;   // last
 // The server counts searches per day, not requests: it gives this phone a search id, sent back with every request of the
 // same search (more letters, the next page, परिवार). Clearing the search box drops it, so the next name is a new search.
 let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: a signed-up login's free + bought searches, counted for good
+// CAN_BUY: any user login may buy searches; BOUGHT: a login with a daily limit, its bought searches left (used after the day's)
+let CAN_BUY = false, BOUGHT = null;
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
   if (r.left != null) searchesLeft = r.left;
+  if (r.bought != null) BOUGHT = r.bought;
   if (DEMO) demoBar();
   buyMoreButton();
 }
-const leftNote = () => (PREPAID ? ''   // shown on its own badge (buyMoreButton)
-  : !DEMO && searchesLeft != null && searchesLeft < 20 ? L(` · आज ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left today`) : '');
+const leftNote = () => (PREPAID || DEMO || searchesLeft == null || searchesLeft >= 20 ? ''   // prepaid: shown on its own badge (buyMoreButton)
+  : BOUGHT ? (searchesLeft ? L(` · आज ${searchesLeft} + खरीदी ${BOUGHT} खोज बाकी`, ` · ${searchesLeft} today + ${BOUGHT} bought searches left`)
+    : L(` · आज की खोज पूरी · खरीदी ${BOUGHT} खोज बाकी`, ` · today's searches used · ${BOUGHT} bought searches left`))
+  : L(` · आज ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left today`));
 function hint() {
   $('results').innerHTML = '<div class="hint">' + L('नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
@@ -892,7 +897,7 @@ async function search(more = false, force = false) {
   if (mine !== seq) return;                       // a newer search has started
   if (r.error) lastAsked = '';                    // let the same search be tried again
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
-  if (r.error === 'credits') buyOpen();   // no searches left: the buying window
+  if (r.error === 'credits' || (r.error === 'limit' && CAN_BUY && !DEMO)) buyOpen();   // no searches left: the buying window
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   if (r.perms) updatePerms(r.perms);
   total = r.total;
@@ -1590,7 +1595,7 @@ const SIGN_ERR = {
 // a signed-up login: how many searches are left (amber at 3 or fewer, red at none) and the button for more
 function buyMoreButton() {
   const show = PREPAID && !DEMO && searchesLeft != null, b = $('leftBadge');
-  $('buyMore').classList.toggle('hidden', !PREPAID || DEMO);
+  $('buyMore').classList.toggle('hidden', !CAN_BUY || DEMO);
   b.classList.toggle('hidden', !show);
   if (!show) return;
   b.textContent = L(`🔍 ${searchesLeft} खोज बाकी`, `🔍 ${searchesLeft} searches left`);
@@ -1649,13 +1654,15 @@ function buyOpen() {
     });
     packs.append(b);
   }
-  box.append(el('b', null, searchesLeft === 0 ? L('आपकी सभी खोज इस्तेमाल हो गईं', 'All your searches are used') : L('और खोज चाहिए?', 'Need more searches?')),
+  const none = searchesLeft === 0 && !BOUGHT;
+  box.append(el('b', null, !none ? L('और खोज चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी खोज इस्तेमाल हो गईं', 'All your searches are used')
+    : L('आज की सभी खोज इस्तेमाल हो गईं', 'All of today\'s searches are used')),
     el('div', 'k', L('कितनी खोज चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे खोज जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
       'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
     packs, wa);
   $('buyBody').replaceChildren(box);
-  $('buyNote').textContent = L('खरीदी खोज कभी खत्म नहीं होतीं। एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
-    'Bought searches never expire. One search = typing a name until the box is cleared; family and more pages are free.');
+  $('buyNote').textContent = L('खरीदी खोज कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की खोज पूरी होने के बाद इस्तेमाल होती हैं') + '। एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
+    'Bought searches never expire' + (PREPAID ? '' : ' — they are used once the day\'s searches are used') + '. One search = typing a name until the box is cleared; family and more pages are free.');
   $('buyPop').classList.remove('hidden');
 }
 function buyClose() {
@@ -1753,7 +1760,7 @@ async function openVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
-  PREPAID = !!r.prepaid; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 }

@@ -7,13 +7,13 @@
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
 //   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free}
 //   POST {action: 'signup', village, phone, name} → {password, token, name, phone, villages, list, perms, prepaid, left, adminPhone}
-//   POST {action: 'request', token, village, n} → {id, phone}   a signed-up login asks for a pack of n searches (PACKS in
+//   POST {action: 'request', token, village, n} → {id, phone}   any user login (signed up or made by an admin) asks for a pack of n searches (PACKS in
 //     _lib.js): the request is kept (req:<id>, see getReq) with to = the admin it goes to (adminFor in _lib.js), and its
 //     id goes in the WhatsApp message to phone ('' = the app's own number) as <site>/<id>; the person's open request for
 //     the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { PACKS, adminFor, newReqId, getReq, whoIs, isPrepaid, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
+const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -61,13 +61,13 @@ module.exports = route(async (req, res, b) => {
     await redis('HSET', `user:${id}`, 'session', sid, 'sessionAt', now, 'sessionIp', clientIp(req), 'sessionDevice', deviceName(req),
       'lastSeen', now, 'logins', 1);
     return send(res, 200, { password, token: makeToken(id, sid), name, phone, role: 'user', admin: false, villages: [v.slug],
-      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, left: free,
+      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, canBuy: true, left: free,
       adminPhone: await adminPhone({ village: v.slug }) });
   }
   if (b.action === 'request') {
     const me = await whoIs(b.token, b.village);
     if (!me || me.status !== 'ok') return send(res, 401, { error: 'login' });
-    if (!isPrepaid(me)) return send(res, 400, { error: 'not_prepaid' });
+    if (!canBuy(me)) return send(res, 400, { error: 'not_prepaid' });
     const pk = PACKS.find(([n]) => n === Number(b.n));
     if (!pk) return send(res, 400, { error: 'bad_credits' });
     const openKey = `reqopen:${me.id}:${pk[0]}`, old = await getReq(await redis('GET', openKey));

@@ -52,7 +52,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, packPrice, newReqId, getReq, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
+const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
@@ -69,7 +69,7 @@ const view = (u) => ({
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   ownVillages: u.ownVillages || [], samitis: u.samitis || [],   // an admin's: given one by one, and whole samitis
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
-  by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
+  by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), canBuy: canBuy(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
@@ -126,7 +126,7 @@ module.exports = route(async (req, res, b) => {
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
     const day = today();
     const searches = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, Number(await redis('GET', `searches:${id}:${day}`)) || 0])));
-    const paid = Object.fromEntries(await Promise.all(all.filter((u) => isPrepaid(u)).map(async (u) => [u.id, Number(await redis('GET', paidKey(u.id))) || 0])));
+    const paid = Object.fromEntries(await Promise.all(all.filter((u) => isPrepaid(u) || credits(u) > 0).map(async (u) => [u.id, Number(await redis('GET', paidKey(u.id))) || 0])));
     const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0, marked: marked[u.id] || 0 });
     const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
@@ -263,7 +263,7 @@ module.exports = route(async (req, res, b) => {
       await redis('DEL', `reqopen:${u.id}:${r.n}`);
       return send(res, 200, { req: reqView(await getReq(r.id)) });
     }
-    if (!isPrepaid(u)) return send(res, 400, { error: 'not_prepaid' });
+    if (!canBuy(u)) return send(res, 400, { error: 'not_prepaid' });
     const n = parseInt(b.n, 10);
     if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
     if (!(await redis('SET', `reqlock:${r.id}`, me.id, 'NX'))) return send(res, 409, { error: 'already_done', req: reqView(await getReq(r.id)) });
@@ -354,7 +354,7 @@ module.exports = route(async (req, res, b) => {
   }
 
   if (b.action === 'credits_add') {
-    if (!isPrepaid(user)) return send(res, 400, { error: 'not_prepaid' });   // admin-made logins have a daily limit
+    if (!canBuy(user)) return send(res, 400, { error: 'not_prepaid' });   // admins and demo logins
     const n = parseInt(b.n, 10);
     if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
     await paidIn(user, n, null);

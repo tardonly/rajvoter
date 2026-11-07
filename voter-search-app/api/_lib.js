@@ -235,9 +235,11 @@ const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); ret
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
 // Prepaid searches (api/signup.js): a user who signed up by themselves (field "self") may start "credits" searches in all
 // (free ones from signing up plus paid ones an admin added, api/admin.js "credits_add") instead of a daily limit; they
-// never expire and are counted for good under "paid:<id>". Users made by an admin have a daily limit instead.
+// never expire and are counted for good under "paid:<id>". Users made by an admin have a daily limit instead, and may
+// buy searches too (canBuy): theirs are used once the day's limit is used up, and counted the same way.
 const credits = (u) => Number(u && u.credits) || 0;
-const isPrepaid = (u) => !!u && u.role === 'user' && !u.demo && (u.self === '1' || credits(u) > 0);
+const isPrepaid = (u) => !!u && u.role === 'user' && !u.demo && u.self === '1';
+const canBuy = (u) => !!u && u.role === 'user' && !u.demo;
 // free searches for a login made by signing up: the first 10 sign-ups not yet given paid searches get 10 each, the next
 // 10 get 2, and after that none (set "free" in api/signup.js holds those logins; "credits_add" takes a login out of it)
 const FREE_TIERS = [{ upTo: 10, searches: 10 }, { upTo: 20, searches: 2 }];
@@ -349,6 +351,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE_TIERS, credits, isPrepaid, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, normPhone,
+  FREE_TIERS, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

@@ -18,7 +18,8 @@
 // used dailyLimit() today. A ward's slips (all) always count 1. The id is made and checked here, so a phone can't
 // skip counting. A demo phone (see DEMO in _lib.js) gets DEMO.searches in all, and its internet address DEMO.perIp a
 // day: the answer is then 'demo_limit'. A signed-up user (isPrepaid in _lib.js) has their credits in all
-// instead of a daily limit: the answer is then 'credits' once they are used up.
+// instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
+// searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
 const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
 const { load, search, family, publicFields } = require('./_search.js');
@@ -36,8 +37,9 @@ async function countSearch(req, user, b, named) {
   const prepaid = isPrepaid(user);   // signed-up / bought searches: counted for good, not per day
   const dayKey = user.demo ? `searches:${user.id}` : prepaid ? paidKey(user.id) : `searches:${user.id}:${today()}`, findKey = `find:${user.id}`;
   const ipKey = `demo-ip:${clientIp(req)}:${today()}`;
-  const [, perMinute, curRaw, usedRaw, ipRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
-    ['GET', findKey], ['GET', dayKey], ['GET', ipKey]]);
+  const extra = !user.demo && !prepaid && credits(user) > 0;   // a daily limit plus bought searches, used after the day's
+  const [, perMinute, curRaw, usedRaw, ipRaw, paidRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
+    ['GET', findKey], ['GET', dayKey], ['GET', ipKey], ['GET', paidKey(user.id)]]);
   if (perMinute > PER_MINUTE) return { error: 'slow_down' };
   if (user.admin) return {};
 
@@ -45,7 +47,7 @@ async function countSearch(req, user, b, named) {
   try { cur = curRaw && JSON.parse(curRaw); } catch (e) { /* start a new search */ }
   const q = { name: fold(b.name), rel: fold(b.rel), ward: String(b.ward || '') };
   const now = Date.now(), limit = user.demo ? DEMO.searches : prepaid ? credits(user) : dailyLimit(user);
-  let used = Number(usedRaw) || 0;
+  let used = Number(usedRaw) || 0, paidUsed = Number(paidRaw) || 0;
   const goesOn = !b.all && cur && b.searchId && b.searchId === cur.id && cur.n < SEARCH_STEPS
     && now - cur.start < SEARCH_MINUTES * 60e3
     && (b.family ? true : named ? follows(q.name, cur.name) && follows(q.rel, cur.rel) : !cur.name && !cur.rel && q.ward === cur.ward);
@@ -53,16 +55,21 @@ async function countSearch(req, user, b, named) {
   let next = cur;
   if (goesOn) next = { ...cur, n: cur.n + 1, ...(b.family ? {} : q) };
   else {
-    if (used >= limit || (user.demo && Number(ipRaw) >= DEMO.perIp)) return { error: user.demo ? 'demo_limit' : prepaid ? 'credits' : 'limit', left: 0 };
-    used++;
-    if (!prepaid) cmds.push(['SET', dayKey, 0, 'EX', (user.demo ? 30 : 3) * 86400, 'NX']);
-    cmds.push(['INCR', dayKey]);
+    if (used >= limit && extra && paidUsed < credits(user)) { paidUsed++; cmds.push(['INCR', paidKey(user.id)]); }
+    else {
+      if (used >= limit || (user.demo && Number(ipRaw) >= DEMO.perIp)) {
+        return { error: user.demo ? 'demo_limit' : prepaid ? 'credits' : 'limit', left: 0, ...(extra ? { bought: 0 } : {}) };
+      }
+      used++;
+      if (!prepaid) cmds.push(['SET', dayKey, 0, 'EX', (user.demo ? 30 : 3) * 86400, 'NX']);
+      cmds.push(['INCR', dayKey]);
+    }
     if (user.demo) cmds.push(['SET', ipKey, 0, 'EX', 86400, 'NX'], ['INCR', ipKey]);
     if (!b.all) next = { id: crypto.randomBytes(8).toString('base64url'), n: 1, start: now, ...q };
   }
   if (next) cmds.push(['SET', findKey, JSON.stringify(next), 'EX', SEARCH_MINUTES * 60]);
   if (cmds.length) await pipeline(cmds);
-  return { searchId: next ? next.id : '', left: limit - used };
+  return { searchId: next ? next.id : '', left: Math.max(0, limit - used), ...(extra ? { bought: credits(user) - paidUsed } : {}) };
 }
 
 async function withMarks(slug, list, cand) {   // cand: the searcher's candidate group, whose marks they see
@@ -84,7 +91,7 @@ module.exports = route(async (req, res, b) => {
   if (b.all && !user.perms.includes('wardPdf')) return send(res, 403, { error: 'no_pdf' });
   const use = await countSearch(req, user, b, named);
   if (use.error) return send(res, 429, use);
-  const left = { searchId: use.searchId, left: use.left };
+  const left = { searchId: use.searchId, left: use.left, bought: use.bought };
 
   // every voter of one ward, in box order, to print or save that ward's slips
   if (b.all) {
