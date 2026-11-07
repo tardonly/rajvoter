@@ -447,6 +447,32 @@ async function openPanel() {
   setup(); showMarks(r);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
+  approveFromLink();
+}
+// search packs [searches, ₹], as in index.html
+const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
+// a person's WhatsApp request carries /admin#add=<phone>&n=<searches>&v=<village>: after logging in, the admin sees who
+// and how much to expect, and one tap adds the searches (the server still checks this admin may manage that person)
+async function approveFromLink() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (!h.get('add')) return;
+  history.replaceState(null, '', location.pathname);   // once only, not again on reload
+  const phone = h.get('add'), n = parseInt(h.get('n'), 10), v = h.get('v') || '';
+  showTab('people');
+  const u = users.find((x) => x.phone === phone && x.village === v && !x.retired) || users.find((x) => x.phone === phone && !x.retired);
+  if (!u) { $('listMsg').textContent = L(`मोबाइल ${showPhone(phone)} (${vName(v)}) का कोई व्यक्ति आपकी सूची में नहीं मिला`, `No one with mobile ${showPhone(phone)} (${vName(v)}) in your list`); return; }
+  if (!(n > 0 && n <= 10000)) { $('listMsg').textContent = MSG.bad_credits; return; }
+  if (!u.prepaid) { $('listMsg').textContent = MSG.not_prepaid; return; }
+  const pk = PACKS.find((x) => x[0] === n);
+  const price = pk ? `₹${pk[1]}` : L('(यह पैक सूची में नहीं)', '(not one of the packs)');
+  if (!confirm(L(`${u.name} · ${showPhone(u.phone)} · ${vName(u.village)}\n\n${n} खोज — ${price}\n\nभुगतान मिल गया? हाँ दबाने पर ${n} खोज जुड़ जाएंगी।`,
+    `${u.name} · ${showPhone(u.phone)} · ${vName(u.village)}\n\n${n} searches — ${price}\n\nPayment received? OK adds ${n} searches.`))) {
+    $('listMsg').textContent = L('खोज नहीं जोड़ी गईं', 'No searches added'); return;
+  }
+  const r = await api({ action: 'credits_add', id: u.id, n });
+  if (r.error) { $('listMsg').textContent = errText(r); return; }
+  await refresh();
+  $('listMsg').textContent = L(`✓ ${u.name} को ${n} खोज मिल गईं (${price})`, `✓ ${u.name} got ${n} searches (${price})`);
 }
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -712,7 +738,7 @@ function creditsBox(u, saved) {
     $('listMsg').textContent = L(`${u.name} को ${n} खोज और मिल गईं`, `${u.name} got ${n} more searches`);
   }
   box.append(L('खोज जोड़ें:', 'Add searches:'));
-  for (const n of [50, 100, 500]) {
+  for (const [n] of PACKS) {
     const b = el('button', 'btn ghost', `+${n}`); b.type = 'button';
     b.addEventListener('click', () => send(n, b));
     box.append(b);
