@@ -1030,8 +1030,9 @@ async function toggleFamily(r, d, btn) {
 // ---------- वंश वृक्ष: who is whose father / husband inside one house, from the names on the slips ----------
 // Every voter names one relative (पिता / पति / माता). That name is looked for among the other voters of the house:
 // same name (spellings folded, endings like कुमार / सिंह / राम allowed to differ) and a believable age (a parent at least
-// 15 years older, a husband within 25 years). When two people fit equally well the link is left out rather than guessed.
-// A father who is not a voter here but is named by two or more of the house becomes one "not on the list" node.
+// 15 years older, or 12 when nobody fits at 15; a husband within 25 years). When two people fit equally well the link is
+// left out rather than guessed. A father who is not a voter here but is named by two or more of the house, or by one child
+// and his widow, becomes one "not on the list" node.
 const FOLD_SUF_EN = ['kumar', 'kumari', 'lal', 'sing', 'ram', 'cand', 'candr', 'prasad', 'devi', 'kanvar', 'das', 'dat', 'nat', 'kan', 'ali'];
 const FOLD_SUF_HI = ['कुमार', 'कुमारि', 'लाल', 'सिह', 'राम', 'चद', 'चदर', 'परसाद', 'देबि', 'कबर', 'दास', 'दत', 'नाथ', 'खान', 'खा', 'अलि'];
 // spellings folded as the village search does (foldEn / foldHi, further down), and a bit more: a final "a" dropped
@@ -1082,20 +1083,26 @@ function familyTree(rows) {
   for (const p of P) {
     const kind = /पति/.test(p.r.rel) ? 'h' : /पिता|माता/.test(p.r.rel) ? 'p' : '';
     if (!kind) continue;
-    const ok = P.filter((q) => q !== p && (kind === 'h'
-      ? isMan(q) && !isMan(p) && Math.abs(q.age - p.age) <= 25
-      : q.age - p.age >= 15 && (/माता/.test(p.r.rel) ? !isMan(q) : !isWoman(q))));
-    let best = 0, hits = [];
-    for (const q of ok) {
-      const f = nameFit(p.rel, q.me);
-      if (f > best) { best = f; hits = [q]; } else if (f && f === best) hits.push(q);
-    }
+    const fits = (gap) => {
+      const ok = P.filter((q) => q !== p && (kind === 'h'
+        ? isMan(q) && !isMan(p) && Math.abs(q.age - p.age) <= 25
+        : q.age - p.age >= gap && (/माता/.test(p.r.rel) ? !isMan(q) : !isWoman(q))));
+      let best = 0, hits = [];
+      for (const q of ok) {
+        const f = nameFit(p.rel, q.me);
+        if (f > best) { best = f; hits = [q]; } else if (f && f === best) hits.push(q);
+      }
+      return hits;
+    };
+    // the list's ages are often a few years off: a parent only 12–14 years older counts when nobody fits at 15
+    let hits = fits(15);
+    if (!hits.length && kind === 'p') hits = fits(12);
     if (hits.length !== 1) continue;   // none, or two that fit as well: leave it out
     (kind === 'h' ? husband : father).set(p, hits[0]);
   }
   // a married woman sits beside her husband; a link to her own father in the same house is dropped
   for (const w of husband.keys()) father.delete(w);
-  // fathers who are not voters here, named by two or more: one shared node (a woman whose unfound husband has that name
+  // fathers who are not voters here, named by two or more, or by one child and his widow: one shared node (the widow
   // sits beside it)
   const lost = P.filter((p) => !father.has(p) && !husband.has(p) && /पिता/.test(p.r.rel) && (p.r.relname || p.r.hrel));
   const ghosts = [];
@@ -1108,10 +1115,13 @@ function familyTree(rows) {
   const mk = (p) => { const u = { p, wives: [], kids: [] }; units.push(u); unitOf.set(p, u); return u; };
   for (const p of P) if (!husband.has(p)) mk(p);
   for (const [w, h] of husband) unitOf.get(h).wives.push(w);
-  for (const g of ghosts.filter((g) => g.kids.length >= 2)) {
+  const widowOf = (g) => P.find((w) => /पति/.test(w.r.rel) && !husband.has(w) && unitOf.has(w) && unitOf.get(w).kids.length === 0
+    && g.kids.some((k) => w.age - k.age >= 12) && (nameFit(w.rel, g.key) === 2 || g.kids.some((k) => nameFit(w.rel, k.rel) === 2)));
+  for (const g of ghosts) {
+    const widow = widowOf(g);
+    if (g.kids.length < 2 && !widow) continue;
     const u = mk(g);
     for (const k of g.kids) father.set(k, g);
-    const widow = P.find((w) => /पति/.test(w.r.rel) && !husband.has(w) && nameFit(w.rel, g.key) === 2 && unitOf.get(w).kids.length === 0);
     if (widow) { units.splice(units.indexOf(unitOf.get(widow)), 1); unitOf.delete(widow); u.wives.push(widow); husband.set(widow, g); }
   }
   // a mother named by the slip (rare): the child goes under her unit (her husband's when she has one)
