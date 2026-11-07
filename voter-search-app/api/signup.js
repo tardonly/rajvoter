@@ -2,14 +2,14 @@
 // The page asks for the mobile number first ('lookup'). A number that already has a login of that village is told to
 // type its password (forgotten → ask the admin); a new number gets its own login at once ('signup') with a few free
 // searches: FREE_TIERS (_lib.js) by how many signed-up logins have not been given paid searches yet, and none for a
-// number that already signed up elsewhere. For more searches the person pays the admin (WhatsApp button in the app) and
+// number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
 // an admin adds them on the admin page (api/admin.js "credits_add").
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
 //   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free}
-//   POST {action: 'signup', village, phone, name} → {password, token, name, phone, villages, list, perms, prepaid, left}
+//   POST {action: 'signup', village, phone, name} → {password, token, name, phone, villages, list, perms, prepaid, left, adminPhone}
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { FREE_TIERS, phoneLogins, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
+const { FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -57,7 +57,8 @@ module.exports = route(async (req, res, b) => {
     await redis('HSET', `user:${id}`, 'session', sid, 'sessionAt', now, 'sessionIp', clientIp(req), 'sessionDevice', deviceName(req),
       'lastSeen', now, 'logins', 1);
     return send(res, 200, { password, token: makeToken(id, sid), name, phone, role: 'user', admin: false, villages: [v.slug],
-      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, left: free });
+      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, left: free,
+      adminPhone: await adminPhone({ village: v.slug }) });
   }
   send(res, 400, { error: 'action' });
 });

@@ -618,7 +618,7 @@ function signOut(msg) {
   lockStepTo('phone');
   showLock(msg);
 }
-let MY_NAME = '', MY_PHONE = '';   // this login's name and mobile number, for the WhatsApp message asking for searches
+let MY_NAME = '', MY_PHONE = '', ADMIN_PHONE = '';   // this login's name and mobile number, and its admin's (WhatsApp for more searches)
 function showApp(name, admin, villages, perms, cand) {
   PERMS = perms || []; MY_NAME = name || '';
   $('who').textContent = (name ? `${L('उपयोगकर्ता', 'User')}: ${who(name)}` : '') + (cand ? ` · ${L('उम्मीदवार', 'Candidate')}: ${cand}` : '');
@@ -800,7 +800,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  PREPAID = !!r.prepaid; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || '';
+  PREPAID = !!r.prepaid; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 });
@@ -1362,11 +1362,11 @@ const SIGN_ERR = {
   too_many: L('बहुत बार कोशिश — थोड़ी देर बाद फिर करें', 'Too many tries — try again later'),
 };
 function buyMoreButton() { $('buyMore').classList.toggle('hidden', !PREPAID || DEMO); }
-// WhatsApp to the app's number asking for more searches, with this login's name, number and village filled in
+// WhatsApp to this login's admin (else the app's number) asking for more searches, with this login's name, number and village filled in
 function buyWhatsApp(cls) {
   const a = el('a', cls, L('💬 WhatsApp पर खोज मंगाएं', '💬 Ask for searches on WhatsApp'));
   const phone = MY_PHONE ? `+${MY_PHONE.slice(0, 2)} ${MY_PHONE.slice(2)}` : '';
-  a.href = `https://wa.me/${WHATSAPP}?text=` + encodeURIComponent(L(
+  a.href = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
     `नमस्ते, मुझे Voter Search में और खोज चाहिए।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}`,
     `Hello, I would like more searches in Voter Search.\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}`));
   a.target = '_blank'; a.rel = 'noopener';
@@ -1480,7 +1480,7 @@ async function openVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
-  PREPAID = !!r.prepaid; MY_PHONE = r.phone || '';
+  PREPAID = !!r.prepaid; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 }

@@ -241,6 +241,21 @@ async function phoneLogins(phone) {
       retired, self };
   }).filter(Boolean);
 }
+// the WhatsApp number a signed-up person asks for more searches: the admin who made the login, else an admin of its
+// village (the one with the fewest villages), else '' (the app then uses its own number)
+async function adminPhone(u) {
+  const ids = (await redis('SMEMBERS', 'users')) || [];
+  if (!ids.length) return '';
+  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'villages', 'retired']));
+  const admins = ids.map((id, i) => {
+    const [phone, role, vils, retired] = rows[i] || [];
+    return role === 'admin' && retired !== '1' && phone ? { id, phone, villages: String(vils || '').split(',').filter(Boolean) } : null;
+  }).filter(Boolean).filter((a) => a.villages.includes(u.village));
+  const own = admins.find((a) => a.id === u.by);
+  if (own) return own.phone;
+  admins.sort((a, b) => a.villages.length - b.villages.length);
+  return admins.length ? admins[0].phone : '';
+}
 const paidKey = (id) => `paid:${id}`;
 async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
@@ -288,6 +303,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE_TIERS, credits, isPrepaid, phoneLogins, paidKey, creditsLeft, normPhone,
+  FREE_TIERS, credits, isPrepaid, phoneLogins, adminPhone, paidKey, creditsLeft, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

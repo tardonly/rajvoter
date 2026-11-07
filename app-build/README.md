@@ -164,7 +164,9 @@ The login page asks only for the **mobile number** first:
   it any time.
 
 More searches (₹1 a search, paid to the admin): that window's **💬 WhatsApp पर खोज मंगाएं** button opens a chat with
-the app's number (`WHATSAPP` in `index.html`) with the person's name, mobile number and village filled in. Once paid,
+that person's admin: the village admin who made the login, else the village's admin with the fewest villages, using
+the mobile number on the admin's login (so give every village admin a number); with no such admin, the app's number
+(`WHATSAPP` in `index.html`). The message has the person's name, mobile number and village filled in. Once paid,
 an admin (the superadmin, or the village's admin) adds them in the admin page's people list: **खोज जोड़ें: +50 / +100 /
 +500** or any number. Those logins are tagged "₹ भुगतान किया" and no longer count for the free sign-up tiers.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit.
