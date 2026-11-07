@@ -71,6 +71,10 @@
   .paybox a.wabtn { background: #16a34a; }   /* WhatsApp green */
   a.buyback { text-decoration: none; text-align: center; }
   .buypw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; font-weight: 700; user-select: all; word-break: break-all; }
+  #leftBadge { display: inline-block; border-radius: 8px; padding: 5px 10px; margin: 6px 6px 0 0; font-size: 13px;
+    background: #e0f2fe; color: #075985; }
+  #leftBadge.low { background: #fef3c7; color: #92400e; }
+  #leftBadge.none { background: #fee2e2; color: #991b1b; }
   #buyMore { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: #16a34a; color: #fff; font-weight: 600; }
   .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .homeacts button { padding: 11px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
@@ -453,7 +457,7 @@
         <option value="absent">सिर्फ़ वोटर नहीं है</option>
       </select>
     </div>
-    <div class="countrow"><div id="count"></div><span><button id="buyMore" class="hidden" type="button">🛒 और खोज खरीदें</button>
+    <div class="countrow"><div id="count"></div><span><b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और खोज खरीदें</button>
       <button id="wardPrint" class="hidden" type="button"></button></span></div>
   </header>
   <main>
@@ -820,7 +824,7 @@ function counted(r) {
   if (DEMO) demoBar();
   buyMoreButton();
 }
-const leftNote = () => (PREPAID && searchesLeft != null ? L(` · ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left`)
+const leftNote = () => (PREPAID ? ''   // shown on its own badge (buyMoreButton)
   : !DEMO && searchesLeft != null && searchesLeft < 20 ? L(` · आज ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left today`) : '');
 function hint() {
   $('results').innerHTML = '<div class="hint">' + L('नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
@@ -1361,7 +1365,16 @@ const SIGN_ERR = {
   phone: L('10 अंकों का मोबाइल नंबर डालें', 'Enter a 10-digit mobile number'),
   too_many: L('बहुत बार कोशिश — थोड़ी देर बाद फिर करें', 'Too many tries — try again later'),
 };
-function buyMoreButton() { $('buyMore').classList.toggle('hidden', !PREPAID || DEMO); }
+// a signed-up login: how many searches are left (amber at 3 or fewer, red at none) and the button for more
+function buyMoreButton() {
+  const show = PREPAID && !DEMO && searchesLeft != null, b = $('leftBadge');
+  $('buyMore').classList.toggle('hidden', !PREPAID || DEMO);
+  b.classList.toggle('hidden', !show);
+  if (!show) return;
+  b.textContent = L(`🔍 ${searchesLeft} खोज बाकी`, `🔍 ${searchesLeft} searches left`);
+  b.classList.toggle('low', searchesLeft > 0 && searchesLeft <= 3);
+  b.classList.toggle('none', searchesLeft === 0);
+}
 // WhatsApp to this login's admin (else the app's number) asking for more searches, with this login's name, number and village filled in
 function buyWhatsApp(cls) {
   const a = el('a', cls, L('💬 WhatsApp पर खोज मंगाएं', '💬 Ask for searches on WhatsApp'));
