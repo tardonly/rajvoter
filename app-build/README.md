@@ -150,6 +150,9 @@ deployment (e.g. to S3) first.
 3. **Add two environment variables** (Project → Settings → Environment Variables):
    - `DATA_KEY` = the text in `app-build/DATA_KEY.txt`
    - `ADMIN_PASSWORD` = the superadmin password (long, not shared with anyone)
+   - optional, for UPI payment in the app: `JADUPE_TOKEN` = the API token from jadupe.com → APIs and Documentation (the
+     part after `Bearer `). Without it the app offers only WhatsApp to the admin. On JaduPe set the webhook URL to
+     `https://raj-voter.vercel.app/api/pay`.
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the variables take effect.
 
 ## Signing up with a mobile number, and getting more searches
@@ -205,6 +208,18 @@ the people list: **खोज जोड़ें** with the pack sizes or any num
 longer count for the free sign-up tiers.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit; admin-made
 logins show their daily limit and, once they have bought some, their bought searches as well.
+
+**Paying online by UPI (JaduPe):** with `JADUPE_TOKEN` set, the buy window has **💳 ₹X UPI से अभी भुगतान करें** above
+the WhatsApp button (`api/pay.js`). It makes a request (gw `jadupe`, sent to the superadmin) and a JaduPe transaction
+for the pack's price, and opens JaduPe's payment page, which comes back to `/<village>?pay=<request id>`; the app then
+shows whether the payment came and the searches were added. The searches are added by themselves when JaduPe says the
+transaction is **completed** for at least the pack's price (within ₹1): checked when the person comes back, when
+JaduPe calls the webhook (`/api/pay`), or when the superadmin opens the request. The payment status is always asked
+from JaduPe with our token, never taken from the webhook's own data, so a made-up webhook adds nothing. A **timeout** /
+**error** closes the request as rejected. The money goes to the superadmin's JaduPe account, so it counts as collected by the superadmin
+("UPI ऑनलाइन (JaduPe)" in the ledger) and no admin owes it. Open online requests show only to the superadmin, marked
+"💳 UPI ऑनलाइन". JaduPe needs a mobile number: a login without one is sent as `JADUPE_MOBILE` (default 9999999999);
+the email sent is `JADUPE_EMAIL` (default noreply@raj-voter.vercel.app).
 
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).

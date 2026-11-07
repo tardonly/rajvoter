@@ -587,6 +587,7 @@ function reqList() {
       el('span', 'st', r.status === 'open' ? L('⏳ बाकी', '⏳ Waiting') : r.status === 'rejected' ? L('✕ अस्वीकार', '✕ Rejected')
         : L(`✓ ${r.doneN} जोड़ी गईं`, `✓ ${r.doneN} added`)));
     b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n} खोज · ₹${r.rs}`, `Asked: ${r.n} searches · ₹${r.rs}`)
+        + (r.online ? L(' · 💳 UPI ऑनलाइन, भुगतान का इंतज़ार', ' · 💳 online UPI, waiting for the payment') : '')
       : r.status === 'rejected' ? L(`माँगी: ${r.n} खोज · अस्वीकार — ${r.doneByName}`, `Asked: ${r.n} searches · rejected — ${r.doneByName}`)
       : L(`₹${r.doneRs} वसूले — ${r.doneByName}${r.hand ? ' (हाथ से जोड़ी)' : ''}`, `₹${r.doneRs} collected — ${r.doneByName}${r.hand ? ' (added by hand)' : ''}`)),
       el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`

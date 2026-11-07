@@ -306,6 +306,58 @@ async function getReq(id) {
 }
 const paidKey = (id) => `paid:${id}`;
 async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
+// n bought searches for person u, collected by `by` ({id, name}: an admin, or GATEWAY): the searches, and the payment
+// recorded in request r (none: a hand-added one, which gets its own request, already approved) and in the pay:* totals
+async function addPaid(u, n, r, by) {
+  const rs = packPrice(n), now = new Date().toISOString();
+  await redis('HINCRBY', `user:${u.id}`, 'credits', n);
+  await redis('HSET', `user:${u.id}`, 'bought', '1');
+  await redis('SREM', 'free', u.id);
+  const id = r ? r.id : await newReqId();
+  if (!r) {
+    await redis('HSET', `req:${id}`, 'user', u.id, 'village', u.village, 'n', n, 'rs', rs, 'created', now, 'hand', '1');
+    await redis('SADD', 'reqs', id);
+  }
+  await redis('HSET', `req:${id}`, 'status', 'done', 'doneAt', now, 'doneN', n, 'doneRs', rs, 'doneBy', by.id, 'doneByName', by.name);
+  await redis('HINCRBY', 'pay:rs', by.id, rs);
+  await redis('HINCRBY', 'pay:n', by.id, n);
+  await redis('HINCRBY', 'pay:count', by.id, 1);
+  if (by.id !== 'admin') await redis('HSET', 'pay:name', by.id, by.name);
+}
+// Online UPI payment through JaduPe (jadupe.com, api/pay.js), when JADUPE_TOKEN (the API token from JaduPe's "APIs and
+// Documentation" page) is set. The money goes to the superadmin's JaduPe merchant account, so it counts as collected
+// by the superadmin. A request paid this way has gw: 'jadupe', txn = JaduPe's transaction id (jtxn:<txn> → request id)
+// and link = the payment page. Its status is only ever taken from JaduPe's check-payment-status API, never from what a
+// phone or the webhook says.
+const GATEWAY = { id: 'admin', name: 'UPI ऑनलाइन (JaduPe)' };
+const payOnline = () => !!process.env.JADUPE_TOKEN;
+async function jadupe(path, payload) {
+  const r = await fetch((process.env.JADUPE_URL || 'https://jadupe.com/api/') + path, {
+    method: payload ? 'POST' : 'GET',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.JADUPE_TOKEN}` },
+    body: payload ? JSON.stringify(payload) : undefined,
+  });
+  const text = await r.text();
+  try { return JSON.parse(text); } catch (e) { return { success: false, message: text.slice(0, 200) }; }
+}
+// asks JaduPe how an online request's payment stands: completed (paid at least the pack's price, give or take ₹1) →
+// the searches are added, once; timeout / error → the request is closed as rejected. → the request as it now is
+async function settleOnline(rid) {
+  const r = await getReq(rid);
+  if (!r || r.gw !== 'jadupe' || !r.txn || r.status !== 'open') return r;
+  const s = await jadupe('check-payment-status', { txn_id: String(r.txn) });
+  const t = s && s.success && s.data && s.data.transaction;
+  if (!t) return r;
+  const st = String(t.status || '').toLowerCase();
+  if (st === 'completed' && Number(t.amount) >= Number(r.rs) - 1) {
+    const u = await getUser(r.user);
+    if (u && await redis('SET', `reqlock:${r.id}`, GATEWAY.id, 'NX')) await addPaid(u, Number(r.n), r, GATEWAY);
+  } else if ((st === 'timeout' || st === 'error') && await redis('SET', `reqlock:${r.id}`, GATEWAY.id, 'NX')) {
+    await redis('HSET', `req:${r.id}`, 'status', 'rejected', 'doneAt', new Date().toISOString(), 'doneBy', GATEWAY.id,
+      'doneByName', `${GATEWAY.name}: ${st === 'timeout' ? 'समय खत्म' : 'भुगतान नहीं हुआ'}`);
+  }
+  return getReq(rid);
+}
 // "98765 43210", "098765-43210", "+91 98765 43210" → "919876543210"; '' when empty; null when not a valid number
 function normPhone(s) {
   const d = String(s || '').replace(/\D/g, '');
@@ -351,6 +403,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE_TIERS, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, normPhone,
+  FREE_TIERS, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

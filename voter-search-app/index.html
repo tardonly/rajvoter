@@ -69,6 +69,9 @@
   .buyback { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 10px; font-size: 13px; color: var(--accent); font-weight: 600; }
   .buyback { justify-self: start; }
   .paybox .wabtn { display: block; width: 100%; background: #16a34a; }   /* WhatsApp green */
+  .paybox .upibtn { display: block; width: 100%; }
+  .paybox .wabtn.alt { background: #fff; color: #15803d; border: 1.5px solid #16a34a; }
+  .paybox .or { font-size: 13px; color: var(--muted); }
   .packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 6px 0 4px; }
   .pack { display: grid; gap: 1px; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 8px 6px; color: var(--ink); }
   .pack b { font-size: 15px; }
@@ -832,7 +835,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 });
@@ -847,7 +850,8 @@ let seq = 0, shown = 0, total = 0, lastBox = 0, lastAsked = '', timer;   // last
 // same search (more letters, the next page, परिवार). Clearing the search box drops it, so the next name is a new search.
 let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: a signed-up login's free + bought searches, counted for good
 // CAN_BUY: any user login may buy searches; BOUGHT: a login with a daily limit, its bought searches left (used after the day's)
-let CAN_BUY = false, BOUGHT = null;
+// ONLINE: packs can also be paid here by UPI (JaduPe, api/pay.js)
+let CAN_BUY = false, BOUGHT = null, ONLINE = false;
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
   if (r.left != null) searchesLeft = r.left;
@@ -1635,11 +1639,28 @@ function buyWhatsApp(cls, [n, rs]) {
   });
   return a;
 }
+// pay for a pack right here by UPI: the server makes the JaduPe transaction (api/pay.js 'start') and this page goes to
+// JaduPe's payment page, which comes back to /<village>?pay=<request id> (payReturn)
+function buyUpi([n, rs]) {
+  const label = L(`💳 ₹${rs} UPI से अभी भुगतान करें`, `💳 Pay ₹${rs} now by UPI`);
+  const a = el('button', 'btn upibtn', label); a.type = 'button';
+  a.addEventListener('click', async () => {
+    if (a.disabled) return;
+    a.disabled = true; a.textContent = L('⏳ भुगतान पेज खुल रहा है…', '⏳ Opening the payment page…');
+    const r = await api('pay', { action: 'start', token: token(), n });
+    if (r.link) { location.href = r.link; return; }
+    a.disabled = false;
+    a.textContent = r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
+      : L('⚠ भुगतान पेज नहीं खुला — दोबारा दबाएं या WhatsApp से मंगाएं', '⚠ Could not open the payment page — tap again or ask on WhatsApp');
+  });
+  return a;
+}
 function buyOpen() {
   delete $('buyPop').dataset.go;
   $('buyTitle').textContent = L('🛒 और खोज', '🛒 More searches');
   const box = el('div', 'paybox'), packs = el('div', 'packs');
-  let pick = PACKS[0], wa = buyWhatsApp('btn wabtn', pick);
+  const waCls = ONLINE ? 'btn wabtn alt' : 'btn wabtn';   // with UPI here, WhatsApp to the admin is the other way
+  let pick = PACKS[0], wa = buyWhatsApp(waCls, pick), upi = ONLINE ? buyUpi(pick) : null;
   for (const pk of PACKS) {
     const b = el('button', `pack${pk === pick ? ' on' : ''}`); b.type = 'button';
     const price = el('span');   // ₹1 a search, struck through, then the pack's price; the saving below
@@ -1650,16 +1671,19 @@ function buyOpen() {
     b.addEventListener('click', () => {
       pick = pk;
       packs.querySelectorAll('.pack').forEach((x) => x.classList.toggle('on', x === b));
-      const w = buyWhatsApp('btn wabtn', pick); wa.replaceWith(w); wa = w;
+      const w = buyWhatsApp(waCls, pick); wa.replaceWith(w); wa = w;
+      if (upi) { const u = buyUpi(pick); upi.replaceWith(u); upi = u; }
     });
     packs.append(b);
   }
   const none = searchesLeft === 0 && !BOUGHT;
   box.append(el('b', null, !none ? L('और खोज चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी खोज इस्तेमाल हो गईं', 'All your searches are used')
     : L('आज की सभी खोज इस्तेमाल हो गईं', 'All of today\'s searches are used')),
-    el('div', 'k', L('कितनी खोज चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे खोज जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
-      'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
-    packs, wa);
+    el('div', 'k', ONLINE ? L('कितनी खोज चाहिए, चुनें और UPI से भुगतान करें — खोज अपने आप जुड़ जाएंगी। या एडमिन को भुगतान करके WhatsApp पर भेजें।',
+      'Choose how many searches and pay by UPI — they are added by themselves. Or pay the admin and send it on WhatsApp.')
+      : L('कितनी खोज चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे खोज जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
+        'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
+    packs, ...(upi ? [upi, el('div', 'or', L('या', 'or'))] : []), wa);
   $('buyBody').replaceChildren(box);
   $('buyNote').textContent = L('खरीदी खोज कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की खोज पूरी होने के बाद इस्तेमाल होती हैं') + '। एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
     'Bought searches never expire' + (PREPAID ? '' : ' — they are used once the day\'s searches are used') + '. One search = typing a name until the box is cleared; family and more pages are free.');
@@ -1760,9 +1784,38 @@ async function openVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
-  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
-  outOfSearches();
+  const paid = new URLSearchParams(location.search).get('pay');
+  if (paid) payReturn(paid); else outOfSearches();
+}
+// back from JaduPe's payment page (?pay=<request id>): ask the server how the payment stands (api/pay.js 'check'), which
+// asks JaduPe; still pending → a button to ask again
+async function payReturn(id) {
+  history.replaceState(null, '', location.pathname);
+  const box = el('div', 'paybox');
+  $('buyTitle').textContent = L('💳 भुगतान', '💳 Payment');
+  $('buyNote').textContent = '';
+  $('buyBody').replaceChildren(box);
+  $('buyPop').classList.remove('hidden');
+  box.append(el('div', 'k', L('भुगतान जाँच रहे हैं…', 'Checking the payment…')));
+  const r = await api('pay', { action: 'check', token: token(), id });
+  if (r.left != null) searchesLeft = r.left;
+  if (r.bought != null) BOUGHT = r.bought;
+  buyMoreButton();
+  const ok = el('button', 'btn', L('ठीक है', 'OK')); ok.type = 'button'; ok.addEventListener('click', buyClose);
+  if (r.status === 'done') {
+    box.replaceChildren(el('div', 'amt', '✓'), el('b', null, L(`भुगतान मिल गया — ${r.n} खोज जुड़ गईं`, `Payment received — ${r.n} searches added`)), ok);
+  } else if (r.status === 'open') {
+    const again = el('button', 'btn', L('फिर जाँचें', 'Check again')); again.type = 'button';
+    again.addEventListener('click', () => payReturn(id));
+    box.replaceChildren(el('b', null, L('भुगतान अभी पूरा नहीं दिखा', 'The payment is not complete yet')),
+      el('div', 'k', L('पैसे कट गए हों तो थोड़ी देर में खोज अपने आप जुड़ जाएंगी — यह पेज दोबारा खोलें।',
+        'If the money has gone from your account, the searches are added by themselves shortly — open this page again.')), again);
+  } else {
+    box.replaceChildren(el('b', null, r.status === 'rejected' ? L('भुगतान नहीं हुआ', 'The payment did not go through') : MSG[r.error] || MSG.server),
+      el('div', 'k', L('दोबारा कोशिश करने के लिए 🛒 और खोज खरीदें दबाएं।', 'To try again, tap 🛒 Buy more searches.')), ok);
+  }
 }
 
 (async () => {

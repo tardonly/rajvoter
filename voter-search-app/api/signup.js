@@ -13,7 +13,7 @@
 //     the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
+const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -61,7 +61,7 @@ module.exports = route(async (req, res, b) => {
     await redis('HSET', `user:${id}`, 'session', sid, 'sessionAt', now, 'sessionIp', clientIp(req), 'sessionDevice', deviceName(req),
       'lastSeen', now, 'logins', 1);
     return send(res, 200, { password, token: makeToken(id, sid), name, phone, role: 'user', admin: false, villages: [v.slug],
-      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, canBuy: true, left: free,
+      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, canBuy: true, online: payOnline(), left: free,
       adminPhone: await adminPhone({ village: v.slug }) });
   }
   if (b.action === 'request') {

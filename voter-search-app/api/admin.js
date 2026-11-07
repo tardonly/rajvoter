@@ -52,7 +52,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
+const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
@@ -77,9 +77,9 @@ const view = (u) => ({
 });
 
 // a pack request as the admin page sees it
-const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand }) =>
+const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw }) =>
   ({ id, user, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
-    doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1' });
+    doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1', online: !!gw });   // online: paid by UPI on JaduPe
 const REQ_DONE_DAYS = 30;   // approved requests stay in the list this long
 
 module.exports = route(async (req, res, b) => {
@@ -96,24 +96,7 @@ module.exports = route(async (req, res, b) => {
   const now = new Date().toISOString();
   // a new login made by this admin: fields = role and village(s) [and more]; → {id, password}
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
-  // n bought searches for person u, paid to this admin: the searches, and the payment recorded in request r (none: a
-  // hand-added one, which gets its own request, already approved) and in the pay:* totals (see _lib.js)
-  async function paidIn(u, n, r) {
-    const rs = packPrice(n);
-    await redis('HINCRBY', `user:${u.id}`, 'credits', n);
-    await redis('HSET', `user:${u.id}`, 'bought', '1');
-    await redis('SREM', 'free', u.id);
-    const id = r ? r.id : await newReqId();
-    if (!r) {
-      await redis('HSET', `req:${id}`, 'user', u.id, 'village', u.village, 'n', n, 'rs', rs, 'created', now, 'hand', '1');
-      await redis('SADD', 'reqs', id);
-    }
-    await redis('HSET', `req:${id}`, 'status', 'done', 'doneAt', now, 'doneN', n, 'doneRs', rs, 'doneBy', me.id, 'doneByName', me.name);
-    await redis('HINCRBY', 'pay:rs', me.id, rs);
-    await redis('HINCRBY', 'pay:n', me.id, n);
-    await redis('HINCRBY', 'pay:count', me.id, 1);
-    await redis('HSET', 'pay:name', me.id, me.name);
-  }
+  const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
   if (b.action === 'list') {
     const ids = (await redis('SMEMBERS', 'users')) || [];
@@ -141,6 +124,7 @@ module.exports = route(async (req, res, b) => {
       const u = mine.get(r.user);   // a person of my villages, asking from one of my villages
       if (!u || !mayUse(r.village) || (r.status !== 'open' && !(r.doneAt > since))) return null;
       if (!isSuper && r.to && r.to !== me.id && r.doneBy !== me.id) return null;   // sent to someone else
+      if (!isSuper && r.gw && r.status === 'open') return null;   // being paid online: added by itself once paid
       const to = r.to === 'admin' ? 'सुपर एडमिन' : r.to ? (all.find((x) => x.id === r.to) || {}).name || '' : '';
       return { ...reqView(r), name: u.name, phone: u.phone || '', toName: isSuper ? to : '' };
     }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
@@ -253,7 +237,7 @@ module.exports = route(async (req, res, b) => {
   }
 
   if (b.action === 'req_get' || b.action === 'req_approve' || b.action === 'req_reject') {
-    const r = await getReq(b.rid), u = r ? await getUser(r.user) : null;
+    const r = await settleOnline(b.rid), u = r ? await getUser(r.user) : null;   // an online one: how its payment stands now
     if (!u || !(isSuper || (u.role === 'user' && mayUse(u.village) && mayUse(r.village)))) return send(res, 404, { error: 'not_found' });
     if (b.action === 'req_get') return send(res, 200, { req: reqView(r) });
     if (r.status !== 'open') return send(res, 409, { error: 'already_done', req: reqView(r) });
