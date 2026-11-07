@@ -72,6 +72,17 @@ const demoId = (device) => `demo_${device}`;
 const villageList = (slugs) => Object.entries(VILLAGES).filter(([slug]) => !slugs || slugs.includes(slug))
   .map(([slug, v]) => ({ slug, name: v.name, title: v.title, panchayatSamiti: v.panchayatSamiti || '', district: v.district || '' }));
 
+// A village admin looks after the villages given to them one by one (field villages "a,b") and every village of the
+// पंचायत समितियाँ given to them whole (field samitis, keys "<district>|<samiti>" joined by ","), so a village imported
+// into such a samiti later is theirs at once.
+const samitiKey = (v) => `${v.district || ''}|${v.panchayatSamiti || ''}`;
+const samitiKeys = () => [...new Set(Object.values(VILLAGES).filter((v) => v.panchayatSamiti).map(samitiKey))];
+const splitList = (s) => String(s || '').split(',').filter(Boolean);
+function adminVillages(villages, samitis) {
+  const whole = splitList(samitis);
+  return [...new Set([...splitList(villages), ...Object.keys(VILLAGES).filter((s) => whole.includes(samitiKey(VILLAGES[s])))])];
+}
+
 function dataKey() {
   const k = process.env.DATA_KEY;
   if (!k) throw new Error('DATA_KEY not set');
@@ -139,7 +150,9 @@ async function getUser(id) {
   const u = { id };
   for (let i = 0; i < arr.length; i += 2) u[arr[i]] = arr[i + 1];
   u.role = u.role === 'admin' ? 'admin' : 'user';
-  u.villages = u.role === 'admin' ? String(u.villages || '').split(',').filter(Boolean) : [u.village].filter(Boolean);
+  u.ownVillages = u.role === 'admin' ? splitList(u.villages) : [];   // given one by one
+  u.samitis = u.role === 'admin' ? splitList(u.samitis) : [];
+  u.villages = u.role === 'admin' ? adminVillages(u.villages, u.samitis.join(',')) : [u.village].filter(Boolean);
   return u;
 }
 
@@ -233,11 +246,11 @@ async function phoneLogins(phone) {
   if (!phone) return [];
   const ids = (await redis('SMEMBERS', 'users')) || [];
   if (!ids.length) return [];
-  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'village', 'villages', 'retired', 'self']));
+  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'village', 'villages', 'retired', 'self', 'samitis']));
   return ids.map((id, i) => {
-    const [ph, role, vil, vils, retired, self] = rows[i] || [];
+    const [ph, role, vil, vils, retired, self, sams] = rows[i] || [];
     if (ph !== phone) return null;
-    return { id, role, village: vil, villages: role === 'admin' ? String(vils || '').split(',').filter(Boolean) : [vil].filter(Boolean),
+    return { id, role, village: vil, villages: role === 'admin' ? adminVillages(vils, sams) : [vil].filter(Boolean),
       retired, self };
   }).filter(Boolean);
 }
@@ -246,10 +259,10 @@ async function phoneLogins(phone) {
 async function adminPhone(u) {
   const ids = (await redis('SMEMBERS', 'users')) || [];
   if (!ids.length) return '';
-  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'villages', 'retired']));
+  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'villages', 'retired', 'samitis']));
   const admins = ids.map((id, i) => {
-    const [phone, role, vils, retired] = rows[i] || [];
-    return role === 'admin' && retired !== '1' && phone ? { id, phone, villages: String(vils || '').split(',').filter(Boolean) } : null;
+    const [phone, role, vils, retired, sams] = rows[i] || [];
+    return role === 'admin' && retired !== '1' && phone ? { id, phone, villages: adminVillages(vils, sams) } : null;
   }).filter(Boolean).filter((a) => a.villages.includes(u.village));
   const own = admins.find((a) => a.id === u.by);
   if (own) return own.phone;
@@ -331,5 +344,5 @@ async function getCand(id) {
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE_TIERS, credits, isPrepaid, phoneLogins, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, normPhone,
-  DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

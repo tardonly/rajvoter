@@ -69,6 +69,11 @@
   .filter select { width: auto; padding: 4px 10px; font-size: 14px; border-radius: 999px; margin-left: auto; }
   .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 2px; }
   .checks label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+  .vpick { display: grid; gap: 10px; max-height: 50vh; overflow-y: auto; padding: 2px; }
+  .vpick .sam { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  .vpick .vgroup { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .vpick .vgroup .checks label:has(input:disabled) { color: var(--muted); }
+  .badge.vil.sam { background: #1f4e8c; color: #fff; }
   .vedit { margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
   .vedit .row { margin-top: 6px; }
   /* progress per ward */
@@ -272,7 +277,7 @@
       <form id="addAdminForm" class="stack" autocomplete="off">
         <input id="admName" type="text" placeholder="एडमिन का नाम" maxlength="60" required>
         <input id="admPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
-        <div class="checks" id="admVillages"></div>
+        <div class="vpick" id="admVillages"></div>
         <button class="btn" id="addAdminBtn" type="submit">एडमिन बनाएं</button>
       </form>
       <div class="msg" id="addAdminMsg"></div>
@@ -834,15 +839,32 @@ function showTab(name) {
   if (btn === 'voters' && !vs.loaded) loadVoters();
 }
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
-function villageChecks(checked) {
-  const box = document.createDocumentFragment();
-  for (const s of Object.keys(villages)) {
-    const l = el('label'); const c = el('input'); c.type = 'checkbox'; c.value = s; c.checked = checked.includes(s);
-    l.append(c, vName(s)); box.append(l);
+// an admin's villages to tick, grouped by पंचायत समिति. "पूरी पंचायत समिति" gives the whole samiti (kept as the samiti,
+// so a village added to it later is the admin's too); its villages are then ticked and can't be unticked one by one.
+const samitiOf = (v) => (v.panchayatSamiti ? `${v.district || ''}|${v.panchayatSamiti}` : '');
+const samitiName = (k) => { const [d, sam] = k.split('|'); return `${sam}${d ? ` (${d})` : ''}`; };
+function villageChecks(checked, samitis = []) {
+  const box = document.createDocumentFragment(), groups = new Map();
+  for (const s of Object.keys(villages)) { const k = samitiOf(villages[s]); (groups.get(k) || groups.set(k, []).get(k)).push(s); }
+  for (const [k, slugs] of [...groups].sort((a, b) => (!a[0]) - (!b[0]) || a[0].localeCompare(b[0]))) {
+    const g = el('div', 'vgroup'), list = el('div', 'checks');
+    const whole = el('input'); whole.type = 'checkbox'; whole.dataset.samiti = k; whole.checked = !!k && samitis.includes(k);
+    if (k) {
+      const head = el('label', 'sam'); head.append(whole, L(`पूरी पंचायत समिति ${samitiName(k)} · ${slugs.length} गाँव`, `Whole panchayat samiti ${samitiName(k)} · ${slugs.length} villages`));
+      g.append(head);
+    } else g.append(el('div', 'sam', L('अन्य गाँव', 'Other villages')));
+    for (const s of slugs) {
+      const l = el('label'), c = el('input'); c.type = 'checkbox'; c.value = s;
+      c.checked = whole.checked || checked.includes(s); c.disabled = whole.checked;
+      l.append(c, vName(s)); list.append(l);
+    }
+    whole.addEventListener('change', () => list.querySelectorAll('input').forEach((c) => { c.checked = whole.checked; c.disabled = whole.checked; }));
+    g.append(list); box.append(g);
   }
   return box;
 }
-const checkedIn = (box) => [...box.querySelectorAll('input:checked')].map((c) => c.value);
+const checkedIn = (box) => [...box.querySelectorAll('input[value]:checked:not(:disabled)')].map((c) => c.value);   // villages one by one
+const samitisIn = (box) => [...box.querySelectorAll('input[data-samiti]:checked')].map((c) => c.dataset.samiti);
 
 async function refresh() {
   const r = await api({ action: 'list' });
@@ -1131,10 +1153,10 @@ $('addForm').addEventListener('submit', async (e) => {
 });
 $('addAdminForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const vs = checkedIn($('admVillages'));
-  if (!vs.length) { $('addAdminMsg').textContent = L('कम से कम एक गाँव चुनें', 'Choose at least one village'); return; }
+  const vs = checkedIn($('admVillages')), ss = samitisIn($('admVillages'));
+  if (!vs.length && !ss.length) { $('addAdminMsg').textContent = L('कम से कम एक गाँव चुनें', 'Choose at least one village'); return; }
   $('addAdminBtn').disabled = true; $('addAdminMsg').textContent = '';
-  const r = await api({ action: 'add_admin', name: $('admName').value.trim(), phone: $('admPhone').value, villages: vs });
+  const r = await api({ action: 'add_admin', name: $('admName').value.trim(), phone: $('admPhone').value, villages: vs, samitis: ss });
   $('addAdminBtn').disabled = false;
   if (r.error) { $('addAdminMsg').textContent = errText(r); return; }
   $('admName').value = ''; $('admPhone').value = ''; $('admVillages').replaceChildren(villageChecks([]));
@@ -1268,7 +1290,11 @@ function person(u) {
   const isAdmin = u.role === 'admin';
   const row = el('div', 'person');
   const nm = el('div', 'name', u.name); nm.append(el('span', `badge ${u.retired ? 'off' : 'on'}`, u.retired ? L('बंद', 'Off') : L('चालू', 'Active')));
-  if (isAdmin) for (const s of u.villages) nm.append(el('span', 'badge vil', vName(s)));
+  if (isAdmin) {   // whole samitis, then the villages given one by one
+    for (const k of u.samitis || []) nm.append(el('span', 'badge vil sam', L(`पं.स. ${samitiName(k)} · ${u.villages.filter((s) => villages[s] && samitiOf(villages[s]) === k).length} गाँव`,
+      `PS ${samitiName(k)} · ${u.villages.filter((s) => villages[s] && samitiOf(villages[s]) === k).length} villages`)));
+    for (const s of u.samitis ? u.ownVillages.filter((s) => !(villages[s] && u.samitis.includes(samitiOf(villages[s])))) : u.villages) nm.append(el('span', 'badge vil', vName(s)));
+  }
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
   if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} खोज`, `₹ paid · ${u.credits} searches in all`)
@@ -1308,12 +1334,12 @@ function person(u) {
     const vb = el('button', 'btn ghost', L('गाँव बदलें', 'Change villages'));
     vb.addEventListener('click', () => {
       if (row.querySelector('.vedit')) return row.querySelector('.vedit').remove();
-      const box = el('div', 'vedit'); const checks = el('div', 'checks'); checks.append(villageChecks(u.villages));
+      const box = el('div', 'vedit'); const checks = el('div', 'vpick'); checks.append(villageChecks(u.ownVillages || u.villages, u.samitis || []));
       const save = el('button', 'btn', L('सेव करें', 'Save')); save.type = 'button';
       save.addEventListener('click', () => {
-        const vs = checkedIn(checks);
-        if (!vs.length) { $('listMsg').textContent = L('कम से कम एक गाँव चुनें', 'Choose at least one village'); return; }
-        act({ action: 'villages', id: u.id, villages: vs });
+        const vs = checkedIn(checks), ss = samitisIn(checks);
+        if (!vs.length && !ss.length) { $('listMsg').textContent = L('कम से कम एक गाँव चुनें', 'Choose at least one village'); return; }
+        act({ action: 'villages', id: u.id, villages: vs, samitis: ss });
       });
       const r2 = el('div', 'row'); r2.append(save);
       box.append(checks, r2); actions.after(box);

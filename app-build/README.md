@@ -12,7 +12,9 @@ only receive the cards that match a search. Every search checks that the user's 
 
 ## Who can do what
 - **Superadmin** — the `ADMIN_PASSWORD` set in Vercel. Opens every village. Creates **village admins** and chooses
-  which villages each one looks after (can change this later with **गाँव बदलें**). Can also add and manage users anywhere.
+  which villages each one looks after (can change this later with **गाँव बदलें**): villages one by one, or a whole
+  पंचायत समिति with **पूरी पंचायत समिति** (kept as the samiti, so villages imported into it later are that admin's at
+  once; field `samitis` on the admin's login). Can also add and manage users anywhere.
 - **Village admin** — created by the superadmin. Searches only their villages and adds/manages users only there.
   Cannot see or create other admins.
 - **User** — belongs to exactly one village; their password only opens that village. Opening another village's

@@ -4,8 +4,9 @@
 //                                         progress}   users carry perms, searchesToday, limit (today's, with any extra),
 //                                         ownLimit ('' = default), extraToday and marked (slips with their marks)
 //   action "add", village, name, phone → {user, password}   new user of one village (must be one of the admin's villages)
-//   action "add_admin", name, phone, villages: [slug, ...] → {user, password}            (superadmin only)
-//   action "villages", id, villages: [slug, ...]           → {user}   change an admin's villages (superadmin only)
+//   action "add_admin", name, phone, villages: [slug, ...], samitis: ["<district>|<samiti>", ...] → {user, password}
+//                                         (superadmin only; samitis = whole पंचायत समितियाँ, villages added there later too)
+//   action "villages", id, villages, samitis               → {user}   change an admin's villages (superadmin only)
 //   action "reset",  id         → {user, password}   (new password for the same person; the old one stops working)
 //   action "retire", id         → {ok}               (password stops working; the phone is logged out at once)
 //   action "logout", id         → {ok}               (ends the person's current session; they can log in again)
@@ -50,22 +51,22 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, packPrice, newReqId, getReq, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
+const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, packPrice, newReqId, getReq, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
-// list of village slugs from the request → only real villages, no repeats; null when none
-function villageSlugs(list) {
-  const ok = [...new Set((Array.isArray(list) ? list : []).filter((s) => realVillage(s)))];
-  return ok.length ? ok : null;
-}
+// list of village slugs from the request → only real villages, no repeats
+const villageSlugs = (list) => [...new Set((Array.isArray(list) ? list : []).filter((s) => realVillage(s)))];
+// list of whole पंचायत समितियाँ from the request ("<district>|<samiti>", see adminVillages in _lib.js) → only known ones
+const samitiList = (list) => { const all = samitiKeys(); return [...new Set((Array.isArray(list) ? list : []).filter((k) => all.includes(k)))]; };
 
 const view = (u) => ({
   perms: u.role === 'user' ? permsOf(u) : PERMS.slice(), cand: u.role === 'user' ? u.cand || '' : '',
   limit: u.role === 'user' ? dailyLimit(u) : null, ownLimit: Number(u.limit) || '', extraToday: extraToday(u),
   defaultLimit: DAILY_SEARCHES,
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
+  ownVillages: u.ownVillages || [], samitis: u.samitis || [],   // an admin's: given one by one, and whole samitis
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
   by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
@@ -240,9 +241,9 @@ module.exports = route(async (req, res, b) => {
       }
     } else {
       if (!isSuper) return send(res, 403, { error: 'super_only' });
-      const vs = villageSlugs(b.villages);
-      if (!vs) return send(res, 400, { error: 'no_village' });
-      fields = ['role', 'admin', 'villages', vs.join(',')];
+      const vs = villageSlugs(b.villages), ss = samitiList(b.samitis);
+      if (!vs.length && !ss.length) return send(res, 400, { error: 'no_village' });
+      fields = ['role', 'admin', 'villages', vs.join(','), 'samitis', ss.join(',')];
     }
     const { id, password } = await newLogin(fields, name, phone);
     return send(res, 200, { user: view(await getUser(id)), password });
@@ -316,9 +317,9 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'villages') {
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     if (user.role !== 'admin') return send(res, 400, { error: 'not_admin' });
-    const vs = villageSlugs(b.villages);
-    if (!vs) return send(res, 400, { error: 'no_village' });
-    await redis('HSET', `user:${user.id}`, 'villages', vs.join(','));
+    const vs = villageSlugs(b.villages), ss = samitiList(b.samitis);
+    if (!vs.length && !ss.length) return send(res, 400, { error: 'no_village' });
+    await redis('HSET', `user:${user.id}`, 'villages', vs.join(','), 'samitis', ss.join(','));
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

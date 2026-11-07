@@ -12,7 +12,7 @@ Full setup and admin guide: `app-build/README.md`.
   (run with `.venv/bin/python`).
 - `app-build/import_json.mjs <folder, e.g. rajasthan>` (or `--bucket <s3 bucket>`) adds villages / missing wards from another team's converted JSON
   (`.json` / `.json.gz`) without the PDFs; our own analysed wards are kept (see README).
-- Roles: superadmin (`ADMIN_PASSWORD`), village admins (role `admin`, `villages` list), users (one `village`).
+- Roles: superadmin (`ADMIN_PASSWORD`), village admins (role `admin`, `villages` list and/or whole `samitis`), users (one `village`).
   Permission checks live in `voter-search-app/api/_lib.js` (`whoIs`) and `api/admin.js`.
 
 ## "Analyse <village>" — turning the PDFs into data
