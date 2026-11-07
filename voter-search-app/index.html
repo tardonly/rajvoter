@@ -232,6 +232,24 @@
   .family { margin: -4px 0 14px 10px; padding: 8px 0 0 10px; border-left: 3px solid var(--accent); }
   .family .fh { font-size: 13.5px; font-weight: 600; color: var(--accent); margin: 0 0 8px; }
   .family .slip:last-child { margin-bottom: 0; }
+  .family .fh { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .tbtn { border: 1px solid #15803d; background: #fff; color: #15803d; border-radius: 8px; padding: 3px 10px; font-size: 13px; font-weight: 600; }
+  .tbtn.on { background: #15803d; color: #fff; }
+  .ftree { grid-column: 1 / -1; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    margin: 0 0 10px; font-size: 15px; line-height: 1.5; overflow-x: auto; }
+  .ftree ul { list-style: none; margin: 0; padding: 0; }
+  .ftree ul ul { margin-left: 9px; padding-left: 14px; border-left: 2px solid #bbf7d0; }
+  .ftree li { margin: 3px 0; }
+  .ftree .fl { white-space: nowrap; }
+  .ftree .fp { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .ftree .fp small { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .ftree .fp.gone { color: var(--muted); text-decoration: line-through; font-weight: 400; }
+  .ftree .fp.ghost { font-weight: 400; font-style: italic; color: var(--muted); cursor: default; }
+  .ftree .eq { color: #be185d; font-weight: 700; }
+  .ftree .falone { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line); font-size: 14px; }
+  .ftree .fnote { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .slip.flash { animation: flash 1.4s ease-out; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 4px #22c55e; } 100% { box-shadow: 0 0 0 4px transparent; } }
   .slip .bar small { font-weight: 400; font-size: 12px; margin-left: 8px; opacity: .9; }
   /* bigger text (अ+ button), remembered on this phone */
   html.big .slip, html.big .family .fh, html.big .hint { zoom: 1.2; }
@@ -319,6 +337,9 @@
     #printArea .slip .line b { font-size: 15px; }
     #printArea .slip .kendra { font-size: 11px; }
     #printArea .slip .time { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #printArea .fth { font-size: 16px; font-weight: 700; margin: 0 0 3mm; }
+    #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
+    #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
 </head>
@@ -973,13 +994,197 @@ async function toggleFamily(r, d, btn) {
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
   if (x.error) { alert(MSG[x.error] || MSG.server); return; }
   const others = x.results.filter((v) => v.box !== r.box);
-  const box = el('div', 'family');
-  box.append(el('div', 'fh', others.length ? L(`मकान नं. ${r.house} · वार्ड ${r.ward} · इसी मकान के और ${others.length} मतदाता`,
+  const box = el('div', 'family'), fh = el('div', 'fh');
+  fh.append(el('span', null, others.length ? L(`मकान नं. ${r.house} · वार्ड ${r.ward} · इसी मकान के और ${others.length} मतदाता`,
     `House no. ${r.house} · ward ${r.ward} · ${others.length} more voter${others.length === 1 ? '' : 's'} in this house`)
     : L(`मकान नं. ${r.house} पर और कोई मतदाता नहीं`, `No other voter at house no. ${r.house}`)));
-  for (const v of others) box.append(slip(v, false, true));
+  box.append(fh);
+  const slips = new Map([[r.box, d]]);
+  for (const v of others) { const s = slip(v, false, true); slips.set(v.box, s); box.append(s); }
+  if (others.length) {   // वंश वृक्ष: the house's voters arranged by father and husband, above the slips
+    const tb = el('button', 'tbtn', L('🌳 वंश वृक्ष', '🌳 Family tree')); tb.type = 'button';
+    let tree = null, pb = null;
+    tb.addEventListener('click', () => {
+      if (tree) { tree.remove(); if (pb) pb.remove(); tree = pb = null; tb.classList.remove('on'); return; }
+      tree = treeView(x.results, (v) => slips.get(v.box));
+      fh.after(tree); tb.classList.add('on');
+      if (can('print')) {
+        pb = el('button', 'tbtn', L('प्रिंट / PDF', 'Print / PDF')); pb.type = 'button';
+        pb.addEventListener('click', () => printTree(tree, r));
+        tb.after(pb);
+      }
+    });
+    fh.append(tb);
+  }
   d.after(box);
   btn.classList.add('on'); btn.textContent = L('परिवार छुपाएं', 'Hide family');
+}
+
+// ---------- वंश वृक्ष: who is whose father / husband inside one house, from the names on the slips ----------
+// Every voter names one relative (पिता / पति / माता). That name is looked for among the other voters of the house:
+// same name (spellings folded, endings like कुमार / सिंह / राम allowed to differ) and a believable age (a parent at least
+// 15 years older, a husband within 25 years). When two people fit equally well the link is left out rather than guessed.
+// A father who is not a voter here but is named by two or more of the house becomes one "not on the list" node.
+const FOLD_SUF_EN = ['kumar', 'kumari', 'lal', 'sing', 'ram', 'cand', 'candr', 'prasad', 'devi', 'kanvar', 'das', 'dat', 'nat', 'kan', 'ali'];
+const FOLD_SUF_HI = ['कुमार', 'कुमारि', 'लाल', 'सिह', 'राम', 'चद', 'चदर', 'परसाद', 'देबि', 'कबर', 'दास', 'दत', 'नाथ', 'खान', 'खा', 'अलि'];
+// spellings folded as the village search does (foldEn / foldHi, further down), and a bit more: a final "a" dropped
+// (Surendra = Surender), half न / म as the anusvara (सुरेन्द्र = सुरेंद्र), व = ब
+const treeEn = (s) => foldEn(s).replace(/a$/, '');
+const treeHi = (s) => foldHi(String(s || '').normalize('NFD').replace(/[नम]्(?=[क-ह])/g, '').replace(/्र/g, 'र').replace(/र्/g, 'र'))
+  .replace(/व/g, 'ब').replace(/(.)\1+/g, '$1');
+function cores(f, sufs) {   // the folded name, and the same without a common ending: "rajkumar" → also "raj"
+  const out = [f];
+  for (const x of sufs) if (f.endsWith(x) && f.length - x.length >= 3) out.push(f.slice(0, -x.length));
+  return out;
+}
+// a name's first word counts as well when it is long enough ("Rajendra Prasad Khatkar" → "rajendr"), but not a word
+// that starts many names (मोहम्मद, सैयद, अब्दुल …)
+const FIRST_NOT = new Set(['mohamad', 'mohd', 'muhamad', 'seiad', 'abdul', 'gulam', 'sek', 'seik', 'mirj', 'patan', 'haji', 'sri', 'srimati',
+  'मोहमद', 'मुहमद', 'सेयद', 'अबदुल', 'गुलाम', 'सेख', 'मिरजा', 'हाजि', 'सरि', 'सरिमति']);
+function nameKeys(en, hi) {
+  const k = { en: treeEn(en), hi: treeHi(hi) };
+  k.enC = cores(k.en, FOLD_SUF_EN); k.hiC = cores(k.hi, FOLD_SUF_HI);
+  const w1 = treeEn(String(en || '').trim().split(/\s+/)[0]), h1 = treeHi(String(hi || '').trim().split(/\s+/)[0]);
+  if (w1.length >= 4 && w1 !== k.en && !FIRST_NOT.has(w1)) k.enC.push(w1);
+  if (h1.length >= 3 && h1 !== k.hi && !FIRST_NOT.has(h1)) k.hiC.push(h1);
+  return k;
+}
+function oneSlip(a, b, min) {   // the same but for one vowel (added, dropped or changed): Yunas = Yunus, not Gopal = Bhopal
+  if (a === b) return !!a;
+  if (Math.abs(a.length - b.length) > 1 || Math.min(a.length, b.length) < min) return false;
+  const vowel = (c) => !c || /[aeiouअ-औा-ौ]/.test(c);
+  let i = 0; while (i < a.length && a[i] === b[i]) i++;
+  if (a.slice(i + 1) === b.slice(i + 1)) return vowel(a[i]) && vowel(b[i]);
+  if (a.slice(i) === b.slice(i + 1)) return vowel(b[i]);
+  return a.slice(i + 1) === b.slice(i) && vowel(a[i]);
+}
+// 2: the same name; 1: the same once an ending is dropped; 0: not the same
+function nameFit(a, b) {
+  if ((a.en && a.en === b.en) || (a.hi && a.hi === b.hi)) return 2;
+  if (a.enC.some((x) => x.length >= 4 && b.enC.includes(x)) || a.hiC.some((x) => x.length >= 3 && b.hiC.includes(x))) return 1;
+  if (oneSlip(a.en, b.en, 5) && oneSlip(a.hi, b.hi, 4)) return 1;   // in both spellings
+  return 0;
+}
+const isMan = (p) => /पुरुष|^m/i.test(p.r.sex), isWoman = (p) => /स्त्री|महिला|^f/i.test(p.r.sex);
+
+// rows of one house → {roots: [unit], alone: [person], links}; unit = {p (a person, or a ghost {ghost, hname, name}),
+// wives: [person], kids: [unit]}
+function familyTree(rows) {
+  const P = rows.map((r, i) => ({ r, i, age: Number(r.age) || 0, me: nameKeys(r.name, r.hname), rel: nameKeys(r.relname, r.hrel) }));
+  const father = new Map(), husband = new Map();   // person → person
+  for (const p of P) {
+    const kind = /पति/.test(p.r.rel) ? 'h' : /पिता|माता/.test(p.r.rel) ? 'p' : '';
+    if (!kind) continue;
+    const ok = P.filter((q) => q !== p && (kind === 'h'
+      ? isMan(q) && !isMan(p) && Math.abs(q.age - p.age) <= 25
+      : q.age - p.age >= 15 && (/माता/.test(p.r.rel) ? !isMan(q) : !isWoman(q))));
+    let best = 0, hits = [];
+    for (const q of ok) {
+      const f = nameFit(p.rel, q.me);
+      if (f > best) { best = f; hits = [q]; } else if (f && f === best) hits.push(q);
+    }
+    if (hits.length !== 1) continue;   // none, or two that fit as well: leave it out
+    (kind === 'h' ? husband : father).set(p, hits[0]);
+  }
+  // a married woman sits beside her husband; a link to her own father in the same house is dropped
+  for (const w of husband.keys()) father.delete(w);
+  // fathers who are not voters here, named by two or more: one shared node (a woman whose unfound husband has that name
+  // sits beside it)
+  const lost = P.filter((p) => !father.has(p) && !husband.has(p) && /पिता/.test(p.r.rel) && (p.r.relname || p.r.hrel));
+  const ghosts = [];
+  for (const p of lost) {
+    let g = ghosts.find((g) => g.kids.some((k) => nameFit(k.rel, p.rel) === 2) || nameFit(g.key, p.rel) === 2);
+    if (!g) ghosts.push(g = { ghost: true, hname: p.r.hrel, name: p.r.relname, key: p.rel, kids: [] });
+    g.kids.push(p);
+  }
+  const unitOf = new Map(), units = [];
+  const mk = (p) => { const u = { p, wives: [], kids: [] }; units.push(u); unitOf.set(p, u); return u; };
+  for (const p of P) if (!husband.has(p)) mk(p);
+  for (const [w, h] of husband) unitOf.get(h).wives.push(w);
+  for (const g of ghosts.filter((g) => g.kids.length >= 2)) {
+    const u = mk(g);
+    for (const k of g.kids) father.set(k, g);
+    const widow = P.find((w) => /पति/.test(w.r.rel) && !husband.has(w) && nameFit(w.rel, g.key) === 2 && unitOf.get(w).kids.length === 0);
+    if (widow) { units.splice(units.indexOf(unitOf.get(widow)), 1); unitOf.delete(widow); u.wives.push(widow); husband.set(widow, g); }
+  }
+  // a mother named by the slip (rare): the child goes under her unit (her husband's when she has one)
+  const parentUnit = (p) => {
+    const q = father.get(p);
+    if (!q) return null;
+    return unitOf.get(q) || unitOf.get(husband.get(q));
+  };
+  const placed = new Set();
+  for (const u of units) {
+    if (u.p.ghost) continue;
+    const pu = parentUnit(u.p);
+    if (pu && pu !== u) { pu.kids.push(u); placed.add(u); }
+  }
+  const sortKids = (u) => {
+    u.kids.sort((a, b) => age(b) - age(a));
+    u.kids.forEach(sortKids);
+  };
+  const age = (u) => (u.p.ghost ? Math.max(...u.kids.map(age)) + 25 : u.p.age);
+  let roots = units.filter((u) => !placed.has(u));
+  const alone = roots.filter((u) => !u.p.ghost && !u.wives.length && !u.kids.length).map((u) => u.p);
+  roots = roots.filter((u) => u.p.ghost || u.wives.length || u.kids.length);
+  roots.forEach(sortKids);
+  roots.sort((a, b) => age(b) - age(a));
+  alone.sort((a, b) => b.age - a.age);
+  return { roots, alone, links: father.size + husband.size };
+}
+
+
+// the tree drawn inside the परिवार panel; a tap on a name scrolls to that voter's slip
+function treeView(rows, slipOf) {
+  const t = familyTree(rows), wrap = el('div', 'ftree');
+  const who = (p) => {
+    if (p.ghost) {
+      const g = el('span', 'fp ghost', EN ? p.name || p.hname : p.hname || p.name);
+      g.append(el('small', null, L(' · सूची में नहीं', ' · not on the list')));
+      return g;
+    }
+    const b = el('button', `fp${p.r.del ? ' gone' : ''}`, EN ? p.r.name || p.r.hname : p.r.hname || p.r.name);
+    b.type = 'button';
+    b.append(el('small', null, ` ${p.r.age}`));
+    b.addEventListener('click', () => {
+      const s = slipOf(p.r);
+      if (!s) return;
+      s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      s.classList.remove('flash'); void s.offsetWidth; s.classList.add('flash');
+    });
+    return b;
+  };
+  const draw = (u) => {
+    const li = el('li'), line = el('div', 'fl');
+    line.append(who(u.p));
+    for (const w of u.wives) line.append(el('span', 'eq', ' ═ '), who(w));
+    li.append(line);
+    if (u.kids.length) { const ul = el('ul'); u.kids.forEach((k) => ul.append(draw(k))); li.append(ul); }
+    return li;
+  };
+  if (t.roots.length) { const ul = el('ul', 'ft'); t.roots.forEach((u) => ul.append(draw(u))); wrap.append(ul); }
+  else wrap.append(el('div', 'fnote', L('इस मकान में किसी का रिश्ता नहीं मिला।', 'No relation found in this house.')));
+  if (t.alone.length) {
+    const a = el('div', 'falone');
+    a.append(el('b', null, L('रिश्ता नहीं मिला: ', 'No relation found: ')));
+    t.alone.forEach((p, i) => { if (i) a.append(', '); a.append(who(p)); });
+    wrap.append(a);
+  }
+  wrap.append(el('div', 'fnote', L('═ पति-पत्नी। नाम और उम्र से बना अंदाज़ा है, पक्का रिकॉर्ड नहीं।',
+    '═ husband and wife. A guess from the names and ages on the list, not a record.')));
+  return wrap;
+}
+function printTree(tree, r) {
+  const area = $('printArea'); area.innerHTML = '';
+  const head = el('div', 'fth', L(`${VILLAGE.name} · वार्ड ${r.ward} · मकान नं. ${r.house} · वंश वृक्ष`,
+    `${vn(VILLAGE)} · ward ${r.ward} · house no. ${r.house} · family tree`));
+  const c = tree.cloneNode(true);
+  c.querySelectorAll('.fnote').forEach((n, i, all) => { if (i < all.length - 1) n.remove(); });
+  area.append(head, c);
+  const old = document.title;
+  document.title = L(`वंश वृक्ष ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family tree ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`);
+  window.addEventListener('afterprint', () => { document.title = old; area.innerHTML = ''; }, { once: true });
+  window.print();
 }
 
 // ---------- status marks (set by admins and people allowed to; everyone sees the bar, who set it and when) ----------
