@@ -135,6 +135,15 @@
   .modal { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center;
     padding: calc(60px + env(safe-area-inset-top)) 16px 16px; background: rgba(17,24,39,.45); overflow-y: auto; }
   .modal .card { width: 100%; max-width: 480px; margin: 0; }
+  #apBody .who { font-size: 18px; font-weight: 700; }
+  #apBody .ask { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+  #apBody .ask b { font-size: 20px; }
+  #apBody .packs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  #apBody .packs .on { background: #16a34a; color: #fff; border-color: #16a34a; }
+  #apBody .packs input { width: 110px; }
+  #apBody .price { font-size: 15px; }
+  #apBody .bad { color: var(--bad); font-weight: 600; }
+  #apBody .done { color: #15803d; font-size: 17px; font-weight: 700; }
   .modal .x, .newpw .x { border: 0; background: none; font-size: 18px; color: var(--muted); padding: 0 4px; }
   .newpw { margin: 0 0 14px; }
   .newpw .permsbox { margin-top: 12px; padding-top: 10px; border-top: 1px solid #bfdbfe; }
@@ -318,6 +327,13 @@
     <div class="msg" id="addMsg"></div>
   </div>
 </div>
+<!-- popup: approving searches from a person's WhatsApp request (/admin#add=…) -->
+<div class="modal hidden" id="apModal" role="dialog" aria-modal="true" aria-labelledby="apTitle">
+  <div class="card">
+    <div class="bar2"><h2 id="apTitle"></h2><button class="x" id="apClose" type="button">✕</button></div>
+    <div id="apBody" class="stack"></div>
+  </div>
+</div>
 <footer class="footer">
   <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
   <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
@@ -437,6 +453,7 @@ function showLogin(msg) {
   $('list').innerHTML = ''; $('adminList').innerHTML = ''; $('newPw').classList.add('hidden'); $('addModal').classList.add('hidden');
   $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
   $('loginMsg').textContent = msg || '';
+  if (APPROVE) $('loginMsg').textContent += (msg ? ' · ' : '') + approveHint();
 }
 async function openPanel() {
   const r = await api({ action: 'list' });
@@ -451,35 +468,94 @@ async function openPanel() {
 }
 // search packs [searches, ₹], as in index.html
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
-// a person's WhatsApp request carries /admin#add=<phone>&n=<searches>&v=<village>: after logging in, the admin sees who
-// and how much to expect, and one tap adds the searches (the server still checks this admin may manage that person)
-async function approveFromLink() {
+// a person's WhatsApp request carries /admin#add=<mobile>&n=<searches>&v=<village>. Read once when the page opens (and
+// taken off the address so a reload doesn't ask again); only an admin's password gets past the login, and the approval
+// popup then shows who it is, their searches so far and the pack asked for. The server still checks that this admin
+// may manage that person (api/admin.js "credits_add").
+const APPROVE = (() => {
   const h = new URLSearchParams(location.hash.slice(1));
-  if (!h.get('add')) return;
-  history.replaceState(null, '', location.pathname);   // once only, not again on reload
-  const phone = h.get('add'), n = parseInt(h.get('n'), 10), v = h.get('v') || '';
+  if (!h.get('add')) return null;
+  history.replaceState(null, '', location.pathname);
+  return { phone: h.get('add'), n: parseInt(h.get('n'), 10) || 0, v: h.get('v') || '' };
+})();
+const approveHint = () => L(`खोज मंज़ूर करने के लिए एडमिन पासवर्ड से लॉगिन करें (${APPROVE.n} खोज · ${showPhone(APPROVE.phone)})`,
+  `Log in with an admin password to approve searches (${APPROVE.n} searches · ${showPhone(APPROVE.phone)})`);
+if (APPROVE) $('loginMsg').textContent = approveHint();
+const packPrice = (n) => { const pk = PACKS.find((x) => x[0] === n); return pk ? pk[1] : null; };
+function apClose() { $('apModal').classList.add('hidden'); }
+$('apClose').addEventListener('click', apClose);
+function approveFromLink() {
+  if (!APPROVE) return;
+  const req = APPROVE, body = $('apBody');
   showTab('people');
-  const u = users.find((x) => x.phone === phone && x.village === v && !x.retired) || users.find((x) => x.phone === phone && !x.retired);
-  if (!u) { $('listMsg').textContent = L(`मोबाइल ${showPhone(phone)} (${vName(v)}) का कोई व्यक्ति आपकी सूची में नहीं मिला`, `No one with mobile ${showPhone(phone)} (${vName(v)}) in your list`); return; }
-  if (!(n > 0 && n <= 10000)) { $('listMsg').textContent = MSG.bad_credits; return; }
-  if (!u.prepaid) { $('listMsg').textContent = MSG.not_prepaid; return; }
-  const pk = PACKS.find((x) => x[0] === n);
-  const price = pk ? `₹${pk[1]}` : L('(यह पैक सूची में नहीं)', '(not one of the packs)');
-  if (!confirm(L(`${u.name} · ${showPhone(u.phone)} · ${vName(u.village)}\n\n${n} खोज — ${price}\n\nभुगतान मिल गया? हाँ दबाने पर ${n} खोज जुड़ जाएंगी।`,
-    `${u.name} · ${showPhone(u.phone)} · ${vName(u.village)}\n\n${n} searches — ${price}\n\nPayment received? OK adds ${n} searches.`))) {
-    $('listMsg').textContent = L('खोज नहीं जोड़ी गईं', 'No searches added'); return;
+  $('apTitle').textContent = L('✅ खोज मंज़ूरी', '✅ Approve searches');
+  body.replaceChildren();
+  $('apModal').classList.remove('hidden');
+  const u = users.find((x) => x.phone === req.phone && x.village === req.v && !x.retired)
+    || users.find((x) => x.phone === req.phone && !x.retired);
+  if (!u) {
+    body.append(el('div', 'bad', L(`मोबाइल ${showPhone(req.phone)} (${vName(req.v)}) का कोई व्यक्ति आपकी सूची में नहीं।`,
+      `No one with mobile ${showPhone(req.phone)} (${vName(req.v)}) in your list.`)),
+    el('div', 'sub', L('खोज सिर्फ़ उस गाँव का एडमिन या सुपर एडमिन जोड़ सकता है।', "Only that village's admin or the super admin can add searches.")));
+    return;
   }
-  const r = await api({ action: 'credits_add', id: u.id, n });
-  if (r.error) { $('listMsg').textContent = errText(r); return; }
-  await refresh();
-  $('listMsg').textContent = L(`✓ ${u.name} को ${n} खोज मिल गईं (${price})`, `✓ ${u.name} got ${n} searches (${price})`);
+  if (!u.prepaid) {
+    body.append(el('div', 'who', u.name), el('div', 'bad', MSG.not_prepaid));
+    return;
+  }
+  let n = req.n;
+  const ask = el('div', 'ask');
+  const askPrice = packPrice(req.n);
+  ask.append(L('माँगी: ', 'Asked for: '), el('b', null, L(`${req.n} खोज`, `${req.n} searches`)),
+    askPrice != null ? ` · ₹${askPrice}` : L(' · (यह पैक सूची में नहीं)', ' · (not one of the packs)'));
+  const packs = el('div', 'packs'), inp = el('input'), price = el('div', 'price'), go = el('button', 'btn full'), msg = el('div', 'msg');
+  inp.type = 'number'; inp.min = 1; inp.max = 10000; inp.inputMode = 'numeric';
+  go.type = 'button';
+  const show = () => {
+    packs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === n));
+    if (Number(inp.value) !== n) inp.value = n || '';
+    const rs = packPrice(n);
+    price.textContent = n > 0 ? L(`जोड़ी जाएंगी: ${n} खोज${rs != null ? ` · भुगतान ₹${rs} होना चाहिए` : ''}`,
+      `Will add: ${n} searches${rs != null ? ` · payment should be ₹${rs}` : ''}`) : '';
+    go.textContent = n > 0 ? L(`✓ भुगतान मिल गया — ${n} खोज जोड़ें`, `✓ Payment received — add ${n} searches`) : L('संख्या डालें', 'Enter a number');
+    go.disabled = !(n > 0 && n <= 10000);
+  };
+  for (const [k] of PACKS) {
+    const b = el('button', 'btn ghost', `${k}`); b.type = 'button'; b.dataset.n = k;
+    b.addEventListener('click', () => { n = k; show(); });
+    packs.append(b);
+  }
+  packs.append(inp);
+  inp.addEventListener('input', () => { n = parseInt(inp.value, 10) || 0; show(); });
+  const meter = useMeter(u);
+  go.addEventListener('click', async () => {
+    go.disabled = true; msg.textContent = '';
+    const r = await api({ action: 'credits_add', id: u.id, n });
+    if (r.error) { msg.textContent = errText(r); go.disabled = false; return; }
+    await refresh();
+    const fresh = users.find((x) => x.id === u.id) || u;
+    const left = Math.max(0, fresh.credits - (fresh.paidUsed || 0));
+    const tell = el('a', 'btn wa full', L('💬 उपयोगकर्ता को WhatsApp पर बताएं', '💬 Tell them on WhatsApp'));
+    tell.href = `https://wa.me/${u.phone}?text=` + encodeURIComponent(L(
+      `नमस्ते ${u.name}, आपके Voter Search खाते में ${n} खोज जोड़ दी गई हैं। अब ${left} खोज बाकी हैं।\n${location.origin}/${u.village}`,
+      `Hello ${u.name}, ${n} searches have been added to your Voter Search login. You now have ${left} searches left.\n${location.origin}/${u.village}`));
+    tell.target = '_blank'; tell.rel = 'noopener';
+    body.replaceChildren(el('div', 'who', u.name),
+      el('div', 'done', L(`✓ ${n} खोज जोड़ दी गईं · अब ${left} बाकी`, `✓ ${n} searches added · ${left} left now`)), tell);
+    $('listMsg').textContent = L(`✓ ${u.name} को ${n} खोज मिल गईं`, `✓ ${u.name} got ${n} searches`);
+  });
+  body.append(el('div', 'who', u.name),
+    el('div', 'sub', `${showPhone(u.phone)} · ${vName(u.village)}${u.bought ? L(' · पहले भी खरीदा', ' · bought before') : L(' · पहली खरीद', ' · first purchase')}`),
+    meter, ask, el('div', 'sub', L('भुगतान देखकर संख्या चुनें या बदलें:', 'Check the payment, then pick or change the number:')),
+    packs, price, go, msg);
+  show();
 }
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('loginBtn').disabled = true; $('loginMsg').textContent = '';
   const r = await post('unlock', { password: $('adminPw').value });
   $('loginBtn').disabled = false;
-  if (r.error) { $('loginMsg').textContent = errText(r); return; }
+  if (r.error) { $('loginMsg').textContent = errText(r) + (APPROVE ? ` · ${approveHint()}` : ''); return; }
   $('adminPw').value = '';
   token = r.token; store.set(token);
   openPanel();

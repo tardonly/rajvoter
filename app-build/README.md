@@ -168,8 +168,11 @@ More searches: the **🛒 और खोज खरीदें** window offers pa
 opens a chat with that person's admin: the village admin who made the login, else the village's admin with the fewest
 villages, using the mobile number on the admin's login (so give every village admin a number); with no such admin, the
 app's number (`WHATSAPP` in `index.html`). The message has the person's name, mobile number, village, the pack and a link
-`/admin#add=<mobile>&n=<searches>&v=<village>`. The admin opens it (logging in first if needed), checks the payment, and
-one OK on the box that shows the person and the pack's price adds the searches. Searches can also be added by hand in
+`/admin#add=<mobile>&n=<searches>&v=<village>`. Opening it shows the admin login (only an admin password
+gets in; a person's own password is refused), then the **✅ खोज मंज़ूरी** popup: the person, their searches so far, the
+pack asked for and what the payment should be. The admin picks or changes the number to match the payment and taps
+**✓ भुगतान मिल गया — N खोज जोड़ें**; a WhatsApp button then tells the person. An admin of another village gets "not in
+your list" (the server checks too). Searches can also be added by hand in
 the people list: **खोज जोड़ें** with the pack sizes or any number. Those logins are tagged "₹ भुगतान किया" and no
 longer count for the free sign-up tiers.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit.
