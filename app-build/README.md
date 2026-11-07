@@ -166,7 +166,13 @@ The login page asks only for the **mobile number** first:
 - Signed-up logins have no daily limit: free plus bought searches, which never expire. When none are left the
   **🛒 खोज खरीदें** window opens by itself (after logging in, or on the next search).
 
-Buying (only once `UPI_ID` is set in Vercel and the app redeployed; for signed-up logins, not for admin-made ones):
+Asking on WhatsApp (works with or without `UPI_ID`): the **🛒 खोज खरीदें** window has a **💬 WhatsApp करके खोज मंगाएं**
+button (the only option while `UPI_ID` is not set) that opens a chat with the app's number (`WHATSAPP` in `index.html`)
+with the person's name, mobile number and village filled in. The superadmin then adds searches to that login in the
+admin page's people list: **खोज जोड़ें: +50 / +100 / +500** or any number (signed-up logins only; it counts as a purchase
+for the free sign-up tiers).
+
+Buying with UPI (only once `UPI_ID` is set in Vercel and the app redeployed; for signed-up logins, not for admin-made ones):
 - The person picks a pack (₹50 / 100 / 200 / 500 / 800 / 1000 = that many searches), pays with the
   **UPI ऐप से भुगतान करें** button (phones) or the QR (laptops), and types the payment's 12-digit **UTR**. **10 searches
   are added at once**; the rest when the superadmin approves (3 such early top-ups per internet address a day).

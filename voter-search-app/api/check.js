@@ -14,6 +14,6 @@ module.exports = route(async (req, res, { token, village: slug }) => {
   const prepaid = isPrepaid(user);
   const left = user.demo ? Math.max(0, DEMO.searches - (Number(await redis('GET', `searches:${user.id}`)) || 0))
     : prepaid ? await creditsLeft(user) : undefined;
-  send(res, 200, { active: true, demo: !!user.demo, prepaid, left, name: user.name, admin: !!user.admin, role: user.role, villages: user.villages,
+  send(res, 200, { active: true, demo: !!user.demo, prepaid, left, name: user.name, phone: user.phone || '', admin: !!user.admin, role: user.role, villages: user.villages,
     list: villageList(user.villages), perms: user.perms, cand: user.candName || '' });
 });

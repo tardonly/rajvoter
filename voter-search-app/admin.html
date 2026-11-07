@@ -404,6 +404,7 @@ const MSG = EN ? {
   phone: 'Mobile number is not right — type a 10-digit number',
   no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
+  bad_credits: 'Type how many searches to add (1 to 10000)', not_prepaid: 'This login has a daily limit instead',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
   no_buy: 'Purchase not found', buy_done: 'This purchase was already decided',
 } : {
@@ -415,6 +416,7 @@ const MSG = EN ? {
   phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
+  bad_credits: 'कितनी खोज जोड़नी हैं, 1 से 10000 के बीच लिखें', not_prepaid: 'इस खाते की रोज़ की सीमा है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
   no_buy: 'यह खरीद नहीं मिली', buy_done: 'इस खरीद पर पहले ही फ़ैसला हो चुका है',
 };
@@ -715,6 +717,34 @@ function limitBox(u, msg = 'listMsg', saved) {
   return box;
 }
 
+// searches the superadmin adds to a signed-up login (e.g. paid for on WhatsApp): quick packs or any number
+function creditsBox(u, saved) {
+  const box = el('div', 'limit'), inp = el('input'), add = el('button', 'btn ghost', L('जोड़ें', 'Add'));
+  inp.type = 'number'; inp.min = 1; inp.max = 10000; inp.inputMode = 'numeric'; inp.placeholder = L('संख्या', 'number');
+  add.type = 'button';
+  async function send(n, btn) {
+    if (!confirm(L(`${u.name} को ${n} खोज और दें?`, `Give ${u.name} ${n} more searches?`))) return;
+    btn.disabled = true;
+    const r = await api({ action: 'credits_add', id: u.id, n });
+    btn.disabled = false;
+    if (r.error) { $('listMsg').textContent = errText(r); return; }
+    $('listMsg').textContent = L(`${u.name} को ${n} खोज और मिल गईं`, `${u.name} got ${n} more searches`);
+    inp.value = '';
+    Object.assign(u, r.user);
+    if (saved) saved();
+  }
+  box.append(L('खोज जोड़ें:', 'Add searches:'));
+  for (const n of [50, 100, 500]) {
+    const b = el('button', 'btn ghost', `+${n}`); b.type = 'button';
+    b.addEventListener('click', () => send(n, b));
+    box.append(b);
+  }
+  add.addEventListener('click', () => { const n = parseInt(inp.value, 10); if (n > 0) send(n, add); else $('listMsg').textContent = MSG.bad_credits; });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add.click(); } });
+  box.append(inp, add);
+  return box;
+}
+
 // ---------- new password box ----------
 let shareTo = '', shareLink = '', shareTitle = '';   // phone number the WhatsApp button sends to ('' = WhatsApp asks for a contact)
 function showPassword(u, pw) {
@@ -956,7 +986,8 @@ function person(u) {
   const use = el('div', 'info', L(`${u.marked} पर्चियों पर इनके निशान`, `Their marks on ${u.marked} slips`));
   const meter = isAdmin ? null : useMeter(u);
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? (me.role === 'super' ? [creditsBox(u, () => { meter.update(); refresh(); })] : [])
+    : [limitBox(u, 'listMsg', meter.update)]),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');

@@ -24,6 +24,8 @@
 //   action "cand_set", id, cand      → {user}   puts a user of the candidate's village in that group ('' = no candidate)
 //   action "move", id, village       → {user}   moves a user to another village (both must be the admin's): their
 //                                               candidate is cleared and their phone is logged out
+//   action "credits_add", id, n      → {user}   n more searches (1–10000) for a signed-up login, e.g. paid on WhatsApp;
+//                                               counts as a purchase (FREE_TIERS)                    (superadmin only)
 //   action "buys"                    → {buys}   searches bought with UPI (api/buy.js), newest first     (superadmin only)
 //   action "buy_approve", buy        → {buy, user}   the money arrived: the rest of the pack (beyond the trial searches
 //                                               the buyer got at once) is added to their login     (superadmin only)
@@ -248,6 +250,17 @@ module.exports = route(async (req, res, b) => {
     if (user.role !== 'user') return send(res, 400, { error: 'not_user' });   // admins can always do everything
     const perms = PERMS.filter((p) => Array.isArray(b.perms) && b.perms.includes(p));
     await redis('HSET', `user:${user.id}`, 'perms', perms.join(','));
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'credits_add') {
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    if (!isPrepaid(user)) return send(res, 400, { error: 'not_prepaid' });   // admin-made logins have a daily limit
+    const n = parseInt(b.n, 10);
+    if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
+    await redis('HINCRBY', `user:${user.id}`, 'credits', n);
+    await redis('HSET', `user:${user.id}`, 'bought', '1');
+    await redis('SREM', 'free', user.id);
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

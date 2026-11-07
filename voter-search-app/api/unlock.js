@@ -49,7 +49,7 @@ module.exports = route(async (req, res, { password, village: slug, home, device 
   await redis('HINCRBY', `user:${id}`, 'logins', 1);
   if (stillInUse) await redis('HINCRBY', `user:${id}`, 'kicks', 1);
   const prepaid = isPrepaid(user);   // signed-up / bought searches: how many are left
-  send(res, 200, { name: user.name, token: makeToken(id, sid), admin: user.role === 'admin', role: user.role, villages: user.villages,
+  send(res, 200, { name: user.name, phone: user.phone || '', token: makeToken(id, sid), admin: user.role === 'admin', role: user.role, villages: user.villages,
     prepaid, left: prepaid ? await creditsLeft(user) : undefined,
     list: villageList(user.villages), perms: user.role === 'admin' ? PERMS.slice() : permsOf(user),
     cand: cand && cand.village === user.village ? cand.name : '' });

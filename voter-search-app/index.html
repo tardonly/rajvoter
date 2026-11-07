@@ -77,6 +77,8 @@
   .paybox .upi { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; word-break: break-all; }
   .paybox .upi button, .buyback { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 10px; font-size: 13px; color: var(--accent); font-weight: 600; }
   .buyback { justify-self: start; }
+  .paybox a.wabtn { background: #16a34a; }   /* WhatsApp green */
+  a.buyback { text-decoration: none; text-align: center; }
   .buypw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; font-weight: 700; user-select: all; word-break: break-all; }
   .buyerr { color: var(--bad); font-size: 14px; min-height: 18px; }
   #buyMore { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: #16a34a; color: #fff; font-weight: 600; }
@@ -626,8 +628,9 @@ function signOut(msg) {
   lockStepTo('phone');
   showLock(msg);
 }
+let MY_NAME = '', MY_PHONE = '';   // this login's name and mobile number, for the WhatsApp message asking for searches
 function showApp(name, admin, villages, perms, cand) {
-  PERMS = perms || [];
+  PERMS = perms || []; MY_NAME = name || '';
   $('who').textContent = (name ? `${L('उपयोगकर्ता', 'User')}: ${who(name)}` : '') + (cand ? ` · ${L('उम्मीदवार', 'Candidate')}: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1));   // only for logins with several villages
@@ -807,7 +810,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  PREPAID = !!r.prepaid; if (r.left != null) searchesLeft = r.left;
+  PREPAID = !!r.prepaid; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 });
@@ -1385,7 +1388,7 @@ async function buyInfo() {
   return BUY;
 }
 const buyVillage = (slug) => (BUY && BUY.villages.find((v) => v.slug === slug)) || { slug, name: slug };
-function buyMoreButton() { $('buyMore').classList.toggle('hidden', !(PREPAID && BUY && BUY.upi)); }
+function buyMoreButton() { $('buyMore').classList.toggle('hidden', !(PREPAID && BUY)); }   // with buying off it offers WhatsApp
 function buyOpen() {
   $('buyTitle').textContent = L('🛒 खोज खरीदें', '🛒 Buy searches');
   $('buyPop').classList.remove('hidden');
@@ -1398,13 +1401,27 @@ function buyClose() {
 }
 // a signed-in user with no searches left gets the buying window straight away
 function outOfSearches() { if (PREPAID && searchesLeft === 0 && !DEMO) buyOpen(); }
+// WhatsApp to the app's number asking for more searches; the superadmin adds them on the admin page ("खोज जोड़ें")
+function buyWhatsApp(cls) {
+  const a = el('a', cls, L('💬 WhatsApp करके खोज मंगाएं', '💬 Ask for searches on WhatsApp'));
+  const phone = MY_PHONE ? `+${MY_PHONE.slice(0, 2)} ${MY_PHONE.slice(2)}` : '';
+  a.href = `https://wa.me/${WHATSAPP}?text=` + encodeURIComponent(L(
+    `नमस्ते, मुझे Voter Search में और खोज चाहिए।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}`,
+    `Hello, I would like more searches in Voter Search.\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}`));
+  a.target = '_blank'; a.rel = 'noopener';
+  return a;
+}
 async function buyForm(pre = {}) {
   clearTimeout(buyTimer);
   const body = $('buyBody');
   $('buyNote').textContent = '';
   const info = await buyInfo();
-  if (!info || !info.upi) {
-    body.replaceChildren(el('div', 'lempty', L('अभी यहाँ खोज खरीदना बंद है — अपने एडमिन से पूछें', 'Buying searches is off for now — ask your admin')));
+  if (!info || !info.upi) {   // no UPI ID set: searches are asked for on WhatsApp
+    const box = el('div', 'paybox');
+    box.append(el('b', null, searchesLeft === 0 ? L('आपकी सभी खोज इस्तेमाल हो गईं', 'All your searches are used') : L('और खोज चाहिए?', 'Need more searches?')),
+      el('div', 'k', L('WhatsApp पर संदेश भेजें — सुपर एडमिन आपके खाते में खोज जोड़ देंगे।', 'Send a WhatsApp message — the super admin adds searches to your login.')),
+      buyWhatsApp('btn wabtn'));
+    body.replaceChildren(box);
     return;
   }
   const f = el('form', 'buyform'), packs = el('div', 'packs');
@@ -1417,8 +1434,10 @@ async function buyForm(pre = {}) {
   }
   const err = el('div', 'buyerr'), go = el('button', 'btn', L('आगे — भुगतान करें', 'Next — pay'));
   go.type = 'submit';
+  const wa = buyWhatsApp('buyback');
+  wa.textContent = L('या WhatsApp पर खोज मंगाएं', 'or ask for searches on WhatsApp');
   f.append(el('div', 'k', searchesLeft === 0 ? L('आपकी सभी खोज इस्तेमाल हो गईं। कितनी और खोज चाहिए? ₹1 = 1 खोज', 'All your searches are used. How many more? ₹1 = 1 search')
-    : L('कितनी खोज चाहिए? ₹1 = 1 खोज', 'How many searches? ₹1 = 1 search')), packs, err, go);
+    : L('कितनी खोज चाहिए? ₹1 = 1 खोज', 'How many searches? ₹1 = 1 search')), packs, err, go, wa);
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!amount) { err.textContent = BUY_ERR.amount; return; }
@@ -1526,11 +1545,12 @@ $('buyMore').addEventListener('click', buyOpen);
 $('buyClose').addEventListener('click', buyClose);
 $('buyPop').addEventListener('click', (e) => { if (e.target === $('buyPop')) buyClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') buyClose(); });
-// buying is offered once the server says it is on (UPI_ID set); a decided purchase shows its result by itself
+// the buy-more button shows once the server has answered (with buying off it offers WhatsApp); a decided purchase
+// shows its result by itself
 if (!DEMO) {
   buyInfo().then(async (b) => {
-    if (!b || !b.upi) return;
     buyMoreButton();
+    if (!b || !b.upi) return;
     const saved = buyStore.get();
     if (!saved || !$('buyPop').classList.contains('hidden')) return;
     const r = await api('buy', { action: 'status', id: saved.id, key: saved.key });
@@ -1622,7 +1642,7 @@ async function openVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
-  PREPAID = !!r.prepaid;
+  PREPAID = !!r.prepaid; MY_PHONE = r.phone || '';
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 }

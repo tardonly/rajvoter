@@ -84,7 +84,7 @@ module.exports = route(async (req, res, b) => {
     const sid = newSession(), now = new Date().toISOString();
     await redis('HSET', `user:${id}`, 'session', sid, 'sessionAt', now, 'sessionIp', clientIp(req), 'sessionDevice', deviceName(req),
       'lastSeen', now, 'logins', 1);
-    return send(res, 200, { password, token: makeToken(id, sid), name, role: 'user', admin: false, villages: [v.slug],
+    return send(res, 200, { password, token: makeToken(id, sid), name, phone, role: 'user', admin: false, villages: [v.slug],
       list: villageList([v.slug]), perms: permsOf({}), prepaid: true, left: free });
   }
 
