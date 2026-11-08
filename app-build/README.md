@@ -123,7 +123,10 @@ deployment (e.g. to S3) first.
   `adsar/`); if that folder holds a village of another samiti, the samiti is added (`bigga-lunkaransar/`). A village we
   don't have yet gets a new folder with `voters.json` and a `village.json` (name, ps/zp, district, पंचायत समिति from
   their `tehsil`, which holds the samiti's name). If `<village>-<samiti>` is taken too, `<village>-<samiti>-<district>`.
-- **Wards we analysed ourselves** (folders with `* All Wards.xlsx`) are the source of the English names.
+- **Wards we analysed ourselves** (folders with `* All Wards.xlsx`) are the source of the English names. Villages whose
+  election is over are moved out of the app into `election-done/` in the main checkout; add
+  `--names ../../../election-done` (or its full path) so their names still teach the import, else the names are only
+  spelled out from the Hindi (the report then says `English names: 0%`).
 - **पं.सं. / जि.प. per ward**: in about 25 villages some wards belong to another पंचायत समिति / जिला परिषद
   constituency (e.g. बामनवाली wards 1–4 पं.सं. 1, wards 5–11 पं.सं. 4). The import keeps each ward's numbers in
   `voters.json` (`seats`), `encrypt.mjs` puts the wards that differ from `village.json` into `_villages.json`, and each

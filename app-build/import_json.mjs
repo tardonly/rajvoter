@@ -13,16 +13,18 @@
 //   Voters they mark as struck off get del "X" (no reason given).
 // It prints only what may need a look and a summary per पंचायत समिति; every village's line is in import-report.txt.
 //
-// Usage:  node app-build/import_json.mjs <folder or files> ...  [--dry-run] [--no-build]
+// Usage:  node app-build/import_json.mjs <folder or files> ...  [--dry-run] [--no-build] [--names <folder>]
 //           e.g. a whole "rajasthan" folder copied into this project: node app-build/import_json.mjs rajasthan
 //         node app-build/import_json.mjs --bucket <s3 bucket> [<s3 folder> ...]  [--dry-run] [--no-build]
 //           downloads the .json.gz files first (aws CLI, already logged in) into import/ (default folder: rolls,
 //           everything); reruns only download files that changed
+//         --names <folder>: also learn the English names from the analysed villages in that folder (e.g. the main
+//           checkout's election-done/, where villages whose election is over are kept out of the app)
 // Rerunning is safe: unchanged villages are left as they are.
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, statSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { execFileSync } from 'node:child_process';
-import { dirname, join, basename } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -30,6 +32,7 @@ const root = join(here, '..');
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run'), BUILD = !DRY && !args.includes('--no-build');
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
+const NAMES = []; for (let n; (n = opt('--names'));) NAMES.push(resolve(n));
 const BUCKET = opt('--bucket')?.replace(/^s3:\/\//, '').replace(/\/+$/, '');
 let inputs = args.filter((a) => !a.startsWith('--'));
 if (BUCKET) {
@@ -76,16 +79,21 @@ function learn(h, e) {
 }
 // our villages: folder → {meta, own}; own = analysed from the PDFs (has "* All Wards.xlsx"), the source of the
 // dictionary (wards this script added are only our guess, so not learnt from)
+// (--names <folder>: villages kept elsewhere, e.g. election-done/, that only teach the English names)
 const ourVillages = new Map();
-for (const d of readdirSync(root)) {
-  if (!existsSync(join(root, d, 'village.json')) || !existsSync(join(root, d, 'voters.json'))) continue;
-  const own = readdirSync(join(root, d)).some((f) => /All Wards\.xlsx$/.test(f) && !f.startsWith('~$'));
-  ourVillages.set(d, { meta: JSON.parse(readFileSync(join(root, d, 'village.json'), 'utf8')), own });
-  if (!own) continue;
-  const v = JSON.parse(readFileSync(join(root, d, 'voters.json'), 'utf8')), F = Object.fromEntries(v.fields.map((x, i) => [x, i]));
-  const imported = new Set(v.imported || []);
-  for (const r of v.rows) if (!imported.has(r[F.ward])) { learn(r[F.hname], r[F.name]); learn(r[F.hrel], r[F.relname]); }
-}
+const learnFolder = (base, keep) => {
+  for (const d of readdirSync(base)) {
+    if (!existsSync(join(base, d, 'village.json')) || !existsSync(join(base, d, 'voters.json'))) continue;
+    const own = readdirSync(join(base, d)).some((f) => /All Wards\.xlsx$/.test(f) && !f.startsWith('~$'));
+    if (keep) ourVillages.set(d, { meta: JSON.parse(readFileSync(join(base, d, 'village.json'), 'utf8')), own });
+    if (!own) continue;
+    const v = JSON.parse(readFileSync(join(base, d, 'voters.json'), 'utf8')), F = Object.fromEntries(v.fields.map((x, i) => [x, i]));
+    const imported = new Set(v.imported || []);
+    for (const r of v.rows) if (!imported.has(r[F.ward])) { learn(r[F.hname], r[F.name]); learn(r[F.hrel], r[F.relname]); }
+  }
+};
+learnFolder(root, true);
+for (const n of NAMES) learnFolder(n, false);
 const best = (c) => [...c].sort((a, b) => b[1] - a[1])[0][0];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 // the spelling most used for that word, counting the ways it is written in Hindi (कँवर, कंवर, कवर) together
@@ -169,7 +177,7 @@ for (const [dir, { meta, own }] of [...ourVillages].sort()) {
 const target = new Map();   // folder → village
 const taken = (folder, v) => target.has(folder) || RESERVED.has(folder) || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(folder)
   || (ourVillages.has(folder) ? fold(ourVillages.get(folder).meta.panchayatSamiti || '') !== fold(samitiHi(v))
-    : existsSync(join(root, folder)) || inputs.some((p) => basename(p) === folder));
+    : existsSync(join(root, folder)) || inputs.some((p) => resolve(p) === join(root, folder)));
 for (const v of [...byVillage.values()].sort((a, b) => (a.panchayat < b.panchayat ? -1 : 1))) {
   const [slug, samiti = 'x', district = 'x'] = parts(v).reverse();
   let folder = byName.get(nameKey(v.name, samitiHi(v)));
