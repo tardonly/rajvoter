@@ -1,8 +1,7 @@
 // Signing up with a mobile number on the login page.
 // The page asks for the mobile number first ('lookup'). A number that already has a login of that village is told to
-// type its password (forgotten → ask the admin); a new number gets its own login at once ('signup') with a few free
-// searches: FREE_TIERS (_lib.js) by how many signed-up logins have not been given paid searches yet, and none for a
-// number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
+// type its password (forgotten → ask the admin); a new number gets its own login at once ('signup') with
+// FREE_SEARCHES (_lib.js) free searches, none for a number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
 // an admin adds them on the admin page (api/admin.js "credits_add").
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
 //   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free, otp}   otp: sign-up needs a
@@ -20,19 +19,15 @@
 //     the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, newLogin, today, clientIp, redis, newSession, makeToken,
+const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, FREE_SEARCHES, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
 
 
-// free searches for a new login: by how many signed-up logins have no paid searches yet; none if this number signed up
-// before
+// free searches for a new login: FREE_SEARCHES, none if this number signed up before
 async function freeSearches(phone) {
-  if ((await phoneLogins(phone)).some((u) => u.self === '1')) return 0;
-  const n = Number(await redis('SCARD', 'free')) || 0;
-  const tier = FREE_TIERS.find((t) => n < t.upTo);
-  return tier ? tier.searches : 0;
+  return (await phoneLogins(phone)).some((u) => u.self === '1') ? 0 : FREE_SEARCHES;
 }
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 

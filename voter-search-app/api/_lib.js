@@ -362,9 +362,8 @@ const canBuy = (u) => !!u && u.role === 'user' && !u.demo;
 // a signed-up login that picked the wrong village may move itself to another one this many times (api/signup.js "move")
 const MOVES = 3;
 const movesLeft = (u) => (isPrepaid(u) ? Math.max(0, MOVES - (Number(u.moves) || 0)) : 0);
-// free searches for a login made by signing up: the first 10 sign-ups not yet given paid searches get 10 each, the next
-// 10 get 2, and after that none (set "free" in api/signup.js holds those logins; "credits_add" takes a login out of it)
-const FREE_TIERS = [{ upTo: 10, searches: 10 }, { upTo: 20, searches: 2 }];
+// free searches for a login made by signing up (none for a number that signed up before; api/signup.js)
+const FREE_SEARCHES = 10;
 // every login with this mobile number (normPhone form): [{id, role, village, villages, retired, self}]
 async function phoneLogins(phone) {
   if (!phone) return [];
@@ -526,6 +525,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE_TIERS, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
+  FREE_SEARCHES, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

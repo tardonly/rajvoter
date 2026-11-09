@@ -26,7 +26,7 @@
 //   action "move", id, village       → {user}   moves a user to another village (both must be the admin's): their
 //                                               candidate is cleared and their phone is logged out
 //   action "credits_add", id, n      → {user}   n more searches (1–10000) for a login made by signing up (api/signup.js),
-//                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
+//                                               e.g. paid to the admin; takes it out of the set "free" (signed up, nothing bought)
 //   (in "list": reqs = those requests of this admin's people that were sent to them (to, see adminFor in _lib.js; the
 //    superadmin sees every one, with toName), open ones first, plus the ones approved or rejected in the last 30 days,
 //    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with सर्च जोड़ें)
