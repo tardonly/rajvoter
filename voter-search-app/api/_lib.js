@@ -3,10 +3,11 @@
 //   DATA_KEY        the key that unlocks the village data in api/_data/ (from app-build/DATA_KEY.txt)
 //   ADMIN_PASSWORD  the superadmin password: manages every village and creates the village admins
 //   KV_REST_API_URL / KV_REST_API_TOKEN  added automatically when you connect Upstash for Redis in Vercel
-//   USER_REDIS_URL  your own Redis, outside Vercel: redis://user:password@host:port (rediss:// for TLS), or an Upstash
-//                   REST address https://… with USER_REDIS_TOKEN. When set, ALL the app's data (logins, sessions, marks,
-//                   searches, payments, …) is kept there; the Upstash database above is then only read by the
-//                   superadmin's one-time copy on the admin page (copyOldDb below, api/admin.js "db_copy").
+//   USER_REDIS_URL  your own Redis, outside Vercel, for people's data: redis://user:password@host:port (rediss:// for
+//                   TLS), or an Upstash REST address https://… with USER_REDIS_TOKEN. When set, the logins (names, mobile
+//                   numbers, passwords, sessions), bought searches, pack requests and payments are kept there (USER_KEYS
+//                   below), and Upstash keeps the rest: slip marks, candidates, search counters, rate limits, demo counts.
+//                   Logins made before it was set are moved over once by the superadmin (admin page, moveUserData below).
 //   KEY_PREFIX      optional, default "rv:": put in front of every database key, so this app can share one
 //                   database with another app (e.g. the older single-village Adsar app) without mixing data
 const crypto = require('crypto');
@@ -66,25 +67,39 @@ function tcpDb(url) {
     },
   };
 }
-const OLD_DB = restDb(KV_URL, KV_TOKEN);
-const DB = !USER_URL ? OLD_DB : /^rediss?:\/\//i.test(USER_URL) ? tcpDb(USER_URL) : restDb(USER_URL.replace(/\/+$/, ''), process.env.USER_REDIS_TOKEN);
+const USER_DB = !USER_URL ? null : /^rediss?:\/\//i.test(USER_URL) ? tcpDb(USER_URL)
+  : restDb(USER_URL.replace(/\/+$/, ''), process.env.USER_REDIS_TOKEN);
+const MAIN_DB = KV_URL || !USER_DB ? restDb(KV_URL, KV_TOKEN) : USER_DB;   // only USER_REDIS_URL set: everything there
+// People's data (keys without KEY_PREFIX): logins, password index, the sign-up set, bought searches used, pack requests,
+// online payments, payments per admin and their handovers, OTP codes, and the "moved" marker
+const USER_KEYS = /^(user:|pw:|users$|free$|paid:|req:|reqs$|reqopen:|reqlock:|jtxn:|pay:|settle:|otp:|usermoved$)/;
+const dbOf = (key) => (USER_DB && USER_KEYS.test(key) ? USER_DB : MAIN_DB);
 
 // Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
 const prefixed = ([name, key, ...args]) => [name, KEY_PREFIX + key, ...args];
-const redis = (...cmd) => DB.call(prefixed(cmd));
-// several commands in one round trip: [[name, key, ...args], ...] → their results, in order
-const pipeline = (cmds) => DB.pipe(cmds.map(prefixed));
+const redis = (...cmd) => dbOf(cmd[1]).call(prefixed(cmd));
+// several commands in one round trip: [[name, key, ...args], ...] → their results, in order (one trip per database)
+async function pipeline(cmds) {
+  const out = new Array(cmds.length), groups = new Map();
+  cmds.forEach((c, i) => { const db = dbOf(c[1]); if (!groups.has(db)) groups.set(db, []); groups.get(db).push(i); });
+  await Promise.all([...groups].map(async ([db, idx]) => {
+    const res = await db.pipe(idx.map((i) => prefixed(cmds[i])));
+    idx.forEach((i, j) => { out[i] = res[j]; });
+  }));
+  return out;
+}
 
-// Moving to USER_REDIS_URL: copies the old Upstash database's keys (KEY_PREFIX*) into it, one SCAN step per call
-// (cursor '0' to start; → {next, keys}, next '0' = done). What is already in the new database wins: a value is only
-// filled in where it is missing (strings SET NX, hash fields HSETNX, set members SADD), so it is safe to run again.
-const canCopyDb = () => !!(USER_URL && KV_URL && KV_TOKEN && (USER_URL !== KV_URL));
-async function copyOldDb(cursor) {
-  const [next, keys] = await OLD_DB.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 200]);
+// Moving people's data to USER_REDIS_URL: copies Upstash's USER_KEYS into it, then removes them from Upstash, one SCAN
+// step per call (cursor '0' to start; → {next, keys}, next '0' = done). What is already in the new database wins: a value
+// is only filled in where it is missing (strings SET NX, hash fields HSETNX, set members SADD), so it is safe to run again.
+const canMoveUserData = () => !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB);
+async function moveUserData(cursor) {
+  const [next, found] = await MAIN_DB.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
+  const keys = found.filter((k) => USER_KEYS.test(k.slice(KEY_PREFIX.length)));
   if (!keys.length) return { next: String(next), keys: 0 };
-  const types = await OLD_DB.pipe(keys.map((k) => ['TYPE', k]));
-  const vals = await OLD_DB.pipe(keys.map((k, i) => [{ string: 'GET', hash: 'HGETALL', set: 'SMEMBERS' }[types[i]] || 'TYPE', k]));
-  const ttls = await OLD_DB.pipe(keys.map((k) => ['PTTL', k]));
+  const types = await MAIN_DB.pipe(keys.map((k) => ['TYPE', k]));
+  const vals = await MAIN_DB.pipe(keys.map((k, i) => [{ string: 'GET', hash: 'HGETALL', set: 'SMEMBERS' }[types[i]] || 'TYPE', k]));
+  const ttls = await MAIN_DB.pipe(keys.map((k) => ['PTTL', k]));
   const writes = [];
   keys.forEach((k, i) => {
     const v = vals[i], ttl = Number(ttls[i]);
@@ -93,7 +108,8 @@ async function copyOldDb(cursor) {
     else if (types[i] === 'set' && v.length) writes.push(['SADD', k, ...v]);
     if ((types[i] === 'hash' || types[i] === 'set') && ttl > 0) writes.push(['PEXPIRE', k, ttl]);
   });
-  for (let i = 0; i < writes.length; i += 1000) await DB.pipe(writes.slice(i, i + 1000));
+  for (let i = 0; i < writes.length; i += 1000) await USER_DB.pipe(writes.slice(i, i + 1000));
+  await MAIN_DB.pipe(keys.map((k) => ['DEL', k]));   // only once they are safely in the new database
   return { next: String(next), keys: keys.length };
 }
 
@@ -198,8 +214,13 @@ async function newLogin(fields, name, phone, by, byName) {
   return { id, password };
 }
 
-async function getUser(id) {
-  const arr = await redis('HGETALL', `user:${id}`);
+const getUser = async (id) => userFrom(id, await redis('HGETALL', `user:${id}`));
+// many logins in one round trip (the admin page's lists)
+async function getUsers(ids) {
+  const rows = ids.length ? await pipeline(ids.map((id) => ['HGETALL', `user:${id}`])) : [];
+  return ids.map((id, i) => userFrom(id, rows[i])).filter(Boolean);
+}
+function userFrom(id, arr) {
   if (!arr || !arr.length) return null;
   const u = { id };
   for (let i = 0; i < arr.length; i += 2) u[arr[i]] = arr[i + 1];
@@ -444,8 +465,9 @@ async function marksFor(slug, keys, cand) {
   const vals = (await redis('HMGET', markHash(slug, cand), ...keys)) || [];
   return keys.map((k, i) => parseMark(vals[i]));
 }
-async function allMarks(slug, cand) {   // "<ward>:<box>" → parsed mark, for every marked slip of the village (of that group)
-  const flat = (await redis('HGETALL', markHash(slug, cand))) || [];
+const allMarks = async (slug, cand) => marksFrom(await redis('HGETALL', markHash(slug, cand)));
+function marksFrom(flat) {   // "<ward>:<box>" → parsed mark, for every marked slip of the village (of that group)
+  flat ||= [];
   const out = {};
   for (let i = 0; i < flat.length; i += 2) out[flat[i]] = parseMark(flat[i + 1]);
   return out;
@@ -461,5 +483,5 @@ async function getCand(id) {
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE_TIERS, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
-  canCopyDb, copyOldDb, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
-  whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };
+  canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

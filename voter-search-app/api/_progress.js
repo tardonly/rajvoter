@@ -5,7 +5,7 @@ const { village, MARKS, allMarks, markHash, getCand, redis } = require('./_lib.j
 
 // how many slips of a village (of one candidate's group) carry each mark, overall and per ward, and the backup its last
 // "clear" left
-async function markSummary(slug, cand, all) {
+async function markSummary(slug, cand, all, bk) {   // all, bk: already read (the admin page reads every village at once)
   all ||= await allMarks(slug, cand.id);
   const zero = () => Object.fromEntries(MARKS.map((m) => [m, 0]));
   const marks = zero(), perWard = {};
@@ -22,7 +22,7 @@ async function markSummary(slug, cand, all) {
     const w = perWard[key.split(':')[0]];
     if (w) w[m]++;
   }
-  const bk = await redis('GET', `${markHash(slug, cand.id)}:backup`);
+  if (bk === undefined) bk = await redis('GET', `${markHash(slug, cand.id)}:backup`);
   let backup = null;
   try { if (bk) { const j = JSON.parse(bk); backup = { n: j.flat.length / 2, at: j.at }; } } catch (e) { /* ignore a broken backup */ }
   return { key: `${slug}|${cand.id}`, slug, cand: cand.id, name: village(slug).name, candName: cand.name || '', marks,

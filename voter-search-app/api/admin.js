@@ -42,10 +42,10 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
-//   action "db_copy", cursor          → {next, keys, done}   superadmin: one step of copying the old Upstash database
-//                                               into USER_REDIS_URL (copyOldDb in _lib.js); the admin page repeats it from
-//                                               cursor '0' until next is '0'. "list" says dbCopy: 'todo' | 'done' while
-//                                               both databases are set (key "dbcopied" = when it finished)
+//   action "db_copy", cursor          → {next, keys, done}   superadmin: one step of moving people's data from Upstash
+//                                               into USER_REDIS_URL (moveUserData in _lib.js); the admin page repeats it
+//                                               from cursor '0' until next is '0'. "list" says dbCopy: 'todo' | 'done'
+//                                               while both databases are set (key "usermoved" = when it finished)
 //   action "req_reject", rid         → {req}    closes an open request without searches (status 'rejected', doneAt,
 //                                               doneByName = who rejected it)
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
@@ -56,7 +56,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canCopyDb, copyOldDb, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
+const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
@@ -104,24 +104,28 @@ module.exports = route(async (req, res, b) => {
 
   if (b.action === 'db_copy') {
     if (!isSuper) return send(res, 403, { error: 'super_only' });
-    if (!canCopyDb()) return send(res, 400, { error: 'no_db_copy' });
-    const r = await copyOldDb(b.cursor);
-    if (r.next === '0') await redis('SET', 'dbcopied', now);
+    if (!canMoveUserData()) return send(res, 400, { error: 'no_db_copy' });
+    const r = await moveUserData(b.cursor);
+    if (r.next === '0') await redis('SET', 'usermoved', now);
     return send(res, 200, { ...r, done: r.next === '0' });
   }
 
   if (b.action === 'list') {
     const ids = (await redis('SMEMBERS', 'users')) || [];
-    const all = (await Promise.all(ids.map(getUser))).filter(Boolean).sort((x, y) => (x.created < y.created ? 1 : -1));
-    // marks of my villages (each candidate's apart): progress, and how many slips each person marked
+    const all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
+    // marks of my villages (each candidate's apart): progress, and how many slips each person marked; every village's
+    // marks and last-clear backup in one round trip (the superadmin has hundreds of villages)
     const cands = await candsOf(me.villages), groups = groupsOf(me.villages, cands);
-    const marksBy = await Promise.all(groups.map((g) => allMarks(g.slug, g.cand.id)));
-    const progress = await Promise.all(groups.map((g, i) => markSummary(g.slug, g.cand, marksBy[i])));
+    const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id)], ['GET', `${markHash(g.slug, g.cand.id)}:backup`]])) : [];
+    const marksBy = groups.map((g, i) => marksFrom(read[2 * i]));
+    const progress = await Promise.all(groups.map((g, i) => markSummary(g.slug, g.cand, marksBy[i], read[2 * i + 1])));
     const marked = {};
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
     const day = today();
-    const searches = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, Number(await redis('GET', `searches:${id}:${day}`)) || 0])));
-    const paid = Object.fromEntries(await Promise.all(all.filter((u) => isPrepaid(u) || credits(u) > 0).map(async (u) => [u.id, Number(await redis('GET', paidKey(u.id))) || 0])));
+    const buyers = all.filter((u) => isPrepaid(u) || credits(u) > 0);
+    const counts = ids.length ? await pipeline([...ids.map((id) => ['GET', `searches:${id}:${day}`]), ...buyers.map((u) => ['GET', paidKey(u.id)])]) : [];
+    const searches = Object.fromEntries(ids.map((id, i) => [id, Number(counts[i]) || 0]));
+    const paid = Object.fromEntries(buyers.map((u, i) => [u.id, Number(counts[ids.length + i]) || 0]));
     const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0, marked: marked[u.id] || 0 });
     const users = all.filter((u) => u.role === 'user' && mayUse(u.village) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
@@ -153,7 +157,7 @@ module.exports = route(async (req, res, b) => {
         settled: Number(sO[id]) || 0, due: id === 'admin' ? 0 : (Number(rsO[id]) || 0) - (Number(sO[id]) || 0) }))
         .filter((c) => isSuper || c.by === me.id).sort((a, b) => b.rs - a.rs);
     }
-    const dbCopy = isSuper && canCopyDb() ? ((await redis('GET', 'dbcopied')) ? 'done' : 'todo') : undefined;
+    const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
     return send(res, 200, { dbCopy, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
