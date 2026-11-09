@@ -2,17 +2,19 @@
 //   a village admin of that village, or the superadmin password.
 // POST {password} (no village, from the admin page) → the same, but only for the superadmin or a village admin.
 // POST {password, home: true} (the start page) → the same for any active password; list = the villages it opens.
+// phone (the number typed on the login page): the login must have that mobile number, else 401 'wrong', as for a wrong
+//   password. Without a phone ('एडमिन? सीधे पासवर्ड से खोलें') only an admin, or a login with no number, opens → 403 'need_phone'.
 // POST {village: 'demo' or 'demo-<village>', device} → a demo login for that phone (device = a random id the phone keeps),
 //   with left = how many of its demo searches remain and list = the demo villages. No password.
 // A password of another village → 403 {error: 'other_village', village, villageName} so the app can point there.
 // Each login starts a new session; a phone still using an older session of the same password is logged out
 // on its next request. The token is sent with every search; an admin token also opens the admin page.
 const { isPrepaid, canBuy, payOnline, adminPhone, creditsLeft, getCand, DEMO, demoSlugs, isDevice, demoId, village, villageList, PERMS, permsOf, redis, pwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
-  deviceName, blocked, failed, send, route } = require('./_lib.js');
+  deviceName, normPhone, blocked, failed, send, route } = require('./_lib.js');
 
 const STILL_IN_USE_MS = 30 * 60 * 1000;   // previous phone used within 30 min → counts as "two phones at once"
 
-module.exports = route(async (req, res, { password, village: slug, home, device }) => {
+module.exports = route(async (req, res, { password, phone, village: slug, home, device }) => {
   const v = slug ? village(slug) : null;
   if (slug === DEMO.slug || (v && v.demo)) {
     if (!isDevice(device)) return send(res, 400, { error: 'device' });
@@ -30,10 +32,11 @@ module.exports = route(async (req, res, { password, village: slug, home, device 
   }
   const id = password ? await redis('GET', `pw:${pwHash(password)}`) : null;
   const user = id ? await getUser(id) : null;
-  if (!user) {
+  if (!user || (phone && normPhone(phone) !== normPhone(user.phone))) {   // number and password must be the same login's
     await failed(req, 'unlock');
     return send(res, 401, { error: 'wrong' });
   }
+  if (!phone && user.role !== 'admin' && normPhone(user.phone)) return send(res, 403, { error: 'need_phone' });
   if (user.retired === '1') return send(res, 403, { error: 'retired' });
   if (v && !user.villages.includes(v.slug)) {
     const own = village(user.villages[0]);

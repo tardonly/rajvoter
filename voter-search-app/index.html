@@ -596,6 +596,7 @@ const token = () => { if (DEMO) return store.get('tok:demo'); tokKey = store.get
 
 const MSG = {
   wrong: L('पासवर्ड गलत है', 'Wrong password'),
+  need_phone: L('अपना मोबाइल नंबर डालकर पासवर्ड से खोलें', 'Enter your mobile number, then your password'),
   retired: L('यह पासवर्ड बंद कर दिया गया है — एडमिन से नया पासवर्ड लें', 'This password has been switched off — ask your admin for a new one'),
   login: L('दोबारा लॉगिन करें', 'Please log in again'),
   logged_out: L('आपको लॉग आउट कर दिया गया है — दोबारा लॉगिन करें', 'You have been logged out — please log in again'),
@@ -824,9 +825,12 @@ $('lockForm').addEventListener('submit', async (e) => {
   const password = $('pw').value.trim();
   if (!password) return;
   $('unlockBtn').disabled = true; showLock(L('खुल रहा है…', 'Opening…'), true);
-  const r = await api('unlock', HOME ? { password, village: '', home: true } : { password });
+  // the number typed first goes along: the server opens only if this password is that number's login
+  const phone = $('phone').classList.contains('hidden') ? '' : $('phone').value.replace(/\D/g, '');
+  const r = await api('unlock', HOME ? { password, phone, village: '', home: true } : { password, phone });
   $('unlockBtn').disabled = false;
   if (r.error === 'other_village' && r.village) return otherVillage(r);
+  if (r.error === 'wrong' && phone) return showLock(L('मोबाइल नंबर और पासवर्ड मेल नहीं खाते — दोनों जाँचें', 'The mobile number and password do not match — check both'));
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   const keep = $('remember').checked;
   tokKey = r.admin ? 'tok:admin' : `tok:${HOME ? r.villages[0] : SLUG}`;
