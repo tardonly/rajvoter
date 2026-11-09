@@ -220,6 +220,24 @@ async function newLogin(fields, name, phone, by, byName) {
   return { id, password };
 }
 
+// A password the person chose (sign-up, or पासवर्ड बदलें in the app) is kept under pw:<hash of number + password>, so two
+// people may choose the same one; a login with a number tries that first (api/unlock.js), then the made-up ones'
+// pw:<hash of password>. 6–40 characters, upper and lower case the same (pwHash).
+const PW_MIN = 6, PW_MAX = 40;
+const ownPwHash = (phone, pw) => pwHash(`${phone}:${String(pw || '').trim()}`);
+const badOwnPassword = (pw) => { const n = String(pw || '').trim().length; return n < PW_MIN || n > PW_MAX; };
+// → '' when set, else 'pw_short' | 'pw_taken' (this number's other login already has it) | 'phone'
+async function setOwnPassword(u, pw) {
+  if (badOwnPassword(pw)) return 'pw_short';
+  if (!u.phone) return 'phone';
+  const hash = ownPwHash(u.phone, pw), was = await redis('GET', `pw:${hash}`);
+  if (was && was !== u.id) return 'pw_taken';
+  if (u.hash && u.hash !== hash) await redis('DEL', `pw:${u.hash}`);
+  await redis('HSET', `user:${u.id}`, 'hash', hash);
+  await redis('SET', `pw:${hash}`, u.id);
+  return '';
+}
+
 const getUser = async (id) => userFrom(id, await redis('HGETALL', `user:${id}`));
 // many logins in one round trip (the admin page's lists)
 async function getUsers(ids) {
@@ -326,7 +344,8 @@ async function whoIs(token, slug) {
   const user = t && t.id !== 'admin' ? await getUser(t.id) : null;
   if (!user) return null;
   user.admin = user.role === 'admin';
-  user.perms = user.admin ? PERMS.slice() : permsOf(user);
+  user.perms = appPerms(user);
+  user.aperms = adminPermsOf(user);
   user.status = user.retired === '1' ? 'retired' : !user.session ? 'logged_out' : user.session !== t.sid ? 'other_device'
     : slug != null && !user.villages.includes(slug) ? 'other_village' : 'ok';
   user.sid = t.sid;
@@ -345,13 +364,26 @@ const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress', 'list'];   // pro
 // list: its मतदाता सूची (voters by mark) — both api/progress.js
 const DEFAULT_PERMS = ['print'];   // for new users, and users added before permissions existed
 const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
+// an admin's in the app: all of them until the superadmin sets them (admins made before these could be set)
+const appPerms = (u) => (u.role === 'admin' && u.perms === undefined ? PERMS.slice() : permsOf(u));
+// What a village admin may do on the admin page, set by the superadmin (field "aperms"; admins made before these
+// existed: all of them):
+//   add: make new users · own: see and look after the users they made · all: see and look after every user of their
+//   villages · credits: add searches to those users · approve: approve or reject their search requests (and the ones sent
+//   to this admin)
+const ADMIN_PERMS = ['add', 'own', 'all', 'credits', 'approve'];
+const PROMOTED_PERMS = ['add', 'own', 'credits', 'approve'];   // a user made admin (api/admin.js "promote")
+const adminPermsOf = (u) => (u.role !== 'admin' ? [] : u.aperms === undefined ? ADMIN_PERMS.slice()
+  : String(u.aperms).split(',').filter((p) => ADMIN_PERMS.includes(p)));
 // today's date in India, for the per-person daily search count
 const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
 // Searches a user may start per day (see api/search.js for what one search is): their own limit if their admin set one
 // (user field "limit"), else DAILY_SEARCHES, plus any extra the admin gave for today (field "extra" = "<day>:<n>").
+// A village admin has no limit unless the superadmin set one (adminLimited); then the same rule.
 const DAILY_SEARCHES = 500;
 const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
+const adminLimited = (u) => u.role === 'admin' && Number(u.limit) > 0;
 // Prepaid searches (api/signup.js): a user who signed up by themselves (field "self") may start "credits" searches in all
 // (free ones from signing up plus paid ones an admin added, api/admin.js "credits_add") instead of a daily limit; they
 // never expire and are counted for good under "paid:<id>". Users made by an admin have a daily limit instead, and may
@@ -541,7 +573,7 @@ async function getCand(id) {
   return c;
 }
 
-module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

@@ -57,7 +57,7 @@
   .lockbox > .langbtn { position: absolute; top: 10px; right: 10px; }
   /* signing up with a mobile number (api/signup.js), and the window for more searches */
   #signStep { display: grid; gap: 8px; margin-bottom: 12px; }
-  #otpStep { display: grid; gap: 2px; }   /* the sign-up OTP box and its resend link */
+  #resetStep { display: grid; gap: 8px; margin-bottom: 12px; }   /* forgotten password: the OTP, the new password, resend */
   #signStep select + select { margin-top: 8px; }
   .movesel { width: 100%; padding: 10px 12px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   #signStep select { width: 100%; padding: 12px 14px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
@@ -372,15 +372,20 @@
         <input id="pw" type="password" autocomplete="current-password" placeholder="पासवर्ड डालें" autocapitalize="none" autocorrect="off" spellcheck="false">
         <label><input id="showPw" type="checkbox"> पासवर्ड दिखाएं</label>
         <label><input id="remember" type="checkbox" checked> इस फ़ोन पर याद रखें</label>
+        <div class="lockalt"><button id="forgotPw" class="hidden" type="button">पासवर्ड भूल गए? OTP से नया बनाएं</button></div>
+      </div>
+      <!-- forgotten password (api/signup.js 'otp' + 'reset'): the code sent to the number, then a new password -->
+      <div id="resetStep" class="hidden">
+        <input id="resetOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="OTP डालें">
+        <input id="resetPw" type="password" autocomplete="new-password" placeholder="नया पासवर्ड (कम से कम 6 अक्षर)" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <div class="lockalt"><button id="otpResend" type="button">OTP फिर भेजें</button></div>
       </div>
       <div id="signStep" class="hidden">
         <select id="signSamiti" aria-label="पंचायत समिति"></select>
         <select id="signVillage" aria-label="गाँव"></select>
         <input id="signName" type="text" maxlength="60" placeholder="आपका नाम">
-        <div id="otpStep" class="hidden">
-          <input id="signOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="OTP डालें">
-          <div class="lockalt"><button id="otpResend" type="button">OTP फिर भेजें</button></div>
-        </div>
+        <input id="signPw" type="password" autocomplete="new-password" maxlength="40" placeholder="अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <label><input id="showSignPw" type="checkbox"> पासवर्ड दिखाएं</label>
       </div>
       <button class="btn" id="unlockBtn" type="submit">आगे</button>
       <div class="lockalt"><button id="phoneBack" class="hidden" type="button">← नंबर बदलें</button><button id="pwOnly" type="button">एडमिन? सीधे पासवर्ड से खोलें</button></div>
@@ -478,7 +483,7 @@
 <section id="app" class="hidden">
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -537,6 +542,9 @@ const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch 
 const L = (hi, en) => (EN ? en : hi);
 const LOCALE = L('hi-IN', 'en-IN');
 const STATIC_EN = {
+  'पासवर्ड भूल गए? OTP से नया बनाएं': 'Forgot your password? Make a new one with an OTP', 'OTP डालें': 'Enter the OTP',
+  'OTP फिर भेजें': 'Send the OTP again', 'नया पासवर्ड (कम से कम 6 अक्षर)': 'New password (at least 6 characters)',
+  'अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)': 'Choose a password (at least 6 characters)', 'पासवर्ड बदलें': 'Change password',
   '📲 ऐप इंस्टॉल करें': '📲 Install the app', 'ऐप इंस्टॉल करें': 'Install the app',
   'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
@@ -633,7 +641,7 @@ const MSG = {
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
 // What this login may do besides searching by name (admins: everything); the server checks these on every request.
 let IS_ADMIN = false, PERMS = [];
-const can = (p) => IS_ADMIN || PERMS.includes(p) || (DEMO && p === 'mark');   // demo marks stay on the phone
+const can = (p) => PERMS.includes(p) || (DEMO && p === 'mark');   // demo marks stay on the phone; an admin's perms come from the superadmin too
 async function api(path, payload) {
   let r;
   try {
@@ -675,6 +683,7 @@ function showApp(name, admin, villages, perms, cand) {
   PERMS = perms || []; MY_NAME = name || ''; MY_VILLAGES = villages || [];
   $('who').textContent = (name ? `${L('उपयोगकर्ता', 'User')}: ${who(name)}` : '') + (cand ? ` · ${L('उम्मीदवार', 'Candidate')}: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
+  $('pwBtn').classList.toggle('hidden', DEMO || !MY_PHONE);   // a person's own login (not the superadmin's, not the demo)
   // logins with several villages, and a signed-up login that may still move itself to another village
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1) && !MOVES_LEFT);
   IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); buyMoreButton();
@@ -841,6 +850,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (lockStep === 'phone') return lockPhone();
   if (lockStep === 'sign') return lockSignup();
+  if (lockStep === 'reset') return lockReset();
   const password = $('pw').value.trim();
   if (!password) return;
   $('unlockBtn').disabled = true; showLock(L('खुल रहा है…', 'Opening…'), true);
@@ -939,9 +949,10 @@ async function search(more = false, force = false) {
     : L('कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें', 'No voter found — try another spelling')) + leftNote();
   $('more').classList.toggle('hidden', !r.more);
 }
-// the admin can change what this person may do at any time; the next answer from the server says so
+// the admin (for a village admin: the superadmin) can change what this login may do at any time; the next answer from the
+// server says so
 function updatePerms(p) {
-  if (IS_ADMIN || p.join() === PERMS.join()) return;
+  if (!Array.isArray(p) || p.join() === PERMS.join()) return;
   PERMS = p;
   wardButton(); progButton(); listButton();
   if (shown) search(false, true);   // redraw the slips with the right buttons
@@ -1614,6 +1625,10 @@ const SIGN_ERR = {
   otp_send: L('OTP नहीं भेज पाए — थोड़ी देर बाद फिर कोशिश करें', 'Could not send the OTP — try again in a while'),
   no_samiti: L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti'), no_village: L('अपना गाँव चुनें', 'Choose your village'), name: L('अपना नाम लिखें', 'Type your name'),
   phone: L('10 अंकों का मोबाइल नंबर डालें', 'Enter a 10-digit mobile number'),
+  pw_short: L('पासवर्ड कम से कम 6 अक्षर का रखें', 'Make the password at least 6 characters'),
+  pw_taken: L('इस नंबर के दूसरे खाते का यही पासवर्ड है — कोई और पासवर्ड चुनें', 'This number\'s other login has this password — choose another'),
+  no_login: L('इस नंबर का कोई खाता नहीं मिला', 'No login found for this number'),
+  no_otp: L('OTP से पासवर्ड अभी नहीं बदल सकते — अपने एडमिन से पूछें', 'The password cannot be reset by OTP yet — ask your admin'),
   too_many: L('बहुत बार कोशिश — थोड़ी देर बाद फिर करें', 'Too many tries — try again later'),
 };
 // a signed-up login: how many searches are left (amber at 3 or fewer, red at none) and the button for more
@@ -1728,12 +1743,12 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !signedU
 // ---------- signing up on the login page: the mobile number first (api/buy.js "lookup"). A number with a login here
 // is asked for its password (forgotten → ask the admin); a new number types a name (and on the start page picks a
 // village) and gets its own login at once, with a few free searches; after those the buying window opens.
-let lockStep = 'phone';   // 'phone' | 'pw' | 'sign'
-// Sign-up checks the number with a one-time code when the server has OTP set up (api/signup.js "otp"): the first tap
-// sends it, then the code box shows and the next tap makes the login.
-let OTP_ON = false, otpSent = false;
-const PW_NOTE = () => L('यह नंबर जुड़ा हुआ है — अपना पासवर्ड डालें। पासवर्ड याद नहीं? अपने एडमिन से पूछें।',
-  'This number has a login — enter your password. Forgot it? Ask your admin.');
+let lockStep = 'phone';   // 'phone' | 'pw' | 'sign' | 'reset'
+// A forgotten password is reset with a one-time code sent to the number when the server has OTP set up
+// (api/signup.js "otp" + "reset"); else the person asks their admin.
+let OTP_ON = false;
+const PW_NOTE = () => OTP_ON ? L('यह नंबर जुड़ा हुआ है — अपना पासवर्ड डालें।', 'This number has a login — enter your password.')
+  : L('यह नंबर जुड़ा हुआ है — अपना पासवर्ड डालें। पासवर्ड याद नहीं? अपने एडमिन से पूछें।', 'This number has a login — enter your password. Forgot it? Ask your admin.');
 function lockStepTo(step, note = '', noPhone = false) {
   lockStep = step;
   $('pwStep').classList.toggle('hidden', step !== 'pw');
@@ -1742,11 +1757,13 @@ function lockStepTo(step, note = '', noPhone = false) {
   $('phone').readOnly = step !== 'phone';
   $('phoneBack').classList.toggle('hidden', step === 'phone');
   $('pwOnly').classList.toggle('hidden', step !== 'phone');
-  if (step !== 'sign') { otpSent = false; $('signOtp').value = ''; }
-  $('otpStep').classList.toggle('hidden', !(step === 'sign' && otpSent));
-  $('unlockBtn').textContent = step === 'pw' ? L('खोलें', 'Open') : step === 'sign' ? (OTP_ON && !otpSent ? L('OTP भेजें', 'Send OTP') : L('खाता बनाएं', 'Create my login')) : L('आगे', 'Next');
+  $('resetStep').classList.toggle('hidden', step !== 'reset');
+  if (step !== 'reset') { $('resetOtp').value = ''; $('resetPw').value = ''; }
+  $('forgotPw').classList.toggle('hidden', !(step === 'pw' && OTP_ON && !noPhone));
+  $('unlockBtn').textContent = step === 'pw' ? L('खोलें', 'Open') : step === 'sign' ? L('खाता बनाएं', 'Create my login')
+    : step === 'reset' ? L('नया पासवर्ड सेव करें', 'Save the new password') : L('आगे', 'Next');
   $('phoneNote').textContent = note;
-  const focus = step === 'pw' ? $('pw') : step === 'sign' ? (HOME ? $('signSamiti') : $('signName')) : $('phone');
+  const focus = step === 'pw' ? $('pw') : step === 'sign' ? (HOME ? $('signSamiti') : $('signName')) : step === 'reset' ? $('resetOtp') : $('phone');
   if (!$('lock').classList.contains('hidden')) focus.focus();
 }
 async function lockPhone() {
@@ -1757,8 +1774,8 @@ async function lockPhone() {
   $('unlockBtn').disabled = false;
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
   showLock('');
+  OTP_ON = !!r.otp;
   if (r.exists) return lockStepTo('pw', PW_NOTE());
-  OTP_ON = !!r.otp; otpSent = false; $('signOtp').value = '';
   await signVillages();
   lockStepTo('sign', r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद ₹1 प्रति सर्च।`,
     `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that ₹1 per search.`)
@@ -1842,6 +1859,37 @@ async function moveOpen(from, tok) {
   villagePicker(ps, sel, (await allVillages()).filter((v) => v.slug !== from));
 }
 let moveBack = null;   // after signing up: ← रहने दें goes back to the new password
+// 🔑 पासवर्ड बदलें: the person chooses a new password (api/signup.js 'password'); this phone stays logged in
+$('pwBtn').addEventListener('click', () => {
+  const box = el('form', 'paybox'), pw = el('input', 'movesel'), pw2 = el('input', 'movesel'), go = el('button', 'btn', L('सेव करें', 'Save'));
+  const msg = el('div', 'k'), back = el('button', 'buyback', L('← रहने दें', '← Never mind'));
+  const user = el('input', 'savepw');   // the number, so the phone's password manager saves the new one under it
+  user.type = 'tel'; user.name = 'username'; user.autocomplete = 'username'; user.value = MY_PHONE.slice(-10); user.readOnly = true; user.tabIndex = -1;
+  for (const x of [pw, pw2]) { x.type = 'password'; x.autocomplete = 'new-password'; x.maxLength = 40; x.autocapitalize = 'none'; x.spellcheck = false; }
+  pw.placeholder = L('नया पासवर्ड (कम से कम 6 अक्षर)', 'New password (at least 6 characters)'); pw2.placeholder = L('नया पासवर्ड फिर से', 'New password again');
+  go.type = 'submit'; back.type = 'button';
+  back.addEventListener('click', buyClose);
+  box.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const p = pw.value.trim();
+    if (p.length < 6) { msg.textContent = SIGN_ERR.pw_short; return; }
+    if (p !== pw2.value.trim()) { msg.textContent = L('दोनों पासवर्ड एक जैसे नहीं हैं', 'The two passwords are not the same'); return; }
+    go.disabled = true; msg.textContent = L('सेव कर रहे हैं…', 'Saving…');
+    const r = await api('signup', { action: 'password', token: token(), password: p });
+    go.disabled = false;
+    if (r.error) { msg.textContent = SIGN_ERR[r.error] || MSG[r.error] || MSG.server; return; }
+    box.replaceChildren(el('div', 'amt', '✓'), el('b', null, L('नया पासवर्ड सेव हो गया', 'New password saved')),
+      el('div', 'k', L('अगली बार मोबाइल नंबर और इसी पासवर्ड से लॉगिन करें।', 'Next time, log in with your mobile number and this password.')), back);
+    back.textContent = L('ठीक है', 'OK');
+  });
+  box.append(user, el('b', null, L('अपना नया पासवर्ड बनाएं', 'Choose a new password')), pw, pw2, go, msg, back);
+  $('buyTitle').textContent = L('🔑 पासवर्ड बदलें', '🔑 Change password');
+  $('buyNote').textContent = '';
+  $('buyClose').classList.remove('hidden');
+  $('buyBody').replaceChildren(box);
+  $('buyPop').classList.remove('hidden');
+  pw.focus();
+});
 const MOVE_ERR = {
   no_moves: L('अब गाँव खुद नहीं बदल सकते — अपने एडमिन से कहें', 'You cannot change the village yourself any more — ask your admin'),
   exists: L('इस नंबर का उस गाँव में पहले से खाता है — उसी से लॉगिन करें', 'This number already has a login in that village — log in with it'),
@@ -1859,11 +1907,10 @@ async function lockSignup() {
   if (HOME && !$('signSamiti').value) return showLock(SIGN_ERR.no_samiti);
   if (!slug) return showLock(SIGN_ERR.no_village);
   if (!name) return showLock(SIGN_ERR.name);
-  if (OTP_ON && !otpSent) return signOtpSend();
-  const otp = $('signOtp').value.replace(/\D/g, '');
-  if (OTP_ON && otp.length !== 6) { $('signOtp').focus(); return showLock(SIGN_ERR.otp); }
+  const password = $('signPw').value.trim();
+  if (password.length < 6) { $('signPw').focus(); return showLock(SIGN_ERR.pw_short); }
   $('unlockBtn').disabled = true; showLock(L('खाता बन रहा है…', 'Making your login…'), true);
-  const r = await api('signup', { action: 'signup', village: slug, name, phone: $('phone').value, otp });
+  const r = await api('signup', { action: 'signup', village: slug, name, phone: $('phone').value, password });
   $('unlockBtn').disabled = false;
   if (r.error === 'exists') { showLock(''); return lockStepTo('pw', PW_NOTE()); }
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
@@ -1911,17 +1958,31 @@ async function lockSignup() {
   $('buyNote').textContent = '';
   $('buyPop').classList.remove('hidden');
 }
-async function signOtpSend() {
-  $('unlockBtn').disabled = $('otpResend').disabled = true; showLock(L('OTP भेज रहे हैं…', 'Sending the OTP…'), true);
-  const r = await api('signup', { action: 'otp', phone: $('phone').value });
-  $('unlockBtn').disabled = $('otpResend').disabled = false;
+// forgotten password: a code to the number (only one with a login), then the code and a new password
+async function resetOtpSend() {
+  $('forgotPw').disabled = $('otpResend').disabled = true; showLock(L('OTP भेज रहे हैं…', 'Sending the OTP…'), true);
+  const r = await api('signup', { action: 'otp', phone: $('phone').value, village: HOME ? '' : SLUG });
+  $('forgotPw').disabled = $('otpResend').disabled = false;
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
-  otpSent = true; $('signOtp').value = '';
-  lockStepTo('sign', L(`OTP ${$('phone').value} पर भेजा गया — 10 मिनट में डालें।`, `OTP sent to ${$('phone').value} — enter it within 10 minutes.`));
   showLock('');
-  $('signOtp').focus();
+  lockStepTo('reset', L(`OTP ${$('phone').value} पर भेजा गया — 10 मिनट में डालें और नया पासवर्ड बनाएं।`,
+    `OTP sent to ${$('phone').value} — enter it within 10 minutes and choose a new password.`));
 }
-$('otpResend').addEventListener('click', signOtpSend);
+async function lockReset() {
+  const otp = $('resetOtp').value.replace(/\D/g, ''), password = $('resetPw').value.trim();
+  if (otp.length !== 6) { $('resetOtp').focus(); return showLock(SIGN_ERR.otp); }
+  if (password.length < 6) { $('resetPw').focus(); return showLock(SIGN_ERR.pw_short); }
+  $('unlockBtn').disabled = true; showLock(L('पासवर्ड बदल रहे हैं…', 'Changing the password…'), true);
+  const r = await api('signup', { action: 'reset', phone: $('phone').value, village: HOME ? '' : SLUG, otp, password });
+  $('unlockBtn').disabled = false;
+  if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
+  lockStepTo('pw', L('✓ नया पासवर्ड बन गया — खुल रहा है…', '✓ New password saved — opening…'));
+  $('pw').value = password;
+  $('lockForm').requestSubmit();   // log in with it
+}
+$('forgotPw').addEventListener('click', resetOtpSend);
+$('otpResend').addEventListener('click', resetOtpSend);
+$('showSignPw').addEventListener('change', (e) => { $('signPw').type = e.target.checked ? 'text' : 'password'; });
 $('pwOnly').addEventListener('click', () => { showLock(''); lockStepTo('pw', '', true); });
 $('phoneBack').addEventListener('click', () => { $('pw').value = ''; showLock(''); lockStepTo('phone'); });
 

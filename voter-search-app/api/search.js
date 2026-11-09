@@ -9,7 +9,7 @@
 // Every search checks that the password behind the token is still active and that this phone holds its newest
 // session, so retiring or logging in on another phone takes effect at once.
 //
-// Daily limit (users only; admins have none): what counts is one *search*, not one request. The server hands out a
+// Daily limit (users, and village admins the superadmin gave one; adminLimited in _lib.js): what counts is one *search*, not one request. The server hands out a
 // search id with the first answer ({searchId, left}); the phone sends it back with every request that belongs to the
 // same search and drops it when the search box is cleared. A request carries on the current search, for free, when its
 // id is this person's current one, the search has lasted under SEARCH_STEPS requests and SEARCH_MINUTES, and it is:
@@ -21,7 +21,7 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
+const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
 const { load, search, family, publicFields } = require('./_search.js');
 
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
@@ -37,11 +37,12 @@ async function countSearch(req, user, b, named) {
   const prepaid = isPrepaid(user);   // signed-up / bought searches: counted for good, not per day
   const dayKey = user.demo ? `searches:${user.id}` : prepaid ? paidKey(user.id) : `searches:${user.id}:${today()}`, findKey = `find:${user.id}`;
   const ipKey = `demo-ip:${clientIp(req)}:${today()}`;
-  const extra = !user.demo && !prepaid && credits(user) > 0;   // a daily limit plus bought searches, used after the day's
+  // a daily limit plus bought searches, used after the day's (not an admin's: a user made admin keeps none of theirs)
+  const extra = !user.demo && !prepaid && !user.admin && credits(user) > 0;
   const [, perMinute, curRaw, usedRaw, ipRaw, paidRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
     ['GET', findKey], ['GET', dayKey], ['GET', ipKey], ['GET', paidKey(user.id)]]);
   if (perMinute > PER_MINUTE) return { error: 'slow_down' };
-  if (user.admin) return {};
+  if (user.admin && !adminLimited(user)) return {};   // the superadmin, and village admins without a limit
 
   let cur = null;
   try { cur = curRaw && JSON.parse(curRaw); } catch (e) { /* start a new search */ }

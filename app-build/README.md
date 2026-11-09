@@ -15,8 +15,16 @@ only receive the cards that match a search. Every search checks that the user's 
   which villages each one looks after (can change this later with **गाँव बदलें**): villages one by one, or a whole
   पंचायत समिति with **पूरी पंचायत समिति** (kept as the samiti, so villages imported into it later are that admin's at
   once; field `samitis` on the admin's login). Can also add and manage users anywhere.
-- **Village admin** — created by the superadmin. Searches only their villages and adds/manages users only there.
-  Cannot see or create other admins.
+- **Village admin** — created by the superadmin, or a user made admin with **एडमिन बनाएं** on their card (same number
+  and password; becomes admin of their village). Searches only their villages. Cannot see or create other admins. On
+  each admin's card (एडमिन tab) the superadmin ticks:
+  - **ऐप में** — the same app permissions as a user (below); admins made before this: all of them.
+  - **एडमिन पेज पर** (`ADMIN_PERMS` in `api/_lib.js`, field `aperms`): **नए व्यक्ति बना सकते हैं** · **अपने बनाए व्यक्ति
+    देख सकते हैं** (and look after them) · **अपने गाँवों के सभी व्यक्ति देख सकते हैं** · **अपने व्यक्तियों को सर्च जोड़
+    सकते हैं** · **अपने व्यक्तियों के अनुरोध मंज़ूर कर सकते हैं** (also requests sent to them). New admins: all; a user
+    made admin: all but "सभी व्यक्ति"; admins made before this: all.
+  - **रोज़ की सर्च सीमा** — empty = no limit (as before); a number limits the admin's searches per day like a user's,
+    with **+100 आज के लिए**.
 - **User** — belongs to exactly one village; their password only opens that village. Opening another village's
   page with it shows "यह पासवर्ड … का है" with a link to the right village. Besides searching by name, a user can do
   only what their admin ticks under their name on the admin page (the server checks this on every request):
@@ -169,22 +177,27 @@ deployment (e.g. to S3) first.
 
 ## Signing up with a mobile number, and getting more searches
 The login page asks only for the **mobile number** first:
-- A number that already has a login for that village (or, on the start page, any login) gets the password box, with
-  "पासवर्ड याद नहीं? अपने एडमिन से पूछें". Admins without a number use **एडमिन? सीधे पासवर्ड से खोलें**.
-- A new number types a name (on the start page it also picks the village) and gets its **own login at once**
-  (`api/signup.js`): the password is shown to write down, and the person goes straight into the village. Free searches
+- A number that already has a login for that village (or, on the start page, any login) gets the password box. With
+  OTP set up (below) it also has **पासवर्ड भूल गए? OTP से नया बनाएं**: a code to the number, then a new password, and
+  the app opens; without OTP it says "पासवर्ड याद नहीं? अपने एडमिन से पूछें". Admins without a number use
+  **एडमिन? सीधे पासवर्ड से खोलें** (made-up passwords only).
+- A new number types a name and **chooses its own password** (6–40 characters; on the start page it also picks the
+  village) and gets its **own login at once** (`api/signup.js`), then goes straight into the village. A password
+  someone chose is kept with their number (`ownPwHash` in `api/_lib.js`), so it opens only with that number — also on
+  the admin page, which has a mobile number box for it. In the app, **🔑** (पासवर्ड बदलें) lets anyone with a number
+  choose a new password; an admin's **नया पासवर्ड** still makes up one. Free searches
   for such a sign-up follow the superadmin's rule, set on the admin page (**साइन-अप पर मुफ़्त सर्च**, `freeRule` in
   `api/_lib.js`), counted per village (retired logins too): **सीधे** — the first X people of each village get Y each,
   later ones none; **घटते हुए** — the first X get Y, the next X get Y/2, and so on down to 1, then none (10 → 5 → 2 → 1).
   Until it is set: सीधे, 10 people, 10 searches. A number that signed up before (in any village) gets no
   free searches again. One internet address can sign up 3 times a day.
-- **OTP check (optional):** with `OTP_SEND_URL` set in Vercel, a new number first gets a 6-digit code ("OTP भेजें"),
-  and the login is made only with the right code. Codes last 10 minutes; a new one after 30 seconds, 5 a day per
+- **OTP for a forgotten password (optional):** with `OTP_SEND_URL` set in Vercel, a number with a login can get a 6-digit
+  code to set a new password (sign-up itself sends none). Codes last 10 minutes; a new one after 30 seconds, 5 a day per
   number, 5 wrong tries per code (`OTP` in `api/_lib.js`). With **2Factor** (2factor.in, API key under the dashboard's
   API section): `OTP_SEND_URL` = `https://2factor.in/API/V1/<API key>/SMS/{mobile}/{otp}/<OTP template name>` (the
   template name as approved in 2Factor's DLT section; a voice call instead: `…/VOICE/{mobile}/{otp}`, no DLT needed).
   Any other provider: its send address with `{mobile}` (10 digits), `{mobile91}` and `{otp}` in it; for a POST API also
-  `OTP_SEND_METHOD=POST` and `OTP_SEND_BODY` (same placeholders). Without `OTP_SEND_URL` sign-up works as before. Local test: `DEV_OTP=1` on `dev-server.mjs`
+  `OTP_SEND_METHOD=POST` and `OTP_SEND_BODY` (same placeholders). Without `OTP_SEND_URL` there is no reset by OTP. Local test: `DEV_OTP=1` on `dev-server.mjs`
   (the code is at `/__otp/last?mobile=<number>`).
 - Picked the wrong village? The new-password window has **गलत गाँव? बदलें**, and in the app a signed-up login has a
   **गाँव बदलें** button: पंचायत समिति, then village. The login moves itself there with its password and searches and

@@ -108,6 +108,7 @@
   /* what each user may do */
   .perms { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13.5px; }
   .perms label { display: flex; align-items: center; gap: 5px; }
+  .permhead { margin-top: 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
   .perms input { width: 17px; height: 17px; margin: 0; }
   .usage { margin-top: 8px; max-width: 420px; }
   .usage .usetext { font-size: 14px; font-weight: 600; color: var(--ok); }
@@ -243,6 +244,7 @@
     <div class="bar2"><h1>एडमिन लॉगिन</h1><button class="langbtn" data-lang type="button"></button></div>
     <p class="sub">Voter Search · पासवर्ड बनाएं और बंद करें</p>
     <form id="loginForm" autocomplete="off">
+      <input id="adminPhone" type="tel" inputmode="numeric" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर (अपना बनाया पासवर्ड हो तो)">
       <input id="adminPw" type="password" placeholder="एडमिन पासवर्ड" autocapitalize="none" autocorrect="off" spellcheck="false" required>
       <button class="btn full" id="loginBtn" type="submit">लॉगिन</button>
     </form>
@@ -417,7 +419,7 @@ const STATIC_EN = {
   'घटते हुए: Y → Y/2 → … → 1, हर बार X लोगों को': 'Halving: Y → Y/2 → … → 1, X people at each step', 'लोग (X)': 'People (X)', 'सर्च (Y)': 'Searches (Y)',
   'सेव करें': 'Save',
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
-  'एडमिन पासवर्ड': 'Admin password', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
+  'एडमिन पासवर्ड': 'Admin password', 'मोबाइल नंबर (अपना बनाया पासवर्ड हो तो)': 'Mobile number (if you chose your own password)', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
   'व्यक्ति': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'मतदाता सूची': 'Voter list', 'निशान हटाएं': 'Clear marks',
   'बंद करें': 'Close', 'कॉपी करें': 'Copy', 'WhatsApp पर भेजें': 'Send on WhatsApp',
   'यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।': 'This password is shown only now. If it is forgotten, make another with "New password".',
@@ -469,7 +471,7 @@ const MSG = EN ? {
   other_device: 'This password was opened on another phone — please log in again',
   offline: 'No internet', server: 'Server problem', name: 'Type a name', not_found: 'Person not found',
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
-  no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000 and searches 1–1000',
+  no_perm: 'You are not allowed to do this — ask the super admin', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000 and searches 1–1000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
   bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
@@ -480,7 +482,7 @@ const MSG = EN ? {
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
-  no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000 और सर्च 1–1000 डालें',
+  no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000 और सर्च 1–1000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
   bad_credits: 'कितनी सर्च जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में सर्च नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
@@ -882,7 +884,8 @@ function approveView(u, req, fromList) {
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('loginBtn').disabled = true; $('loginMsg').textContent = '';
-  const r = await post('unlock', { password: $('adminPw').value });
+  // a password the admin chose themself opens only with their number (ownPwHash in api/_lib.js)
+  const r = await post('unlock', { password: $('adminPw').value, phone: $('adminPhone').value.replace(/\D/g, '') });
   $('loginBtn').disabled = false;
   if (r.error) { $('loginMsg').textContent = errText(r) + (APPROVE ? ` · ${approveHint()}` : ''); return; }
   $('adminPw').value = '';
@@ -902,7 +905,11 @@ function goHome(msg) {
 }
 
 // ---------- village choices: what this admin may use ----------
+// what this admin may do (api/admin.js "aperms"; the superadmin everything)
+const mayDo = (p) => !!me && (me.role === 'super' || (me.aperms || []).includes(p));
 function setup() {
+  $('openAdd').classList.toggle('hidden', !mayDo('add'));
+  $('bell').classList.toggle('hidden', !mayDo('approve'));
   const mine = me.villages.filter((s) => villages[s]);
   $('meText').textContent = me.role === 'super' ? L('सुपर एडमिन · सभी गाँव', 'Super admin · all villages') : `${me.name} · ${mine.map(vName).join(', ')}`;
   const pick = mine.length === 1 ? mine[0] : '';
@@ -1113,13 +1120,36 @@ function permBoxes(u, msg = 'listMsg', saved) {
     c.addEventListener('change', async () => {
       const want = [...box.querySelectorAll('input')].map((x, i) => x.checked && Object.keys(PERM_NAME)[i]).filter(Boolean);
       box.querySelectorAll('input').forEach((x) => { x.disabled = true; });
-      const r = await api({ action: 'perms', id: u.id, perms: want });
+      const r = await api({ action: 'perms', id: u.id, perms: want });   // a village admin's: only the superadmin
       box.querySelectorAll('input').forEach((x) => { x.disabled = false; });
       if (r.error) { c.checked = !c.checked; $(msg).textContent = errText(r); return; }
       $(msg).textContent = ''; u.perms = r.user.perms;
       if (saved) saved();
     });
     l.append(c, label); box.append(l);
+  }
+  return box;
+}
+
+// superadmin: what a village admin may do here (ADMIN_PERMS in api/_lib.js)
+const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they made', all: 'Sees every user of their villages',
+  credits: 'Can add searches to their users', approve: 'Can approve their users\' requests' }
+  : { add: 'नए व्यक्ति बना सकते हैं', own: 'अपने बनाए व्यक्ति देख सकते हैं', all: 'अपने गाँवों के सभी व्यक्ति देख सकते हैं',
+  credits: 'अपने व्यक्तियों को सर्च जोड़ सकते हैं', approve: 'अपने व्यक्तियों के अनुरोध मंज़ूर कर सकते हैं' };
+function adminPermBoxes(u) {
+  const box = el('div', 'perms'), keys = Object.keys(APERM_NAME);
+  for (const p of keys) {
+    const l = el('label'), c = el('input');
+    c.type = 'checkbox'; c.checked = (u.aperms || []).includes(p);
+    c.addEventListener('change', async () => {
+      const want = [...box.querySelectorAll('input')].map((x, i) => x.checked && keys[i]).filter(Boolean);
+      box.querySelectorAll('input').forEach((x) => { x.disabled = true; });
+      const r = await api({ action: 'aperms', id: u.id, aperms: want });
+      box.querySelectorAll('input').forEach((x) => { x.disabled = false; });
+      if (r.error) { c.checked = !c.checked; $('listMsg').textContent = errText(r); return; }
+      $('listMsg').textContent = ''; u.aperms = r.user.aperms;
+    });
+    l.append(c, APERM_NAME[p]); box.append(l);
   }
   return box;
 }
@@ -1132,7 +1162,10 @@ function limitBox(u, msg = 'listMsg', saved) {
   inp.value = u.ownLimit || ''; inp.placeholder = String(u.defaultLimit);
   save.type = more.type = 'button';
   const note = el('span', 'note');
-  const show = () => { note.textContent = (u.ownLimit ? '' : L(`(खाली = ${u.defaultLimit})`, `(empty = ${u.defaultLimit})`)) + (u.extraToday ? L(` · आज +${u.extraToday}`, ` · today +${u.extraToday}`) : ''); };
+  const admin = u.role === 'admin';   // empty = no limit for a village admin
+  if (admin) inp.placeholder = '—';
+  const show = () => { note.textContent = (u.ownLimit ? '' : admin ? L('(खाली = कोई सीमा नहीं)', '(empty = no limit)') : L(`(खाली = ${u.defaultLimit})`, `(empty = ${u.defaultLimit})`))
+    + (u.extraToday && (!admin || u.ownLimit) ? L(` · आज +${u.extraToday}`, ` · today +${u.extraToday}`) : ''); };
   show();
   async function send(payload, btn) {
     btn.disabled = true;
@@ -1399,7 +1432,7 @@ function person(u) {
   if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} सर्च`, `₹ paid · ${u.credits} searches in all`)
     : L(`${u.credits} सर्च · अभी कुछ नहीं खरीदा`, `${u.credits} searches · nothing bought yet`)));
   else if (!isAdmin && u.credits) nm.append(el('span', 'badge paid', L(`₹ खरीदी · ${Math.max(0, u.credits - (u.paidUsed || 0))} सर्च बाकी`, `₹ bought · ${Math.max(0, u.credits - (u.paidUsed || 0))} searches left`)));
-  if (!isAdmin && !u.prepaid && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की सर्च सीमा पूरी', 'Today\'s search limit used up')));
+  if (u.limit != null && !u.prepaid && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की सर्च सीमा पूरी', 'Today\'s search limit used up')));
   if (!isAdmin && candOf(u.cand)) nm.append(el('span', 'badge cand', `${L('उम्मीदवार', 'Candidate')} ${candOf(u.cand).name}`));
   // who made this login: the admin's current name when they are in the list, else the name kept when it was made
   if (u.by) {
@@ -1425,13 +1458,23 @@ function person(u) {
   });
   ph.append(edit);
   const use = el('div', 'info', L(`${u.marked} पर्चियों पर इनके निशान`, `Their marks on ${u.marked} slips`));
-  const meter = isAdmin ? null : useMeter(u);
+  const meter = isAdmin && u.limit == null ? null : useMeter(u);   // an admin: only with a limit from the superadmin
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
+  if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches
+    row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
+      limitBox(u, 'listMsg', refresh));
+  }
   if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
-    ...(u.canBuy ? [creditsBox(u, refresh)] : []),   // a daily limit, and bought searches for after it
+    ...(u.canBuy && mayDo('credits') ? [creditsBox(u, refresh)] : []),   // a daily limit, and bought searches for after it
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
+  if (!isAdmin && !u.retired && me.role === 'super') {   // a user becomes a village admin of their village, same login
+    const up = el('button', 'btn ghost', L('एडमिन बनाएं', 'Make admin'));
+    up.addEventListener('click', () => act({ action: 'promote', id: u.id }, L(`${u.name} को ${vName(u.village)} का एडमिन बनाएं? वही नंबर और पासवर्ड रहेगा; वे नए व्यक्ति बना सकेंगे, अपने व्यक्ति देख सकेंगे, उन्हें सर्च जोड़ सकेंगे और उनके अनुरोध मंज़ूर कर सकेंगे। बाद में "एडमिन" टैब में बदल सकते हैं।`,
+      `Make ${u.name} an admin of ${vName(u.village)}? Same number and password; they can make new users, see their own users, add searches to them and approve their requests. Change this later in the Admins tab.`)));
+    actions.append(up);
+  }
   if (isAdmin) {   // superadmin: change which villages this admin looks after
     const vb = el('button', 'btn ghost', L('गाँव बदलें', 'Change villages'));
     vb.addEventListener('click', () => {
