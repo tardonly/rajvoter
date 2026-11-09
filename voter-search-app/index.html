@@ -380,7 +380,7 @@
       <div class="lockalt"><button id="phoneBack" class="hidden" type="button">← नंबर बदलें</button><button id="pwOnly" type="button">एडमिन? सीधे पासवर्ड से खोलें</button></div>
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
-    <a id="demoLink" class="demolink hidden" href="/demo"><span class="play" aria-hidden="true">▶</span><span>डेमो देखें<small>बिना खाते के, असली मतदाता सूची में 10 खोज</small></span></a>
+    <a id="demoLink" class="demolink hidden" href="/demo"><span class="play" aria-hidden="true">▶</span><span>डेमो देखें<small>बिना खाते के, असली मतदाता सूची में 10 सर्च</small></span></a>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
 </section>
@@ -409,9 +409,9 @@
   </div>
 </div>
 
-<div id="buyPop" class="progpop hidden" role="dialog" aria-label="खोज खरीदें">
+<div id="buyPop" class="progpop hidden" role="dialog" aria-label="सर्च खरीदें">
   <div class="card">
-    <div class="head"><h2 id="buyTitle">🛒 खोज खरीदें</h2>
+    <div class="head"><h2 id="buyTitle">🛒 सर्च खरीदें</h2>
       <span><button id="buyClose" type="button" aria-label="बंद करें">✕</button></span></div>
     <div id="buyBody"></div>
     <div class="note" id="buyNote"></div>
@@ -461,7 +461,7 @@
     <p id="homeMsg">अपना गाँव चुनें</p>
     <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ वीडियो देखें</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
     <div class="vfind hidden" id="vFind">
-      <input id="vSearch" type="search" placeholder="🔍 गाँव खोजें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
+      <input id="vSearch" type="search" placeholder="🔍 गाँव सर्च करें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
       <select id="vPs" aria-label="पंचायत समिति"></select>
       <div class="vcount" id="vCount"></div>
     </div>
@@ -479,7 +479,7 @@
       <div class="row2">
         <input id="qRel" type="search" placeholder="पिता / पति का नाम" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
         <select id="qWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
-        <button id="qReset" type="button" title="खोज साफ़ करें">↺ रीसेट</button>
+        <button id="qReset" type="button" title="सर्च साफ़ करें">↺ रीसेट</button>
       </div>
       <select id="qMark" class="hidden" aria-label="निशान से छाँटें">
         <option value="">सभी मतदाता</option>
@@ -489,7 +489,7 @@
         <option value="absent">सिर्फ़ वोटर नहीं है</option>
       </select>
     </div>
-    <div class="countrow"><div id="count"></div><span><b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और खोज खरीदें</button>
+    <div class="countrow"><div id="count"></div><span><b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button>
       <button id="wardPrint" class="hidden" type="button"></button></span></div>
   </header>
   <main>
@@ -535,7 +535,7 @@ const STATIC_EN = {
   'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
   'डेमो देखें': 'Try the demo',
-  'बिना खाते के, असली मतदाता सूची में 10 खोज': 'No login needed: 10 searches in a real voter list',
+  'बिना खाते के, असली मतदाता सूची में 10 सर्च': 'No login needed: 10 searches in a real voter list',
   '▶ वीडियो देखें': '▶ Watch the video', '↗ शेयर करें': '↗ Share', '↗ शेयर': '↗ Share', 'शेयर करें': 'Share',
   'ऐप कैसे काम करता है': 'How the app works', 'वीडियो': 'Video', '📱 फ़ोन': '📱 Phone', '💻 लैपटॉप': '💻 Laptop', 'बंद करें': 'Close',
   'WhatsApp स्टेटस पर लगाएं': 'Post on WhatsApp status', 'ऐप का वीडियो और लिंक, फिर "My status" चुनें': 'The app\'s video and link, then choose "My status"',
@@ -545,13 +545,13 @@ const STATIC_EN = {
   'आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।': 'The icon opens this page without the browser. Internet is still needed.',
   'वोटर रिपोर्ट': 'Voter report', '↻ रिफ्रेश': '↻ Refresh', 'मतदाता सूची': 'Voter list', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
   'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
-  'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव खोजें / Village': '🔍 Search village / गाँव',
+  'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव सर्च करें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
   'नाम / Name / मकान नं. / Voter ID': 'Name / नाम / House no. / Voter ID', 'पिता / पति का नाम': 'Father\'s / husband\'s name',
-  'निशान से छाँटें': 'Filter by mark', '↺ रीसेट': '↺ Reset', 'खोज साफ़ करें': 'Clear the search',
+  'निशान से छाँटें': 'Filter by mark', '↺ रीसेट': '↺ Reset', 'सर्च साफ़ करें': 'Clear the search',
   'आगे': 'Next', '← नंबर बदलें': '← Change number', 'एडमिन? सीधे पासवर्ड से खोलें': 'Admin? Open with the password',
   'आपका नाम': 'Your name', 'गाँव': 'Village',
-  'खोज खरीदें': 'Buy searches', '🛒 खोज खरीदें': '🛒 Buy searches', '🛒 और खोज खरीदें': '🛒 Buy more searches', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
+  'सर्च खरीदें': 'Buy searches', '🛒 सर्च खरीदें': '🛒 Buy searches', '🛒 और सर्च खरीदें': '🛒 Buy more searches', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
   'सिर्फ़ ✓ वोट दिया': 'Only ✓ voted', 'सिर्फ़ आ रहे हैं': 'Only coming', 'सिर्फ़ वोटर नहीं है': 'Only not a voter',
 };
 function translatePage() {
@@ -606,9 +606,9 @@ const MSG = {
   other_device: L('यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है, इसलिए यहाँ से लॉग आउट हो गया। एक पासवर्ड एक समय पर एक ही फ़ोन पर चलता है।',
     'This password was opened on another phone, so it was logged out here. A password works on one phone at a time.'),
   too_many: L('बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें', 'Too many wrong passwords — try again in 15 minutes'),
-  slow_down: L('बहुत तेज़ खोज — एक मिनट रुककर कोशिश करें', 'Searching too fast — wait a minute and try again'),
-  limit: L('आज की खोज सीमा पूरी हो गई — कल फिर खोजें या एडमिन से बात करें', 'Today\'s search limit is used up — search again tomorrow or talk to your admin'),
-  demo_limit: L('डेमो की खोज पूरी हो गईं — अपने गाँव के लिए यह ऐप लेने को ऊपर अपने गाँव का नाम लिखकर WhatsApp करें',
+  slow_down: L('बहुत तेज़ सर्च — एक मिनट रुककर कोशिश करें', 'Searching too fast — wait a minute and try again'),
+  limit: L('आज की सर्च सीमा पूरी हो गई — कल फिर सर्च करें या एडमिन से बात करें', 'Today\'s search limit is used up — search again tomorrow or talk to your admin'),
+  demo_limit: L('डेमो की सर्च पूरी हो गईं — अपने गाँव के लिए यह ऐप लेने को ऊपर अपने गाँव का नाम लिखकर WhatsApp करें',
     'The demo searches are used up — to get this app for your village, type its name above and send it on WhatsApp'),
   offline: L('इंटरनेट नहीं है — इंटरनेट चालू करें', 'No internet — please switch on the internet'),
   server: L('सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें', 'Server problem — try again in a little while'),
@@ -621,8 +621,8 @@ const MSG = {
   no_progress: L('प्रगति देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the report — ask your admin'),
   no_list: L('मतदाता सूची देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter list — ask your admin'),
   no_pdf: L('पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें', 'You may not print a whole ward\'s slips — ask your admin'),
-  no_ward_list: L('पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर खोजें', 'You may not list a whole ward — search by name'),
-  credits: L('आपकी सभी खोज इस्तेमाल हो गईं — और खोज खरीदें', 'All your searches are used — buy more'),
+  no_ward_list: L('पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर सर्च करें', 'You may not list a whole ward — search by name'),
+  credits: L('आपकी सभी सर्च इस्तेमाल हो गईं — और सर्च खरीदें', 'All your searches are used — buy more'),
 };
 const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other_village'];
 // What this login may do besides searching by name (admins: everything); the server checks these on every request.
@@ -865,13 +865,13 @@ function counted(r) {
   buyMoreButton();
 }
 const leftNote = () => (PREPAID || DEMO || searchesLeft == null || searchesLeft >= 20 ? ''   // prepaid: shown on its own badge (buyMoreButton)
-  : BOUGHT ? (searchesLeft ? L(` · आज ${searchesLeft} + खरीदी ${BOUGHT} खोज बाकी`, ` · ${searchesLeft} today + ${BOUGHT} bought searches left`)
-    : L(` · आज की खोज पूरी · खरीदी ${BOUGHT} खोज बाकी`, ` · today's searches used · ${BOUGHT} bought searches left`))
-  : L(` · आज ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left today`));
+  : BOUGHT ? (searchesLeft ? L(` · आज ${searchesLeft} + खरीदी ${BOUGHT} सर्च बाकी`, ` · ${searchesLeft} today + ${BOUGHT} bought searches left`)
+    : L(` · आज की सर्च पूरी · खरीदी ${BOUGHT} सर्च बाकी`, ` · today's searches used · ${BOUGHT} bought searches left`))
+  : L(` · आज ${searchesLeft} सर्च बाकी`, ` · ${searchesLeft} searches left today`));
 function hint() {
   $('results').innerHTML = '<div class="hint">' + L('नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
-    'मकान नंबर (जैसे <b>512</b>, चाहें तो वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी खोज सकते हैं।' +
+    'मकान नंबर (जैसे <b>512</b>, चाहें तो वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी सर्च कर सकते हैं।' +
     (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : ''),
     'Type a name or the father\'s / husband\'s name, in English or Hindi.<br>' +
     'Spelling need not be exact, e.g. <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>.<br>' +
@@ -899,7 +899,7 @@ async function search(more = false, force = false) {
   if (!named && !can('ward')) { ++seq; $('results').innerHTML = '';
     $('count').textContent = MSG.no_ward_list; $('more').classList.add('hidden'); return; }
   const mine = ++seq;
-  if (!more) $('count').textContent = L('खोज रहे हैं…', 'Searching…');
+  if (!more) $('count').textContent = L('सर्च कर रहे हैं…', 'Searching…');
   // a whole ward pages on from the last box shown, so slips marked meanwhile don't shift the list
   const r = await api('search', { ...q, offset: more ? shown : 0, after: more ? lastBox : 0, searchId, token: token() });
   counted(r);
@@ -1447,7 +1447,7 @@ function myVillages(list) {
   $('homeAdmin').classList.toggle('hidden', DEMO || savedLogin() !== 'tok:admin');   // superadmin and village admins
   $('homeOut').classList.toggle('hidden', DEMO);
   $('demoActs').classList.toggle('hidden', !DEMO);   // the demo's villages: the video and a share button
-  $('homeMsg').textContent = DEMO ? L(`डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} खोज बाकी`,
+  $('homeMsg').textContent = DEMO ? L(`डेमो: गाँव चुनें · हर गाँव के पहले 2 वार्ड · ${searchesLeft} सर्च बाकी`,
     `Demo: choose a village · the first 2 wards of each · ${searchesLeft} searches left`)
     : list.length ? L('अपना गाँव चुनें', 'Choose your village') : L('इस पासवर्ड से कोई गाँव नहीं खुलता — एडमिन से पूछें', 'This password opens no village — ask your admin');
   homeList = list;
@@ -1537,7 +1537,7 @@ $('homeOut').addEventListener('click', () => {
 function otherVillage(r) {
   const name = EN ? enName(r.village) : r.villageName || r.village;
   showLock(L(`यह पासवर्ड ${name} का है। `, `This password is for ${name}. `));
-  const a = el('a', null, L(`${name} की खोज खोलें →`, `Open ${name}'s search →`)); a.href = `/${r.village}`;
+  const a = el('a', null, L(`${name} की सर्च खोलें →`, `Open ${name}'s search →`)); a.href = `/${r.village}`;
   $('lockMsg').append(a);
 }
 function setVillage(v) {
@@ -1589,9 +1589,9 @@ function demoBar() {
     bar.append(el('div'), el('div', 'ask', L('अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:',
       'Want this app for your village? Type its name and send it on WhatsApp:')), form, acts);
   }
-  bar.firstChild.replaceChildren(el('b', null, L('डेमो', 'Demo')), L(` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में खोजकर देखें`,
+  bar.firstChild.replaceChildren(el('b', null, L('डेमो', 'Demo')), L(` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में सर्च करके देखें`,
     ` · try a search in the real voter list of the first ${VILLAGE.wards.length} wards of ${vn(VILLAGE)}`),
-    searchesLeft != null ? L(` · ${searchesLeft} खोज बाकी`, ` · ${searchesLeft} searches left`) : '');
+    searchesLeft != null ? L(` · ${searchesLeft} सर्च बाकी`, ` · ${searchesLeft} searches left`) : '');
   bar.classList.remove('hidden');
 }
 
@@ -1607,7 +1607,7 @@ function buyMoreButton() {
   $('buyMore').classList.toggle('hidden', !CAN_BUY || DEMO);
   b.classList.toggle('hidden', !show);
   if (!show) return;
-  b.textContent = L(`🔍 ${searchesLeft} खोज बाकी`, `🔍 ${searchesLeft} searches left`);
+  b.textContent = L(`🔍 ${searchesLeft} सर्च बाकी`, `🔍 ${searchesLeft} searches left`);
   b.classList.toggle('low', searchesLeft > 0 && searchesLeft <= 3);
   b.classList.toggle('none', searchesLeft === 0);
 }
@@ -1619,7 +1619,7 @@ const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // nothing about the person itself. A tab is opened at once (a tap may open one; after waiting for the server it may
 // not), then sent to WhatsApp; the window then closes.
 function buyWhatsApp(cls, [n, rs]) {
-  const label = L(`💬 ${n} खोज (₹${rs}) WhatsApp पर मंगाएं`, `💬 Ask for ${n} searches (₹${rs}) on WhatsApp`);
+  const label = L(`💬 ${n} सर्च (₹${rs}) WhatsApp पर मंगाएं`, `💬 Ask for ${n} searches (₹${rs}) on WhatsApp`);
   const a = el('button', cls, label); a.type = 'button';
   a.addEventListener('click', async () => {
     if (a.disabled) return;
@@ -1637,7 +1637,7 @@ function buyWhatsApp(cls, [n, rs]) {
     const link = `${location.origin}/${r.id}`;
     if (r.phone != null) ADMIN_PHONE = r.phone;   // whom the server sent the request to ('' = the superadmin: our number)
     const url = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
-      `नमस्ते, मुझे Voter Search में ${n} खोज चाहिए (₹${rs})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
+      `नमस्ते, मुझे Voter Search में ${n} सर्च चाहिए (₹${rs})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
       `Hello, I would like ${n} searches in Voter Search (₹${rs}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\n${link}`));
     buyClose();
     if (tab) { tab.opener = null; tab.location.href = url; } else location.href = url;
@@ -1665,7 +1665,7 @@ function buyUpi([n, rs]) {
 function buyOpen() {
   delete $('buyPop').dataset.go;
   $('buyClose').classList.remove('hidden');
-  $('buyTitle').textContent = L('🛒 और खोज', '🛒 More searches');
+  $('buyTitle').textContent = L('🛒 और सर्च', '🛒 More searches');
   const box = el('div', 'paybox'), packs = el('div', 'packs');
   // with UPI here, only that; else (no JaduPe token on the server) WhatsApp to the admin
   const payBtn = (pk) => (ONLINE ? buyUpi(pk) : buyWhatsApp('btn wabtn', pk));
@@ -1675,7 +1675,7 @@ function buyOpen() {
     const price = el('span');   // ₹1 a search, struck through, then the pack's price; the saving below
     if (pk[1] < pk[0]) price.append(el('s', null, `₹${pk[0]}`), ' ');
     price.append(`₹${pk[1]}`);
-    b.append(el('b', null, L(`${pk[0]} खोज`, `${pk[0]} searches`)), price);
+    b.append(el('b', null, L(`${pk[0]} सर्च`, `${pk[0]} searches`)), price);
     if (pk[1] < pk[0]) b.append(el('small', null, L(`₹${pk[0] - pk[1]} बचत`, `save ₹${pk[0] - pk[1]}`)));
     b.addEventListener('click', () => {
       pick = pk;
@@ -1685,15 +1685,15 @@ function buyOpen() {
     packs.append(b);
   }
   const none = searchesLeft === 0 && !BOUGHT;
-  box.append(el('b', null, !none ? L('और खोज चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी खोज इस्तेमाल हो गईं', 'All your searches are used')
-    : L('आज की सभी खोज इस्तेमाल हो गईं', 'All of today\'s searches are used')),
-    el('div', 'k', ONLINE ? L('कितनी खोज चाहिए, चुनें और UPI से भुगतान करें — खोज अपने आप जुड़ जाएंगी।',
+  box.append(el('b', null, !none ? L('और सर्च चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी सर्च इस्तेमाल हो गईं', 'All your searches are used')
+    : L('आज की सभी सर्च इस्तेमाल हो गईं', 'All of today\'s searches are used')),
+    el('div', 'k', ONLINE ? L('कितनी सर्च चाहिए, चुनें और UPI से भुगतान करें — सर्च अपने आप जुड़ जाएंगी।',
       'Choose how many searches and pay by UPI — they are added by themselves.')
-      : L('कितनी खोज चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे खोज जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
+      : L('कितनी सर्च चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे सर्च जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
         'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
     packs, pay);
   $('buyBody').replaceChildren(box);
-  $('buyNote').textContent = L('खरीदी खोज कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की खोज पूरी होने के बाद इस्तेमाल होती हैं') + '। एक खोज = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
+  $('buyNote').textContent = L('खरीदी सर्च कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की सर्च पूरी होने के बाद इस्तेमाल होती हैं') + '। एक सर्च = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
     'Bought searches never expire' + (PREPAID ? '' : ' — they are used once the day\'s searches are used') + '. One search = typing a name until the box is cleared; family and more pages are free.');
   $('buyPop').classList.remove('hidden');
 }
@@ -1739,9 +1739,9 @@ async function lockPhone() {
   showLock('');
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   await signVillages();
-  lockStepTo('sign', r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} खोज मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति खोज।`,
+  lockStepTo('sign', r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति सर्च।`,
     `New number — type your name: your login is made at once with ${r.free} free searches. After that ₹1 per search.`)
-    : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर खोज खरीदें (₹1 प्रति खोज)।',
+    : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (₹1 प्रति सर्च)।',
       'New number — type your name: your login is made at once; then buy searches (₹1 per search).'));
 }
 // The start page asks for the पंचायत समिति first, then the village in it; a village page is that village.
@@ -1804,8 +1804,8 @@ async function lockSignup() {
   }
   box.append(user, pass, el('div', 'amt', '✓'), el('b', null, L('आपका खाता बन गया — पासवर्ड:', 'Your login is ready — password:')), el('div', 'buypw', r.password), copy, ...(save ? [save] : []),
     el('div', 'k', L('यह पासवर्ड लिख लें: दूसरे फ़ोन पर मोबाइल नंबर और इसी पासवर्ड से खुलेगा।', 'Write this password down: on another phone, your mobile number and this password open it.')),
-    el('div', 'k', r.left ? L(`${r.left} खोज मुफ़्त — उसके बाद ₹1 प्रति खोज।`, `${r.left} free searches — after that ₹1 per search.`)
-      : L('खोज खरीदकर शुरू करें (₹1 प्रति खोज)।', 'Buy searches to start (₹1 per search).')), open);
+    el('div', 'k', r.left ? L(`${r.left} सर्च मुफ़्त — उसके बाद ₹1 प्रति सर्च।`, `${r.left} free searches — after that ₹1 per search.`)
+      : L('सर्च खरीदकर शुरू करें (₹1 प्रति सर्च)।', 'Buy searches to start (₹1 per search).')), open);
   $('buyTitle').textContent = L('आपका खाता', 'Your login');
   $('buyPop').dataset.go = slug;
   $('buyClose').classList.add('hidden');
@@ -1848,16 +1848,16 @@ async function payReturn(id) {
   buyMoreButton();
   const ok = el('button', 'btn', L('ठीक है', 'OK')); ok.type = 'button'; ok.addEventListener('click', buyClose);
   if (r.status === 'done') {
-    box.replaceChildren(el('div', 'amt', '✓'), el('b', null, L(`भुगतान मिल गया — ${r.n} खोज जुड़ गईं`, `Payment received — ${r.n} searches added`)), ok);
+    box.replaceChildren(el('div', 'amt', '✓'), el('b', null, L(`भुगतान मिल गया — ${r.n} सर्च जुड़ गईं`, `Payment received — ${r.n} searches added`)), ok);
   } else if (r.status === 'open') {
     const again = el('button', 'btn', L('फिर जाँचें', 'Check again')); again.type = 'button';
     again.addEventListener('click', () => payReturn(id));
     box.replaceChildren(el('b', null, L('भुगतान अभी पूरा नहीं दिखा', 'The payment is not complete yet')),
-      el('div', 'k', L('पैसे कट गए हों तो थोड़ी देर में खोज अपने आप जुड़ जाएंगी — यह पेज दोबारा खोलें।',
+      el('div', 'k', L('पैसे कट गए हों तो थोड़ी देर में सर्च अपने आप जुड़ जाएंगी — यह पेज दोबारा खोलें।',
         'If the money has gone from your account, the searches are added by themselves shortly — open this page again.')), again);
   } else {
     box.replaceChildren(el('b', null, r.status === 'rejected' ? L('भुगतान नहीं हुआ', 'The payment did not go through') : MSG[r.error] || MSG.server),
-      el('div', 'k', L('दोबारा कोशिश करने के लिए 🛒 और खोज खरीदें दबाएं।', 'To try again, tap 🛒 Buy more searches.')), ok);
+      el('div', 'k', L('दोबारा कोशिश करने के लिए 🛒 और सर्च खरीदें दबाएं।', 'To try again, tap 🛒 Buy more searches.')), ok);
   }
 }
 

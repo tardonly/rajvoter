@@ -29,7 +29,7 @@
 //                                               e.g. paid to the admin; takes it out of the free sign-up count (FREE_TIERS)
 //   (in "list": reqs = those requests of this admin's people that were sent to them (to, see adminFor in _lib.js; the
 //    superadmin sees every one, with toName), open ones first, plus the ones approved or rejected in the last 30 days,
-//    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with खोज जोड़ें)
+//    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with सर्च जोड़ें)
 //   and collected: [{by, name, rs, n, count, settled, due}] payments collected so far by each admin (all time), what they
 //   handed over to the superadmin and what is still due; a village admin gets only their own row
 //   action "ledger" [, by]            → {ledger}  हिसाब of one admin (by = admin id, superadmin only; a village admin gets

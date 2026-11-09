@@ -291,7 +291,7 @@ async function newReqId() {   // 8 digits no request has yet
   do id = String(crypto.randomInt(10000000, 100000000)); while (await getReq(id));
   return id;
 }
-// Payments: each approved request (and each hand-added "खोज जोड़ें" on the admin page, which gets an approved request of
+// Payments: each approved request (and each hand-added "सर्च जोड़ें" on the admin page, which gets an approved request of
 // its own with hand: '1') records doneRs = the ₹ collected and doneBy / doneByName = the admin who collected it;
 // pay:rs, pay:n, pay:count (hashes, admin id → total ₹, searches, payments) and pay:name (admin id → name) add them up
 // for the superadmin.

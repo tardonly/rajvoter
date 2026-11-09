@@ -247,7 +247,7 @@
 
   <section id="panel" class="hidden">
     <div class="bar"><div><h1>एडमिन</h1><div class="sub" id="meText" style="margin:0"></div></div>
-      <span class="row"><button class="btn ghost bell" id="bell" type="button" title="खोज अनुरोध" aria-label="खोज अनुरोध">🔔<span class="bn hidden" id="bellN"></span></button><button class="langbtn" data-lang type="button"></button><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← खोज</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
+      <span class="row"><button class="btn ghost bell" id="bell" type="button" title="सर्च अनुरोध" aria-label="सर्च अनुरोध">🔔<span class="bn hidden" id="bellN"></span></button><button class="langbtn" data-lang type="button"></button><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← सर्च</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
 
     <nav class="tabs" id="tabs" role="tablist">
       <button type="button" data-tab="people">व्यक्ति</button>
@@ -386,7 +386,7 @@ const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch 
 const L = (hi, en) => (EN ? en : hi);
 const STATIC_EN = {
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
-  'एडमिन पासवर्ड': 'Admin password', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← खोज': '← Search', 'लॉग आउट': 'Log out',
+  'एडमिन पासवर्ड': 'Admin password', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
   'व्यक्ति': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'मतदाता सूची': 'Voter list', 'निशान हटाएं': 'Clear marks',
   'बंद करें': 'Close', 'कॉपी करें': 'Copy', 'WhatsApp पर भेजें': 'Send on WhatsApp',
   'यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।': 'This password is shown only now. If it is forgotten, make another with "New password".',
@@ -450,8 +450,8 @@ const MSG = EN ? {
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
-  no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
-  bad_credits: 'कितनी खोज जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में खोज नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
+  no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
+  bad_credits: 'कितनी सर्च जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में सर्च नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
 };
 // 919876543210 → "+91 98765 43210"
@@ -519,8 +519,8 @@ const APPROVE = (() => {
   return { phone: h.get('add'), n: parseInt(h.get('n'), 10) || 0, v: h.get('v') || '' };
 })();
 const approveHint = () => (APPROVE.rid
-  ? L(`खोज अनुरोध #${APPROVE.rid}: मंज़ूर करने के लिए एडमिन पासवर्ड से लॉगिन करें`, `Search request #${APPROVE.rid}: log in with an admin password to approve it`)
-  : L(`खोज मंज़ूर करने के लिए एडमिन पासवर्ड से लॉगिन करें (${APPROVE.n} खोज · ${showPhone(APPROVE.phone)})`,
+  ? L(`सर्च अनुरोध #${APPROVE.rid}: मंज़ूर करने के लिए एडमिन पासवर्ड से लॉगिन करें`, `Search request #${APPROVE.rid}: log in with an admin password to approve it`)
+  : L(`सर्च मंज़ूर करने के लिए एडमिन पासवर्ड से लॉगिन करें (${APPROVE.n} सर्च · ${showPhone(APPROVE.phone)})`,
     `Log in with an admin password to approve searches (${APPROVE.n} searches · ${showPhone(APPROVE.phone)})`));
 if (APPROVE) $('loginMsg').textContent = approveHint();
 const packPrice = (n) => { const pk = PACKS.find((x) => x[0] === n); return pk ? pk[1] : null; };
@@ -539,10 +539,10 @@ async function approveFromLink() {
   apAgain = approveFromLink;
   const body = $('apBody');
   showTab('people');
-  $('apTitle').textContent = L('✅ खोज मंज़ूरी', '✅ Approve searches');
+  $('apTitle').textContent = L('✅ सर्च मंज़ूरी', '✅ Approve searches');
   body.replaceChildren(el('div', 'sub', L('खुल रहा है…', 'Opening…')));
   $('apModal').classList.remove('hidden');
-  const notMine = el('div', 'sub', L('खोज सिर्फ़ उस गाँव का एडमिन या सुपर एडमिन जोड़ सकता है।', "Only that village's admin or the super admin can add searches."));
+  const notMine = el('div', 'sub', L('सर्च सिर्फ़ उस गाँव का एडमिन या सुपर एडमिन जोड़ सकता है।', "Only that village's admin or the super admin can add searches."));
   let req, u;
   if (APPROVE.rid) {
     const r = await api({ action: 'req_get', rid: APPROVE.rid });
@@ -575,7 +575,7 @@ function showBell() {
 function reqList() {
   apAgain = reqList;
   const body = $('apBody');
-  $('apTitle').textContent = L('🔔 खोज अनुरोध', '🔔 Search requests');
+  $('apTitle').textContent = L('🔔 सर्च अनुरोध', '🔔 Search requests');
   $('apModal').classList.remove('hidden');
   const open = reqs.filter((r) => r.status === 'open').length;
   const head = el('div', 'sub', reqs.length ? L(`${open} मंज़ूरी बाकी · ${reqs.length - open} निपटाए (पिछले 30 दिन)`, `${open} waiting · ${reqs.length - open} handled (last 30 days)`)
@@ -586,15 +586,15 @@ function reqList() {
     const t = el('div', 't'); t.append(el('span', null, r.name),
       el('span', 'st', r.status === 'open' ? L('⏳ बाकी', '⏳ Waiting') : r.status === 'rejected' ? L('✕ अस्वीकार', '✕ Rejected')
         : L(`✓ ${r.doneN} जोड़ी गईं`, `✓ ${r.doneN} added`)));
-    b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n} खोज · ₹${r.rs}`, `Asked: ${r.n} searches · ₹${r.rs}`)
+    b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n} सर्च · ₹${r.rs}`, `Asked: ${r.n} searches · ₹${r.rs}`)
         + (r.online ? L(' · 💳 UPI ऑनलाइन, भुगतान का इंतज़ार', ' · 💳 online UPI, waiting for the payment') : '')
-      : r.status === 'rejected' ? L(`माँगी: ${r.n} खोज · अस्वीकार — ${r.doneByName}`, `Asked: ${r.n} searches · rejected — ${r.doneByName}`)
+      : r.status === 'rejected' ? L(`माँगी: ${r.n} सर्च · अस्वीकार — ${r.doneByName}`, `Asked: ${r.n} searches · rejected — ${r.doneByName}`)
       : L(`₹${r.doneRs} वसूले — ${r.doneByName}${r.hand ? ' (हाथ से जोड़ी)' : ''}`, `₹${r.doneRs} collected — ${r.doneByName}${r.hand ? ' (added by hand)' : ''}`)),
       el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`
         + (r.toName ? L(` · भेजा: ${r.toName}`, ` · sent to: ${r.toName}`) : '')));
     b.addEventListener('click', () => {
       const u = users.find((x) => x.id === r.user);
-      $('apTitle').textContent = L('✅ खोज मंज़ूरी', '✅ Approve searches');
+      $('apTitle').textContent = L('✅ सर्च मंज़ूरी', '✅ Approve searches');
       if (u) approveView(u, r, true); else $('apBody').replaceChildren(el('div', 'bad', MSG.not_found));
     });
     list.append(b);
@@ -607,8 +607,8 @@ function collectedBox() {
   if (!collected) return [];
   const box = el('div', 'paid'), all = me.role === 'super';
   const sum = (k) => collected.reduce((t, c) => t + c[k], 0), total = sum('rs'), n = sum('n'), count = sum('count');
-  box.append(el('div', 'pt', all ? L(`💰 कुल वसूली: ₹${total} · ${n} खोज`, `💰 Collected in all: ₹${total} · ${n} searches`)
-    : L(`💰 आपकी वसूली: ₹${total} · ${count} भुगतान · ${n} खोज`, `💰 You collected: ₹${total} · ${count} payment${count === 1 ? '' : 's'} · ${n} searches`)));
+  box.append(el('div', 'pt', all ? L(`💰 कुल वसूली: ₹${total} · ${n} सर्च`, `💰 Collected in all: ₹${total} · ${n} searches`)
+    : L(`💰 आपकी वसूली: ₹${total} · ${count} भुगतान · ${n} सर्च`, `💰 You collected: ₹${total} · ${count} payment${count === 1 ? '' : 's'} · ${n} searches`)));
   if (all && sum('due')) box.append(el('div', 'due', L(`एडमिन से आना बाकी: ₹${sum('due')}`, `Still to come from admins: ₹${sum('due')}`)));
   if (!collected.length) box.append(el('div', 'sub', L('अभी कोई भुगतान नहीं।', 'No payments yet.')));
   const settledLine = (c) => (c.by === 'admin' ? L('आपके पास', 'with you')
@@ -617,7 +617,7 @@ function collectedBox() {
     if (!all && c.by !== me.id) continue;
     const row = el('button', 'pr'); row.type = 'button';
     row.append(el('span', null, all ? c.name : L('📒 हिसाब देखें', '📒 See the ledger')), el('b', null, all ? `₹${c.rs}` : '›'),
-      el('small', null, (all ? L(`${c.count} भुगतान · ${c.n} खोज · `, `${c.count} payment${c.count === 1 ? '' : 's'} · ${c.n} searches · `) : '') + settledLine(c)));
+      el('small', null, (all ? L(`${c.count} भुगतान · ${c.n} सर्च · `, `${c.count} payment${c.count === 1 ? '' : 's'} · ${c.n} searches · `) : '') + settledLine(c)));
     if (c.due) row.classList.add('owes');
     row.addEventListener('click', () => ledgerView(c.by));
     box.append(row);
@@ -668,7 +668,7 @@ async function ledgerView(by, got) {
     if (it.p) {
       const p = it.p;
       t.append(el('span', null, p.name), el('span', 'st', `+ ₹${p.rs}`));
-      row.append(t, el('div', 'sub', `${showPhone(p.phone)} · ${vName(p.village)} · ${L(`${p.n} खोज`, `${p.n} searches`)}${p.hand ? L(' (हाथ से)', ' (by hand)') : ` · #${p.id}`} · ${fmt(p.at)}`));
+      row.append(t, el('div', 'sub', `${showPhone(p.phone)} · ${vName(p.village)} · ${L(`${p.n} सर्च`, `${p.n} searches`)}${p.hand ? L(' (हाथ से)', ' (by hand)') : ` · #${p.id}`} · ${fmt(p.at)}`));
     } else {
       const x = it.x;
       t.append(el('span', null, L('सुपर एडमिन को जमा', 'Handed to the superadmin')), el('span', 'st', `− ₹${x.rs}`));
@@ -717,10 +717,10 @@ function approveView(u, req, fromList) {
     head.unshift(back);
   }
   const ask = el('div', 'ask'), askPrice = packPrice(req.n);
-  ask.append(L('माँगी: ', 'Asked for: '), el('b', null, L(`${req.n} खोज`, `${req.n} searches`)),
+  ask.append(L('माँगी: ', 'Asked for: '), el('b', null, L(`${req.n} सर्च`, `${req.n} searches`)),
     askPrice != null ? ` · ₹${askPrice}` : L(' · (यह पैक सूची में नहीं)', ' · (not one of the packs)'));
   if (req.status === 'done') {
-    body.replaceChildren(...head, ask, el('div', 'done', L(`✓ यह अनुरोध मंज़ूर हो चुका है: ${req.doneN} खोज जोड़ी गईं`, `✓ This request is already approved: ${req.doneN} searches added`)),
+    body.replaceChildren(...head, ask, el('div', 'done', L(`✓ यह अनुरोध मंज़ूर हो चुका है: ${req.doneN} सर्च जोड़ी गईं`, `✓ This request is already approved: ${req.doneN} searches added`)),
       el('div', 'sub', L(`₹${req.doneRs} वसूले — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`, `₹${req.doneRs} collected — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`)));
     return;
   }
@@ -741,7 +741,7 @@ function approveView(u, req, fromList) {
     if (!r.error && u.phone) {
       const tell = el('a', 'btn ghost full', L('💬 उपयोगकर्ता को WhatsApp पर बताएं', '💬 Tell them on WhatsApp'));
       tell.href = `https://wa.me/${u.phone}?text=` + encodeURIComponent(L(
-        `नमस्ते ${u.name}, Voter Search में ${req.n} खोज का आपका अनुरोध (#${req.id}) स्वीकार नहीं हुआ — भुगतान नहीं मिला। सवाल हो तो इसी नंबर पर बात करें।`,
+        `नमस्ते ${u.name}, Voter Search में ${req.n} सर्च का आपका अनुरोध (#${req.id}) स्वीकार नहीं हुआ — भुगतान नहीं मिला। सवाल हो तो इसी नंबर पर बात करें।`,
         `Hello ${u.name}, your Voter Search request for ${req.n} searches (#${req.id}) was not approved — no payment was received. Reply here if you have a question.`));
       tell.target = '_blank'; tell.rel = 'noopener';
       $('apBody').append(tell);
@@ -756,9 +756,9 @@ function approveView(u, req, fromList) {
     packs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === n));
     if (Number(inp.value) !== n) inp.value = n || '';
     const rs = packPrice(n);
-    price.textContent = n > 0 ? L(`जोड़ी जाएंगी: ${n} खोज${rs != null ? ` · भुगतान ₹${rs} होना चाहिए` : ''}`,
+    price.textContent = n > 0 ? L(`जोड़ी जाएंगी: ${n} सर्च${rs != null ? ` · भुगतान ₹${rs} होना चाहिए` : ''}`,
       `Will add: ${n} searches${rs != null ? ` · payment should be ₹${rs}` : ''}`) : '';
-    go.textContent = n > 0 ? L(`✓ भुगतान मिल गया — ${n} खोज जोड़ें`, `✓ Payment received — add ${n} searches`) : L('संख्या डालें', 'Enter a number');
+    go.textContent = n > 0 ? L(`✓ भुगतान मिल गया — ${n} सर्च जोड़ें`, `✓ Payment received — add ${n} searches`) : L('संख्या डालें', 'Enter a number');
     go.disabled = !(n > 0 && n <= 10000);
   };
   for (const [k] of PACKS) {
@@ -778,13 +778,13 @@ function approveView(u, req, fromList) {
     const left = Math.max(0, fresh.credits - (fresh.paidUsed || 0));
     const tell = el('a', 'btn wa full', L('💬 उपयोगकर्ता को WhatsApp पर बताएं', '💬 Tell them on WhatsApp'));
     tell.href = `https://wa.me/${u.phone}?text=` + encodeURIComponent(L(
-      `नमस्ते ${u.name}, आपके Voter Search खाते में ${n} खोज जोड़ दी गई हैं। अब ${left} खोज बाकी हैं।\n${location.origin}/${u.village}`,
+      `नमस्ते ${u.name}, आपके Voter Search खाते में ${n} सर्च जोड़ दी गई हैं। अब ${left} सर्च बाकी हैं।\n${location.origin}/${u.village}`,
       `Hello ${u.name}, ${n} searches have been added to your Voter Search login. You now have ${left} searches left.\n${location.origin}/${u.village}`));
     tell.target = '_blank'; tell.rel = 'noopener';
     body.replaceChildren(el('div', 'who', u.name),
-      el('div', 'done', L(`✓ ${n} खोज जोड़ दी गईं · अब ${left} बाकी`, `✓ ${n} searches added · ${left} left now`)), contact, tell);
+      el('div', 'done', L(`✓ ${n} सर्च जोड़ दी गईं · अब ${left} बाकी`, `✓ ${n} searches added · ${left} left now`)), contact, tell);
     if (fromList) body.prepend(head[0]);   // ← सभी अनुरोध
-    $('listMsg').textContent = L(`✓ ${u.name} को ${n} खोज मिल गईं`, `✓ ${u.name} got ${n} searches`);
+    $('listMsg').textContent = L(`✓ ${u.name} को ${n} सर्च मिल गईं`, `✓ ${u.name} got ${n} searches`);
   });
   body.replaceChildren(...head, ask, el('div', 'sub', L('भुगतान देखकर संख्या चुनें या बदलें:', 'Check the payment, then pick or change the number:')),
     packs, price, go, ...(req.id ? [no] : []), msg);
@@ -1050,7 +1050,7 @@ function limitBox(u, msg = 'listMsg', saved) {
   save.addEventListener('click', () => send({ action: 'limit', limit: inp.value.trim() }, save));
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save.click(); } });
   more.addEventListener('click', () => send({ action: 'extra', n: 100 }, more));
-  box.append(L('रोज़ की खोज सीमा:', 'Searches per day:'), inp, save, more, note);
+  box.append(L('रोज़ की सर्च सीमा:', 'Searches per day:'), inp, save, more, note);
   return box;
 }
 
@@ -1060,7 +1060,7 @@ function creditsBox(u, saved) {
   inp.type = 'number'; inp.min = 1; inp.max = 10000; inp.inputMode = 'numeric'; inp.placeholder = L('संख्या', 'number');
   add.type = 'button';
   async function send(n, btn) {
-    if (!confirm(L(`${u.name} को ${n} खोज और दें?`, `Give ${u.name} ${n} more searches?`))) return;
+    if (!confirm(L(`${u.name} को ${n} सर्च और दें?`, `Give ${u.name} ${n} more searches?`))) return;
     btn.disabled = true;
     const r = await api({ action: 'credits_add', id: u.id, n });
     btn.disabled = false;
@@ -1068,9 +1068,9 @@ function creditsBox(u, saved) {
     inp.value = '';
     Object.assign(u, r.user);
     if (saved) await saved();   // the list again, with the new count
-    $('listMsg').textContent = L(`${u.name} को ${n} खोज और मिल गईं`, `${u.name} got ${n} more searches`);
+    $('listMsg').textContent = L(`${u.name} को ${n} सर्च और मिल गईं`, `${u.name} got ${n} more searches`);
   }
-  box.append(L('खोज जोड़ें:', 'Add searches:'));
+  box.append(L('सर्च जोड़ें:', 'Add searches:'));
   for (const [n] of PACKS) {
     const b = el('button', 'btn ghost', `+${n}`); b.type = 'button';
     b.addEventListener('click', () => send(n, b));
@@ -1271,7 +1271,7 @@ async function act(payload, ask) {
   refresh();
   return r;
 }
-// how much of today's search limit a person has used: "आज की खोज: 120 / 500 · 380 बाकी" over a bar that is
+// how much of today's search limit a person has used: "आज की सर्च: 120 / 500 · 380 बाकी" over a bar that is
 // green under half the limit, yellow up to 80% and red above that (or with the limit reached)
 function useMeter(u) {
   const box = el('div', 'usage'), text = el('div', 'usetext'), bar = el('div', 'usebar'), fill = el('div');
@@ -1279,8 +1279,8 @@ function useMeter(u) {
   box.update = () => {   // bought searches (credits) count for good; everyone else's per day
     const paid = u.prepaid, limit = paid ? u.credits : u.limit, used = (paid ? u.paidUsed : u.searchesToday) || 0;
     const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0, left = Math.max(0, limit - used);
-    text.textContent = paid ? L(`खोज (मुफ़्त + खरीदी): ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches (free + bought): ${used} / ${limit} (${pct}%) · ${left} left`)
-      : L(`आज की खोज: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches today: ${used} / ${limit} (${pct}%) · ${left} left`)
+    text.textContent = paid ? L(`सर्च (मुफ़्त + खरीदी): ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches (free + bought): ${used} / ${limit} (${pct}%) · ${left} left`)
+      : L(`आज की सर्च: ${used} / ${limit} (${pct}%) · ${left} बाकी`, `Searches today: ${used} / ${limit} (${pct}%) · ${left} left`)
         + (u.credits ? L(` · खरीदी: ${u.paidUsed || 0} / ${u.credits} इस्तेमाल`, ` · bought: ${u.paidUsed || 0} / ${u.credits} used`) : '');   // used after the day's
     fill.style.width = pct + '%';
     const share = limit ? used / limit : 0;
@@ -1300,10 +1300,10 @@ function person(u) {
   }
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
-  if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} खोज`, `₹ paid · ${u.credits} searches in all`)
-    : L(`${u.credits} खोज · अभी कुछ नहीं खरीदा`, `${u.credits} searches · nothing bought yet`)));
-  else if (!isAdmin && u.credits) nm.append(el('span', 'badge paid', L(`₹ खरीदी · ${Math.max(0, u.credits - (u.paidUsed || 0))} खोज बाकी`, `₹ bought · ${Math.max(0, u.credits - (u.paidUsed || 0))} searches left`)));
-  if (!isAdmin && !u.prepaid && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की खोज सीमा पूरी', 'Today\'s search limit used up')));
+  if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} सर्च`, `₹ paid · ${u.credits} searches in all`)
+    : L(`${u.credits} सर्च · अभी कुछ नहीं खरीदा`, `${u.credits} searches · nothing bought yet`)));
+  else if (!isAdmin && u.credits) nm.append(el('span', 'badge paid', L(`₹ खरीदी · ${Math.max(0, u.credits - (u.paidUsed || 0))} सर्च बाकी`, `₹ bought · ${Math.max(0, u.credits - (u.paidUsed || 0))} searches left`)));
+  if (!isAdmin && !u.prepaid && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की सर्च सीमा पूरी', 'Today\'s search limit used up')));
   if (!isAdmin && candOf(u.cand)) nm.append(el('span', 'badge cand', `${L('उम्मीदवार', 'Candidate')} ${candOf(u.cand).name}`));
   // who made this login: the admin's current name when they are in the list, else the name kept when it was made
   if (u.by) {

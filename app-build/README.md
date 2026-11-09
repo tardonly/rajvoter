@@ -37,13 +37,13 @@ only receive the cards that match a search. Every search checks that the user's 
   New users (and users added before these boxes existed) start with only **पर्ची प्रिंट**. A change reaches the
   person's phone on their next search, or within a minute. Admins and the superadmin can always do everything.
 - **Daily search limit (users only):** each user may start 500 searches a day (Indian time), or the number their admin
-  types under **रोज़ की खोज सीमा** (in the new-password box when the person is added, or under their name later; empty =
+  types under **रोज़ की सर्च सीमा** (in the new-password box when the person is added, or under their name later; empty =
   500). **+100 आज के लिए** adds 100 for today only. One search is everything from typing a name until the search box is
   cleared: typing more letters or deleting some, adding the father's name, changing the ward or mark filter, the next
   pages and **परिवार** all count once. The server hands out the search id and checks it (same person, the same name
   typed further or shorter, at most 25 requests and 10 minutes), so a phone can't avoid counting. A whole ward listed
   with no name counts once per ward, and a ward's slips count once each time. At the limit the phone shows
-  "आज की खोज सीमा पूरी हो गई"; under 20 left, the count line shows "आज N खोज बाकी". Anyone (admins too) is also
+  "आज की सर्च सीमा पूरी हो गई"; under 20 left, the count line shows "आज N सर्च बाकी". Anyone (admins too) is also
   held to 60 requests a minute.
 
 To add a user the admin must pick the **village** from the dropdown (only their own villages are listed).
@@ -82,7 +82,7 @@ voter-search-app/         the website + API that Vercel runs
 ```
 `ps` / `zp` are the पंचायत समिति / जिला परिषद निर्वाचन क्षेत्र numbers printed on the slips. Optional `panchayatSamiti`
 and `district` (e.g. `"सरदारशहर"`, `"चुरू"`) are shown under the village's name in the अपना गाँव चुनें list. With more than
-5 villages (the superadmin's list, the demo) that list gets a **गाँव खोजें** box (Hindi or English, spelling need not be
+5 villages (the superadmin's list, the demo) that list gets a **गाँव सर्च करें** box (Hindi or English, spelling need not be
 exact: "kitsar" finds कितासर) and a **पंचायत समिति** filter, which the phone remembers. Folder names must be
 lower-case English letters, digits and `-` (e.g. `bigga-bas`).
 
@@ -168,15 +168,15 @@ The login page asks only for the **mobile number** first:
   there are 20, then **0** (`FREE_TIERS` in `api/_lib.js`). A number that signed up before (in any village) gets no
   free searches again. One internet address can sign up 3 times a day.
 - Signed-up logins have no daily limit: their searches (free + paid) never run out by date. When none are left, the
-  **🛒 और खोज** window opens by itself (after logging in, or on the next search); the **🛒 और खोज खरीदें** button opens
+  **🛒 और सर्च** window opens by itself (after logging in, or on the next search); the **🛒 और सर्च खरीदें** button opens
   it any time.
 - Logins made by an admin can buy searches too: they keep their daily limit, and the bought searches are used only
-  once the day's are used up (counted for good under `paid:<id>`, like a sign-up's). The app shows **🛒 और खोज
+  once the day's are used up (counted for good under `paid:<id>`, like a sign-up's). The app shows **🛒 और सर्च
   खरीदें** to them as well, opens the window when the day's searches and bought ones are both used up, and the count
-  line says e.g. "आज की खोज पूरी · खरीदी 297 खोज बाकी". On the admin page they get both the limit box and **खोज जोड़ें**,
-  a "₹ खरीदी · N खोज बाकी" badge, and the bought searches used beside today's.
+  line says e.g. "आज की सर्च पूरी · खरीदी 297 सर्च बाकी". On the admin page they get both the limit box and **सर्च जोड़ें**,
+  a "₹ खरीदी · N सर्च बाकी" badge, and the bought searches used beside today's.
 
-More searches: the **🛒 और खोज खरीदें** window offers packs (`PACKS` in `index.html`, `admin.html` and `api/_lib.js`;
+More searches: the **🛒 और सर्च खरीदें** window offers packs (`PACKS` in `index.html`, `admin.html` and `api/_lib.js`;
 the ₹1-a-search price is shown struck through beside the pack price, with the saving): 100 searches
 ₹100, 200 ₹200, 500 ₹400, 800 ₹650, 1000 ₹800. The person picks one, pays the admin, and the **💬 WhatsApp** button
 opens a chat with that person's admin: whoever made the login (the superadmin, or a village admin who is still active,
@@ -188,9 +188,9 @@ mobile number, village, the pack and a link `/<request id>` (8 digits): the requ
 tapped (picking a pack makes none) and kept on the server
 (`req:<id>`, `api/signup.js` "request"; asking for the same pack again sends the same request) and the link itself
 shows nothing about the person. Opening it shows the admin login (only an admin password gets in; a person's own
-password is refused), then the **✅ खोज मंज़ूरी** popup: the person with **📞 कॉल करें** and WhatsApp buttons to follow
+password is refused), then the **✅ सर्च मंज़ूरी** popup: the person with **📞 कॉल करें** and WhatsApp buttons to follow
 up, their searches so far, the pack asked for and what the payment should be. The admin picks or changes the number to
-match the payment and taps **✓ भुगतान मिल गया — N खोज जोड़ें**; a WhatsApp button then tells the person. A request
+match the payment and taps **✓ भुगतान मिल गया — N सर्च जोड़ें**; a WhatsApp button then tells the person. A request
 can be approved once: opening its link later shows "यह अनुरोध मंज़ूर हो चुका है" with how many, by whom and when, and
 nothing to do. **✕ अस्वीकार करें** (tap twice) closes a request without searches, e.g. when no payment came; its link then
 shows "अस्वीकार किया जा चुका है" and a WhatsApp button can tell the person. An admin of another village gets "not in your list" (the server checks too). Older messages with
@@ -199,7 +199,7 @@ The **🔔** button at the top of the admin page shows how many requests are wai
 minute) and lists the admin's requests: waiting ones first, then those approved (with the ₹ collected and which admin collected
 it) or rejected in the last 30 days; tapping one opens the approval popup; **↻** in the popup fetches them again. A village admin sees only requests made
 from their own villages by people of those villages; the superadmin sees all. Every approval records the payment
-(the pack's price, else ₹1 a search); searches added by hand with **खोज जोड़ें** are recorded too, as "हाथ से जोड़ी".
+(the pack's price, else ₹1 a search); searches added by hand with **सर्च जोड़ें** are recorded too, as "हाथ से जोड़ी".
 The superadmin also sees **💰 कुल वसूली**: the total collected, and per admin the ₹, number of payments and searches
 (all time, `pay:*` keys); a village admin sees **💰 आपकी वसूली**, only what they collected themself.
 **हिसाब (ledger):** a tap on an admin's row (a village admin: on "📒 हिसाब देखें") lists every payment that admin
@@ -207,7 +207,7 @@ collected and every handover to the superadmin, newest first, with वसूल�
 the money, the superadmin records it there (₹ and a note such as cash / UPI; a wrong entry can be removed), and the
 बाकी (due) goes down; "एडमिन से आना बाकी" on the superadmin's box is the total still due from all admins
 (`settle:<admin id>` and `pay:settled` keys). Searches can also be added by hand in
-the people list: **खोज जोड़ें** with the pack sizes or any number. Those logins are tagged "₹ भुगतान किया" and no
+the people list: **सर्च जोड़ें** with the pack sizes or any number. Those logins are tagged "₹ भुगतान किया" and no
 longer count for the free sign-up tiers.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit; admin-made
 logins show their daily limit and, once they have bought some, their bought searches as well.
@@ -285,9 +285,9 @@ shows above the tabs, whichever tab made it.
 - **गाँव:** (when you look after more than one village) moves a person to another village. Their उम्मीदवार is cleared
   (candidates belong to one village) and their phone is logged out; their password then opens the new village, and on
   the old village's page it points there. Their marks stay with the old village.
-- Each person shows **आज की खोज: N / L (P%) · R बाकी** (searches today out of their daily limit, and how many are left)
+- Each person shows **आज की सर्च: N / L (P%) · R बाकी** (searches today out of their daily limit, and how many are left)
   over a bar that is green under half the limit, yellow from 50% to 80% and red above 80%, and how many slips carry
-  their marks. A person who has used up today's limit also gets a yellow **आज की खोज सीमा पूरी** badge. The +100 and
+  their marks. A person who has used up today's limit also gets a yellow **आज की सर्च सीमा पूरी** badge. The +100 and
   the limit box update the bar straight away.
 - **पर्चियों के निशान हटाएं**: pick the village, then remove all marks of one colour, or all of them. After clearing,
   **↺ … निशान वापस लाएं** puts them back; only the most recent clear of each village can be undone.
