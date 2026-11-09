@@ -42,6 +42,9 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
+//   action "free_rule", mode, people, searches → {freeRule}   superadmin: free searches for sign-ups (freeRule in _lib.js):
+//                                               mode 'direct' | 'halving', people 1–100000, searches 1–1000; "list" gives
+//                                               freeRule to the superadmin
 //   action "db_copy", cursor          → {next, keys, done}   superadmin: one step of moving people's data from Upstash
 //                                               into USER_REDIS_URL (moveUserData in _lib.js); the admin page repeats it
 //                                               from cursor '0' until next is '0'. "list" says dbCopy: 'todo' | 'done'
@@ -56,7 +59,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { freeRule, FREE_MAX, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
@@ -102,6 +105,15 @@ module.exports = route(async (req, res, b) => {
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
   const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
+  if (b.action === 'free_rule') {   // superadmin: free searches for sign-ups (freeRule in _lib.js)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const n = (v, max) => { const x = Math.floor(Number(v)); return x >= 1 && x <= max ? x : 0; };
+    const mode = b.mode === 'halving' ? 'halving' : b.mode === 'direct' ? 'direct' : '';
+    const people = n(b.people, FREE_MAX.people), searches = n(b.searches, FREE_MAX.searches);
+    if (!mode || !people || !searches) return send(res, 400, { error: 'free_rule' });
+    await redis('HSET', 'freerule', 'mode', mode, 'people', people, 'searches', searches, 'at', now, 'by', me.id);
+    return send(res, 200, { freeRule: await freeRule() });
+  }
   if (b.action === 'db_copy') {
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     if (!canMoveUserData()) return send(res, 400, { error: 'no_db_copy' });
@@ -158,7 +170,8 @@ module.exports = route(async (req, res, b) => {
         .filter((c) => isSuper || c.by === me.id).sort((a, b) => b.rs - a.rs);
     }
     const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
-    return send(res, 200, { dbCopy, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
+    const freeRuleNow = isSuper ? await freeRule() : undefined;
+    return send(res, 200, { dbCopy, freeRule: freeRuleNow, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }

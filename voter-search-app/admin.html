@@ -35,6 +35,10 @@
   .btn.danger { background: #fff; color: var(--bad); border: 1px solid #fecaca; font-weight: 500; }
   .row { display: flex; gap: 8px; }
   .row input { flex: 1; }
+  #freeCard summary { cursor: pointer; }
+  .fr { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  .fr.num { flex-direction: column; align-items: stretch; gap: 4px; flex: 1; font-size: 14px; color: var(--muted); }
+  input[type=number] { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; }
   .stack { display: grid; gap: 8px; }
   input[type=tel] { width: 100%; padding: 11px 13px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; }
   .btn.wa { background: #1fa855; color: #fff; border: 0; font-weight: 600; }
@@ -257,6 +261,22 @@
       <div class="sub" id="dbCopyMsg"></div>
     </div>
 
+    <!-- superadmin: free searches for people who sign up themselves (api/admin.js "free_rule") -->
+    <details class="card hidden" id="freeCard">
+      <summary><b>साइन-अप पर मुफ़्त सर्च</b> · <span id="freeNow"></span></summary>
+      <div class="stack" style="margin-top:12px">
+        <label class="fr"><input type="radio" name="freeMode" value="direct"> <span>सीधे: हर गाँव के पहले X लोगों को Y सर्च</span></label>
+        <label class="fr"><input type="radio" name="freeMode" value="halving"> <span>घटते हुए: Y → Y/2 → … → 1, हर बार X लोगों को</span></label>
+        <div class="row">
+          <label class="fr num"><span>लोग (X)</span><input id="freePeople" type="number" min="1" max="100000" inputmode="numeric"></label>
+          <label class="fr num"><span>सर्च (Y)</span><input id="freeSearches" type="number" min="1" max="1000" inputmode="numeric"></label>
+        </div>
+        <div class="sub" id="freePreview" style="margin:0"></div>
+        <button class="btn" id="freeSave" type="button">सेव करें</button>
+        <div class="sub" id="freeMsg" style="margin:0"></div>
+      </div>
+    </details>
+
     <nav class="tabs" id="tabs" role="tablist">
       <button type="button" data-tab="people">व्यक्ति</button>
       <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
@@ -393,6 +413,9 @@ const $ = (id) => document.getElementById(id);
 const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch (e) { return false; } })();
 const L = (hi, en) => (EN ? en : hi);
 const STATIC_EN = {
+  'साइन-अप पर मुफ़्त सर्च': 'Free searches on sign-up', 'सीधे: हर गाँव के पहले X लोगों को Y सर्च': 'Direct: the first X people of each village get Y searches',
+  'घटते हुए: Y → Y/2 → … → 1, हर बार X लोगों को': 'Halving: Y → Y/2 → … → 1, X people at each step', 'लोग (X)': 'People (X)', 'सर्च (Y)': 'Searches (Y)',
+  'सेव करें': 'Save',
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
   'एडमिन पासवर्ड': 'Admin password', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
   'व्यक्ति': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'मतदाता सूची': 'Voter list', 'निशान हटाएं': 'Clear marks',
@@ -446,7 +469,7 @@ const MSG = EN ? {
   other_device: 'This password was opened on another phone — please log in again',
   offline: 'No internet', server: 'Server problem', name: 'Type a name', not_found: 'Person not found',
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
-  no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this',
+  no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000 and searches 1–1000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
   bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
@@ -457,7 +480,7 @@ const MSG = EN ? {
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
-  no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
+  no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000 और सर्च 1–1000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
   bad_credits: 'कितनी सर्च जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में सर्च नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
@@ -508,6 +531,7 @@ async function openPanel() {
   for (const v of r.villageList || []) villages[v.slug] = v;
   setup(); showMarks(r);
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
+  showFreeRule(r.freeRule);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
   approveFromLink();
@@ -526,6 +550,47 @@ $('dbCopyBtn').addEventListener('click', async () => {
   await openPanel();   // the lists, now from the new database
   btn.classList.add('hidden'); $('dbCopy').classList.remove('hidden');
   msg.textContent = L(`✓ हो गया: ${n} चीज़ें नए डेटाबेस में। सब लोग अब लॉगिन कर सकते हैं।`, `✓ Done: ${n} items moved. Everyone can log in again.`);
+});
+// ---------- free searches for sign-ups (superadmin): 'direct' = the first X people of each village get Y each;
+// 'halving' = the first X get Y, the next X get Y/2, … down to 1 (freeFor in api/_lib.js)
+function freeSteps(mode, people, searches) {
+  if (mode !== 'halving') return [[people, searches]];
+  const out = [];
+  for (let s = searches; s >= 1; s = Math.floor(s / 2)) out.push([people, s]);
+  return out;
+}
+function freeWords(mode, people, searches) {
+  let from = 1;
+  return freeSteps(mode, people, searches).map(([n, s]) => {
+    const t = L(`${from}–${from + n - 1}वें: ${s}`, `${from}–${from + n - 1}: ${s}`);
+    from += n; return t;
+  }).join(' · ') + L(` · उसके बाद 0 (हर गाँव में)`, ` · then 0 (in each village)`);
+}
+function freeForm() {
+  const mode = (document.querySelector('input[name=freeMode]:checked') || {}).value || 'direct';
+  return { mode, people: Math.floor(Number($('freePeople').value)), searches: Math.floor(Number($('freeSearches').value)) };
+}
+function freePreview() {
+  const f = freeForm(), ok = f.people >= 1 && f.people <= 100000 && f.searches >= 1 && f.searches <= 1000;
+  $('freePreview').textContent = ok ? freeWords(f.mode, f.people, f.searches) : L('लोग 1–100000 और सर्च 1–1000 डालें', 'Enter people 1–100000 and searches 1–1000');
+  $('freeSave').disabled = !ok;
+}
+function showFreeRule(rule) {
+  $('freeCard').classList.toggle('hidden', !rule);
+  if (!rule) return;
+  $('freeNow').textContent = rule.mode === 'halving' ? L(`घटते हुए, ${rule.people} लोग, ${rule.searches} से`, `halving, ${rule.people} people, from ${rule.searches}`)
+    : L(`सीधे, पहले ${rule.people} लोगों को ${rule.searches}`, `direct, first ${rule.people} people get ${rule.searches}`);
+  for (const r of document.querySelectorAll('input[name=freeMode]')) r.checked = r.value === rule.mode;
+  $('freePeople').value = rule.people; $('freeSearches').value = rule.searches;
+  freePreview();
+}
+for (const e of document.querySelectorAll('input[name=freeMode], #freePeople, #freeSearches')) e.addEventListener('input', freePreview);
+$('freeSave').addEventListener('click', async () => {
+  $('freeSave').disabled = true; $('freeMsg').textContent = '';
+  const r = await api({ action: 'free_rule', ...freeForm() });
+  if (r.error) { $('freeMsg').textContent = errText(r); $('freeSave').disabled = false; return; }
+  showFreeRule(r.freeRule);
+  $('freeMsg').textContent = L('✓ सेव हो गया — अब से नए साइन-अप पर लागू', '✓ Saved — applies to new sign-ups from now');
 });
 // search packs [searches, ₹], as in index.html
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];

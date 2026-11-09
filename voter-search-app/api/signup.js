@@ -1,11 +1,11 @@
 // Signing up with a mobile number on the login page.
 // The page asks for the mobile number first ('lookup'). A number that already has a login of that village is told to
 // type its password (forgotten → ask the admin); a new number gets its own login at once ('signup') with
-// free searches if it is one of the village's first FREE.people sign-ups (_lib.js), none for a number that already
-// signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
+// free searches by the superadmin's rule (freeRule in _lib.js: by how many signed up in that village before), none for a
+// number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
 // an admin adds them on the admin page (api/admin.js "credits_add").
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
-//   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free, first, otp}   otp: sign-up needs a
+//   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free, rule, otp}   otp: sign-up needs a
 //     one-time code sent to the number (OTP_SEND_URL is set, see _lib.js)
 //   POST {action: 'otp', phone} → {sent: true}   sends the code; errors 'wait' (asked again within OTP.gap seconds, with
 //     wait = seconds left), 'too_many' (OTP.day codes today), 'otp_send' (the provider failed), 'exists'
@@ -20,15 +20,15 @@
 //     the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, FREE, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, newLogin, today, clientIp, redis, newSession, makeToken,
+const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
 
 
-// free searches for a new login in this village: FREE.searches while the village has fewer than FREE.people logins made
-// by signing up (retired ones count too), none if this number signed up before
-async function freeSearches(phone, slug) {
+// free searches for a new login in this village: freeFor(rule, logins made by signing up there so far, retired ones
+// too), none if this number signed up before
+async function freeSearches(phone, slug, rule) {
   const ids = (await redis('SMEMBERS', 'users')) || [];
   const rows = ids.length ? await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'village', 'self'])) : [];
   let n = 0;
@@ -37,7 +37,7 @@ async function freeSearches(phone, slug) {
     if (ph === phone) return 0;
     if (vil === slug) n++;
   }
-  return n < FREE.people ? FREE.searches : 0;
+  return freeFor(rule || await freeRule(), n);
 }
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 
@@ -51,8 +51,9 @@ module.exports = route(async (req, res, b) => {
     const v = b.village ? realVillage(b.village) : null;
     if (b.village && !v) return send(res, 404, { error: 'no_village' });
     await failed(req, 'lookup');
+    const rule = await freeRule();
     const mine = (await phoneLogins(phone)).filter((u) => u.retired !== '1' && (!v || u.villages.includes(v.slug)));
-    return send(res, 200, { exists: mine.length > 0, free: mine.length ? 0 : v ? await freeSearches(phone, v.slug) : null, first: FREE, otp: otpOn() });
+    return send(res, 200, { exists: mine.length > 0, free: mine.length ? 0 : v ? await freeSearches(phone, v.slug, rule) : null, rule, otp: otpOn() });
   }
 
   if (b.action === 'otp') {

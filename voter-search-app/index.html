@@ -1760,12 +1760,23 @@ async function lockPhone() {
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   OTP_ON = !!r.otp; otpSent = false; $('signOtp').value = '';
   await signVillages();
-  lockStepTo('sign', r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। हर गाँव के पहले ${r.first.people} लोगों को ${r.first.searches} सर्च मुफ़्त, उसके बाद ₹1 प्रति सर्च।`,
-    `New number — type your name and choose your village: your login is made at once. The first ${r.first.people} people of each village get ${r.first.searches} free searches; after that ₹1 per search.`)
+  lockStepTo('sign', r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद ₹1 प्रति सर्च।`,
+    `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that ₹1 per search.`)
     : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति सर्च।`,
     `New number — type your name: your login is made at once with ${r.free} free searches. After that ₹1 per search.`)
     : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (₹1 प्रति सर्च)।',
       'New number — type your name: your login is made at once; then buy searches (₹1 per search).'));
+}
+// the superadmin's free-search rule for sign-ups (freeRule in api/_lib.js) in words: "the first 10 people of each village
+// get 10 free searches", or with halving "… get 10, the next 10 get 5, then 2, then 1"
+function freeText(rule) {
+  const { mode, people, searches } = rule;
+  if (mode !== 'halving') return L(`हर गाँव के पहले ${people} लोगों को ${searches} सर्च मुफ़्त`, `The first ${people} people of each village get ${searches} free searches`);
+  const steps = [];
+  for (let s = searches; s >= 1; s = Math.floor(s / 2)) steps.push(s);
+  const rest = steps.slice(1);
+  return L(`हर गाँव के पहले ${people} लोगों को ${searches} सर्च मुफ़्त` + (rest.length ? `, अगले ${people} को ${rest[0]}` + rest.slice(1).map((s) => `, फिर ${s}`).join('') : ''),
+    `The first ${people} people of each village get ${searches} free searches` + (rest.length ? `, the next ${people} get ${rest[0]}` + rest.slice(1).map((s) => `, then ${s}`).join('') : ''));
 }
 // The start page asks for the पंचायत समिति first, then the village in it; a village page is that village.
 let signList = null;

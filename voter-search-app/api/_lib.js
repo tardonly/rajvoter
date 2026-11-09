@@ -362,9 +362,25 @@ const canBuy = (u) => !!u && u.role === 'user' && !u.demo;
 // a signed-up login that picked the wrong village may move itself to another one this many times (api/signup.js "move")
 const MOVES = 3;
 const movesLeft = (u) => (isPrepaid(u) ? Math.max(0, MOVES - (Number(u.moves) || 0)) : 0);
-// free searches for a login made by signing up: the first FREE.people sign-ups of each village get FREE.searches, later
-// ones none, and none for a number that signed up before (api/signup.js)
-const FREE = { people: 10, searches: 10 };
+// free searches for a login made by signing up, counted per village (none for a number that signed up before; api/signup.js).
+// The superadmin sets the rule on the admin page (key "freerule", api/admin.js "free_rule"), FREE until then:
+//   mode 'direct': the village's first `people` sign-ups get `searches` each, later ones none;
+//   mode 'halving': the first `people` get `searches`, the next `people` half of it, and so on down to 1, then none
+//                   (10 → 5 → 2 → 1).
+const FREE = { mode: 'direct', people: 10, searches: 10 };
+const FREE_MAX = { people: 100000, searches: 1000 };
+async function freeRule() {
+  const h = (await redis('HGETALL', 'freerule')) || [], o = {};
+  for (let i = 0; i < h.length; i += 2) o[h[i]] = h[i + 1];
+  const num = (v, max, d) => { const n = Math.floor(Number(v)); return n >= 1 && n <= max ? n : d; };
+  return { mode: o.mode === 'halving' ? 'halving' : 'direct', people: num(o.people, FREE_MAX.people, FREE.people),
+    searches: num(o.searches, FREE_MAX.searches, FREE.searches) };
+}
+// free searches for the village's sign-up number n + 1 (n = sign-ups there so far) under rule
+function freeFor(rule, n) {
+  if (rule.mode !== 'halving') return n < rule.people ? rule.searches : 0;
+  return Math.floor(rule.searches / 2 ** Math.floor(n / rule.people));
+}
 // every login with this mobile number (normPhone form): [{id, role, village, villages, retired, self}]
 async function phoneLogins(phone) {
   if (!phone) return [];
@@ -526,6 +542,6 @@ async function getCand(id) {
 }
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
+  FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

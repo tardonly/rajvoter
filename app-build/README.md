@@ -172,9 +172,11 @@ The login page asks only for the **mobile number** first:
 - A number that already has a login for that village (or, on the start page, any login) gets the password box, with
   "पासवर्ड याद नहीं? अपने एडमिन से पूछें". Admins without a number use **एडमिन? सीधे पासवर्ड से खोलें**.
 - A new number types a name (on the start page it also picks the village) and gets its **own login at once**
-  (`api/signup.js`): the password is shown to write down, and the person goes straight into the village. The first **10**
-  people to sign up in each village get **10** free searches each, later ones none (`FREE` in `api/_lib.js`; logins
-  made by signing up are counted per village, retired ones too). A number that signed up before (in any village) gets no
+  (`api/signup.js`): the password is shown to write down, and the person goes straight into the village. Free searches
+  for such a sign-up follow the superadmin's rule, set on the admin page (**साइन-अप पर मुफ़्त सर्च**, `freeRule` in
+  `api/_lib.js`), counted per village (retired logins too): **सीधे** — the first X people of each village get Y each,
+  later ones none; **घटते हुए** — the first X get Y, the next X get Y/2, and so on down to 1, then none (10 → 5 → 2 → 1).
+  Until it is set: सीधे, 10 people, 10 searches. A number that signed up before (in any village) gets no
   free searches again. One internet address can sign up 3 times a day.
 - **OTP check (optional):** with `OTP_SEND_URL` set in Vercel, a new number first gets a 6-digit code ("OTP भेजें"),
   and the login is made only with the right code. Codes last 10 minutes; a new one after 30 seconds, 5 a day per
