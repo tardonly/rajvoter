@@ -1760,7 +1760,9 @@ async function lockPhone() {
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   OTP_ON = !!r.otp; otpSent = false; $('signOtp').value = '';
   await signVillages();
-  lockStepTo('sign', r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति सर्च।`,
+  lockStepTo('sign', r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। हर गाँव के पहले ${r.first.people} लोगों को ${r.first.searches} सर्च मुफ़्त, उसके बाद ₹1 प्रति सर्च।`,
+    `New number — type your name and choose your village: your login is made at once. The first ${r.first.people} people of each village get ${r.first.searches} free searches; after that ₹1 per search.`)
+    : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति सर्च।`,
     `New number — type your name: your login is made at once with ${r.free} free searches. After that ₹1 per search.`)
     : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (₹1 प्रति सर्च)।',
       'New number — type your name: your login is made at once; then buy searches (₹1 per search).'));
