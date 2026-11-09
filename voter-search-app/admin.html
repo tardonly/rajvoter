@@ -502,7 +502,7 @@ function showLogin(msg) {
 }
 async function openPanel() {
   const r = await api({ action: 'list' });
-  if (['wrong', 'retired', 'logged_out', 'other_device'].includes(r.error)) { store.del(); return showLogin(MSG[r.error]); }
+  if (['wrong', 'retired', 'logged_out', 'other_device'].includes(r.error)) { store.del(); return goHome(MSG[r.error]); }
   if (r.error) return showLogin(errText(r));
   me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; progress = r.progress || []; reqs = r.reqs || []; collected = r.collected || null; showBell();
   for (const v of r.villageList || []) villages[v.slug] = v;
@@ -826,8 +826,15 @@ $('loginForm').addEventListener('submit', async (e) => {
 });
 $('logout').addEventListener('click', () => {
   post('logout', { token });   // ends a village admin's session on the server; no need to wait
-  store.del(); showLogin('');
+  store.del();
+  try { localStorage.removeItem('villages'); sessionStorage.removeItem('villages'); } catch (e) {}   // the start page's list of this login
+  goHome('');
 });
+// a logout ends on the start page; the message (session ended …) is shown there
+function goHome(msg) {
+  try { if (msg) sessionStorage.setItem('homeMsg', msg); } catch (e) {}
+  location.replace('/');
+}
 
 // ---------- village choices: what this admin may use ----------
 function setup() {

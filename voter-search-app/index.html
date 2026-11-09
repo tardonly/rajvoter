@@ -655,11 +655,20 @@ function showLoading(msg) {
 function signOut(msg) {
   if (DEMO) { store.del('tok:demo'); return demoLogin(); }   // a demo phone just gets a fresh demo login
   if (msg === MSG.other_village) return showLock(msg);   // keep an admin's login for their own villages
-  store.del(tokKey);
-  searchId = ''; searchesLeft = null; BOUGHT = null;
-  $('results').innerHTML = ''; $('qName').value = ''; $('qRel').value = ''; $('qMark').value = ''; $('count').textContent = '';
-  lockStepTo('phone');
-  showLock(msg);
+  store.del(tokKey); store.del('villages');
+  goHome(msg);
+}
+// every logout ends on the start page; a message (session ended, logged in on another phone …) is shown there
+function goHome(msg) {
+  try { if (msg) sessionStorage.setItem('homeMsg', msg); } catch (e) {}
+  location.replace('/');
+}
+// the logout buttons: end every password login kept on this phone (not the demo's)
+function logoutAll() {
+  const keys = [];
+  try { for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) if (/^tok:/.test(s.key(i)) && s.key(i) !== 'tok:demo') keys.push(s.key(i)); } catch (e) {}
+  for (const k of new Set(keys)) { api('logout', { token: store.get(k) }); store.del(k); }   // no need to wait
+  store.del('villages');
 }
 let MY_NAME = '', MY_PHONE = '', ADMIN_PHONE = '';   // this login's name and mobile number, and its admin's (WhatsApp for more searches)
 function showApp(name, admin, villages, perms, cand) {
@@ -852,10 +861,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
 });
-$('lockBtn').addEventListener('click', () => {
-  api('logout', { token: token() });   // close the session on the server; no need to wait
-  signOut('');
-});
+$('lockBtn').addEventListener('click', () => { logoutAll(); goHome(''); });
 
 // ---------- search ----------
 let seq = 0, shown = 0, total = 0, lastBox = 0, lastAsked = '', timer;   // lastAsked: the search already on screen, not sent again
@@ -1536,12 +1542,7 @@ function homeLock(msg, info) {
   $('homeActs').classList.remove('hidden');   // and a short video of the app in use, and a share button
   showLock(msg, info);
 }
-$('homeOut').addEventListener('click', () => {
-  const k = savedLogin();
-  if (k) { api('logout', { token: store.get(k) }); store.del(k); }
-  store.del('villages');
-  homeLock('');
-});
+$('homeOut').addEventListener('click', () => { logoutAll(); if (location.pathname === '/') homeLock(''); else goHome(''); });
 // a password of another village: point to that village's page
 function otherVillage(r) {
   const name = EN ? enName(r.village) : r.villageName || r.village;
@@ -1968,8 +1969,10 @@ async function payReturn(id) {
     setManifest('page=home');
   }
   // start page: log in first, then the villages of this login
+  let left = '';   // why the last page logged out (goHome)
+  try { left = sessionStorage.getItem('homeMsg') || ''; sessionStorage.removeItem('homeMsg'); } catch (e) {}
   const k = savedLogin();
-  if (!k) return homeLock(SLUG ? MSG.no_village : '');
+  if (!k) return homeLock(SLUG ? MSG.no_village : left);
   // show the villages saved at the last login straight away (a village page checks the login itself),
   // and check the login meanwhile
   let saved = null;
