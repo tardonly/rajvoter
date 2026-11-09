@@ -1661,6 +1661,7 @@ function buyUpi([n, rs]) {
 }
 function buyOpen() {
   delete $('buyPop').dataset.go;
+  $('buyClose').classList.remove('hidden');
   $('buyTitle').textContent = L('🛒 और खोज', '🛒 More searches');
   const box = el('div', 'paybox'), packs = el('div', 'packs');
   // with UPI here, only that; else (no JaduPe token on the server) WhatsApp to the admin
@@ -1701,8 +1702,10 @@ function buyClose() {
 function outOfSearches() { if (PREPAID && searchesLeft === 0 && !DEMO) buyOpen(); }
 $('buyMore').addEventListener('click', buyOpen);
 $('buyClose').addEventListener('click', buyClose);
-$('buyPop').addEventListener('click', (e) => { if (e.target === $('buyPop')) buyClose(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') buyClose(); });
+// after signing up the window shows the new password: only its Continue button closes it (and logs in)
+const signedUp = () => !!$('buyPop').dataset.go;
+$('buyPop').addEventListener('click', (e) => { if (e.target === $('buyPop') && !signedUp()) buyClose(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !signedUp()) buyClose(); });
 
 // ---------- signing up on the login page: the mobile number first (api/buy.js "lookup"). A number with a login here
 // is asked for its password (forgotten → ask the admin); a new number types a name (and on the start page picks a
@@ -1760,7 +1763,7 @@ async function lockSignup() {
   showLock('');
   store.set(`tok:${slug}`, r.token, true);
   // the new password, to write down; closing this goes into the village
-  const box = el('div', 'paybox'), open = el('button', 'btn', L('खोज खोलें', 'Open the search')), copy = el('button', 'buyback', L('पासवर्ड कॉपी करें', 'Copy password'));
+  const box = el('div', 'paybox'), open = el('button', 'btn', L('आगे बढ़ें →', 'Continue →')), copy = el('button', 'buyback', L('पासवर्ड कॉपी करें', 'Copy password'));
   open.type = copy.type = 'button';
   copy.addEventListener('click', async () => { if (await copyText(r.password)) copy.textContent = L('कॉपी हो गया ✓', 'Copied ✓'); });
   open.addEventListener('click', buyClose);
@@ -1770,6 +1773,7 @@ async function lockSignup() {
       : L('खोज खरीदकर शुरू करें (₹1 प्रति खोज)।', 'Buy searches to start (₹1 per search).')), open);
   $('buyTitle').textContent = L('आपका खाता', 'Your login');
   $('buyPop').dataset.go = slug;
+  $('buyClose').classList.add('hidden');
   $('buyBody').replaceChildren(box);
   $('buyNote').textContent = '';
   $('buyPop').classList.remove('hidden');
