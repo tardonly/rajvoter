@@ -249,6 +249,14 @@
     <div class="bar"><div><h1>एडमिन</h1><div class="sub" id="meText" style="margin:0"></div></div>
       <span class="row"><button class="btn ghost bell" id="bell" type="button" title="सर्च अनुरोध" aria-label="सर्च अनुरोध">🔔<span class="bn hidden" id="bellN"></span></button><button class="langbtn" data-lang type="button"></button><a class="btn ghost hidden" id="backLink" href="/" style="text-decoration:none">← सर्च</a><button class="btn ghost" id="logout" type="button">लॉग आउट</button></span></div>
 
+    <!-- after moving to USER_REDIS_URL: the superadmin copies the old database's logins, marks and payments over, once -->
+    <div class="card hidden" id="dbCopy">
+      <b>नया डेटाबेस (USER_REDIS_URL) जुड़ गया है</b>
+      <div class="sub">पुराने डेटाबेस के सभी व्यक्ति, एडमिन, निशान और भुगतान अभी नए में कॉपी नहीं हुए हैं। तब तक पुराने लोग लॉगिन नहीं कर पाएंगे — एक बार कॉपी करें। नए डेटाबेस में जो पहले से है वह नहीं बदलेगा।</div>
+      <button class="btn" id="dbCopyBtn" type="button">पुराना डेटा नए डेटाबेस में कॉपी करें</button>
+      <div class="sub" id="dbCopyMsg"></div>
+    </div>
+
     <nav class="tabs" id="tabs" role="tablist">
       <button type="button" data-tab="people">व्यक्ति</button>
       <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
@@ -499,10 +507,26 @@ async function openPanel() {
   me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; progress = r.progress || []; reqs = r.reqs || []; collected = r.collected || null; showBell();
   for (const v of r.villageList || []) villages[v.slug] = v;
   setup(); showMarks(r);
+  $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
   approveFromLink();
 }
+// copy the old database into USER_REDIS_URL (api/admin.js "db_copy"), step by step, then reload the lists
+$('dbCopyBtn').addEventListener('click', async () => {
+  const btn = $('dbCopyBtn'), msg = $('dbCopyMsg');
+  btn.disabled = true;
+  let cursor = '0', n = 0;
+  do {
+    msg.textContent = L(`कॉपी हो रहा है… ${n} चीज़ें`, `Copying… ${n} items`);
+    const r = await api({ action: 'db_copy', cursor });
+    if (r.error) { btn.disabled = false; msg.textContent = errText(r); return; }
+    n += r.keys; cursor = r.next;
+  } while (cursor !== '0');
+  await openPanel();   // the lists, now from the new database
+  btn.classList.add('hidden'); $('dbCopy').classList.remove('hidden');
+  msg.textContent = L(`✓ कॉपी पूरा: ${n} चीज़ें। पुराने लोग अब लॉगिन कर सकते हैं।`, `✓ Copied: ${n} items. Everyone can log in again.`);
+});
 // search packs [searches, ₹], as in index.html
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // A person's WhatsApp request carries <site>/<request id> (api/signup.js 'request'), which serves this page; older ones

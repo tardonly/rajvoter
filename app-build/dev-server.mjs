@@ -4,7 +4,11 @@
 // /demo/<village>),
 // and stands in for the Upstash Redis database with an in-memory store (wiped on restart).
 // Usage:  ADMIN_PASSWORD=some-test-password node app-build/dev-server.mjs   → http://127.0.0.1:8765
+// DEV_USER_REDIS=1 also stands in for an outside Redis (USER_REDIS_URL, spoken over Redis's own protocol on PORT + 1),
+// a second in-memory store: the app then keeps its data there, and the Upstash stand-in is the "old" database the admin
+// page copies from.
 import http from 'node:http';
+import net from 'node:net';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,35 +21,74 @@ process.env.DATA_KEY ||= readFileSync(join(here, 'DATA_KEY.txt'), 'utf8').trim()
 process.env.ADMIN_PASSWORD ||= 'admin-test';
 process.env.KV_REST_API_URL = `http://127.0.0.1:${PORT}/__redis`;
 process.env.KV_REST_API_TOKEN = 'local';
+if (process.env.DEV_USER_REDIS) process.env.USER_REDIS_URL = `redis://127.0.0.1:${PORT + 1}`;
 const require = createRequire(import.meta.url);
 
-// --- tiny Redis stand-in: only the commands the API uses ---
+// --- tiny Redis stand-in: only the commands the API uses (and the database copy: SCAN, TYPE, PTTL, HSETNX) ---
+function makeStore() {
 const kv = new Map(), expiry = new Map();
 const alive = (k) => { if (expiry.has(k) && expiry.get(k) < Date.now()) { kv.delete(k); expiry.delete(k); } return kv.has(k); };
-function redis([cmd, ...a]) {
+return function redis([cmd, ...a]) {
   switch (cmd.toUpperCase()) {
     case 'GET': return alive(a[0]) ? kv.get(a[0]) : null;
-    case 'SET': {   // SET key value [EX seconds] [NX]
+    case 'SET': {   // SET key value [EX seconds | PX ms] [NX]
       const opt = a.slice(2).map((x) => String(x).toUpperCase());
       if (opt.includes('NX') && alive(a[0])) return null;
-      kv.set(a[0], a[1]); expiry.delete(a[0]);
+      kv.set(a[0], String(a[1])); expiry.delete(a[0]);
       if (opt.includes('EX')) expiry.set(a[0], Date.now() + Number(a[2 + opt.indexOf('EX') + 1]) * 1000);
+      if (opt.includes('PX')) expiry.set(a[0], Date.now() + Number(a[2 + opt.indexOf('PX') + 1]));
       return 'OK';
     }
+    case 'SCAN': {   // everything in one step: SCAN 0 MATCH <prefix>* COUNT n → ['0', keys]
+      const m = a.map((x) => String(x).toUpperCase()).indexOf('MATCH'), pre = m >= 0 ? String(a[m + 1]).replace(/\*$/, '') : '';
+      return ['0', [...kv.keys()].filter((k) => alive(k) && k.startsWith(pre))];
+    }
+    case 'TYPE': { if (!alive(a[0])) return 'none'; const v = kv.get(a[0]); return typeof v === 'string' ? 'string' : v instanceof Set ? 'set' : 'hash'; }
+    case 'PTTL': return !alive(a[0]) ? -2 : expiry.has(a[0]) ? expiry.get(a[0]) - Date.now() : -1;
+    case 'PEXPIRE': expiry.set(a[0], Date.now() + Number(a[1])); return 1;
+    case 'HSETNX': { const h = alive(a[0]) ? kv.get(a[0]) : {}; if (a[1] in h) return 0; h[a[1]] = String(a[2]); kv.set(a[0], h); return 1; }
     case 'DEL': return kv.delete(a[0]) ? 1 : 0;
     case 'INCR': { const n = Number(alive(a[0]) ? kv.get(a[0]) : 0) + 1; kv.set(a[0], String(n)); return n; }
     case 'EXPIRE': expiry.set(a[0], Date.now() + Number(a[1]) * 1000); return 1;
-    case 'HSET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; for (let i = 1; i < a.length; i += 2) h[a[i]] = a[i + 1]; kv.set(a[0], h); return 1; }
+    case 'HSET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; for (let i = 1; i < a.length; i += 2) h[a[i]] = String(a[i + 1]); kv.set(a[0], h); return 1; }
     case 'HMGET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; return a.slice(1).map((f) => h[f] ?? null); }
     case 'HDEL': { const h = alive(a[0]) ? kv.get(a[0]) : {}; const n = a.slice(1).filter((f) => f in h).length; a.slice(1).forEach((f) => delete h[f]); return n; }
     case 'HGETALL':return alive(a[0]) ? Object.entries(kv.get(a[0])).flat() : [];
     case 'HINCRBY': { const h = alive(a[0]) ? kv.get(a[0]) : {}; h[a[1]] = String(Number(h[a[1]] || 0) + Number(a[2])); kv.set(a[0], h); return Number(h[a[1]]); }
-    case 'SADD': { const s = alive(a[0]) ? kv.get(a[0]) : new Set(); a.slice(1).forEach((x) => s.add(x)); kv.set(a[0], s); return 1; }
+    case 'SADD': { const s = alive(a[0]) ? kv.get(a[0]) : new Set(); a.slice(1).forEach((x) => s.add(String(x))); kv.set(a[0], s); return 1; }
     case 'SMEMBERS': return alive(a[0]) ? [...kv.get(a[0])] : [];
     case 'SCARD': return alive(a[0]) ? kv.get(a[0]).size : 0;
     case 'SREM': { const s = alive(a[0]) ? kv.get(a[0]) : new Set(); return a.slice(1).filter((x) => s.delete(x)).length; }
     default: throw new Error('unsupported ' + cmd);
   }
+};
+}
+const redis = makeStore();
+
+// DEV_USER_REDIS: the outside Redis, over the Redis protocol (RESP) as ioredis speaks it
+if (process.env.DEV_USER_REDIS) {
+  const store = makeStore();
+  const enc = (v) => v === null || v === undefined ? '$-1\r\n' : typeof v === 'number' ? `:${v}\r\n`
+    : Array.isArray(v) ? `*${v.length}\r\n${v.map(enc).join('')}` : `$${Buffer.byteLength(String(v))}\r\n${v}\r\n`;
+  net.createServer((sock) => {
+    let buf = Buffer.alloc(0);
+    sock.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      for (;;) {   // one command: *<n>\r\n then n × $<len>\r\n<bytes>\r\n
+        let at = 0;
+        const line = () => { const e = buf.indexOf('\r\n', at); if (e < 0) return null; const l = buf.subarray(at, e).toString(); at = e + 2; return l; };
+        const head = line(); if (head === null) return;
+        const n = Number(head.slice(1)), cmd = [];
+        for (let i = 0; i < n; i++) {
+          const len = line(); if (len === null || buf.length < at + Number(len.slice(1)) + 2) return;
+          cmd.push(buf.subarray(at, at + Number(len.slice(1))).toString()); at += Number(len.slice(1)) + 2;
+        }
+        buf = buf.subarray(at);
+        try { sock.write(/^(CLIENT|SELECT|INFO)$/i.test(cmd[0]) ? '+OK\r\n' : enc(store(cmd))); }
+        catch (e) { sock.write(`-ERR ${e.message}\r\n`); }
+      }
+    });
+  }).listen(PORT + 1, '127.0.0.1');
 }
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.json': 'application/json', '.mp4': 'video/mp4' };

@@ -3,8 +3,12 @@
 //   DATA_KEY        the key that unlocks the village data in api/_data/ (from app-build/DATA_KEY.txt)
 //   ADMIN_PASSWORD  the superadmin password: manages every village and creates the village admins
 //   KV_REST_API_URL / KV_REST_API_TOKEN  added automatically when you connect Upstash for Redis in Vercel
+//   USER_REDIS_URL  your own Redis, outside Vercel: redis://user:password@host:port (rediss:// for TLS), or an Upstash
+//                   REST address https://… with USER_REDIS_TOKEN. When set, ALL the app's data (logins, sessions, marks,
+//                   searches, payments, …) is kept there; the Upstash database above is then only read by the
+//                   superadmin's one-time copy on the admin page (copyOldDb below, api/admin.js "db_copy").
 //   KEY_PREFIX      optional, default "rv:": put in front of every database key, so this app can share one
-//                   Upstash database with another app (e.g. the older single-village Adsar app) without mixing data
+//                   database with another app (e.g. the older single-village Adsar app) without mixing data
 const crypto = require('crypto');
 
 // Vercel may add the database variables with a custom prefix (e.g. STORAGE_KV_REST_API_URL), so accept those too.
@@ -13,34 +17,84 @@ function findEnv(names) {
   for (const [k, v] of Object.entries(process.env)) if (v && names.some((n) => k.endsWith('_' + n))) return v;
   return null;
 }
-const DB_URL = findEnv(['KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL']);
-const DB_TOKEN = findEnv(['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN']);
+const KV_URL = findEnv(['KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL']);
+const KV_TOKEN = findEnv(['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN']);
+const USER_URL = process.env.USER_REDIS_URL || '';
 const KEY_PREFIX = process.env.KEY_PREFIX ?? 'rv:';
 
-// Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
-const prefixed = ([name, key, ...args]) => [name, KEY_PREFIX + key, ...args].map(String);
-async function dbPost(path, body) {
-  if (!DB_URL || !DB_TOKEN) {
-    const seen = Object.keys(process.env).filter((k) => /KV|REDIS|UPSTASH/.test(k)).join(', ') || 'none';
-    throw new Error(`database not connected (database variables found: ${seen})`);
+// A database: call(cmd) runs one command, pipe(cmds) several in one round trip; both take whole keys (prefix included).
+// Upstash over HTTPS (REST) …
+function restDb(url, token) {
+  async function post(path, body) {
+    if (!url || !token) {
+      const seen = Object.keys(process.env).filter((k) => /KV|REDIS|UPSTASH/.test(k)).join(', ') || 'none';
+      throw new Error(`database not connected (database variables found: ${seen})`);
+    }
+    const r = await fetch(url + path, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return r.json();
   }
-  const r = await fetch(DB_URL + path, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${DB_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+  return {
+    async call(cmd) { const j = await post('', cmd.map(String)); if (j.error) throw new Error(j.error); return j.result; },
+    async pipe(cmds) {
+      const j = await post('/pipeline', cmds.map((c) => c.map(String)));
+      if (!Array.isArray(j)) throw new Error(j.error || 'pipeline');
+      return j.map((x) => { if (x.error) throw new Error(x.error); return x.result; });
+    },
+  };
+}
+// … or any Redis over its own protocol (ioredis), one connection kept per running function
+function tcpDb(url) {
+  let c = null;
+  const conn = () => {
+    if (!c) {
+      const Redis = require('ioredis');
+      c = new Redis(url, { maxRetriesPerRequest: 2, enableReadyCheck: false, connectTimeout: 8000 });
+      c.on('error', (e) => console.error('USER_REDIS_URL:', e.message));
+    }
+    return c;
+  };
+  return {
+    call: (cmd) => conn().call(...cmd.map(String)),
+    async pipe(cmds) {
+      const p = conn().pipeline();
+      for (const cmd of cmds) p.call(...cmd.map(String));
+      return (await p.exec()).map(([e, r]) => { if (e) throw e; return r; });
+    },
+  };
+}
+const OLD_DB = restDb(KV_URL, KV_TOKEN);
+const DB = !USER_URL ? OLD_DB : /^rediss?:\/\//i.test(USER_URL) ? tcpDb(USER_URL) : restDb(USER_URL.replace(/\/+$/, ''), process.env.USER_REDIS_TOKEN);
+
+// Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
+const prefixed = ([name, key, ...args]) => [name, KEY_PREFIX + key, ...args];
+const redis = (...cmd) => DB.call(prefixed(cmd));
+// several commands in one round trip: [[name, key, ...args], ...] → their results, in order
+const pipeline = (cmds) => DB.pipe(cmds.map(prefixed));
+
+// Moving to USER_REDIS_URL: copies the old Upstash database's keys (KEY_PREFIX*) into it, one SCAN step per call
+// (cursor '0' to start; → {next, keys}, next '0' = done). What is already in the new database wins: a value is only
+// filled in where it is missing (strings SET NX, hash fields HSETNX, set members SADD), so it is safe to run again.
+const canCopyDb = () => !!(USER_URL && KV_URL && KV_TOKEN && (USER_URL !== KV_URL));
+async function copyOldDb(cursor) {
+  const [next, keys] = await OLD_DB.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 200]);
+  if (!keys.length) return { next: String(next), keys: 0 };
+  const types = await OLD_DB.pipe(keys.map((k) => ['TYPE', k]));
+  const vals = await OLD_DB.pipe(keys.map((k, i) => [{ string: 'GET', hash: 'HGETALL', set: 'SMEMBERS' }[types[i]] || 'TYPE', k]));
+  const ttls = await OLD_DB.pipe(keys.map((k) => ['PTTL', k]));
+  const writes = [];
+  keys.forEach((k, i) => {
+    const v = vals[i], ttl = Number(ttls[i]);
+    if (types[i] === 'string') writes.push(ttl > 0 ? ['SET', k, v, 'PX', ttl, 'NX'] : ['SET', k, v, 'NX']);
+    else if (types[i] === 'hash') for (let j = 0; j < v.length; j += 2) writes.push(['HSETNX', k, v[j], v[j + 1]]);
+    else if (types[i] === 'set' && v.length) writes.push(['SADD', k, ...v]);
+    if ((types[i] === 'hash' || types[i] === 'set') && ttl > 0) writes.push(['PEXPIRE', k, ttl]);
   });
-  return r.json();
-}
-async function redis(...cmd) {
-  const j = await dbPost('', prefixed(cmd));
-  if (j.error) throw new Error(j.error);
-  return j.result;
-}
-// several commands in one round trip (Upstash's /pipeline): [[name, key, ...args], ...] → their results, in order
-async function pipeline(cmds) {
-  const j = await dbPost('/pipeline', cmds.map(prefixed));
-  if (!Array.isArray(j)) throw new Error(j.error || 'pipeline');
-  return j.map((x) => { if (x.error) throw new Error(x.error); return x.result; });
+  for (let i = 0; i < writes.length; i += 1000) await DB.pipe(writes.slice(i, i + 1000));
+  return { next: String(next), keys: keys.length };
 }
 
 // Villages built into the app (by app-build/encrypt.mjs): slug → {name, title, ps, zp, pollTime, wards, voters}
@@ -407,5 +461,5 @@ async function getCand(id) {
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE_TIERS, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
-  MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  canCopyDb, copyOldDb, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, clientIp, deviceName, blocked, failed, send, route };

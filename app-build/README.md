@@ -150,6 +150,14 @@ deployment (e.g. to S3) first.
    `KV_REST_API_URL` and `KV_REST_API_TOKEN` (possibly with a prefix; both forms work). This app stores all its
    keys under `rv:` (change with an optional `KEY_PREFIX` variable), so it never touches the other app's passwords.
    With no database yet: Storage → Create Database → **Upstash for Redis** (free plan) → Connect to the project.
+   **Your own Redis instead (outside Vercel):** set `USER_REDIS_URL` = `redis://user:password@host:port` (`rediss://`
+   for TLS; an Upstash REST `https://…` address also works, with `USER_REDIS_TOKEN`). Then all the app's data
+   (logins, sessions, marks, searches, payments) is kept there, through the `ioredis` package (`package.json`; Vercel
+   installs it). Moving over from Upstash: after the deploy, log in to the admin page as superadmin and press
+   **पुराना डेटा नए डेटाबेस में कॉपी करें** once — until then people from before can't log in. It copies every `rv:` key and
+   never overwrites what is already in the new database, so pressing it again is safe. Keep the Upstash database
+   connected until that is done. Local test of this: `DEV_USER_REDIS=1` on `dev-server.mjs` (a second in-memory store on
+   PORT + 1 stands in for it).
 3. **Add two environment variables** (Project → Settings → Environment Variables):
    - `DATA_KEY` = the text in `app-build/DATA_KEY.txt`
    - `ADMIN_PASSWORD` = the superadmin password (long, not shared with anyone)

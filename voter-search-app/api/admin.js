@@ -42,6 +42,10 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
+//   action "db_copy", cursor          → {next, keys, done}   superadmin: one step of copying the old Upstash database
+//                                               into USER_REDIS_URL (copyOldDb in _lib.js); the admin page repeats it from
+//                                               cursor '0' until next is '0'. "list" says dbCopy: 'todo' | 'done' while
+//                                               both databases are set (key "dbcopied" = when it finished)
 //   action "req_reject", rid         → {req}    closes an open request without searches (status 'rejected', doneAt,
 //                                               doneByName = who rejected it)
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
@@ -52,7 +56,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
+const { village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canCopyDb, copyOldDb, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, blocked, failed,
   send, route } = require('./_lib.js');
 
 // a village people and candidates can be added to: not a demo village ("demo-riri")
@@ -98,6 +102,14 @@ module.exports = route(async (req, res, b) => {
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
   const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
+  if (b.action === 'db_copy') {
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    if (!canCopyDb()) return send(res, 400, { error: 'no_db_copy' });
+    const r = await copyOldDb(b.cursor);
+    if (r.next === '0') await redis('SET', 'dbcopied', now);
+    return send(res, 200, { ...r, done: r.next === '0' });
+  }
+
   if (b.action === 'list') {
     const ids = (await redis('SMEMBERS', 'users')) || [];
     const all = (await Promise.all(ids.map(getUser))).filter(Boolean).sort((x, y) => (x.created < y.created ? 1 : -1));
@@ -141,7 +153,8 @@ module.exports = route(async (req, res, b) => {
         settled: Number(sO[id]) || 0, due: id === 'admin' ? 0 : (Number(rsO[id]) || 0) - (Number(sO[id]) || 0) }))
         .filter((c) => isSuper || c.by === me.id).sort((a, b) => b.rs - a.rs);
     }
-    return send(res, 200, { me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
+    const dbCopy = isSuper && canCopyDb() ? ((await redis('GET', 'dbcopied')) ? 'done' : 'todo') : undefined;
+    return send(res, 200, { dbCopy, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0 }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }

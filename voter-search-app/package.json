@@ -1,0 +1,8 @@
+{
+  "name": "voter-search-app",
+  "private": true,
+  "description": "Vercel functions in api/; ioredis talks to USER_REDIS_URL (api/_lib.js)",
+  "dependencies": {
+    "ioredis": "^5.11.1"
+  }
+}
