@@ -3,7 +3,7 @@
 // POST {password} (no village, from the admin page) → the same, but only for the superadmin or a village admin.
 // POST {password, home: true} (the start page) → the same for any active password; list = the villages it opens.
 // phone (the number typed on the login page): the login must have that mobile number, else 401 'wrong', as for a wrong
-//   password. Without a phone ('एडमिन? सीधे पासवर्ड से खोलें') only an admin, or a login with no number, opens → 403 'need_phone'.
+//   password. Without a phone ('एडमिन? सीधे पासवर्ड से खोलें') only an admin (or the superadmin) opens → 403 'need_phone'.
 // POST {village: 'demo' or 'demo-<village>', device} → a demo login for that phone (device = a random id the phone keeps),
 //   with left = how many of its demo searches remain and list = the demo villages. No password.
 // A password of another village → 403 {error: 'other_village', village, villageName} so the app can point there.
@@ -36,7 +36,7 @@ module.exports = route(async (req, res, { password, phone, village: slug, home, 
     await failed(req, 'unlock');
     return send(res, 401, { error: 'wrong' });
   }
-  if (!phone && user.role !== 'admin' && normPhone(user.phone)) return send(res, 403, { error: 'need_phone' });
+  if (!phone && user.role !== 'admin') return send(res, 403, { error: 'need_phone' });   // password alone: admins only
   if (user.retired === '1') return send(res, 403, { error: 'retired' });
   if (v && !user.villages.includes(v.slug)) {
     const own = village(user.villages[0]);

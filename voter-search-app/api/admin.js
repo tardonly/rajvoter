@@ -215,7 +215,8 @@ module.exports = route(async (req, res, b) => {
     const name = String(b.name || '').trim().slice(0, 60);
     if (!name) return send(res, 400, { error: 'name' });
     const phone = normPhone(b.phone);
-    if (phone === null) return send(res, 400, { error: 'phone' });
+    // a person's login opens only with its mobile number and password (unlock.js), so it needs a number
+    if (phone === null || (b.action === 'add' && !phone)) return send(res, 400, { error: 'phone' });
     let fields;
     if (b.action === 'add') {
       if (!realVillage(b.village)) return send(res, 400, { error: 'no_village' });
@@ -369,7 +370,7 @@ module.exports = route(async (req, res, b) => {
 
   if (b.action === 'phone') {
     const phone = normPhone(b.phone);
-    if (phone === null) return send(res, 400, { error: 'phone' });
+    if (phone === null || (user.role === 'user' && !phone)) return send(res, 400, { error: 'phone' });   // see 'add'
     await redis('HSET', `user:${user.id}`, 'phone', phone);
     return send(res, 200, { user: view(await getUser(user.id)) });
   }

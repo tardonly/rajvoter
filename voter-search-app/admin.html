@@ -437,7 +437,7 @@ const MSG = EN ? {
   logged_out: 'You have been logged out — please log in again',
   other_device: 'This password was opened on another phone — please log in again',
   offline: 'No internet', server: 'Server problem', name: 'Type a name', not_found: 'Person not found',
-  phone: 'Mobile number is not right — type a 10-digit number',
+  phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
   no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
   bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
@@ -448,7 +448,7 @@ const MSG = EN ? {
   logged_out: 'आपको लॉग आउट कर दिया गया है — दोबारा लॉगिन करें',
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
-  phone: 'मोबाइल नंबर सही नहीं है — 10 अंकों का नंबर लिखें',
+  phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
   no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'खोज सीमा 1 से 5000 के बीच लिखें',
   bad_credits: 'कितनी खोज जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में खोज नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
@@ -1318,7 +1318,9 @@ function person(u) {
     ? L(`अभी लॉगिन: ${u.sessionDevice || '—'} · IP ${u.sessionIp || '—'} · ${fmt(u.sessionAt)} से`,
       `Logged in now: ${who(u.sessionDevice) || '—'} · IP ${u.sessionIp || '—'} · since ${fmt(u.sessionAt)}`)
     : L('अभी किसी फ़ोन पर लॉगिन नहीं', 'Not logged in on any phone'));
-  const ph = el('div', 'phone', u.phone ? `📱 ${showPhone(u.phone)}` : L('मोबाइल नंबर नहीं जोड़ा', 'No mobile number added'));
+  const ph = el('div', 'phone', u.phone ? `📱 ${showPhone(u.phone)}`
+    : u.role === 'user' ? L('⚠ मोबाइल नंबर नहीं जोड़ा — नंबर जोड़ें, बिना नंबर लॉगिन नहीं होगा', '⚠ No mobile number — add one, it cannot log in without it')
+    : L('मोबाइल नंबर नहीं जोड़ा', 'No mobile number added'));
   const edit = el('button', null, u.phone ? L('बदलें', 'Change') : L('जोड़ें', 'Add'));
   edit.type = 'button';
   edit.addEventListener('click', () => {
