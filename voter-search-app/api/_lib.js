@@ -9,10 +9,11 @@
 //                   below), and Upstash keeps the rest: slip marks, candidates, search counters, rate limits, demo counts.
 //                   Logins made before it was set are moved over once by the superadmin (admin page, moveUserData below).
 //   OTP_SEND_URL    optional: sign-up then checks the mobile number with a one-time code (sendOtp below). The address
-//                   of the SMS / voice OTP provider's send API (e.g. CallerDesk, once they enable OTP on the account),
-//                   with {mobile} (10 digits), {mobile91} (with 91) and {otp} where those go, and the API key in it too,
-//                   e.g. https://…/send_otp?authcode=KEY&mobile={mobile}&otp={otp}. GET by default; OTP_SEND_METHOD=POST
-//                   with OTP_SEND_BODY (the same placeholders, e.g. JSON) posts instead.
+//                   of the SMS / voice OTP provider's send API with {mobile} (10 digits), {mobile91} (with 91) and {otp}
+//                   where those go, and the API key in it too. 2Factor (2factor.in):
+//                   https://2factor.in/API/V1/<API key>/SMS/{mobile}/{otp}/<template name>  (voice call: …/VOICE/{mobile}/{otp})
+//                   GET by default; OTP_SEND_METHOD=POST with OTP_SEND_BODY (the same placeholders, e.g. JSON) posts
+//                   instead. A reply that isn't 2xx, or says "Status": "Error" / false, counts as not sent.
 //   KEY_PREFIX      optional, default "rv:": put in front of every database key, so this app can share one
 //                   database with another app (e.g. the older single-village Adsar app) without mixing data
 const crypto = require('crypto');
