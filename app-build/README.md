@@ -176,6 +176,15 @@ The login page asks only for the **mobile number** first:
   for such a sign-up: **10** while fewer than 10 signed-up logins have not been given paid searches, then **2** until
   there are 20, then **0** (`FREE_TIERS` in `api/_lib.js`). A number that signed up before (in any village) gets no
   free searches again. One internet address can sign up 3 times a day.
+- **OTP check (optional):** with `OTP_SEND_URL` set in Vercel, a new number first gets a 6-digit code ("OTP भेजें"),
+  and the login is made only with the right code. Codes last 10 minutes; a new one after 30 seconds, 5 a day per
+  number, 5 wrong tries per code (`OTP` in `api/_lib.js`). `OTP_SEND_URL` is the SMS / voice OTP provider's send address
+  with `{mobile}` (10 digits), `{mobile91}` and `{otp}` in it and the API key, e.g.
+  `https://…/send_otp?authcode=KEY&mobile={mobile}&otp={otp}`; for a POST API also `OTP_SEND_METHOD=POST` and
+  `OTP_SEND_BODY` (same placeholders). CallerDesk: SMS / voice OTP has to be switched on by their sales team (the
+  account's SMS Broadcast says "contact our sales"), SMS also needs a DLT-registered sender ID and OTP template; they then
+  give the send address. Without `OTP_SEND_URL` sign-up works as before. Local test: `DEV_OTP=1` on `dev-server.mjs`
+  (the code is at `/__otp/last?mobile=<number>`).
 - Picked the wrong village? The new-password window has **गलत गाँव? बदलें**, and in the app a signed-up login has a
   **गाँव बदलें** button: पंचायत समिति, then village. The login moves itself there with its password and searches and
   stays logged in (`api/signup.js` "move"). It can do this **3 times** (`MOVES` in `api/_lib.js`); after that the

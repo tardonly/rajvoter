@@ -8,6 +8,11 @@
 //                   numbers, passwords, sessions), bought searches, pack requests and payments are kept there (USER_KEYS
 //                   below), and Upstash keeps the rest: slip marks, candidates, search counters, rate limits, demo counts.
 //                   Logins made before it was set are moved over once by the superadmin (admin page, moveUserData below).
+//   OTP_SEND_URL    optional: sign-up then checks the mobile number with a one-time code (sendOtp below). The address
+//                   of the SMS / voice OTP provider's send API (e.g. CallerDesk, once they enable OTP on the account),
+//                   with {mobile} (10 digits), {mobile91} (with 91) and {otp} where those go, and the API key in it too,
+//                   e.g. https://…/send_otp?authcode=KEY&mobile={mobile}&otp={otp}. GET by default; OTP_SEND_METHOD=POST
+//                   with OTP_SEND_BODY (the same placeholders, e.g. JSON) posts instead.
 //   KEY_PREFIX      optional, default "rv:": put in front of every database key, so this app can share one
 //                   database with another app (e.g. the older single-village Adsar app) without mixing data
 const crypto = require('crypto');
@@ -242,6 +247,44 @@ function deviceName(req) {
     : /FxiOS|Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '';
   return br ? `${os} · ${br}` : os;
 }
+// One-time codes for signing up (api/signup.js "otp"): a 6-digit code, kept hashed under "otp:<phone>" for OTP_TTL
+// seconds with how many wrong tries it had; a new one only after OTP_GAP seconds, OTP_DAY a day per number.
+const OTP = { ttl: 600, gap: 30, day: 5, tries: 5 };
+const otpOn = () => !!process.env.OTP_SEND_URL;
+async function sendOtp(phone, code) {   // phone: 91XXXXXXXXXX → true when the provider took it
+  const fill = (s) => String(s || '').replaceAll('{mobile91}', phone).replaceAll('{mobile}', phone.slice(-10)).replaceAll('{otp}', code);
+  const post = /^post$/i.test(process.env.OTP_SEND_METHOD || '');
+  try {
+    const r = await fetch(fill(process.env.OTP_SEND_URL), post
+      ? { method: 'POST', headers: { 'Content-Type': process.env.OTP_SEND_TYPE || 'application/json' }, body: fill(process.env.OTP_SEND_BODY) } : {});
+    const text = await r.text();
+    if (!r.ok || /"(status|type|success)"\s*:\s*("?(false|error|failed)"?|0)\b/i.test(text)) { console.error('otp send', r.status, text.slice(0, 300)); return false; }
+    return true;
+  } catch (e) { console.error('otp send', e.message); return false; }
+}
+// → '' when sent, else 'wait' (asked again within OTP.gap), 'too_many' (OTP.day today) or 'otp_send' (provider failed)
+async function newOtp(phone) {
+  const k = `otp:${phone}`, sent = Number(await redis('HGET', k, 'at')) || 0;
+  if (Date.now() - sent < OTP.gap * 1000) return 'wait';
+  const dk = `otp:day:${phone}:${today()}`;
+  if (await redis('INCR', dk) > OTP.day) return 'too_many';
+  await redis('EXPIRE', dk, 86400);
+  const code = String(crypto.randomInt(100000, 1000000));
+  if (!(await sendOtp(phone, code))) return 'otp_send';
+  await redis('HSET', k, 'hash', hmac(`otp:${phone}:${code}`), 'tries', 0, 'at', Date.now());
+  await redis('EXPIRE', k, OTP.ttl);
+  return '';
+}
+// → '' when right (the code is then used up), else 'otp_expired' | 'otp_tries' | 'otp_wrong'
+async function checkOtp(phone, code) {
+  const k = `otp:${phone}`, [hash, tries] = (await redis('HMGET', k, 'hash', 'tries')) || [];
+  if (!hash) return 'otp_expired';
+  if (Number(tries) >= OTP.tries) return 'otp_tries';
+  if (!sameText(hmac(`otp:${phone}:${String(code || '').replace(/\D/g, '')}`), hash)) { await redis('HINCRBY', k, 'tries', 1); return 'otp_wrong'; }
+  await redis('DEL', k);
+  return '';
+}
+
 async function blocked(req, kind) { return Number(await redis('GET', `fail:${kind}:${clientIp(req)}`)) >= 10; }
 async function failed(req, kind) {
   const k = `fail:${kind}:${clientIp(req)}`;
@@ -483,5 +526,5 @@ async function getCand(id) {
 
 module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE_TIERS, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
-  canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

@@ -5,8 +5,12 @@
 // number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
 // an admin adds them on the admin page (api/admin.js "credits_add").
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
-//   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free}
-//   POST {action: 'signup', village, phone, name} → {password, token, name, phone, villages, list, perms, prepaid, left, adminPhone}
+//   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free, otp}   otp: sign-up needs a
+//     one-time code sent to the number (OTP_SEND_URL is set, see _lib.js)
+//   POST {action: 'otp', phone} → {sent: true}   sends the code; errors 'wait' (asked again within OTP.gap seconds, with
+//     wait = seconds left), 'too_many' (OTP.day codes today), 'otp_send' (the provider failed), 'exists'
+//   POST {action: 'signup', village, phone, name, otp} → (otp: the code, when OTP is on; else 'otp_wrong' | 'otp_expired' |
+//     'otp_tries') {password, token, name, phone, villages, list, perms, prepaid, left, adminPhone}
 //   POST {action: 'move', token, village, to} → {village, list, movesLeft}   a signed-up login picked the wrong village:
 //     it moves itself to village "to" (its searches and password go along, it stays logged in), up to MOVES times; after
 //     that its admin moves it (api/admin.js "move")
@@ -16,7 +20,7 @@
 //     the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
+const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -43,7 +47,19 @@ module.exports = route(async (req, res, b) => {
     if (b.village && !v) return send(res, 404, { error: 'no_village' });
     await failed(req, 'lookup');
     const mine = (await phoneLogins(phone)).filter((u) => u.retired !== '1' && (!v || u.villages.includes(v.slug)));
-    return send(res, 200, { exists: mine.length > 0, free: mine.length ? 0 : await freeSearches(phone) });
+    return send(res, 200, { exists: mine.length > 0, free: mine.length ? 0 : await freeSearches(phone), otp: otpOn() });
+  }
+
+  if (b.action === 'otp') {
+    if (!otpOn()) return send(res, 400, { error: 'no_otp' });
+    if (await blocked(req, 'lookup')) return send(res, 429, { error: 'too_many' });
+    const phone = normPhone(b.phone);
+    if (!phone) return send(res, 400, { error: 'phone' });
+    await failed(req, 'lookup');   // each code sent counts toward this address's 10 tries in 15 minutes
+    const err = await newOtp(phone);
+    if (err === 'wait') return send(res, 429, { error: 'wait', wait: OTP.gap });
+    if (err) return send(res, err === 'too_many' ? 429 : 502, { error: err });
+    return send(res, 200, { sent: true });
   }
 
   if (b.action === 'signup') {
@@ -55,6 +71,10 @@ module.exports = route(async (req, res, b) => {
     const name = String(b.name || '').trim().slice(0, 60);
     if (!name) return send(res, 400, { error: 'name' });
     if ((await phoneLogins(phone)).some((u) => u.retired !== '1' && u.villages.includes(v.slug))) return send(res, 409, { error: 'exists' });
+    if (otpOn()) {   // the number must be the person's own: the code sent to it
+      const bad = await checkOtp(phone, b.otp);
+      if (bad) { await failed(req, 'lookup'); return send(res, 400, { error: bad }); }
+    }
     const k = `signups:${clientIp(req)}:${today()}`, n = await redis('INCR', k);
     await redis('EXPIRE', k, 86400);
     if (n > SIGNUPS_PER_DAY) return send(res, 429, { error: 'too_many' });

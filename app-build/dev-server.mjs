@@ -21,6 +21,9 @@ process.env.DATA_KEY ||= readFileSync(join(here, 'DATA_KEY.txt'), 'utf8').trim()
 process.env.ADMIN_PASSWORD ||= 'admin-test';
 process.env.KV_REST_API_URL = `http://127.0.0.1:${PORT}/__redis`;
 process.env.KV_REST_API_TOKEN = 'local';
+// DEV_OTP=1: sign-up asks for an OTP; the "provider" is /__otp here, and /__otp/last?mobile=<10 digits> shows the code
+if (process.env.DEV_OTP) process.env.OTP_SEND_URL = `http://127.0.0.1:${PORT}/__otp?mobile={mobile}&otp={otp}`;
+const otps = new Map();
 if (process.env.DEV_USER_REDIS) process.env.USER_REDIS_URL = `redis://127.0.0.1:${PORT + 1}`;
 const require = createRequire(import.meta.url);
 
@@ -51,6 +54,7 @@ return function redis([cmd, ...a]) {
     case 'INCR': { const n = Number(alive(a[0]) ? kv.get(a[0]) : 0) + 1; kv.set(a[0], String(n)); return n; }
     case 'EXPIRE': expiry.set(a[0], Date.now() + Number(a[1]) * 1000); return 1;
     case 'HSET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; for (let i = 1; i < a.length; i += 2) h[a[i]] = String(a[i + 1]); kv.set(a[0], h); return 1; }
+    case 'HGET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; return h[a[1]] ?? null; }
     case 'HMGET': { const h = alive(a[0]) ? kv.get(a[0]) : {}; return a.slice(1).map((f) => h[f] ?? null); }
     case 'HDEL': { const h = alive(a[0]) ? kv.get(a[0]) : {}; const n = a.slice(1).filter((f) => f in h).length; a.slice(1).forEach((f) => delete h[f]); return n; }
     case 'HGETALL':return alive(a[0]) ? Object.entries(kv.get(a[0])).flat() : [];
@@ -110,6 +114,8 @@ http.createServer(async (req, res) => {
     else url.pathname = '/index.html';
   }
 
+  if (url.pathname === '/__otp') { otps.set(url.searchParams.get('mobile'), url.searchParams.get('otp')); return res.end('{"status":"success"}'); }
+  if (url.pathname === '/__otp/last') return res.end(JSON.stringify({ otp: otps.get(url.searchParams.get('mobile')) || null }));
   if (url.pathname === '/__redis') {
     try { res.end(JSON.stringify({ result: redis(JSON.parse(raw)) })); }
     catch (e) { res.end(JSON.stringify({ error: e.message })); }
