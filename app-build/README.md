@@ -167,6 +167,10 @@ The login page asks only for the **mobile number** first:
   for such a sign-up: **10** while fewer than 10 signed-up logins have not been given paid searches, then **2** until
   there are 20, then **0** (`FREE_TIERS` in `api/_lib.js`). A number that signed up before (in any village) gets no
   free searches again. One internet address can sign up 3 times a day.
+- Picked the wrong village? The new-password window has **गलत गाँव? बदलें**, and in the app a signed-up login has a
+  **गाँव बदलें** button: पंचायत समिति, then village. The login moves itself there with its password and searches and
+  stays logged in (`api/signup.js` "move"). It can do this **3 times** (`MOVES` in `api/_lib.js`); after that the
+  admin moves it (admin page, **गाँव:**).
 - Signed-up logins have no daily limit: their searches (free + paid) never run out by date. When none are left, the
   **🛒 और सर्च** window opens by itself (after logging in, or on the next search); the **🛒 और सर्च खरीदें** button opens
   it any time.

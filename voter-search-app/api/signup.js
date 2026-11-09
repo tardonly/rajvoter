@@ -7,6 +7,9 @@
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
 //   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free}
 //   POST {action: 'signup', village, phone, name} → {password, token, name, phone, villages, list, perms, prepaid, left, adminPhone}
+//   POST {action: 'move', token, village, to} → {village, list, movesLeft}   a signed-up login picked the wrong village:
+//     it moves itself to village "to" (its searches and password go along, it stays logged in), up to MOVES times; after
+//     that its admin moves it (api/admin.js "move")
 //   POST {action: 'request', token, village, n} → {id, phone}   any user login (signed up or made by an admin) asks for a pack of n searches (PACKS in
 //     _lib.js): the request is kept (req:<id>, see getReq) with to = the admin it goes to (adminFor in _lib.js), and its
 //     id goes in the WhatsApp message to phone ('' = the app's own number) as <site>/<id>; the person's open request for
@@ -14,9 +17,10 @@
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
 const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, FREE_TIERS, phoneLogins, adminPhone, village, villageList, normPhone, newLogin, today, clientIp, redis, newSession, makeToken,
-  deviceName, permsOf, blocked, failed, send, route } = require('./_lib.js');
+  deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
+
 
 // free searches for a new login: by how many signed-up logins have no paid searches yet; none if this number signed up
 // before
@@ -61,8 +65,19 @@ module.exports = route(async (req, res, b) => {
     await redis('HSET', `user:${id}`, 'session', sid, 'sessionAt', now, 'sessionIp', clientIp(req), 'sessionDevice', deviceName(req),
       'lastSeen', now, 'logins', 1);
     return send(res, 200, { password, token: makeToken(id, sid), name, phone, role: 'user', admin: false, villages: [v.slug],
-      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, canBuy: true, online: payOnline(), left: free,
+      list: villageList([v.slug]), perms: permsOf({}), prepaid: true, canBuy: true, online: payOnline(), left: free, movesLeft: movesLeft({ role: 'user', self: '1' }),
       adminPhone: await adminPhone({ village: v.slug }) });
+  }
+  if (b.action === 'move') {
+    const me = await whoIs(b.token, b.village);
+    if (!me || me.status !== 'ok') return send(res, 401, { error: 'login' });
+    if (!movesLeft(me)) return send(res, 403, { error: 'no_moves' });
+    const v = realVillage(b.to);
+    if (!v) return send(res, 400, { error: 'no_village' });
+    if (v.slug === me.village) return send(res, 400, { error: 'same_village' });
+    if ((await phoneLogins(me.phone)).some((u) => u.id !== me.id && u.retired !== '1' && u.villages.includes(v.slug))) return send(res, 409, { error: 'exists' });
+    await redis('HSET', `user:${me.id}`, 'village', v.slug, 'cand', '', 'moves', (Number(me.moves) || 0) + 1);
+    return send(res, 200, { village: v.slug, list: villageList([v.slug]), movesLeft: movesLeft(me) - 1 });
   }
   if (b.action === 'request') {
     const me = await whoIs(b.token, b.village);
