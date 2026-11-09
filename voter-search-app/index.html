@@ -57,6 +57,7 @@
   .lockbox > .langbtn { position: absolute; top: 10px; right: 10px; }
   /* signing up with a mobile number (api/signup.js), and the window for more searches */
   #signStep { display: grid; gap: 8px; margin-bottom: 12px; }
+  #signStep select + select { margin-top: 8px; }
   #signStep select { width: 100%; padding: 12px 14px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .lockbox .phonenote:empty { display: none; }
   .lockalt { display: flex; justify-content: center; gap: 14px; margin-top: 10px; }
@@ -371,6 +372,7 @@
         <label><input id="remember" type="checkbox" checked> इस फ़ोन पर याद रखें</label>
       </div>
       <div id="signStep" class="hidden">
+        <select id="signSamiti" aria-label="पंचायत समिति"></select>
         <select id="signVillage" aria-label="गाँव"></select>
         <input id="signName" type="text" maxlength="60" placeholder="आपका नाम">
       </div>
@@ -1595,7 +1597,7 @@ function demoBar() {
 
 // ---------- more searches: a signed-up login pays the admin (WhatsApp) and an admin adds them on the admin page ----------
 const SIGN_ERR = {
-  no_village: L('अपना गाँव चुनें', 'Choose your village'), name: L('अपना नाम लिखें', 'Type your name'),
+  no_samiti: L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti'), no_village: L('अपना गाँव चुनें', 'Choose your village'), name: L('अपना नाम लिखें', 'Type your name'),
   phone: L('10 अंकों का मोबाइल नंबर डालें', 'Enter a 10-digit mobile number'),
   too_many: L('बहुत बार कोशिश — थोड़ी देर बाद फिर करें', 'Too many tries — try again later'),
 };
@@ -1724,7 +1726,7 @@ function lockStepTo(step, note = '', noPhone = false) {
   $('pwOnly').classList.toggle('hidden', step !== 'phone');
   $('unlockBtn').textContent = step === 'pw' ? L('खोलें', 'Open') : step === 'sign' ? L('खाता बनाएं', 'Create my login') : L('आगे', 'Next');
   $('phoneNote').textContent = note;
-  const focus = step === 'pw' ? $('pw') : step === 'sign' ? (HOME ? $('signVillage') : $('signName')) : $('phone');
+  const focus = step === 'pw' ? $('pw') : step === 'sign' ? (HOME ? $('signSamiti') : $('signName')) : $('phone');
   if (!$('lock').classList.contains('hidden')) focus.focus();
 }
 async function lockPhone() {
@@ -1742,18 +1744,35 @@ async function lockPhone() {
     : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर खोज खरीदें (₹1 प्रति खोज)।',
       'New number — type your name: your login is made at once; then buy searches (₹1 per search).'));
 }
-async function signVillages() {   // the start page asks which village; a village page is that village
-  const sel = $('signVillage');
-  sel.classList.toggle('hidden', !HOME);
-  if (!HOME || sel.options.length) return;
+// The start page asks for the पंचायत समिति first, then the village in it; a village page is that village.
+let signList = [];
+const samitiOf = (v) => `${v.district || ''}|${v.panchayatSamiti || ''}`;
+async function signVillages() {
+  const ps = $('signSamiti');
+  ps.classList.toggle('hidden', !HOME);
+  $('signVillage').classList.toggle('hidden', !HOME);
+  if (!HOME || ps.options.length) return;
   const info = await api('signup', { action: 'info' });
-  sel.add(new Option(L('अपना गाँव चुनें', 'Choose your village'), ''));
-  for (const v of [...(info.villages || [])].sort((a, b) => vn(a).localeCompare(vn(b), LOCALE))) {
-    sel.add(new Option(`${vn(v)}${v.panchayatSamiti ? ` · ${L('पंचायत समिति', 'Panchayat samiti')} ${v.panchayatSamiti}` : ''}`, v.slug));
+  signList = info.villages || [];
+  const samitis = new Map();
+  for (const v of signList) if (!samitis.has(samitiOf(v))) samitis.set(samitiOf(v), v);
+  ps.add(new Option(L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti'), ''));
+  for (const [k, v] of [...samitis].sort((a, b) => String(a[1].panchayatSamiti || '').localeCompare(String(b[1].panchayatSamiti || ''), LOCALE))) {
+    ps.add(new Option(`${v.panchayatSamiti || L('अन्य', 'Other')}${v.district ? ` (${L('जिला', 'District')} ${v.district})` : ''}`, k));
   }
+  signSamitiPicked();
 }
+function signSamitiPicked() {
+  const sel = $('signVillage'), k = $('signSamiti').value;
+  sel.replaceChildren(new Option(k ? L('अपना गाँव (ग्राम पंचायत) चुनें', 'Choose your village (gram panchayat)') : L('पहले पंचायत समिति चुनें', 'First choose the panchayat samiti'), ''));
+  sel.disabled = !k;
+  for (const v of signList.filter((v) => samitiOf(v) === k).sort((a, b) => vn(a).localeCompare(vn(b), LOCALE))) sel.add(new Option(vn(v), v.slug));
+  if (k) sel.focus();
+}
+$('signSamiti').addEventListener('change', signSamitiPicked);
 async function lockSignup() {
   const slug = HOME ? $('signVillage').value : SLUG, name = $('signName').value.trim();
+  if (HOME && !$('signSamiti').value) return showLock(SIGN_ERR.no_samiti);
   if (!slug) return showLock(SIGN_ERR.no_village);
   if (!name) return showLock(SIGN_ERR.name);
   $('unlockBtn').disabled = true; showLock(L('खाता बन रहा है…', 'Making your login…'), true);
