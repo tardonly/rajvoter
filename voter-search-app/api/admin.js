@@ -113,7 +113,7 @@ const view = (u) => ({
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   ownVillages: u.ownVillages || [], samitis: u.samitis || [],   // an admin's: given one by one, and whole samitis
   more: u.more || [], areas: u.areas || [],   // a person's extra villages: one by one, and whole ZP / PS wards
-  phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
+  phone: u.phone || '', note: u.note || '', created: u.created, lastSeen: u.lastSeen || null,
   by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), canBuy: canBuy(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
   // referrals: who invited this login, and what this login's invites earned (refRule in _lib.js)
@@ -515,6 +515,11 @@ module.exports = route(async (req, res, b) => {
     const { more, areas } = extraVillages(user.village);
     await redis('HSET', `user:${user.id}`, 'more', more.join(','), 'areas', areas.join(','));
     if (user.cand) await candReach(user.cand, userVillages(user.village, more.join(','), areas.join(',')));
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'note') {   // the admins' own note on a person: shown only on the admin page, never in the app
+    await redis('HSET', `user:${user.id}`, 'note', String(b.note || '').trim().slice(0, 1000));
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
