@@ -1136,7 +1136,7 @@ const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they m
   credits: 'Can add searches to their users', approve: 'Can approve their users\' requests' }
   : { add: 'नए व्यक्ति बना सकते हैं', own: 'अपने बनाए व्यक्ति देख सकते हैं', all: 'अपने गाँवों के सभी व्यक्ति देख सकते हैं',
   credits: 'अपने व्यक्तियों को सर्च जोड़ सकते हैं', approve: 'अपने व्यक्तियों के अनुरोध मंज़ूर कर सकते हैं' };
-function adminPermBoxes(u) {
+function adminPermBoxes(u, msg = 'listMsg') {
   const box = el('div', 'perms'), keys = Object.keys(APERM_NAME);
   for (const p of keys) {
     const l = el('label'), c = el('input');
@@ -1146,8 +1146,8 @@ function adminPermBoxes(u) {
       box.querySelectorAll('input').forEach((x) => { x.disabled = true; });
       const r = await api({ action: 'aperms', id: u.id, aperms: want });
       box.querySelectorAll('input').forEach((x) => { x.disabled = false; });
-      if (r.error) { c.checked = !c.checked; $('listMsg').textContent = errText(r); return; }
-      $('listMsg').textContent = ''; u.aperms = r.user.aperms;
+      if (r.error) { c.checked = !c.checked; $(msg).textContent = errText(r); return; }
+      $(msg).textContent = ''; u.aperms = r.user.aperms;
     });
     l.append(c, APERM_NAME[p]); box.append(l);
   }
@@ -1222,11 +1222,14 @@ function showPassword(u, pw) {
   $('newPwText').textContent = pw;
   $('sharePw').textContent = `${L('WhatsApp पर भेजें', 'Send on WhatsApp')}${shareTo ? ` (${showPhone(shareTo)})` : ''}`;
   $('sharePw').classList.toggle('wa', !!shareTo);
-  // a new user starts with only पर्ची प्रिंट and the default search limit: both can be changed right here
-  const isUser = u.role === 'user' && u.perms;
-  $('newPwPerms').classList.toggle('hidden', !isUser);
+  // a new user starts with the default permissions and search limit, a new admin with all of them and no limit: the
+  // superadmin can change an admin's right here too
+  const isUser = u.role === 'user' && u.perms, isAdm = u.role === 'admin' && u.perms && me.role === 'super';
+  $('newPwPerms').classList.toggle('hidden', !isUser && !isAdm);
   $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', L('यह व्यक्ति क्या कर सकता है:', 'What this person may do:')), permBoxes(u, 'newPwMsg', refresh),
-    ...(u.prepaid ? [] : [limitBox(u, 'newPwMsg', refresh)])] : []));   // bought searches have no daily limit
+    ...(u.prepaid ? [] : [limitBox(u, 'newPwMsg', refresh)])]   // bought searches have no daily limit
+    : isAdm ? [el('div', 'ph', L('यह एडमिन क्या कर सकता है — ऐप में:', 'What this admin may do — in the app:')), permBoxes(u, 'newPwMsg', refresh),
+      el('div', 'ph', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u, 'newPwMsg'), limitBox(u, 'newPwMsg', refresh)] : []));
   $('newPwMsg').textContent = '';
   $('newPw').classList.remove('hidden');
   $('newPw').scrollIntoView({ behavior: 'smooth', block: 'center' });

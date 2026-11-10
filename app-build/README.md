@@ -42,8 +42,10 @@ only receive the cards that match a search. Every search checks that the user's 
     voters. Same groups as the report: a candidate's worker sees only that candidate's marks; an admin, the village's
     own. Not in the demo.
 
-  New users (and users added before these boxes existed) start with only **पर्ची प्रिंट**. A change reaches the
-  person's phone on their next search, or within a minute. Admins and the superadmin can always do everything.
+  New users (and users added before these boxes existed) start with **निशान लगा सकते हैं**, **पर्ची प्रिंट** and
+  **वार्ड अनुसार प्रगति देख सकते हैं**. A change reaches the person's phone on their next search, or within a minute.
+  A village admin starts with all of them; the superadmin ticks theirs under **ऐप में** (in the new-password box when
+  the admin is made, or in the एडमिन tab later). The superadmin can always do everything.
 - **Daily search limit (users only):** each user may start 500 searches a day (Indian time), or the number their admin
   types under **रोज़ की सर्च सीमा** (in the new-password box when the person is added, or under their name later; empty =
   500). **+100 आज के लिए** adds 100 for today only. One search is everything from typing a name until the search box is
@@ -264,9 +266,10 @@ the email sent is `JADUPE_EMAIL` (default noreply@raj-voter.vercel.app).
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).
 - **+ नया व्यक्ति** (व्यक्ति tab): choose the village, type the person's name → you get their password once → Copy or send by
-  WhatsApp (the message has that village's link). The same box has the person's permission ticks (they start with only
-  पर्ची प्रिंट), so you can set what they may do right away.
+  WhatsApp (the message has that village's link). The same box has the person's permission ticks (they start with
+  निशान, पर्ची प्रिंट and वार्ड अनुसार प्रगति), so you can set what they may do right away.
 - **नया एडमिन जोड़ें** (superadmin only): name + tick the villages → the admin's password, sent with the `/admin` link.
+  The same box has the admin's ticks: in the app, on the admin page, and their daily search limit.
 - Each person shows **बनाया: …** (made by): the admin who created that password ("आप" for yourself). Passwords made
   before this tag existed have none.
 - **बंद करें:** that password stops working; the person is logged out on their next search.

@@ -362,7 +362,7 @@ async function whoIs(token, slug) {
 //   slips · print: the प्रिंट / PDF button on a slip
 const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress', 'list'];   // progress: वार्ड अनुसार प्रगति in the app,
 // list: its मतदाता सूची (voters by mark) — both api/progress.js
-const DEFAULT_PERMS = ['print'];   // for new users, and users added before permissions existed
+const DEFAULT_PERMS = ['mark', 'print', 'progress'];   // for new users, and users added before permissions existed
 const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
 // an admin's in the app: all of them until the superadmin sets them (admins made before these could be set)
 const appPerms = (u) => (u.role === 'admin' && u.perms === undefined ? PERMS.slice() : permsOf(u));
