@@ -21,8 +21,8 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('./_lib.js');
-const { load, search, family, publicFields } = require('./_search.js');
+const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
+const { load, search, family, publicFields } = require('../_search.js');
 
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
 const SEARCH_STEPS = 25, SEARCH_MINUTES = 10;

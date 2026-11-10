@@ -3,8 +3,8 @@
 // '' clears the mark. Every user of the village sees the mark on the slip, with who set it and when
 // (see marks.js for how phones pick up new marks); a candidate's workers mark and see only their candidate's marks
 // (see markHash in _lib.js).
-const { village, redis, whoIs, MARKS, markKey, markHash, send, route } = require('./_lib.js');
-const { load } = require('./_search.js');
+const { village, redis, whoIs, MARKS, markKey, markHash, send, route } = require('../_lib.js');
+const { load } = require('../_search.js');
 
 module.exports = route(async (req, res, b) => {
   const v = village(b.village);

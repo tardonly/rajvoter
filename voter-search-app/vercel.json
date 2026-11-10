@@ -1,16 +1,7 @@
 {
   "cleanUrls": false,
   "functions": {
-    "api/search.js": {
-      "includeFiles": "api/_data/**"
-    },
-    "api/mark.js": {
-      "includeFiles": "api/_data/**"
-    },
-    "api/admin.js": {
-      "includeFiles": "api/_data/**"
-    },
-    "api/progress.js": {
+    "api/data.js": {
       "includeFiles": "api/_data/**"
     }
   },
@@ -32,6 +23,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/:fn(search|mark|admin|progress)",
+      "destination": "/api/data?fn=:fn"
+    },
     {
       "source": "/admin",
       "destination": "/admin.html"

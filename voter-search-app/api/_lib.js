@@ -431,7 +431,7 @@ async function whoIs(token, slug) {
 //   mark: set status marks on slips · ward: list a whole ward without a name · wardPdf: print / save a whole ward's
 //   slips · print: the प्रिंट / PDF button on a slip
 const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress', 'list'];   // progress: वार्ड अनुसार प्रगति in the app,
-// list: its मतदाता सूची (voters by mark) — both api/progress.js
+// list: its मतदाता सूची (voters by mark) — both api/_routes/progress.js
 const DEFAULT_PERMS = ['mark', 'print', 'progress'];   // for new users, and users added before permissions existed
 const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
 // an admin's in the app: all of them until the superadmin sets them (admins made before these could be set)
@@ -442,12 +442,12 @@ const appPerms = (u) => (u.role === 'admin' && u.perms === undefined ? PERMS.sli
 //   villages · credits: add searches to those users · approve: approve or reject their search requests (and the ones sent
 //   to this admin)
 const ADMIN_PERMS = ['add', 'own', 'all', 'credits', 'approve'];
-const PROMOTED_PERMS = ['add', 'own', 'credits', 'approve'];   // a user made admin (api/admin.js "promote")
+const PROMOTED_PERMS = ['add', 'own', 'credits', 'approve'];   // a user made admin (api/_routes/admin.js "promote")
 const adminPermsOf = (u) => (u.role !== 'admin' ? [] : u.aperms === undefined ? ADMIN_PERMS.slice()
   : String(u.aperms).split(',').filter((p) => ADMIN_PERMS.includes(p)));
 // today's date in India, for the per-person daily search count
 const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
-// Searches a user may start per day (see api/search.js for what one search is): their own limit if their admin set one
+// Searches a user may start per day (see api/_routes/search.js for what one search is): their own limit if their admin set one
 // (user field "limit"), else DAILY_SEARCHES, plus any extra the admin gave for today (field "extra" = "<day>:<n>").
 // A village admin has the same daily limit (adminLimited; the superadmin may change it) and may buy more searches, or
 // ask the superadmin for them on WhatsApp (adminFor). The superadmin has no limit.
@@ -456,7 +456,7 @@ const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); ret
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
 const adminLimited = (u) => u.role === 'admin';
 // Prepaid searches (api/signup.js): a user who signed up by themselves (field "self") may start "credits" searches in all
-// (free ones from signing up plus paid ones an admin added, api/admin.js "credits_add") instead of a daily limit; they
+// (free ones from signing up plus paid ones an admin added, api/_routes/admin.js "credits_add") instead of a daily limit; they
 // never expire and are counted for good under "paid:<id>". Users made by an admin have a daily limit instead, and may
 // buy searches too (canBuy): theirs are used once the day's limit is used up, and counted the same way.
 const credits = (u) => Number(u && u.credits) || 0;
@@ -469,7 +469,7 @@ const buyVillage = (u, slug) => u.village || (slug && (u.villages || []).include
 const MOVES = 3;
 const movesLeft = (u) => (isPrepaid(u) ? Math.max(0, MOVES - (Number(u.moves) || 0)) : 0);
 // free searches for a login made by signing up, counted per village (none for a number that signed up before; api/signup.js).
-// The superadmin sets the rule on the admin page (key "freerule", api/admin.js "free_rule"), FREE until then:
+// The superadmin sets the rule on the admin page (key "freerule", api/_routes/admin.js "free_rule"), FREE until then:
 //   mode 'direct': the village's first `people` sign-ups get `searches` each, later ones none;
 //   mode 'halving': the first `people` get `searches`, the next `people` half of it, and so on down to 1, then none
 //                   (10 → 5 → 2 → 1).
@@ -516,7 +516,7 @@ async function takeFree(slug, rule, want) {
 // number that signs up through it gets `joiner` extra searches (not a number that signed up before), and the login
 // keeps refBy / refByName. When that person first buys searches (addPaid), the inviter gets `inviter` searches, once
 // (field refPaid on the new login; the inviter counts refBought and refEarned). The superadmin sets it on the admin page
-// (key "refrule", api/admin.js "ref_rule"), REF until then.
+// (key "refrule", api/_routes/admin.js "ref_rule"), REF until then.
 const REF = { on: true, inviter: 20, joiner: 5 };
 const REF_MAX = 1000;
 async function refRule() {
@@ -577,13 +577,13 @@ const adminPhone = async (u) => (await adminFor(u)).phone;
 // search packs a person can ask for: [searches, ₹] (the same list is in index.html and admin.html)
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // A request for a pack (api/signup.js 'request'), key req:<id>, id = 8 digits: the WhatsApp message to the admin carries
-// only <site>/<id>, which opens the admin page; the admin logs in and sees who asked (api/admin.js 'req_get'). Fields:
+// only <site>/<id>, which opens the admin page; the admin logs in and sees who asked (api/_routes/admin.js 'req_get'). Fields:
 // user, village, n, rs, created, status 'open' | 'done' | 'rejected', and once approved or rejected doneAt, doneBy,
 // doneByName (approved: also doneN, doneRs).
 // reqopen:<user>:<n> → that person's open request for that pack, so asking again sends the same link.
 // what a number of searches costs: the pack's price, else ₹1 a search
 const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
-// Coupons (कूपन), made by the superadmin on the admin page (api/admin.js "coupon_set"): hash coupon:<CODE> with kind
+// Coupons (कूपन), made by the superadmin on the admin page (api/_routes/admin.js "coupon_set"): hash coupon:<CODE> with kind
 // 'pct' (value % off the pack's price) | 'rs' (₹value off) | 'bonus' (value extra searches) | 'bonuspct' (value % of the
 // pack's searches extra), maxOff (the most it gives for 'pct': ₹ off, for 'bonuspct': extra searches; 0 = no limit), and
 // its conditions:
@@ -780,7 +780,7 @@ const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the w
 // buttons, reports, lists and "clear" work on the set in use, and on polling day each slip also shows its survey mark.
 // Which set: each person switches for themself in the app (user fields markmode 'survey' | 'poll' and markmodeAt,
 // api/signup.js "mark_mode"; a village admin also on the admin page), and the superadmin for everyone (keys "markmode"
-// and "markmodeat", api/admin.js "mark_mode"): the newer of the two wins, so the superadmin's switch on polling day
+// and "markmodeat", api/_routes/admin.js "mark_mode"): the newer of the two wins, so the superadmin's switch on polling day
 // reaches every phone, and anyone may switch back afterwards. whoIs gives it as .survey, which the routes pass on.
 async function markModeOf(u) {   // u: a login's record, or null (the superadmin, a demo phone) → true for the survey
   const [g, gAt] = await pipeline([['GET', 'markmode'], ['GET', 'markmodeat']]);

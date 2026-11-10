@@ -7,7 +7,7 @@
 //
 // Each .enc file: "RVZ1", 12-byte iv, 16-byte GCM tag, 32-byte HMAC of voters.json (so an unchanged village is not
 // rewritten and git sees no change), then voters.json brotli-compressed and AES-256-GCM encrypted.
-// Vercel bundles api/_data into the search functions, which may be at most 250 MB: a warning is printed near that.
+// Vercel bundles api/_data into the one data function (api/data.js), which may be at most 250 MB: a warning is printed near that.
 //
 // Usage:  node app-build/encrypt.mjs    (creates DATA_KEY.txt the first time)
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, unlinkSync, statSync } from 'node:fs';

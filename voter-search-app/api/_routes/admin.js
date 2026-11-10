@@ -86,9 +86,9 @@
 // The password is shown to the admin once; only its hash is stored.
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
-const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
+const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
 const { candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
-  send, route } = require('./_lib.js');
+  send, route } = require('../_lib.js');
 
 // admin permissions from the request → only known ones
 const adminPermsIn = (list) => ADMIN_PERMS.filter((p) => Array.isArray(list) && list.includes(p));

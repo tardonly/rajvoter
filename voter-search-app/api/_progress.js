@@ -1,5 +1,5 @@
-// Marks per ward (वार्ड अनुसार प्रगति) and the voters behind them (मतदाता सूची), shared by the admin page (api/admin.js)
-// and the app (api/progress.js).
+// Marks per ward (वार्ड अनुसार प्रगति) and the voters behind them (मतदाता सूची), shared by the admin page (api/_routes/admin.js)
+// and the app (api/_routes/progress.js).
 const { load } = require('./_search.js');
 const { village, MARKS, allMarks, markHash, getCand, redis } = require('./_lib.js');
 

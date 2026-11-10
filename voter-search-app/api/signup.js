@@ -4,7 +4,7 @@
 // is set; else ask the admin); a new number chooses its own password and gets its own login at once ('signup') with
 // free searches by the superadmin's rule (freeRule in _lib.js: by how many signed up in that village before), none for a
 // number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
-// an admin adds them on the admin page (api/admin.js "credits_add").
+// an admin adds them on the admin page (api/_routes/admin.js "credits_add").
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
 //   POST {action: 'lookup', village (optional on the start page), phone [, ref]} → {exists, free, rule, otp, refBy}   ref: the
 //     invite link's code (refInviter in _lib.js); refBy: the inviter's name, free then includes the referral bonus;   otp: a forgotten
@@ -20,7 +20,7 @@
 //     prepaid, left, adminPhone, ref}   ref (answer): this login's own invite code and reward (refFor in _lib.js)   password: the one the person chose (setOwnPassword in _lib.js)
 //   POST {action: 'move', token, village, to} → {village, list, movesLeft}   a signed-up login picked the wrong village:
 //     it moves itself to village "to" (its searches and password go along, it stays logged in), up to MOVES times; after
-//     that its admin moves it (api/admin.js "move")
+//     that its admin moves it (api/_routes/admin.js "move")
 //   POST {action: 'request', token, village, n} → {id, phone}   any user login (signed up or made by an admin) asks for a pack of n searches (PACKS in
 //     _lib.js): the request is kept (req:<id>, see getReq) with to = the admin it goes to (adminFor in _lib.js), and its
 //     id goes in the WhatsApp message to phone ('' = the app's own number) as <site>/<id>; the person's open request for
@@ -212,7 +212,7 @@ module.exports = route(async (req, res, b) => {
     await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, b.village), 'n', pk[0], 'created', new Date().toISOString(), 'status', 'open',
       'to', to.id, ...fields);
     await redis('SET', openKey, id);
-    await redis('SADD', 'reqs', id);   // every request, for the admin page's list (api/admin.js "list")
+    await redis('SADD', 'reqs', id);   // every request, for the admin page's list (api/_routes/admin.js "list")
     return send(res, 200, { id, phone: to.phone, rs: fields[1], bonus: fields[5] });
   }
   send(res, 400, { error: 'action' });

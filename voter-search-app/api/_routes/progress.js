@@ -6,8 +6,8 @@
 // मतदाता सूची in the app: the voters carrying that mark ('done' | 'coming' | 'absent') or none yet ('none'), 100 at a
 // time, as in the admin page's मतदाता सूची tab, plus the per-ward counts for its buttons. Needs the "list" permission;
 // a person sees their own group's marks, an admin the village's own. Not in the demo.
-const { village, whoIs, send, route } = require('./_lib.js');
-const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
+const { village, whoIs, send, route } = require('../_lib.js');
+const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
 
 module.exports = route(async (req, res, b) => {
   const v = village(b.village);
