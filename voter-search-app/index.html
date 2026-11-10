@@ -361,10 +361,8 @@
     #printArea .slip .line b { font-size: 15px; }
     #printArea .slip .kendra { font-size: 11px; }
     #printArea .slip .time { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    #printArea .fth { font-size: 16px; font-weight: 700; margin: 0 0 3mm; }
     #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
     #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    #printArea .pbreak { break-before: page; page-break-before: always; }
   }
 </style>
 </head>
@@ -1127,16 +1125,11 @@ async function toggleFamily(r, d, btn) {
   for (const v of others) { const s = slip(v, false, true); slips.set(v.box, s); box.append(s); }
   if (others.length) {   // वंशावली: the house's voters arranged by father and husband, above the slips
     const tb = el('button', 'tbtn', L('🌳 वंशावली खोलें', '🌳 Open family tree')); tb.type = 'button';
-    let tree = null, pb = null;
+    let tree = null;
     tb.addEventListener('click', () => {
-      if (tree) { tree.remove(); if (pb) pb.remove(); tree = pb = null; tb.classList.remove('on'); return; }
+      if (tree) { tree.remove(); tree = null; tb.classList.remove('on'); return; }
       tree = treeView(x.results, (v) => slips.get(v.box));
       fh.after(tree); tb.classList.add('on');
-      if (can('print')) {
-        pb = el('button', 'tbtn', L('वंशावली + पर्चियाँ · प्रिंट / PDF', 'Family tree + slips · Print / PDF')); pb.type = 'button';
-        pb.addEventListener('click', () => printTree(tree, r, x.results));
-        tb.after(pb);
-      }
     });
     fh.append(tb);
   }
@@ -1314,26 +1307,6 @@ function treeView(rows, slipOf) {
     '═ husband and wife. A guess from the names and ages on the list, not a record.')));
   return wrap;
 }
-// the tree, then every slip of the house (struck-off voters left out) on the following page(s)
-function printTree(tree, r, rows) {
-  const area = $('printArea'); area.innerHTML = '';
-  const head = el('div', 'fth', L(`${VILLAGE.name} · वार्ड ${r.ward} · मकान नं. ${r.house} · वंशावली`,
-    `${vn(VILLAGE)} · ward ${r.ward} · house no. ${r.house} · family tree`));
-  const c = tree.cloneNode(true);
-  c.querySelectorAll('.fnote').forEach((n, i, all) => { if (i < all.length - 1) n.remove(); });
-  area.append(head, c);
-  const live = (rows || []).filter((v) => !v.del);
-  if (live.length) {
-    const sh = el('div', 'fth pbreak', L(`परिवार की पर्चियाँ (${live.length})`, `Family slips (${live.length})`));
-    area.append(sh);
-    for (const v of live) area.append(slip(v, true));
-  }
-  const old = document.title;
-  document.title = L(`वंशावली ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family tree ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`);
-  window.addEventListener('afterprint', () => { document.title = old; area.innerHTML = ''; }, { once: true });
-  window.print();
-}
-
 // ---------- status marks (set by admins and people allowed to; everyone sees the bar, who set it and when) ----------
 const when = (iso) => new Date(iso).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 // polling day: the slip's survey mark (अपना वोट …) as a small tag above the buttons, apart from the day's mark
