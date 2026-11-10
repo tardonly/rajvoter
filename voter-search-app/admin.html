@@ -278,6 +278,33 @@
       </div>
     </details>
 
+    <!-- superadmin: coupons for buying searches, with their conditions (api/admin.js "coupon_set" / "coupon_del") -->
+    <details class="card hidden" id="cpnCard">
+      <summary><b>🎟 कूपन</b> · <span id="cpnNow"></span></summary>
+      <div class="stack" style="margin-top:12px">
+        <div id="cpnList" class="stack"></div>
+        <b id="cpnFormTitle">नया कूपन</b>
+        <div class="row">
+          <label class="fr num"><span>कोड (3–15 अक्षर/अंक)</span><input id="cpnCode" maxlength="15" style="text-transform:uppercase" placeholder="DIWALI20"></label>
+          <label class="fr num"><span>किस तरह का</span><select id="cpnKind">
+            <option value="pct">% छूट</option><option value="rs">₹ छूट</option><option value="bonus">ज़्यादा सर्च मुफ़्त</option></select></label>
+          <label class="fr num"><span id="cpnValText">कितना</span><input id="cpnValue" type="number" min="1" inputmode="numeric"></label>
+        </div>
+        <div class="sub" style="margin:0">शर्तें (खाली या 0 = कोई शर्त नहीं):</div>
+        <div class="row">
+          <label class="fr num"><span>कम से कम पैक (सर्च)</span><input id="cpnMin" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+          <label class="fr num"><span>कुल कितनी बार</span><input id="cpnMax" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+          <label class="fr num"><span>आखिरी दिन</span><input id="cpnUntil" type="date"></label>
+        </div>
+        <label class="fr"><input type="checkbox" id="cpnOnce" checked> <span>एक व्यक्ति सिर्फ़ एक बार</span></label>
+        <label class="fr"><input type="checkbox" id="cpnFirst"> <span>सिर्फ़ पहली खरीद पर</span></label>
+        <label class="fr"><input type="checkbox" id="cpnOn" checked> <span>चालू</span></label>
+        <label class="fr num"><span>नोट (अपने लिए)</span><input id="cpnNote" maxlength="100"></label>
+        <div class="row"><button class="btn" id="cpnSave" type="button">कूपन बनाएं</button><button class="btn ghost hidden" id="cpnCancel" type="button">रद्द</button></div>
+        <div class="sub" id="cpnMsg" style="margin:0"></div>
+      </div>
+    </details>
+
     <!-- superadmin: survey marks before the election, polling-day marks on the day (api/admin.js "mark_mode") -->
     <div class="card hidden" id="modeCard">
       <b id="modeTitle"></b> · <span id="modeNow"></span>
@@ -556,7 +583,7 @@ async function openPanel() {
   for (const v of r.villageList || []) villages[v.slug] = v;
   setup(); showMarks(r);
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
-  showFreeRule(r.freeRule); showRefRule(r.refRule);
+  showFreeRule(r.freeRule); showRefRule(r.refRule); showCoupons(r.coupons);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
   approveFromLink();
@@ -636,6 +663,66 @@ $('refSave').addEventListener('click', async () => {
   if (r.error) { $('refMsg').textContent = L('0 से 1000 तक की संख्या डालें', 'Enter numbers from 0 to 1000'); return; }
   showRefRule(r.refRule);
   $('refMsg').textContent = L('✓ सेव हो गया', '✓ Saved');
+});
+// coupons (getCoupon in api/_lib.js): the list, each with ✎ (into the form) and 🗑; the form makes or changes one
+let COUPONS = [], cpnEdit = null;
+const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट` : c.kind === 'rs' ? `₹${c.value} छूट` : `${c.value} सर्च मुफ़्त`);
+const cpnRules = (c) => [c.minN ? `${c.minN}+ सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
+  c.until ? `${c.until} तक` : '', `${c.used}${c.maxUses ? `/${c.maxUses}` : ''} बार इस्तेमाल`].filter(Boolean).join(' · ');
+function showCoupons(list) {
+  $('cpnCard').classList.toggle('hidden', !list);
+  if (!list) return;
+  COUPONS = list;
+  const live = list.filter((c) => c.on).length;
+  $('cpnNow').textContent = list.length ? `${live} चालू · ${list.length} कुल` : 'अभी कोई नहीं';
+  $('cpnList').replaceChildren(...list.map((c) => {
+    const row = el('div', 'sub');
+    row.style.cssText = 'margin:0;padding:8px;border:1px solid #e5e7eb;border-radius:8px;display:flex;gap:8px;align-items:center';
+    const txt = el('div'); txt.style.flex = '1';
+    txt.append(el('b', null, `${c.code} — ${cpnWhat(c)}`), c.on ? '' : el('span', null, ' (बंद)'), el('br'), cpnRules(c), c.note ? el('div', null, c.note) : '');
+    const ed = el('button', 'btn ghost', '✎'), del = el('button', 'btn ghost', '🗑');
+    for (const x of [ed, del]) { x.type = 'button'; x.style.cssText = 'width:auto;padding:6px 10px;margin:0'; }
+    ed.addEventListener('click', () => cpnForm(c));
+    del.addEventListener('click', async () => {
+      if (!confirm(`कूपन ${c.code} हटाएं? (जो अनुरोध इससे बन चुके हैं, उनकी कीमत वही रहेगी)`)) return;
+      const r = await api({ action: 'coupon_del', code: c.code });
+      if (r.error) { $('cpnMsg').textContent = errText(r); return; }
+      showCoupons(COUPONS.filter((x) => x.code !== c.code));
+      if (cpnEdit === c.code) cpnForm(null);
+    });
+    row.append(txt, ed, del);
+    return row;
+  }));
+}
+function cpnForm(c) {
+  cpnEdit = c ? c.code : null;
+  $('cpnFormTitle').textContent = c ? `कूपन ${c.code} बदलें` : 'नया कूपन';
+  $('cpnCode').value = c ? c.code : ''; $('cpnCode').disabled = !!c;
+  $('cpnKind').value = c ? c.kind : 'pct'; $('cpnValue').value = c ? c.value : '';
+  $('cpnMin').value = c && c.minN ? c.minN : ''; $('cpnMax').value = c && c.maxUses ? c.maxUses : ''; $('cpnUntil').value = c ? c.until : '';
+  $('cpnOnce').checked = c ? c.once : true; $('cpnFirst').checked = c ? c.first : false; $('cpnOn').checked = c ? c.on : true;
+  $('cpnNote').value = c ? c.note || '' : '';
+  $('cpnSave').textContent = c ? 'सेव करें' : 'कूपन बनाएं';
+  $('cpnCancel').classList.toggle('hidden', !c);
+  $('cpnMsg').textContent = '';
+  cpnKindText();
+}
+const cpnKindText = () => { $('cpnValText').textContent = { pct: 'कितने % (1–99)', rs: 'कितने ₹', bonus: 'कितनी सर्च' }[$('cpnKind').value]; };
+$('cpnKind').addEventListener('change', cpnKindText);
+$('cpnCancel').addEventListener('click', () => cpnForm(null));
+$('cpnSave').addEventListener('click', async () => {
+  $('cpnSave').disabled = true; $('cpnMsg').textContent = '';
+  const r = await api({ action: 'coupon_set', isNew: !cpnEdit, code: $('cpnCode').value, kind: $('cpnKind').value, value: $('cpnValue').value,
+    minN: $('cpnMin').value, maxUses: $('cpnMax').value, until: $('cpnUntil').value, once: $('cpnOnce').checked, first: $('cpnFirst').checked,
+    on: $('cpnOn').checked, note: $('cpnNote').value });
+  $('cpnSave').disabled = false;
+  if (r.error) {
+    $('cpnMsg').textContent = { cpn_code: 'कोड में 3 से 15 अंग्रेज़ी अक्षर या अंक हों', cpn_rule: 'कीमत/संख्या सही डालें (% 1 से 99 तक)', cpn_exists: 'यह कोड पहले से है' }[r.error] || errText(r);
+    return;
+  }
+  showCoupons([...COUPONS.filter((x) => x.code !== r.coupon.code), r.coupon].sort((a, b) => (a.code < b.code ? -1 : 1)));
+  cpnForm(null);
+  $('cpnMsg').textContent = `✓ कूपन ${r.coupon.code} सेव हो गया`;
 });
 // search packs [searches, ₹], as in index.html
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
@@ -720,10 +807,12 @@ function reqList() {
     const t = el('div', 't'); t.append(el('span', null, r.name),
       el('span', 'st', r.status === 'open' ? L('⏳ बाकी', '⏳ Waiting') : r.status === 'rejected' ? L('✕ अस्वीकार', '✕ Rejected')
         : L(`✓ ${r.doneN} जोड़ी गईं`, `✓ ${r.doneN} added`)));
-    b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n} सर्च · ₹${r.rs}`, `Asked: ${r.n} searches · ₹${r.rs}`)
+    b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n}${r.bonus ? ` + ${r.bonus}` : ''} सर्च · ₹${r.rs}`, `Asked: ${r.n}${r.bonus ? ` + ${r.bonus}` : ''} searches · ₹${r.rs}`)
+        + (r.coupon ? ` · 🎟 ${r.coupon}` : '')
         + (r.online ? L(' · 💳 UPI ऑनलाइन, भुगतान का इंतज़ार', ' · 💳 online UPI, waiting for the payment') : '')
       : r.status === 'rejected' ? L(`माँगी: ${r.n} सर्च · अस्वीकार — ${r.doneByName}`, `Asked: ${r.n} searches · rejected — ${r.doneByName}`)
-      : L(`₹${r.doneRs} वसूले — ${r.doneByName}${r.hand ? ' (हाथ से जोड़ी)' : ''}`, `₹${r.doneRs} collected — ${r.doneByName}${r.hand ? ' (added by hand)' : ''}`)),
+      : L(`₹${r.doneRs} वसूले — ${r.doneByName}${r.hand ? ' (हाथ से जोड़ी)' : ''}`, `₹${r.doneRs} collected — ${r.doneByName}${r.hand ? ' (added by hand)' : ''}`)
+        + (r.doneCoupon ? ` · 🎟 ${r.doneCoupon}` : '')),
       el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`
         + (r.toName ? L(` · भेजा: ${r.toName}`, ` · sent to: ${r.toName}`) : '')));
     b.addEventListener('click', () => {
@@ -850,9 +939,10 @@ function approveView(u, req, fromList) {
     back.addEventListener('click', reqList);
     head.unshift(back);
   }
-  const ask = el('div', 'ask'), askPrice = packPrice(req.n);
+  const ask = el('div', 'ask'), askPrice = req.coupon ? req.rs : packPrice(req.n);
   ask.append(L('माँगी: ', 'Asked for: '), el('b', null, L(`${req.n} सर्च`, `${req.n} searches`)),
-    askPrice != null ? ` · ₹${askPrice}` : L(' · (यह पैक सूची में नहीं)', ' · (not one of the packs)'));
+    askPrice != null ? ` · ₹${askPrice}` : L(' · (यह पैक सूची में नहीं)', ' · (not one of the packs)'),
+    req.coupon ? L(` · 🎟 कूपन ${req.coupon}${req.bonus ? ` (+${req.bonus} सर्च मुफ़्त)` : ''}`, ` · 🎟 coupon ${req.coupon}${req.bonus ? ` (+${req.bonus} free searches)` : ''}`) : '');
   if (req.status === 'done') {
     body.replaceChildren(...head, ask, el('div', 'done', L(`✓ यह अनुरोध मंज़ूर हो चुका है: ${req.doneN} सर्च जोड़ी गईं`, `✓ This request is already approved: ${req.doneN} searches added`)),
       el('div', 'sub', L(`₹${req.doneRs} वसूले — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`, `₹${req.doneRs} collected — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`)));
@@ -889,9 +979,9 @@ function approveView(u, req, fromList) {
   const show = () => {
     packs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === n));
     if (Number(inp.value) !== n) inp.value = n || '';
-    const rs = packPrice(n);
-    price.textContent = n > 0 ? L(`जोड़ी जाएंगी: ${n} सर्च${rs != null ? ` · भुगतान ₹${rs} होना चाहिए` : ''}`,
-      `Will add: ${n} searches${rs != null ? ` · payment should be ₹${rs}` : ''}`) : '';
+    const cp = req.coupon && n === req.n, rs = cp ? req.rs : packPrice(n), add = n + (cp ? req.bonus : 0);   // a coupon counts only for the pack asked for
+    price.textContent = n > 0 ? L(`जोड़ी जाएंगी: ${add} सर्च${rs != null ? ` · भुगतान ₹${rs} होना चाहिए` : ''}${req.coupon && !cp ? ' · (दूसरी संख्या पर कूपन नहीं लगेगा)' : ''}`,
+      `Will add: ${add} searches${rs != null ? ` · payment should be ₹${rs}` : ''}${req.coupon && !cp ? ' · (the coupon does not apply to another number)' : ''}`) : '';
     go.textContent = n > 0 ? L(`✓ भुगतान मिल गया — ${n} सर्च जोड़ें`, `✓ Payment received — add ${n} searches`) : L('संख्या डालें', 'Enter a number');
     go.disabled = !(n > 0 && n <= 10000);
   };

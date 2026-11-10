@@ -263,6 +263,27 @@ from JaduPe with our token, never taken from the webhook's own data, so a made-u
 "💳 UPI ऑनलाइन". JaduPe needs a mobile number: a login without one is sent as `JADUPE_MOBILE` (default 9999999999);
 the email sent is `JADUPE_EMAIL` (default noreply@raj-voter.vercel.app).
 
+## Coupons (कूपन)
+
+The superadmin makes coupons in the **🎟 कूपन** box on the admin page. A coupon gives one of three things:
+
+- a **% discount** (1–99%);
+- a **₹ discount**;
+- **extra searches free** on top of the pack.
+
+It can carry these conditions (blank or 0 = no condition):
+
+- a **minimum pack**, in searches;
+- a **total number of uses**;
+- a **last day**;
+- **once per person** (ticked by default);
+- **first purchase only**;
+- **on / off**.
+
+A buyer types the code in the buy window and taps **लागू करें**. The packs then show the new prices, and the WhatsApp request or UPI payment goes out at that price. The admin's request screen shows the coupon and the price to collect.
+
+A coupon is counted as used only when the purchase is approved or paid. If the admin approves a different number of searches than were asked for, the coupon is dropped. A price never goes below ₹1. Deleting a coupon does not change requests already made with it.
+
 ## Referrals (दोस्तों को बुलाएं)
 Every user login has a **🎁 दोस्तों को बुलाएं** button in the app (next to the search count). It sends their link
 `<site>/<village>?ref=<their id>` on WhatsApp. A new number that signs up through it gets **joiner** extra searches on

@@ -483,6 +483,48 @@ const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // reqopen:<user>:<n> → that person's open request for that pack, so asking again sends the same link.
 // what a number of searches costs: the pack's price, else ₹1 a search
 const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
+// Coupons (कूपन), made by the superadmin on the admin page (api/admin.js "coupon_set"): hash coupon:<CODE> with kind
+// 'pct' (value % off the pack's price) | 'rs' (₹value off) | 'bonus' (value extra searches), and its conditions:
+// minN (only packs of at least minN searches), until (last day, YYYY-MM-DD, '' = none), maxUses (total, 0 = no limit),
+// once '1' (once per person), first '1' (only a person's first purchase), on '1' / '0'; used = times used so far; note.
+// Set "coupons" lists the codes; cpnusers:<CODE> = who has used it. A request made with a coupon (api/signup.js
+// 'request', api/pay.js 'start') keeps coupon, bonus and the lower rs; the coupon is counted as used when it is paid
+// (addPaid). A price never goes below ₹1.
+const COUPON_RE = /^[A-Z0-9]{3,15}$/;
+const couponCode = (c) => String(c || '').trim().toUpperCase();
+async function getCoupon(code) {
+  code = couponCode(code);
+  if (!COUPON_RE.test(code)) return null;
+  const arr = await redis('HGETALL', `coupon:${code}`);
+  if (!arr || !arr.length) return null;
+  const c = { code };
+  for (let i = 0; i < arr.length; i += 2) c[arr[i]] = arr[i + 1];
+  for (const k of ['value', 'minN', 'maxUses', 'used']) c[k] = Number(c[k]) || 0;
+  for (const k of ['once', 'first', 'on']) c[k] = c[k] === '1';
+  c.until = c.until || '';
+  return c;
+}
+// what pack n costs with coupon c: {rs, bonus}
+function couponPrice(c, n) {
+  const base = packPrice(n);
+  if (c.kind === 'pct') return { rs: Math.max(1, Math.round(base * (100 - c.value) / 100)), bonus: 0 };
+  if (c.kind === 'rs') return { rs: Math.max(1, base - c.value), bonus: 0 };
+  return { rs: base, bonus: c.value };
+}
+// can person u use coupon `code` (for pack n, if given)? → {c} or {error}
+async function couponFor(code, u, n) {
+  const c = await getCoupon(code);
+  if (!c) return { error: 'cpn_none' };
+  if (!c.on) return { error: 'cpn_off' };
+  if (c.until && today() > c.until) return { error: 'cpn_expired' };
+  if (c.maxUses && c.used >= c.maxUses) return { error: 'cpn_used_up' };
+  if (c.first && u.bought === '1') return { error: 'cpn_first' };
+  if (c.once && await redis('SISMEMBER', `cpnusers:${c.code}`, u.id)) return { error: 'cpn_used' };
+  if (n != null && c.minN && Number(n) < c.minN) return { error: 'cpn_min', minN: c.minN };
+  return { c };
+}
+// the coupon as the buy window sees it
+const couponView = (c) => ({ code: c.code, kind: c.kind, value: c.value, minN: c.minN });
 async function newReqId() {   // 8 digits no request has yet
   let id;
   do id = String(crypto.randomInt(10000000, 100000000)); while (await getReq(id));
@@ -505,10 +547,17 @@ const paidKey = (id) => `paid:${id}`;
 async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
 // n bought searches for person u, collected by `by` ({id, name}: an admin, or GATEWAY): the searches, and the payment
 // recorded in request r (none: a hand-added one, which gets its own request, already approved) and in the pay:* totals
+// A request made with a coupon and approved for the pack it asked for: its own (lower) price and bonus searches, and the
+// coupon is counted as used; approved for another number of searches, the coupon is dropped.
 async function addPaid(u, n, r, by) {
-  const rs = packPrice(n), now = new Date().toISOString();
+  const cpn = r && r.coupon && Number(n) === Number(r.n) ? r.coupon : '';
+  const rs = cpn ? Number(r.rs) : packPrice(n), bonus = cpn ? Number(r.bonus) || 0 : 0, now = new Date().toISOString();
   await refReward(u.id);
-  await redis('HINCRBY', `user:${u.id}`, 'credits', n);
+  if (cpn) {
+    await redis('HINCRBY', `coupon:${cpn}`, 'used', 1);
+    await redis('SADD', `cpnusers:${cpn}`, u.id);
+  }
+  await redis('HINCRBY', `user:${u.id}`, 'credits', n + bonus);
   await redis('HSET', `user:${u.id}`, 'bought', '1');
   await redis('SREM', 'free', u.id);
   const id = r ? r.id : await newReqId();
@@ -516,7 +565,7 @@ async function addPaid(u, n, r, by) {
     await redis('HSET', `req:${id}`, 'user', u.id, 'village', u.village, 'n', n, 'rs', rs, 'created', now, 'hand', '1');
     await redis('SADD', 'reqs', id);
   }
-  await redis('HSET', `req:${id}`, 'status', 'done', 'doneAt', now, 'doneN', n, 'doneRs', rs, 'doneBy', by.id, 'doneByName', by.name);
+  await redis('HSET', `req:${id}`, 'status', 'done', 'doneAt', now, 'doneN', n + bonus, 'doneRs', rs, 'doneCoupon', cpn, 'doneBy', by.id, 'doneByName', by.name);
   await redis('HINCRBY', 'pay:rs', by.id, rs);
   await redis('HINCRBY', 'pay:n', by.id, n);
   await redis('HINCRBY', 'pay:count', by.id, 1);
@@ -620,6 +669,6 @@ async function getCand(id) {
 }
 
 module.exports = { REF, REF_MAX, refRule, refFor, refInviter, MARKS, MODE, readMarkMode, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
+  FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

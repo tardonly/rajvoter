@@ -1,13 +1,13 @@
 // Buying a search pack online with UPI through JaduPe (jadupe.com; set JADUPE_TOKEN, see _lib.js). The money goes to the
 // superadmin's JaduPe account and the searches are added by themselves once JaduPe says it is paid.
-//   POST {action: 'start', token, village, n} → {id, link}   makes a request (req:<id>, gw 'jadupe', to the superadmin)
+//   POST {action: 'start', token, village, n, coupon?} → {id, link}   makes a request (req:<id>, gw 'jadupe', to the superadmin)
 //     for pack n, and a JaduPe transaction for its price; the phone opens link (JaduPe's payment page), which comes back
 //     to /<village>?pay=<id> when done. 20 new requests a day per login (shared with the WhatsApp requests).
 //   POST {action: 'check', token, village, id} → {status: 'open' | 'done' | 'rejected', n, left, bought}   the phone asks
 //     after coming back; the server asks JaduPe (settleOnline in _lib.js).
 //   POST <JaduPe's webhook: {txn_id, status, …}> → {ok}   set https://<site>/api/pay as the webhook URL on JaduPe. Only
 //     the txn_id is used: the payment is checked with JaduPe itself, so a made-up webhook can't add searches.
-const { PACKS, GATEWAY, payOnline, jadupe, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+const { couponFor, couponPrice, PACKS, GATEWAY, payOnline, jadupe, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 const site = (req) => {
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'raj-voter.vercel.app');
@@ -36,6 +36,13 @@ module.exports = route(async (req, res, b) => {
   if (!canBuy(me)) return send(res, 400, { error: 'not_prepaid' });
   const pk = PACKS.find(([n]) => n === Number(b.n));
   if (!pk) return send(res, 400, { error: 'bad_credits' });
+  let cpn = null;   // a coupon: its lower price and bonus searches (couponFor in _lib.js)
+  if (b.coupon) {
+    const r = await couponFor(b.coupon, me, pk[0]);
+    if (r.error) return send(res, 400, r);
+    cpn = { coupon: r.c.code, ...couponPrice(r.c, pk[0]) };
+  }
+  const rs = cpn ? cpn.rs : pk[1];
   const k = `reqs:${me.id}:${today()}`;
   if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
   await redis('EXPIRE', k, 86400);
@@ -44,7 +51,7 @@ module.exports = route(async (req, res, b) => {
   const j = await jadupe('transactions/create', {
     type: 'any', user_name: me.name || 'User', user_email: process.env.JADUPE_EMAIL || 'noreply@raj-voter.vercel.app',
     user_mobile: /^\d{10}$/.test(mobile) ? mobile : process.env.JADUPE_MOBILE || '9999999999',
-    amount: pk[1], redirect_url: `${site(req)}/${me.village}?pay=${id}`,
+    amount: rs, redirect_url: `${site(req)}/${me.village}?pay=${id}`,
   });
   const txn = j && j.success && j.data ? String(j.data.txnId || '').replace(/\D/g, '') : '';
   const link = j && j.success && j.data ? String(j.data.paymentLink || '') : '';
@@ -52,7 +59,7 @@ module.exports = route(async (req, res, b) => {
     console.error('jadupe create', j);
     return send(res, 502, { error: 'gateway', detail: (j && j.message) || '' });
   }
-  await redis('HSET', `req:${id}`, 'user', me.id, 'village', me.village, 'n', pk[0], 'rs', pk[1], 'created', new Date().toISOString(),
+  await redis('HSET', `req:${id}`, 'user', me.id, 'village', me.village, 'n', pk[0], 'rs', rs, ...(cpn ? ['coupon', cpn.coupon, 'bonus', cpn.bonus] : []), 'created', new Date().toISOString(),
     'status', 'open', 'to', GATEWAY.id, 'gw', 'jadupe', 'txn', txn, 'link', link);
   await redis('SET', `jtxn:${txn}`, id);
   await redis('SADD', 'reqs', id);   // in the admin page's list too (the superadmin's, while open)

@@ -49,6 +49,9 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
+//   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus'), value, minN, maxUses, until, once, first, on, note, isNew
+//                                         → {coupon}   superadmin: a coupon (getCoupon in _lib.js); "list" gives coupons
+//   action "coupon_del", code → {ok}      superadmin
 //   action "ref_rule", on, inviter, joiner → {refRule}   superadmin: referral searches (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   superadmin: which set of marks the whole app uses (MODE in
@@ -70,7 +73,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { REF_MAX, refRule, MODE, freeRule, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, MODE, freeRule, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('./_lib.js');
 
 // admin permissions from the request → only known ones
@@ -100,9 +103,10 @@ const view = (u) => ({
 });
 
 // a pack request as the admin page sees it
-const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw }) =>
+const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw, coupon, bonus, doneCoupon }) =>
   ({ id, user, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
-    doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1', online: !!gw });   // online: paid by UPI on JaduPe
+    doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1', online: !!gw,
+    coupon: coupon || '', bonus: Number(bonus) || 0, doneCoupon: doneCoupon || '' });   // online: paid by UPI on JaduPe
 const REQ_DONE_DAYS = 30;   // approved requests stay in the list this long
 
 module.exports = route(async (req, res, b) => {
@@ -132,6 +136,30 @@ module.exports = route(async (req, res, b) => {
     if (inviter < 0 || joiner < 0) return send(res, 400, { error: 'ref_rule' });
     await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'inviter', inviter, 'joiner', joiner, 'at', now, 'by', me.id);
     return send(res, 200, { refRule: await refRule() });
+  }
+  if (b.action === 'coupon_set') {   // superadmin: make or change a coupon (getCoupon in _lib.js)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const code = couponCode(b.code), num = (v, max) => { const x = Math.floor(Number(v) || 0); return x >= 0 && x <= max ? x : -1; };
+    const kind = ['pct', 'rs', 'bonus'].includes(b.kind) ? b.kind : '';
+    const value = num(b.value, kind === 'pct' ? 99 : 10000), minN = num(b.minN, 10000), maxUses = num(b.maxUses, 1000000);
+    const until = String(b.until || '');
+    if (!COUPON_RE.test(code)) return send(res, 400, { error: 'cpn_code' });
+    if (!kind || value < 1 || minN < 0 || maxUses < 0 || (until && !/^\d{4}-\d{2}-\d{2}$/.test(until))) return send(res, 400, { error: 'cpn_rule' });
+    const old = await getCoupon(code);
+    if (b.isNew && old) return send(res, 409, { error: 'cpn_exists' });
+    await redis('HSET', `coupon:${code}`, 'kind', kind, 'value', value, 'minN', minN, 'maxUses', maxUses, 'until', until,
+      'once', b.once ? '1' : '0', 'first', b.first ? '1' : '0', 'on', b.on ? '1' : '0', 'note', String(b.note || '').slice(0, 100),
+      ...(old ? [] : ['used', 0, 'created', now]), 'at', now);
+    await redis('SADD', 'coupons', code);
+    return send(res, 200, { coupon: await getCoupon(code) });
+  }
+  if (b.action === 'coupon_del') {   // superadmin: delete a coupon; requests already made with it keep their price
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const code = couponCode(b.code);
+    if (!COUPON_RE.test(code)) return send(res, 400, { error: 'cpn_code' });
+    await redis('DEL', `coupon:${code}`, `cpnusers:${code}`);
+    await redis('SREM', 'coupons', code);
+    return send(res, 200, { ok: true });
   }
   if (b.action === 'mark_mode') {   // superadmin: survey marks or polling-day marks, for the whole app (MODE in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
@@ -206,7 +234,7 @@ module.exports = route(async (req, res, b) => {
     }
     const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
     const freeRuleNow = isSuper ? await freeRule() : undefined;
-    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
+    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, coupons: isSuper ? (await Promise.all(((await redis('SMEMBERS', 'coupons')) || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1)) : undefined, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }

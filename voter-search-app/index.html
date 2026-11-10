@@ -76,6 +76,12 @@
   .pack span { font-size: 18px; font-weight: 800; }
   .pack span s { font-size: 13px; font-weight: 500; color: var(--muted); }
   .pack small { font-size: 11.5px; color: #15803d; font-weight: 600; }
+  .cpnrow { display: flex; gap: 6px; margin: 8px 0 2px; }
+  .cpnrow input { flex: 1; min-width: 0; text-transform: uppercase; font-size: 15px; padding: 8px 10px; border: 1.5px dashed #a855f7; border-radius: 8px; }
+  .cpnbtn { border: 0; border-radius: 8px; padding: 8px 14px; background: #7c3aed; color: #fff; font-weight: 600; font-size: 14px; }
+  .cpnbtn:disabled { opacity: .6; }
+  .cpnmsg.good { color: #15803d; font-weight: 600; }
+  .cpnmsg.bad { color: #b91c1c; }
   .pack.on { border-color: #16a34a; background: #f0fdf4; box-shadow: 0 0 0 2px #16a34a inset; }
   a.buyback { text-decoration: none; text-align: center; }
   .savepw { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }   /* for the phone's password manager */
@@ -1711,6 +1717,16 @@ const SIGN_ERR = {
   no_otp: L('OTP से पासवर्ड अभी नहीं बदल सकते — अपने एडमिन से पूछें', 'The password cannot be reset by OTP yet — ask your admin'),
   too_many: L('बहुत बार कोशिश — थोड़ी देर बाद फिर करें', 'Too many tries — try again later'),
 };
+// why a coupon can't be used (couponFor in api/_lib.js)
+const CPN_MSG = {
+  cpn_none: () => L('⚠ यह कूपन कोड सही नहीं है', '⚠ This coupon code is not valid'),
+  cpn_off: () => L('⚠ यह कूपन अभी बंद है', '⚠ This coupon is switched off'),
+  cpn_expired: () => L('⚠ इस कूपन की तारीख निकल चुकी है', '⚠ This coupon has expired'),
+  cpn_used_up: () => L('⚠ यह कूपन पूरा इस्तेमाल हो चुका है', '⚠ This coupon has been used up'),
+  cpn_used: () => L('⚠ आप यह कूपन पहले इस्तेमाल कर चुके हैं', '⚠ You have already used this coupon'),
+  cpn_first: () => L('⚠ यह कूपन सिर्फ़ पहली खरीद पर है', '⚠ This coupon is only for a first purchase'),
+  cpn_min: (r) => L(`⚠ यह कूपन ${r.minN} या ज़्यादा सर्च के पैक पर है`, `⚠ This coupon is for packs of ${r.minN} or more searches`),
+};
 // a signed-up login: how many searches are left (amber at 3 or fewer, red at none) and the button for more
 function buyMoreButton() {
   const show = PREPAID && !DEMO && searchesLeft != null, b = $('leftBadge');
@@ -1729,18 +1745,18 @@ const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // 'request'; asking for the same pack again sends the same one) and the link opens the admin page at it, so it shows
 // nothing about the person itself. A tab is opened at once (a tap may open one; after waiting for the server it may
 // not), then sent to WhatsApp; the window then closes.
-function buyWhatsApp(cls, [n, rs]) {
-  const label = L(`💬 ${n} सर्च (₹${rs}) WhatsApp पर मंगाएं`, `💬 Ask for ${n} searches (₹${rs}) on WhatsApp`);
+function buyWhatsApp(cls, [n, rs], coupon = '', bonus = 0) {
+  const label = L(`💬 ${n}${bonus ? ` + ${bonus}` : ''} सर्च (₹${rs}) WhatsApp पर मंगाएं`, `💬 Ask for ${n}${bonus ? ` + ${bonus}` : ''} searches (₹${rs}) on WhatsApp`);
   const a = el('button', cls, label); a.type = 'button';
   a.addEventListener('click', async () => {
     if (a.disabled) return;
     const tab = window.open('', '_blank');
     a.disabled = true; a.textContent = L('⏳ …', '⏳ …');
-    const r = await api('signup', { action: 'request', token: token(), n });
+    const r = await api('signup', { action: 'request', token: token(), n, coupon });
     a.disabled = false; a.textContent = label;
     if (!r.id) {
       if (tab) tab.close();
-      a.textContent = r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
+      a.textContent = CPN_MSG[r.error] ? CPN_MSG[r.error](r) : r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
         : L('⚠ अनुरोध नहीं बना — दोबारा दबाएं', '⚠ Could not make the request — tap again');
       return;
     }
@@ -1748,8 +1764,8 @@ function buyWhatsApp(cls, [n, rs]) {
     const link = `${location.origin}/${r.id}`;
     if (r.phone != null) ADMIN_PHONE = r.phone;   // whom the server sent the request to ('' = the superadmin: our number)
     const url = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
-      `नमस्ते, मुझे Voter Search में ${n} सर्च चाहिए (₹${rs})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
-      `Hello, I would like ${n} searches in Voter Search (₹${rs}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\n${link}`));
+      `नमस्ते, मुझे Voter Search में ${n} सर्च चाहिए (₹${rs}${coupon ? `, कूपन ${coupon}` : ''})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
+      `Hello, I would like ${n} searches in Voter Search (₹${rs}${coupon ? `, coupon ${coupon}` : ''}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\n${link}`));
     buyClose();
     if (tab) { tab.opener = null; tab.location.href = url; } else location.href = url;
   });
@@ -1757,19 +1773,20 @@ function buyWhatsApp(cls, [n, rs]) {
 }
 // pay for a pack right here by UPI: the server makes the JaduPe transaction (api/pay.js 'start') and this page goes to
 // JaduPe's payment page, which comes back to /<village>?pay=<request id> (payReturn)
-function buyUpi([n, rs]) {
+function buyUpi([n, rs], coupon = '', bonus = 0) {
   const label = L(`💳 ₹${rs} UPI से अभी भुगतान करें`, `💳 Pay ₹${rs} now by UPI`);
   const a = el('button', 'btn upibtn', label); a.type = 'button';
   a.addEventListener('click', async () => {
     if (a.disabled) return;
     a.disabled = true; a.textContent = L('⏳ भुगतान पेज खुल रहा है…', '⏳ Opening the payment page…');
-    const r = await api('pay', { action: 'start', token: token(), n });
+    const r = await api('pay', { action: 'start', token: token(), n, coupon });
     if (r.link) { location.href = r.link; return; }
     a.disabled = false;
+    if (CPN_MSG[r.error]) { a.textContent = CPN_MSG[r.error](r); return; }
     if (r.error === 'too_many') { a.textContent = L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow'); return; }
     // UPI not working right now (e.g. JaduPe refused): ask the admin on WhatsApp instead
     a.replaceWith(el('div', 'k', L('⚠ अभी UPI से भुगतान नहीं हो पा रहा — एडमिन को भुगतान करके WhatsApp पर भेजें:',
-      '⚠ UPI payment is not working right now — pay the admin and send this on WhatsApp:')), buyWhatsApp('btn wabtn', [n, rs]));
+      '⚠ UPI payment is not working right now — pay the admin and send this on WhatsApp:')), buyWhatsApp('btn wabtn', [n, rs], coupon, bonus));
   });
   return a;
 }
@@ -1779,22 +1796,64 @@ function buyOpen() {
   $('buyTitle').textContent = L('🛒 और सर्च', '🛒 More searches');
   const box = el('div', 'paybox'), packs = el('div', 'packs');
   // with UPI here, only that; else (no JaduPe token on the server) WhatsApp to the admin
-  const payBtn = (pk) => (ONLINE ? buyUpi(pk) : buyWhatsApp('btn wabtn', pk));
+  // a coupon (कूपन) applied below: each pack's price and bonus with it (couponPrice in api/_lib.js)
+  let cpn = null;
+  const withCpn = ([n, rs]) => {
+    if (!cpn || (cpn.minN && n < cpn.minN)) return { rs, bonus: 0, on: false };
+    if (cpn.kind === 'pct') return { rs: Math.max(1, Math.round(rs * (100 - cpn.value) / 100)), bonus: 0, on: true };
+    if (cpn.kind === 'rs') return { rs: Math.max(1, rs - cpn.value), bonus: 0, on: true };
+    return { rs, bonus: cpn.value, on: true };
+  };
+  const payBtn = (pk) => {
+    const p = withCpn(pk), code = p.on ? cpn.code : '';
+    return ONLINE ? buyUpi([pk[0], p.rs], code, p.bonus) : buyWhatsApp('btn wabtn', [pk[0], p.rs], code, p.bonus);
+  };
   let pick = PACKS[0], pay = payBtn(pick);
-  for (const pk of PACKS) {
-    const b = el('button', `pack${pk === pick ? ' on' : ''}`); b.type = 'button';
-    const price = el('span');   // ₹1 a search, struck through, then the pack's price; the saving below
-    if (pk[1] < pk[0]) price.append(el('s', null, `₹${pk[0]}`), ' ');
-    price.append(`₹${pk[1]}`);
-    b.append(el('b', null, L(`${pk[0]} सर्च`, `${pk[0]} searches`)), price);
-    if (pk[1] < pk[0]) b.append(el('small', null, L(`₹${pk[0] - pk[1]} बचत`, `save ₹${pk[0] - pk[1]}`)));
-    b.addEventListener('click', () => {
-      pick = pk;
-      packs.querySelectorAll('.pack').forEach((x) => x.classList.toggle('on', x === b));
-      const w = payBtn(pick); pay.replaceWith(w); pay = w;
-    });
-    packs.append(b);
-  }
+  const drawPacks = () => {
+    packs.replaceChildren();
+    for (const pk of PACKS) {
+      const b = el('button', `pack${pk === pick ? ' on' : ''}`); b.type = 'button';
+      const p = withCpn(pk), full = pk[0];   // ₹1 a search, struck through, then the price; the saving below
+      const price = el('span');
+      if (p.rs < full) price.append(el('s', null, `₹${full}`), ' ');
+      price.append(`₹${p.rs}`);
+      b.append(el('b', null, L(`${pk[0]}${p.bonus ? ` + ${p.bonus}` : ''} सर्च`, `${pk[0]}${p.bonus ? ` + ${p.bonus}` : ''} searches`)), price);
+      if (p.rs < full) b.append(el('small', null, L(`₹${full - p.rs} बचत`, `save ₹${full - p.rs}`)));
+      if (p.bonus) b.append(el('small', null, L(`🎟 ${p.bonus} सर्च मुफ़्त`, `🎟 ${p.bonus} searches free`)));
+      b.addEventListener('click', () => {
+        pick = pk;
+        packs.querySelectorAll('.pack').forEach((x) => x.classList.toggle('on', x === b));
+        const w = payBtn(pick); pay.replaceWith(w); pay = w;
+      });
+      packs.append(b);
+    }
+    const w = payBtn(pick); pay.replaceWith(w); pay = w;
+  };
+  drawPacks();
+  // कूपन: checked on the server (api/signup.js 'coupon'), then the prices above change
+  const cpnRow = el('div', 'cpnrow'), cpnIn = el('input'), cpnBtn = el('button', 'cpnbtn', L('लागू करें', 'Apply')), cpnMsg = el('div', 'k cpnmsg');
+  cpnIn.placeholder = L('🎟 कूपन कोड (हो तो)', '🎟 Coupon code (if any)'); cpnIn.autocapitalize = 'characters'; cpnIn.maxLength = 15;
+  cpnBtn.type = 'button';
+  cpnBtn.addEventListener('click', async () => {
+    if (cpn) {   // remove it
+      cpn = null; cpnIn.value = ''; cpnIn.disabled = false; cpnBtn.textContent = L('लागू करें', 'Apply'); cpnMsg.textContent = ''; drawPacks(); return;
+    }
+    const code = cpnIn.value.trim().toUpperCase();
+    if (!code) { cpnIn.focus(); return; }
+    cpnBtn.disabled = true; cpnMsg.textContent = '';
+    const r = await api('signup', { action: 'coupon', token: token(), code });
+    cpnBtn.disabled = false;
+    if (!r.coupon) { cpnMsg.textContent = CPN_MSG[r.error] ? CPN_MSG[r.error](r) : r.error === 'too_many' ? MSG.too_many : L('⚠ कूपन जाँच नहीं पाए — दोबारा दबाएं', '⚠ Could not check the coupon — tap again'); cpnMsg.className = 'k cpnmsg bad'; return; }
+    cpn = r.coupon; cpnIn.value = cpn.code; cpnIn.disabled = true; cpnBtn.textContent = L('हटाएं', 'Remove');
+    const what = cpn.kind === 'pct' ? L(`${cpn.value}% छूट`, `${cpn.value}% off`) : cpn.kind === 'rs' ? L(`₹${cpn.value} छूट`, `₹${cpn.value} off`)
+      : L(`${cpn.value} सर्च मुफ़्त`, `${cpn.value} searches free`);
+    cpnMsg.className = 'k cpnmsg good';
+    cpnMsg.textContent = L(`✓ कूपन ${cpn.code} लगा: ${what}${cpn.minN ? ` (${cpn.minN} या ज़्यादा सर्च के पैक पर)` : ''}`,
+      `✓ Coupon ${cpn.code} applied: ${what}${cpn.minN ? ` (on packs of ${cpn.minN} or more searches)` : ''}`);
+    if (cpn.minN && pick[0] < cpn.minN) pick = PACKS.find(([n]) => n >= cpn.minN) || pick;
+    drawPacks();
+  });
+  cpnRow.append(cpnIn, cpnBtn);
   const none = searchesLeft === 0 && !BOUGHT;
   box.append(el('b', null, !none ? L('और सर्च चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी सर्च इस्तेमाल हो गईं', 'All your searches are used')
     : L('आज की सभी सर्च इस्तेमाल हो गईं', 'All of today\'s searches are used')),
@@ -1802,7 +1861,7 @@ function buyOpen() {
       'Choose how many searches and pay by UPI — they are added by themselves.')
       : L('कितनी सर्च चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे सर्च जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
         'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
-    packs, pay);
+    packs, cpnRow, cpnMsg, pay);
   $('buyBody').replaceChildren(box);
   $('buyNote').textContent = L('खरीदी सर्च कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की सर्च पूरी होने के बाद इस्तेमाल होती हैं') + '। एक सर्च = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
     'Bought searches never expire' + (PREPAID ? '' : ' — they are used once the day\'s searches are used') + '. One search = typing a name until the box is cleared; family and more pages are free.');
