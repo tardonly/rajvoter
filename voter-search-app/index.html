@@ -313,12 +313,11 @@
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
   /* install as an app: a button at the top of every page (and a link in the footer), and the steps */
-  .fabinstall { position: fixed; right: 12px; bottom: 14px; z-index: 30; display: flex; align-items: center; gap: 2px; padding: 3px;
-    border-radius: 999px; border: 1.5px solid var(--pink-dark); background: #fdf2f8; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+  .fabinstall { display: flex; width: max-content; max-width: calc(100% - 24px); margin: 10px auto 0; align-items: center; gap: 2px; padding: 3px;
+    border-radius: 999px; border: 1.5px solid var(--pink-dark); background: #fdf2f8; }
   .fabinstall [data-install] { border: 0; background: none; padding: 6px 6px 6px 12px; color: #9d174d; font-size: 15px; font-weight: 600; }
   #installHide { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #fce7f3; color: #9d174d; font-size: 14px; line-height: 1; }
   html.noinstall .fabinstall, html.noinstall .footinstall, html.installhidden .fabinstall { display: none !important; }   /* opened as the app, or iPhone/iPad; or put away */
-  html:not(.noinstall):not(.installhidden) body { padding-bottom: 64px; }   /* room for the floating button */
   .topelec { width: calc(100% - 24px); max-width: 720px; margin: 10px auto 0; }
   #installPop .card { max-width: 480px; }
   #installClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
