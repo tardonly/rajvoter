@@ -369,6 +369,12 @@
   /* laptops and big tablets: the header's boxes on one line, the slips side by side, the village list in columns */
   @media (min-width: 900px) {
     header > * { max-width: 1240px; margin-left: auto; margin-right: auto; }
+    /* election dates: a strip across the top on one line, its text lined up with the header's content, the days left at the right end */
+    .topelec { width: auto; max-width: none; margin: 0; border-radius: 0; border-width: 0 0 1px; gap: 4px 18px; font-size: 14px;
+      padding: 7px max(16px, calc((100% - 1240px) / 2 + 12px)); }
+    .topelec div { width: auto; }
+    .topelec .left { order: 1; }
+    .fabinstall { top: auto; bottom: 16px; left: auto; right: 16px; transform: none; }   /* off the strip: the bottom corner */
     /* coupon banners: lined up with the header's content, cards of one size (a single one doesn't stretch across) */
     #cpnBanners { padding-left: max(12px, calc((100% - 1240px) / 2)); padding-right: max(12px, calc((100% - 1240px) / 2));
       scroll-padding: 0 max(12px, calc((100% - 1240px) / 2)); }
