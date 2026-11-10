@@ -159,6 +159,7 @@
   .sharelist .wa small { color: #dcfce7; }
   .sharesave { display: flex; gap: 8px; }
   .sharesave a { flex: 1; text-align: center; font-size: 14px; padding: 9px 6px; }
+  .sharesave a.busy { opacity: .5; cursor: progress; }
   .btn { width: 100%; padding: 12px; font-size: 18px; border: 0; border-radius: 10px; background: var(--pink-dark); color: #fff; font-weight: 600; }
   .btn:disabled { opacity: .6; }
   #lockMsg { min-height: 22px; margin-top: 10px; font-size: 14px; color: var(--bad); line-height: 1.5; }
@@ -890,6 +891,16 @@ function promoLoad() {   // fetched as the share box opens, so a tap can share i
     .catch(() => { promoFile = null; return null; });
   return promoFile;
 }
+// The videos live on Cloudflare R2 (vercel.json sends /<name>.mp4 there). A browser saves a link from another site only by
+// opening it, so ⬇ fetches the video and saves it from here; if that fails, the video opens in a new tab to save from its menu.
+async function saveVideo(href, name, blob) {
+  try {
+    blob ||= await fetch(href).then((r) => (r.ok ? r.blob() : Promise.reject(new Error('no video'))));
+    const u = URL.createObjectURL(blob), a = el('a');
+    a.href = u; a.download = name; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
+  } catch (e) { window.open(href, '_blank', 'noopener'); }
+}
 async function copyText(t) {
   try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
   const ta = el('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
@@ -920,12 +931,19 @@ async function shareStatus() {
     }
   }
   // no sharing of files here (most laptops): save the video and copy the text, to post it from WhatsApp
-  const a = el('a'); a.href = PROMO; a.download = 'matdata-khoj.mp4'; document.body.append(a); a.click(); a.remove();
+  saveVideo(PROMO, 'matdata-khoj.mp4', file);
   const copied = await copyText(SHARE_TEXT);
   note.textContent = L(`वीडियो डाउनलोड हो रहा है। WhatsApp में Status → ＋ से यह वीडियो लगाएं${copied ? ' और कैप्शन में लिंक पेस्ट करें (कॉपी हो गया है)' : ''}।`,
     `The video is downloading. In WhatsApp, add it with Status → ＋${copied ? ' and paste the link into the caption (it is copied)' : ''}.`);
 }
 $('shStatus').addEventListener('click', shareStatus);
+for (const a of document.querySelectorAll('.sharesave a')) a.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (a.classList.contains('busy')) return;
+  a.classList.add('busy');
+  await saveVideo(a.getAttribute('href'), a.download);
+  a.classList.remove('busy');
+});
 $('shWa').addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(SHARE_TEXT)}`, '_blank', 'noopener'));
 $('shMore').addEventListener('click', () => navigator.share({ title: 'Voter Search', text: SHARE_LINE, url: SITE }).catch(() => {}));
 $('shCopy').addEventListener('click', async () => { $('shareNote').textContent = (await copyText(SITE)) ? L('लिंक कॉपी हो गया', 'Link copied') : SITE; });

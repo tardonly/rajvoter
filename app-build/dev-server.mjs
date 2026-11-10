@@ -117,6 +117,12 @@ http.createServer(async (req, res) => {
     else url.pathname = '/index.html';
   }
 
+  // a video with no local copy: the same redirect to Cloudflare R2 as vercel.json
+  if (/^\/[a-z0-9-]+\.mp4$/.test(url.pathname) && !existsSync(join(root, url.pathname))) {
+    const to = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8')).redirects.find((r) => r.source.includes('.mp4'));
+    if (to) { res.writeHead(307, { Location: to.destination.replace(':name', url.pathname.slice(1, -4)) }); return res.end(); }
+  }
+
   if (url.pathname === '/__otp') { otps.set(url.searchParams.get('mobile'), url.searchParams.get('otp')); return res.end('{"status":"success"}'); }
   if (url.pathname === '/__otp/last') return res.end(JSON.stringify({ otp: otps.get(url.searchParams.get('mobile')) || null }));
   if (url.pathname === '/__redis') {

@@ -90,6 +90,7 @@
     .sharerow > * { flex: 1; }
     .bottomcta .ctas { grid-template-columns: 1fr 1fr; max-width: 680px; margin: 0 auto; }
   }
+  a.busy { opacity: .5; cursor: progress; }
 </style>
 </head>
 <body>
@@ -189,6 +190,23 @@
   document.querySelectorAll('[data-wa]').forEach((a) => a.addEventListener('click', (e) => {
     e.preventDefault();
     wa(`${LINE}\nवीडियो: ${SITE.replace(/\/$/, '')}${a.dataset.wa}\nऔर वीडियो: ${PAGE}\nशुरू करें: ${SITE}`);
+  }));
+
+  // ⬇ सेव: the videos live on Cloudflare R2 (vercel.json sends /<name>.mp4 there), and a browser saves a link from another
+  // site only by opening it — so fetch the video and save it from here; if that fails, open it in a new tab to save from its menu
+  document.querySelectorAll('a[download]').forEach((a) => a.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (a.classList.contains('busy')) return;
+    a.classList.add('busy');
+    const href = a.getAttribute('href');
+    try {
+      const r = await fetch(href);
+      if (!r.ok) throw new Error('no video');
+      const u = URL.createObjectURL(await r.blob()), s = document.createElement('a');
+      s.href = u; s.download = a.download; document.body.append(s); s.click(); s.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    } catch { window.open(href, '_blank', 'noopener'); }
+    a.classList.remove('busy');
   }));
 </script>
 </body>
