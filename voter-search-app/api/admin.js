@@ -14,8 +14,8 @@
 //   action "add", village, name, phone [, cand, more, areas] → {user, password}   new user of one village (must be one of
 //                                         the admin's villages); more: [slug, ...] extra villages they open too, areas:
 //                                         whole ZP / PS wards ["zp:<district>|<zp>" | "ps:<district>|<samiti>|<ps>", ...]
-//                                         (userVillages in _lib.js); every village these give must be the admin's
-//   action "user_villages", id, more, areas → {user}   change a user's extra villages (as in "add")
+//                                         (userVillages in _lib.js); more and areas: superadmin only
+//   action "user_villages", id, more, areas → {user}   change a user's extra villages (as in "add"; superadmin only)
 //   action "add_admin", name, phone, villages: [slug, ...], samitis: ["<district>|<samiti>", ...] [, aperms] → {user, password}
 //                                         (superadmin only; samitis = whole पंचायत समितियाँ, villages added there later too)
 //   action "villages", id, villages, samitis               → {user}   change an admin's villages (superadmin only)
@@ -150,11 +150,11 @@ module.exports = route(async (req, res, b) => {
   // a new login made by this admin: fields = role and village(s) [and more]; → {id, password}
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
   // a person's extra villages from the request (b.more, b.areas) besides their own village home: → {more, areas, all} or
-  // {error} when one of the villages they give is not this admin's
+  // {error}. Only the superadmin gives them (a village admin's request may carry none).
   const extraVillages = (home) => {
     const more = villageSlugs(b.more).filter((s) => s !== home), areas = areaList(b.areas);
-    const all = userVillages(home, more.join(','), areas.join(','));
-    return all.every(mayUse) ? { more, areas, all } : { error: 'not_your_village' };
+    if ((more.length || areas.length) && !isSuper) return { error: 'super_only' };
+    return { more, areas, all: userVillages(home, more.join(','), areas.join(',')) };
   };
   const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
@@ -510,12 +510,9 @@ module.exports = route(async (req, res, b) => {
   }
 
   if (b.action === 'user_villages') {   // the villages a person opens besides their own (ZP / PS candidates' workers)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
     if (user.role !== 'user') return send(res, 400, { error: 'not_user' });
-    const ex = extraVillages(user.village);
-    if (ex.error) return send(res, 403, { error: ex.error });
-    // villages given by another admin (or the superadmin) that this admin doesn't look after stay as they are
-    const keepMore = user.more.filter((s) => !mayUse(s)), keepAreas = user.areas.filter((k) => !areaVillages(k).every(mayUse));
-    const more = [...new Set([...keepMore, ...ex.more])], areas = [...new Set([...keepAreas, ...ex.areas])];
+    const { more, areas } = extraVillages(user.village);
     await redis('HSET', `user:${user.id}`, 'more', more.join(','), 'areas', areas.join(','));
     if (user.cand) await candReach(user.cand, userVillages(user.village, more.join(','), areas.join(',')));
     return send(res, 200, { user: view(await getUser(user.id)) });

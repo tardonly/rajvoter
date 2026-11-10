@@ -1560,7 +1560,7 @@ const areasIn = (box) => [...box.querySelectorAll('input[data-area]:checked')].m
 // the add form: the chosen village's own ZP and PS ward, to give whole
 function newAreaOptions() {
   const box = $('newAreas'), slug = $('newVillage').value;
-  const list = slug ? homeAreas(slug).filter((k) => areaWhole(k) && AREA_SIZE[k] > 1) : [];
+  const list = slug && me.role === 'super' ? homeAreas(slug).filter((k) => areaWhole(k) && AREA_SIZE[k] > 1) : [];   // superadmin only
   box.replaceChildren(...(list.length ? [el('div', 'sub', L('ZP / PS उम्मीदवार के कार्यकर्ता? पूरे वार्ड के गाँव भी दें:', 'Worker of a ZP / PS candidate? Give the whole ward\'s villages too:'))] : []),
     ...list.map((k) => areaCheck(k, false)));
   box.classList.toggle('hidden', !list.length);
@@ -1734,7 +1734,7 @@ function villageBox(u) {
   box.append(L('गाँव:', 'Village:'), sel);
   return box;
 }
-// more villages this person opens (a ZP / PS candidate's worker): whole wards and villages one by one, of this admin's
+// more villages this person opens (a ZP / PS candidate's worker): whole wards and villages one by one (superadmin only)
 function moreBox(u, row) {
   const box = el('div', 'limit'), n = u.villages.length - 1;
   const open = el('button', 'btn ghost', n ? L(`और गाँव: ${n} — बदलें`, `More villages: ${n} — change`) : L('+ और गाँव / ZP-PS वार्ड', '+ More villages / ZP-PS ward'));
@@ -1836,7 +1836,7 @@ function person(u) {
   }
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
   if (!isAdmin) {   // the villages this person opens besides their own: whole ZP / PS wards, then one by one
-    for (const k of u.areas || []) nm.append(el('span', 'badge vil sam', `${areaName(k)} · ${L(`${areaSlugs(k).length} गाँव`, `${areaSlugs(k).length} villages`)}`));
+    for (const k of u.areas || []) nm.append(el('span', 'badge vil sam', `${areaName(k)} · ${L(`${AREA_SIZE[k] || areaSlugs(k).length} गाँव`, `${AREA_SIZE[k] || areaSlugs(k).length} villages`)}`));   // all of the ward's, not only this admin's
     const inAreas = new Set((u.areas || []).flatMap(areaSlugs));
     for (const s of (u.more || []).filter((x) => !inAreas.has(x))) nm.append(el('span', 'badge vil', `+ ${vName(s)}`));
   }
@@ -1887,7 +1887,7 @@ function person(u) {
   }
   if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
     ...(u.canBuy && mayDo('credits') ? [creditsBox(u, refresh)] : []),   // a daily limit, and bought searches for after it
-    ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u), moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
+    ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(me.role === 'super' ? [moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
   if (!isAdmin && !u.retired && me.role === 'super') {   // a user becomes a village admin of their village, same login
