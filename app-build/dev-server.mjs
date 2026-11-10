@@ -117,7 +117,7 @@ http.createServer(async (req, res) => {
     else url.pathname = '/index.html';
   }
 
-  // a video with no local copy: the same redirect to Cloudflare R2 as vercel.json
+  // a video with no local copy: the same redirect to jsDelivr (GitHub repo ramcala/rajelection-videos) as vercel.json
   if (/^\/[a-z0-9-]+\.mp4$/.test(url.pathname) && !existsSync(join(root, url.pathname))) {
     const to = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8')).redirects.find((r) => r.source.includes('.mp4'));
     if (to) { res.writeHead(307, { Location: to.destination.replace(':name', url.pathname.slice(1, -4)) }); return res.end(); }

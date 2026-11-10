@@ -897,7 +897,7 @@ function promoLoad() {   // fetched as the share box opens, so a tap can share i
     .catch(() => { promoFile = null; return null; });
   return promoFile;
 }
-// The videos live on Cloudflare R2 (vercel.json sends /<name>.mp4 there). A browser saves a link from another site only by
+// The videos live in the public GitHub repo ramcala/rajelection-videos, served by jsDelivr (vercel.json sends /<name>.mp4 there). A browser saves a link from another site only by
 // opening it, so ⬇ fetches the video and saves it from here; if that fails, the video opens in a new tab to save from its menu.
 async function saveVideo(href, name, blob) {
   try {

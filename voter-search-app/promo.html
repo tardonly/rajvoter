@@ -210,7 +210,7 @@
     wa(`${LINE}\nवीडियो: ${SITE.replace(/\/$/, '')}${a.dataset.wa}\nऔर वीडियो: ${PAGE}\nशुरू करें: ${SITE}`);
   }));
 
-  // ⬇ सेव: the videos live on Cloudflare R2 (vercel.json sends /<name>.mp4 there), and a browser saves a link from another
+  // ⬇ सेव: the videos live in the public GitHub repo ramcala/rajelection-videos, served by jsDelivr (vercel.json sends /<name>.mp4 there), and a browser saves a link from another
   // site only by opening it — so fetch the video and save it from here; if that fails, open it in a new tab to save from its menu
   document.querySelectorAll('a[download]').forEach((a) => a.addEventListener('click', async (e) => {
     e.preventDefault();

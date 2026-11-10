@@ -16,6 +16,11 @@
   },
   "redirects": [
     {
+      "source": "/:name(promo-[a-z]+|short-[a-z]+).mp4",
+      "destination": "https://cdn.jsdelivr.net/gh/ramcala/rajelection-videos@main/:name.mp4",
+      "permanent": false
+    },
+    {
       "source": "/((?!api/)[a-z0-9-]+)/admin",
       "destination": "/admin",
       "permanent": false
