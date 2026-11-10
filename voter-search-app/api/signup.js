@@ -29,13 +29,13 @@
 //     A person has one open request per coupon (couponHold in _lib.js): asking with it again moves it to the new request,
 //     or → 'cpn_pending' while an online payment with it is still open.
 //   POST {action: 'coupon', token, village, code} → {coupon: {code, kind, value, minN}} or {error: 'cpn_…'}
-//   POST {action: 'coupons', token, village} → {coupons: [{code, kind, value, minN, until, first}]}   the coupons the
+//   POST {action: 'coupons', token, village} → {coupons: [{code, kind, value, minN, maxN, until, first}]}   the coupons the
 //     superadmin lists in the buy window (show) that this login can use now, best first
 //   POST {action: 'mark_mode', token, village, mode: 'survey' | 'poll'} → {survey}   this person's own choice of marks
 //     (सर्वे / मतदान दिवस, markModeOf in _lib.js), until the superadmin next switches everyone
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { getCoupon, couponHold, selfCount, afterMove, couponFor, couponPrice, couponView, refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
+const { getCoupon, couponHold, selfCount, afterMove, couponFor, couponPrice, couponView, refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, freeLeft, takeFree, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -43,11 +43,13 @@ const SIGNUPS_PER_DAY = 3;   // per internet address
 
 // free searches for a new login in this village: freeFor(rule, logins made by signing up there so far, retired ones
 // too: selfcount in _lib.js), none if this number signed up before; plus the referral bonus (refRule in _lib.js) when it
-// came through a friend's link (ref: the inviter)
-async function freeSearches(phone, slug, rule, ref) {
+// came through a friend's link (ref: the inviter). The village's cap (rule.cap) can make it less; take: this is the
+// sign-up itself, so the searches are counted against the cap (takeFree), otherwise only looked at (lookup).
+async function freeSearches(phone, slug, rule, ref, take) {
   if ((await phoneLogins(phone)).some((u) => u.self === '1')) return 0;
-  const rr = ref ? await refRule() : null;
-  return freeFor(rule || await freeRule(), await selfCount(slug)) + (rr && rr.on ? rr.joiner : 0);
+  rule = rule || await freeRule();
+  const rr = ref ? await refRule() : null, want = freeFor(rule, await selfCount(slug));
+  return (take ? await takeFree(slug, rule, want) : await freeLeft(slug, rule, want)) + (rr && rr.on ? rr.joiner : 0);
 }
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 // the login a password reset is for: this number's active login of that village; without a village (the start page) an
@@ -105,7 +107,7 @@ module.exports = route(async (req, res, b) => {
     await redis('EXPIRE', k, 86400);
     if (n > SIGNUPS_PER_DAY) return send(res, 429, { error: 'too_many' });
     const inv = await refInviter(b.ref, phone);   // came through a friend's invite link
-    const free = await freeSearches(phone, v.slug, null, inv);
+    const free = await freeSearches(phone, v.slug, null, inv, true);
     const { id } = await newLogin(['role', 'user', 'village', v.slug, 'credits', free, 'self', '1', ...(inv ? ['refBy', inv.id, 'refByName', inv.name] : [])],
       name, phone, 'self', '');
     await redis('INCR', `selfcount:${v.slug}`);   // this village's sign-ups (freeSearches)
@@ -161,14 +163,14 @@ module.exports = route(async (req, res, b) => {
     await redis('HSET', `user:${me.id}`, 'markmode', b.mode, 'markmodeAt', new Date().toISOString());
     return send(res, 200, { survey: b.mode === 'survey' });
   }
-  if (b.action === 'coupons') {   // the buy window's list of coupons to tap
+  if (b.action === 'coupons') {   // the buy window's list of coupons to tap, and the app's coupon banners (banner: true)
     const me = await whoIs(b.token, b.village);
     if (!me || me.status !== 'ok') return send(res, 401, { error: 'login' });
     if (!canBuy(me)) return send(res, 200, { coupons: [] });
     const codes = (await redis('SMEMBERS', 'coupons')) || [];
-    const all = (await Promise.all(codes.map(getCoupon))).filter((c) => c && c.show);
+    const all = (await Promise.all(codes.map(getCoupon))).filter((c) => c && (c.show || c.banner));
     const fits = (await Promise.all(all.map((c) => couponFor(c.code, me)))).filter((r) => r.c).map((r) => r.c);
-    const worth = (c) => couponPrice(c, 1000);   // best first: the most off (or the most extra) on the biggest pack
+    const worth = (c) => couponPrice(c, c.maxN || 1000);   // best first: the most off (or the most extra) on the biggest pack it takes
     fits.sort((x, y) => (worth(x).rs - worth(y).rs) || (worth(y).bonus - worth(x).bonus));
     return send(res, 200, { coupons: fits.slice(0, 10).map(couponView) });
   }

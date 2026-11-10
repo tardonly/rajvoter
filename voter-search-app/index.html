@@ -84,6 +84,13 @@
   .cpnlist .k { width: 100%; margin: 0; }
   .cpnchip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 10px; border: 1.5px dashed #a855f7;
     border-radius: 8px; background: #faf5ff; color: #581c87; font-size: 14px; text-align: left; }
+  .cpnbanners { position: relative; display: flex; flex-direction: column; gap: 6px; margin: 6px 0 2px; }
+  .cpnbanner { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 34px 9px 12px; border: 0; border-radius: 10px; text-align: left;
+    background: linear-gradient(90deg, #7c3aed, #db2777); color: #fff; font-size: 14.5px; font-weight: 600; box-shadow: 0 2px 8px rgba(124, 58, 237, .3); }
+  .cpnbanner span { flex: 1; }
+  .cpnbanner b { flex: none; padding: 3px 10px; border-radius: 999px; background: #fff; color: #7c3aed; font-size: 13px; white-space: nowrap; }
+  .cpnbanners .cpnbanner + .cpnbanner { padding-right: 12px; }
+  .cpnbannerx { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(255,255,255,.25); color: #fff; font-size: 13px; line-height: 1; }
   .cpnchip small { font-size: 12px; color: #6b21a8; }
   .cpnchip.on { border-style: solid; background: #7c3aed; color: #fff; } .cpnchip.on small { color: #ede9fe; }
   .moderow { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--muted); }
@@ -313,12 +320,13 @@
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
   /* install as an app: a button at the top of every page (and a link in the footer), and the steps */
-  .fabinstall { display: flex; width: max-content; max-width: calc(100% - 24px); margin: 10px auto 0; align-items: center; gap: 2px; padding: 3px;
-    border-radius: 999px; border: 1.5px solid var(--pink-dark); background: #fdf2f8; }
+  .fabinstall { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 40; display: flex; width: max-content; max-width: calc(100% - 24px);
+    align-items: center; gap: 2px; padding: 3px; border-radius: 999px; border: 1.5px solid var(--pink-dark); background: #fdf2f8;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }   /* stays at the top of the window while scrolling, over the page */
   .fabinstall [data-install] { border: 0; background: none; padding: 6px 6px 6px 12px; color: #9d174d; font-size: 15px; font-weight: 600; }
   #installHide { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #fce7f3; color: #9d174d; font-size: 14px; line-height: 1; }
   html.noinstall .fabinstall, html.noinstall .footinstall, html.installhidden .fabinstall { display: none !important; }   /* opened as the app, or iPhone/iPad; or put away */
-  .topelec { width: calc(100% - 24px); max-width: 720px; margin: 10px auto 0; }
+  .topelec { width: calc(100% - 24px); max-width: 720px; margin: 0 auto; }
   #installPop .card { max-width: 480px; }
   #installClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
   #installPop h3 { font-size: 15px; margin: 12px 0 4px; }
@@ -510,6 +518,7 @@
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
       <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
+    <div class="cpnbanners hidden" id="cpnBanners"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row2">
@@ -777,7 +786,7 @@ function showApp(name, admin, villages, perms, cand, role) {
   $('pwBtn').classList.toggle('hidden', DEMO || !MY_PHONE);   // a person's own login (not the superadmin's, not the demo)
   // logins with several villages, and a signed-up login that may still move itself to another village
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1) && !MOVES_LEFT);
-  IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); buyMoreButton();
+  IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); buyMoreButton(); cpnBanners();
   $('modeRow').classList.toggle('hidden', DEMO || role === 'super');   // the superadmin switches everyone on the admin page
   if (DEMO) {   // ← वापस: back to the start page; गाँव बदलें: back to the demo's villages
     $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); $('switchBtn').href = '/demo'; demoBar();
@@ -1743,6 +1752,7 @@ const CPN_MSG = {
   cpn_first: () => L('⚠ यह कूपन सिर्फ़ पहली खरीद पर है', '⚠ This coupon is only for a first purchase'),
   cpn_pending: () => L('⚠ इस कूपन से एक UPI भुगतान अभी चल रहा है — पहले उसे पूरा करें या थोड़ी देर बाद फिर कोशिश करें', '⚠ A UPI payment with this coupon is still open — finish it first, or try again a little later'),
   cpn_min: (r) => L(`⚠ यह कूपन ${r.minN} या ज़्यादा सर्च के पैक पर है`, `⚠ This coupon is for packs of ${r.minN} or more searches`),
+  cpn_max: (r) => L(`⚠ यह कूपन ${r.maxN} तक सर्च के पैक पर है`, `⚠ This coupon is for packs of up to ${r.maxN} searches`),
 };
 // a signed-up login: how many searches are left (amber at 3 or fewer, red at none) and the button for more
 function buyMoreButton() {
@@ -1807,7 +1817,15 @@ function buyUpi([n, rs], coupon = '', bonus = 0) {
   });
   return a;
 }
-function buyOpen() {
+// which packs a coupon is for: "500+", "up to 500", "200–800" ('' = every pack)
+const cpnPacks = (c) => (c.minN && c.maxN ? L(`${c.minN}–${c.maxN} सर्च के पैक पर`, `on packs of ${c.minN}–${c.maxN}`)
+  : c.minN ? L(`${c.minN}+ सर्च के पैक पर`, `on packs of ${c.minN}+`) : c.maxN ? L(`${c.maxN} तक सर्च के पैक पर`, `on packs of up to ${c.maxN}`) : '');
+const cpnWhat = (c) => (c.kind === 'pct' ? L(`${c.value}% छूट`, `${c.value}% off`) + (c.maxOff ? L(` (₹${c.maxOff} तक)`, ` (up to ₹${c.maxOff})`) : '')
+  : c.kind === 'rs' ? L(`₹${c.value} छूट`, `₹${c.value} off`)
+  : c.kind === 'bonuspct' ? L(`${c.value}% ज़्यादा सर्च मुफ़्त`, `${c.value}% extra searches free`) + (c.maxOff ? L(` (${c.maxOff} सर्च तक)`, ` (up to ${c.maxOff} searches)`) : '')
+  : L(`${c.value} सर्च मुफ़्त`, `${c.value} searches free`));
+// the buy window; code: a coupon to apply straight away (the coupon banners, cpnBanners)
+function buyOpen(code) {
   delete $('buyPop').dataset.go;
   $('buyClose').classList.remove('hidden');
   $('buyTitle').textContent = L('🛒 और सर्च', '🛒 More searches');
@@ -1816,10 +1834,11 @@ function buyOpen() {
   // a coupon (कूपन) applied below: each pack's price and bonus with it (couponPrice in api/_lib.js)
   let cpn = null;
   const withCpn = ([n, rs]) => {
-    if (!cpn || (cpn.minN && n < cpn.minN)) return { rs, bonus: 0, on: false };
-    if (cpn.kind === 'pct') return { rs: Math.max(1, Math.round(rs * (100 - cpn.value) / 100)), bonus: 0, on: true };
+    if (!cpn || (cpn.minN && n < cpn.minN) || (cpn.maxN && n > cpn.maxN)) return { rs, bonus: 0, on: false };
+    const most = (x) => (cpn.maxOff ? Math.min(x, cpn.maxOff) : x);   // the coupon's highest limit (couponPrice in api/_lib.js)
+    if (cpn.kind === 'pct') return { rs: Math.max(1, rs - most(rs - Math.round(rs * (100 - cpn.value) / 100))), bonus: 0, on: true };
     if (cpn.kind === 'rs') return { rs: Math.max(1, rs - cpn.value), bonus: 0, on: true };
-    if (cpn.kind === 'bonuspct') return { rs, bonus: Math.floor(n * cpn.value / 100), on: true };
+    if (cpn.kind === 'bonuspct') return { rs, bonus: most(Math.floor(n * cpn.value / 100)), on: true };
     return { rs, bonus: cpn.value, on: true };
   };
   const payBtn = (pk) => {
@@ -1852,8 +1871,6 @@ function buyOpen() {
   const cpnRow = el('div', 'cpnrow'), cpnIn = el('input'), cpnBtn = el('button', 'cpnbtn', L('लागू करें', 'Apply')), cpnMsg = el('div', 'k cpnmsg');
   cpnIn.placeholder = L('🎟 कूपन कोड (हो तो)', '🎟 Coupon code (if any)'); cpnIn.autocapitalize = 'characters'; cpnIn.maxLength = 15;
   cpnBtn.type = 'button';
-  const cpnWhat = (c) => (c.kind === 'pct' ? L(`${c.value}% छूट`, `${c.value}% off`) : c.kind === 'rs' ? L(`₹${c.value} छूट`, `₹${c.value} off`)
-    : c.kind === 'bonuspct' ? L(`${c.value}% ज़्यादा सर्च मुफ़्त`, `${c.value}% extra searches free`) : L(`${c.value} सर्च मुफ़्त`, `${c.value} searches free`));
   // the coupons the superadmin lists here (api/signup.js 'coupons'): tap one to apply it
   const cpnList = el('div', 'cpnlist hidden');
   const markChosen = () => cpnList.querySelectorAll('button').forEach((x) => x.classList.toggle('on', !!cpn && x.dataset.code === cpn.code));
@@ -1863,7 +1880,7 @@ function buyOpen() {
     for (const c of r.coupons) {
       const b = el('button', 'cpnchip'); b.type = 'button'; b.dataset.code = c.code;
       const top = el('span'); top.append(el('b', null, c.code), ` · ${cpnWhat(c)}`); b.append(top);
-      const when = [c.minN ? L(`${c.minN}+ सर्च के पैक पर`, `on packs of ${c.minN}+`) : '', c.first ? L('पहली खरीद पर', 'first purchase') : '',
+      const when = [cpnPacks(c), c.first ? L('पहली खरीद पर', 'first purchase') : '',
         c.until ? L(`${c.until} तक`, `until ${c.until}`) : ''].filter(Boolean).join(' · ');
       if (when) b.append(el('small', null, when));
       b.addEventListener('click', () => {
@@ -1876,6 +1893,7 @@ function buyOpen() {
     cpnList.classList.remove('hidden');
     markChosen();
   });
+  if (typeof code === 'string' && code) { cpnIn.value = code; setTimeout(() => cpnBtn.click()); }   // after cpnBtn's handler is set
   cpnBtn.addEventListener('click', async () => {
     if (cpn) {   // remove it
       cpn = null; cpnIn.value = ''; cpnIn.disabled = false; cpnBtn.textContent = L('लागू करें', 'Apply'); cpnMsg.textContent = ''; markChosen(); drawPacks(); return;
@@ -1889,9 +1907,10 @@ function buyOpen() {
     cpn = r.coupon; cpnIn.value = cpn.code; cpnIn.disabled = true; cpnBtn.textContent = L('हटाएं', 'Remove'); markChosen();
     const what = cpnWhat(cpn);
     cpnMsg.className = 'k cpnmsg good';
-    cpnMsg.textContent = L(`✓ कूपन ${cpn.code} लगा: ${what}${cpn.minN ? ` (${cpn.minN} या ज़्यादा सर्च के पैक पर)` : ''}`,
-      `✓ Coupon ${cpn.code} applied: ${what}${cpn.minN ? ` (on packs of ${cpn.minN} or more searches)` : ''}`);
-    if (cpn.minN && pick[0] < cpn.minN) pick = PACKS.find(([n]) => n >= cpn.minN) || pick;
+    const packs = cpnPacks(cpn);
+    cpnMsg.textContent = L(`✓ कूपन ${cpn.code} लगा: ${what}${packs ? ` (${packs})` : ''}`, `✓ Coupon ${cpn.code} applied: ${what}${packs ? ` (${packs})` : ''}`);
+    const fits = ([n]) => (!cpn.minN || n >= cpn.minN) && (!cpn.maxN || n <= cpn.maxN);
+    if (!fits(pick)) pick = (cpn.minN && pick[0] < cpn.minN ? PACKS.find(fits) : [...PACKS].reverse().find(fits)) || pick;
     drawPacks();
   });
   cpnRow.append(cpnIn, cpnBtn);
@@ -1914,7 +1933,30 @@ function buyClose() {
 }
 // a signed-up login with no searches left gets this window straight away
 function outOfSearches() { if (PREPAID && searchesLeft === 0 && !DEMO) buyOpen(); }
-$('buyMore').addEventListener('click', buyOpen);
+$('buyMore').addEventListener('click', () => buyOpen());
+// coupon banners: coupons the superadmin marked "banner" (api/signup.js 'coupons', the ones this login may use, best
+// first); tapping one opens the buy window with it applied. ✕ hides them until the page is opened again.
+let cpnBannersShut = false;
+async function cpnBanners() {
+  const box = $('cpnBanners');
+  box.replaceChildren(); box.classList.add('hidden');
+  if (!CAN_BUY || DEMO || cpnBannersShut) return;
+  const r = await api('signup', { action: 'coupons', token: token() });
+  const list = (r.coupons || []).filter((c) => c.banner).slice(0, 2);
+  if (!list.length || cpnBannersShut) return;
+  for (const c of list) {
+    const b = el('button', 'cpnbanner'); b.type = 'button';
+    const packs = cpnPacks(c);
+    b.append(el('span', null, c.bannerText || L(`🎟 कूपन ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`, `🎟 Coupon ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`)),
+      el('b', null, L('अभी लें ›', 'Get it ›')));
+    b.addEventListener('click', () => buyOpen(c.code));
+    box.append(b);
+  }
+  const x = el('button', 'cpnbannerx', '✕'); x.type = 'button'; x.setAttribute('aria-label', L('बंद करें', 'Close'));
+  x.addEventListener('click', () => { cpnBannersShut = true; box.classList.add('hidden'); });
+  box.append(x);
+  box.classList.remove('hidden');
+}
 // 🎁 दोस्तों को बुलाएं: this login's invite link on WhatsApp; the inviter gets searches when the friend first buys some
 $('invite').addEventListener('click', () => {
   if (!MY_REF) return;
@@ -1980,6 +2022,10 @@ async function lockPhone() {
 // the superadmin's free-search rule for sign-ups (freeRule in api/_lib.js) in words: "the first 10 people of each village
 // get 10 free searches", or with halving "… get 10, the next 10 get 5, then 2, then 1"
 function freeText(rule) {
+  const cap = rule.cap ? L(` (हर गाँव में कुल ${rule.cap} मुफ़्त सर्च तक)`, ` (at most ${rule.cap} free searches in all per village)`) : '';
+  return freeSteps(rule) + cap;
+}
+function freeSteps(rule) {
   const { mode, people, searches } = rule;
   if (mode !== 'halving') return L(`हर गाँव के पहले ${people} लोगों को ${searches} सर्च मुफ़्त`, `The first ${people} people of each village get ${searches} free searches`);
   const steps = [];

@@ -5,6 +5,9 @@
 //   action "list" [, village]          → {me: {id, role, name, villages}, users: [...], admins: [...] (superadmin only), …}
 //                                         quick (no voter files read): users carry perms, searchesToday, limit (today's,
 //                                         with any extra), ownLimit ('' = default) and extraToday
+//   action "reqs"                      → {reqs, collected}   pack requests (the 🔔) and money collected, asked for after "list"
+//   action "settings"                  → {freeRule, refRule, coupons}   superadmin, when one of those tabs opens
+//   action "stats" [, all: n] [, only: 'marked'] (only: just {marked, survey}, no voter files read)
 //   action "stats" [, all: n]          → {progress, marked: {id: slips marked}, partial, groups, survey}   the slow part,
 //                                         asked for after "list": progress per ward (only groups with marks when there
 //                                         are more than STATS_ALL, else the first n groups, those with marks first) and how many slips each person marked
@@ -54,7 +57,7 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
-//   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, minN, maxUses, until, once, first, on, show, note, isNew
+//   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, maxOff, minN, maxN, maxUses, until, once, first, on, show, note, banner, bannerText, isNew
 //                                         → {coupon}   superadmin: a coupon (getCoupon in _lib.js); "list" gives coupons
 //   action "coupon_del", code → {ok}      superadmin
 //   action "ref_rule", on, inviter, joiner → {refRule}   superadmin: referral searches (refRule in _lib.js); "list" gives
@@ -62,8 +65,9 @@
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   the superadmin: which set of marks everyone uses from now on
 //                                         (each person may switch back for themself); a village admin: their own choice
 //                                         (markModeOf in _lib.js). "list" says what this admin uses as survey: true | false
-//   action "free_rule", mode, people, searches → {freeRule}   superadmin: free searches for sign-ups (freeRule in _lib.js):
-//                                               mode 'direct' | 'halving', people 1–100000, searches 1–1000; "list" gives
+//   action "free_rule", mode, people, searches, cap → {freeRule}   superadmin: free searches for sign-ups (freeRule in _lib.js):
+//                                               mode 'direct' | 'halving', people 1–100000, searches 1–1000, cap (most in all
+//                                               per village) 0–10000000, 0 = no limit; "settings" gives
 //                                               freeRule to the superadmin
 //   action "db_copy", cursor          → {next, keys, done}   superadmin: one step of moving people's data from Upstash
 //                                               into USER_REDIS_URL (moveUserData in _lib.js); the admin page repeats it
@@ -148,14 +152,16 @@ module.exports = route(async (req, res, b) => {
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const code = couponCode(b.code), num = (v, max) => { const x = Math.floor(Number(v) || 0); return x >= 0 && x <= max ? x : -1; };
     const kind = ['pct', 'rs', 'bonus', 'bonuspct'].includes(b.kind) ? b.kind : '';
-    const value = num(b.value, kind === 'pct' ? 99 : kind === 'bonuspct' ? 1000 : 10000), minN = num(b.minN, 10000), maxUses = num(b.maxUses, 1000000);
+    const value = num(b.value, kind === 'pct' ? 99 : kind === 'bonuspct' ? 1000 : 10000), minN = num(b.minN, 10000), maxN = num(b.maxN, 10000), maxUses = num(b.maxUses, 1000000);
+    const maxOff = kind === 'pct' || kind === 'bonuspct' ? num(b.maxOff, 1000000) : 0;   // the most ₹ off / extra searches, 0 = no limit
     const until = String(b.until || '');
     if (!COUPON_RE.test(code)) return send(res, 400, { error: 'cpn_code' });
-    if (!kind || value < 1 || minN < 0 || maxUses < 0 || (until && !/^\d{4}-\d{2}-\d{2}$/.test(until))) return send(res, 400, { error: 'cpn_rule' });
+    if (!kind || value < 1 || minN < 0 || maxN < 0 || (maxN && maxN < minN) || maxUses < 0 || maxOff < 0 || (until && !/^\d{4}-\d{2}-\d{2}$/.test(until))) return send(res, 400, { error: 'cpn_rule' });
     const old = await getCoupon(code);
     if (b.isNew && old) return send(res, 409, { error: 'cpn_exists' });
-    await redis('HSET', `coupon:${code}`, 'kind', kind, 'value', value, 'minN', minN, 'maxUses', maxUses, 'until', until,
+    await redis('HSET', `coupon:${code}`, 'kind', kind, 'value', value, 'maxOff', maxOff, 'minN', minN, 'maxN', maxN, 'maxUses', maxUses, 'until', until,
       'once', b.once ? '1' : '0', 'first', b.first ? '1' : '0', 'on', b.on ? '1' : '0', 'show', b.show ? '1' : '0', 'note', String(b.note || '').slice(0, 100),
+      'banner', b.banner ? '1' : '0', 'bannerText', String(b.bannerText || '').trim().slice(0, 120),
       ...(old ? [] : ['used', 0, 'created', now]), 'at', now);
     await redis('SADD', 'coupons', code);
     return send(res, 200, { coupon: await getCoupon(code) });
@@ -179,8 +185,9 @@ module.exports = route(async (req, res, b) => {
     const n = (v, max) => { const x = Math.floor(Number(v)); return x >= 1 && x <= max ? x : 0; };
     const mode = b.mode === 'halving' ? 'halving' : b.mode === 'direct' ? 'direct' : '';
     const people = n(b.people, FREE_MAX.people), searches = n(b.searches, FREE_MAX.searches);
-    if (!mode || !people || !searches) return send(res, 400, { error: 'free_rule' });
-    await redis('HSET', 'freerule', 'mode', mode, 'people', people, 'searches', searches, 'at', now, 'by', me.id);
+    const cap = b.cap === undefined || b.cap === '' ? 0 : Math.floor(Number(b.cap));   // 0 = no limit
+    if (!mode || !people || !searches || !(cap >= 0 && cap <= FREE_MAX.cap)) return send(res, 400, { error: 'free_rule' });
+    await redis('HSET', 'freerule', 'mode', mode, 'people', people, 'searches', searches, 'cap', cap, 'at', now, 'by', me.id);
     return send(res, 200, { freeRule: await freeRule() });
   }
   if (b.action === 'db_copy') {
@@ -195,12 +202,13 @@ module.exports = route(async (req, res, b) => {
   // village's voter file) and how many slips each person marked. Every village's marks and last-clear backup are read in
   // one round trip; with more than STATS_ALL groups (the superadmin has hundreds of villages) only the groups that have
   // marks, a backup or a candidate get a progress table (all: true asks for every one).
-  const stats = async (all) => {
+  const stats = async (all, onlyMarked) => {
     const cands = await candsOf(me.villages), groups = groupsOf(me.villages, cands);
     const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id, me.survey)], ['GET', `${markHash(g.slug, g.cand.id, me.survey)}:backup`]])) : [];
     const marksBy = groups.map((g, i) => marksFrom(read[2 * i]));
     const marked = {};
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
+    if (onlyMarked) return { marked, survey: me.survey };   // the person list's numbers: no voter files read
     // all: how many groups to give (a page of STATS_ALL more each time the page asks), those with marks first
     const busy = (i) => groups[i].cand.id || read[2 * i + 1] || Object.keys(marksBy[i]).length;
     const idx = groups.map((g, i) => i);
@@ -210,53 +218,63 @@ module.exports = route(async (req, res, b) => {
     const progress = await Promise.all(keep.map((i) => markSummary(groups[i].slug, groups[i].cand, me.survey, marksBy[i], read[2 * i + 1])));
     return { progress, marked, partial: keep.length < groups.length, groups: groups.length, survey: me.survey };
   };
-  if (b.action === 'stats') return send(res, 200, await stats(Math.min(10000, Math.max(0, parseInt(b.all, 10) || 0))));
-  if (b.action === 'list') {   // quick: no voter files are read (see "stats")
-    const ids = (await redis('SMEMBERS', 'users')) || [];
+  if (b.action === 'stats') return send(res, 200, await stats(Math.min(10000, Math.max(0, parseInt(b.all, 10) || 0)), b.only === 'marked'));
+  if (b.action === 'list') {   // quick: what the person list needs (requests: "reqs"; tab settings: "settings")
+    const [ids, cands, moved] = await Promise.all([
+      redis('SMEMBERS', 'users').then((x) => x || []),
+      candsOf(me.villages),
+      isSuper && canMoveUserData() ? redis('GET', 'usermoved') : null]);
     const all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
-    const cands = await candsOf(me.villages);
+    const shown = all.filter((u) => (mine(u) && (!b.village || u.village === b.village)) || (isSuper && u.role === 'admin'));
     const day = today();
-    const buyers = all.filter((u) => isPrepaid(u) || credits(u) > 0);
-    const counts = ids.length ? await pipeline([...ids.map((id) => ['GET', `searches:${id}:${day}`]), ...buyers.map((u) => ['GET', paidKey(u.id)])]) : [];
-    const searches = Object.fromEntries(ids.map((id, i) => [id, Number(counts[i]) || 0]));
-    const paid = Object.fromEntries(buyers.map((u, i) => [u.id, Number(counts[ids.length + i]) || 0]));
+    const buyers = shown.filter((u) => isPrepaid(u) || credits(u) > 0);
+    const counts = shown.length ? await pipeline([...shown.map((u) => ['GET', `searches:${u.id}:${day}`]), ...buyers.map((u) => ['GET', paidKey(u.id)])]) : [];
+    const searches = Object.fromEntries(shown.map((u, i) => [u.id, Number(counts[i]) || 0]));
+    const paid = Object.fromEntries(buyers.map((u, i) => [u.id, Number(counts[shown.length + i]) || 0]));
     const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0 });
-    const users = all.filter((u) => mine(u) && (!b.village || u.village === b.village)).map(withUse);
-    const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
-    // pack requests of the people this admin manages: every open one, and those approved in the last REQ_DONE_DAYS
-    const people = new Map(all.filter((u) => u.role === 'user' && mayUse(u.village)).map((u) => [u.id, u]));
-    const reqIds = (await redis('SMEMBERS', 'reqs')) || [];
-    const reqRows = reqIds.length ? await pipeline(reqIds.map((id) => ['HGETALL', `req:${id}`])) : [];
-    const since = new Date(Date.now() - REQ_DONE_DAYS * 864e5).toISOString();
-    const reqs = reqIds.map((id, i) => {
-      const r = { id }, arr = reqRows[i] || [];
-      for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
-      const u = people.get(r.user);   // a person of my villages, asking from one of my villages
-      if (!u || !mayUse(r.village) || (r.status !== 'open' && !(r.doneAt > since))) return null;
-      if (!may('approve') || !(mine(u) || r.to === me.id)) return null;   // requests of my users, or sent to me
-      if (!isSuper && r.to && r.to !== me.id && r.doneBy !== me.id) return null;   // sent to someone else
-      if (!isSuper && r.gw && r.status === 'open') return null;   // being paid online: added by itself once paid
-      const to = r.to === 'admin' ? 'सुपर एडमिन' : r.to ? (all.find((x) => x.id === r.to) || {}).name || '' : '';
-      return { ...reqView(r), name: u.name, phone: u.phone || '', toName: isSuper ? to : '' };
-    }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
-      : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
-    // payments collected so far, per admin (pay:* in _lib.js), and what each has handed over; a village admin sees only
-    // their own
-    let collected;
-    {
-      const [rsH, nH, cH, nameH, sH] = await pipeline(['pay:rs', 'pay:n', 'pay:count', 'pay:name', 'pay:settled'].map((k) => ['HGETALL', k]));
-      const h = (arr) => { const o = {}; for (let k = 0; k < (arr || []).length; k += 2) o[arr[k]] = arr[k + 1]; return o; };
-      const rsO = h(rsH), nO = h(nH), cO = h(cH), nameO = h(nameH), sO = h(sH);
-      const nameOf = (id) => (id === 'admin' ? 'सुपर एडमिन' : (all.find((u) => u.id === id) || {}).name || nameO[id] || id);
-      collected = Object.keys(rsO).map((id) => ({ by: id, name: nameOf(id), rs: Number(rsO[id]) || 0, n: Number(nO[id]) || 0, count: Number(cO[id]) || 0,
-        settled: Number(sO[id]) || 0, due: id === 'admin' ? 0 : (Number(rsO[id]) || 0) - (Number(sO[id]) || 0) }))
-        .filter((c) => isSuper || c.by === me.id).sort((a, b) => b.rs - a.rs);
-    }
-    const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
-    const freeRuleNow = isSuper ? await freeRule() : undefined;
-    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, coupons: isSuper ? (await Promise.all(((await redis('SMEMBERS', 'coupons')) || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1)) : undefined, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
+    const users = shown.filter((u) => mine(u) && (!b.village || u.village === b.village)).map(withUse);
+    const admins = isSuper ? shown.filter((u) => u.role === 'admin').map(withUse) : undefined;
+    const dbCopy = isSuper && canMoveUserData() ? (moved ? 'done' : 'todo') : undefined;
+    return send(res, 200, { dbCopy, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins,
       villageList: villageList(me.villages), cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
+  }
+  if (b.action === 'settings') {   // superadmin, when a settings tab opens: free searches, referrals, coupons
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const [free, ref, codes] = await Promise.all([freeRule(), refRule(), redis('SMEMBERS', 'coupons')]);
+    const coupons = (await Promise.all((codes || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1));
+    return send(res, 200, { freeRule: free, refRule: ref, coupons });
+  }
+  if (b.action === 'reqs') {   // pack requests (the 🔔) and money collected; after "list", so the page shows first
+    // pack requests of the people this admin manages: every open one, and those approved in the last REQ_DONE_DAYS
+    const since = new Date(Date.now() - REQ_DONE_DAYS * 864e5).toISOString();
+    const [reqIds, payH] = await Promise.all([
+      redis('SMEMBERS', 'reqs').then((x) => x || []),
+      pipeline(['pay:rs', 'pay:n', 'pay:count', 'pay:name', 'pay:settled'].map((k) => ['HGETALL', k]))]);
+    const reqRows = reqIds.length ? await pipeline(reqIds.map((id) => ['HGETALL', `req:${id}`])) : [];
+    const h = (arr) => { const o = {}; for (let k = 0; k < (arr || []).length; k += 2) o[arr[k]] = arr[k + 1]; return o; };
+    const rows = reqIds.map((id, i) => ({ id, ...h(reqRows[i]) }))
+      .filter((r) => r.user && mayUse(r.village) && (r.status === 'open' || r.doneAt > since));
+    const [rsO, nO, cO, nameO, sO] = payH.map(h);
+    const payIds = Object.keys(rsO).filter((id) => isSuper || id === me.id);
+    // only the people these requests and payments name are read, not every login
+    const who = new Map((await getUsers([...new Set([...rows.flatMap((r) => [r.user, r.to]), ...payIds].filter((id) => id && id !== 'admin'))])).map((u) => [u.id, u]));
+    const reqs = may('approve') ? rows.map((r) => {
+      const u = who.get(r.user);   // a person of my villages, asking from one of my villages
+      if (!u || u.role !== 'user' || !mayUse(u.village)) return null;
+      if (!(mine(u) || r.to === me.id)) return null;   // requests of my users, or sent to me
+      if (!isSuper && r.to && r.to !== me.id && r.doneBy !== me.id) return null;   // sent to someone else
+      if (!isSuper && r.gw && r.status === 'open') return null;   // being paid online: added by itself once paid
+      const to = r.to === 'admin' ? 'सुपर एडमिन' : r.to ? (who.get(r.to) || {}).name || '' : '';
+      return { ...reqView(r), name: u.name, phone: u.phone || '', toName: isSuper ? to : '' };
+    }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
+      : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300) : [];
+    // payments collected so far, per admin (pay:* in _lib.js), and what each has handed over; a village admin sees only
+    // their own
+    const nameOf = (id) => (id === 'admin' ? 'सुपर एडमिन' : (who.get(id) || {}).name || nameO[id] || id);
+    const collected = payIds.map((id) => ({ by: id, name: nameOf(id), rs: Number(rsO[id]) || 0, n: Number(nO[id]) || 0, count: Number(cO[id]) || 0,
+      settled: Number(sO[id]) || 0, due: id === 'admin' ? 0 : (Number(rsO[id]) || 0) - (Number(sO[id]) || 0) })).sort((a, b) => b.rs - a.rs);
+    return send(res, 200, { reqs, collected });
   }
 
   // the mark group a request names: the village's own marks (no cand) or one of its candidates'

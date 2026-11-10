@@ -443,19 +443,44 @@ const movesLeft = (u) => (isPrepaid(u) ? Math.max(0, MOVES - (Number(u.moves) ||
 //   mode 'direct': the village's first `people` sign-ups get `searches` each, later ones none;
 //   mode 'halving': the first `people` get `searches`, the next `people` half of it, and so on down to 1, then none
 //                   (10 → 5 → 2 → 1).
-const FREE = { mode: 'direct', people: 10, searches: 10 };
-const FREE_MAX = { people: 100000, searches: 1000 };
+//   cap: at most this many free searches in all per village (counted in hash "freegiven" by village, takeFree), 0 = no limit;
+//        the sign-up that reaches it gets what is left. The referral bonus is not counted.
+const FREE = { mode: 'direct', people: 10, searches: 10, cap: 0 };
+const FREE_MAX = { people: 100000, searches: 1000, cap: 10000000 };
 async function freeRule() {
   const h = (await redis('HGETALL', 'freerule')) || [], o = {};
   for (let i = 0; i < h.length; i += 2) o[h[i]] = h[i + 1];
-  const num = (v, max, d) => { const n = Math.floor(Number(v)); return n >= 1 && n <= max ? n : d; };
+  const num = (v, max, d, min = 1) => { const n = Math.floor(Number(v)); return n >= min && n <= max ? n : d; };
   return { mode: o.mode === 'halving' ? 'halving' : 'direct', people: num(o.people, FREE_MAX.people, FREE.people),
-    searches: num(o.searches, FREE_MAX.searches, FREE.searches) };
+    searches: num(o.searches, FREE_MAX.searches, FREE.searches), cap: num(o.cap, FREE_MAX.cap, FREE.cap, 0) };
 }
-// free searches for the village's sign-up number n + 1 (n = sign-ups there so far) under rule
+// free searches for the village's sign-up number n + 1 (n = sign-ups there so far) under rule, before the cap
 function freeFor(rule, n) {
   if (rule.mode !== 'halving') return n < rule.people ? rule.searches : 0;
   return Math.floor(rule.searches / 2 ** Math.floor(n / rule.people));
+}
+// free searches given by signing up in this village so far. A village from before the count starts at what the current
+// rule gave its sign-ups.
+async function freeGiven(slug, rule) {
+  const v = await redis('HGET', 'freegiven', slug);
+  if (v != null) return Number(v) || 0;
+  const n = await selfCount(slug);
+  let s = 0;
+  for (let i = 0; i < n; i++) s += freeFor(rule, i);
+  await redis('HSETNX', 'freegiven', slug, s);
+  return Number(await redis('HGET', 'freegiven', slug)) || 0;
+}
+// what a sign-up would get now: want = freeFor(...), less if the village's cap is nearly used up
+const freeLeft = async (slug, rule, want) => (rule.cap && want ? Math.min(want, Math.max(0, rule.cap - await freeGiven(slug, rule))) : want);
+// a sign-up takes up to `want` free searches from the village's count; returns how many it got (never past the cap,
+// even with sign-ups at the same moment)
+async function takeFree(slug, rule, want) {
+  if (!want) return 0;
+  await freeGiven(slug, rule);
+  const t = Number(await redis('HINCRBY', 'freegiven', slug, want));
+  const got = rule.cap ? Math.max(0, Math.min(want, rule.cap - (t - want))) : want;
+  if (got < want) await redis('HINCRBY', 'freegiven', slug, got - want);
+  return got;
 }
 // Referrals (रेफ़रल): a user's invite link is <site>/<village>?ref=<their id> (the app's 🎁 दोस्तों को बुलाएं button). A new
 // number that signs up through it gets `joiner` extra searches (not a number that signed up before), and the login
@@ -530,11 +555,13 @@ const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
 // Coupons (कूपन), made by the superadmin on the admin page (api/admin.js "coupon_set"): hash coupon:<CODE> with kind
 // 'pct' (value % off the pack's price) | 'rs' (₹value off) | 'bonus' (value extra searches) | 'bonuspct' (value % of the
-// pack's searches extra), and its conditions:
-// minN (only packs of at least minN searches), until (last day, YYYY-MM-DD, '' = none), maxUses (total, 0 = no limit),
+// pack's searches extra), maxOff (the most it gives for 'pct': ₹ off, for 'bonuspct': extra searches; 0 = no limit), and
+// its conditions:
+// minN / maxN (only packs of at least minN / at most maxN searches, 0 = any), until (last day, YYYY-MM-DD, '' = none), maxUses (total, 0 = no limit),
 // once '1' (once per person), first '1' (only a person's first purchase), on '1' / '0', show '1' (listed in the buy
 // window for everyone it fits, api/signup.js "coupons"; else only someone who has the code can use it); used = times
-// used so far; note.
+// used so far; note; banner '1' (shown as a banner in the app to everyone it fits; tapping it opens the buy window with
+// the coupon applied) with bannerText (its words, '' = made from the coupon).
 // Set "coupons" lists the codes; cpnusers:<CODE> = who has used it. A request made with a coupon (api/signup.js
 // 'request', api/pay.js 'start') keeps coupon, bonus and the lower rs; the coupon is counted as used when it is paid
 // (addPaid). A price never goes below ₹1.
@@ -547,17 +574,18 @@ async function getCoupon(code) {
   if (!arr || !arr.length) return null;
   const c = { code };
   for (let i = 0; i < arr.length; i += 2) c[arr[i]] = arr[i + 1];
-  for (const k of ['value', 'minN', 'maxUses', 'used']) c[k] = Number(c[k]) || 0;
-  for (const k of ['once', 'first', 'on', 'show']) c[k] = c[k] === '1';
-  c.until = c.until || '';
+  for (const k of ['value', 'maxOff', 'minN', 'maxN', 'maxUses', 'used']) c[k] = Number(c[k]) || 0;
+  for (const k of ['once', 'first', 'on', 'show', 'banner']) c[k] = c[k] === '1';
+  c.until = c.until || ''; c.bannerText = c.bannerText || '';
   return c;
 }
 // what pack n costs with coupon c: {rs, bonus}
 function couponPrice(c, n) {
   const base = packPrice(n);
-  if (c.kind === 'pct') return { rs: Math.max(1, Math.round(base * (100 - c.value) / 100)), bonus: 0 };
+  const most = (x) => (c.maxOff ? Math.min(x, c.maxOff) : x);   // the coupon's highest limit
+  if (c.kind === 'pct') return { rs: Math.max(1, base - most(base - Math.round(base * (100 - c.value) / 100))), bonus: 0 };
   if (c.kind === 'rs') return { rs: Math.max(1, base - c.value), bonus: 0 };
-  if (c.kind === 'bonuspct') return { rs: base, bonus: Math.floor(Number(n) * c.value / 100) };
+  if (c.kind === 'bonuspct') return { rs: base, bonus: most(Math.floor(Number(n) * c.value / 100)) };
   return { rs: base, bonus: c.value };
 }
 // can person u use coupon `code` (for pack n, if given)? → {c} or {error}
@@ -570,6 +598,7 @@ async function couponFor(code, u, n) {
   if (c.first && u.bought === '1') return { error: 'cpn_first' };
   if (c.once && await redis('SISMEMBER', `cpnusers:${c.code}`, u.id)) return { error: 'cpn_used' };
   if (n != null && c.minN && Number(n) < c.minN) return { error: 'cpn_min', minN: c.minN };
+  if (n != null && c.maxN && Number(n) > c.maxN) return { error: 'cpn_max', maxN: c.maxN };
   return { c };
 }
 // One open request per person per coupon, and one per person with any "first purchase" coupon, so the same coupon
@@ -606,7 +635,8 @@ async function useCoupon(code, uid, first) {
   return true;
 }
 // the coupon as the buy window sees it
-const couponView = (c) => ({ code: c.code, kind: c.kind, value: c.value, minN: c.minN, until: c.until, first: c.first });
+const couponView = (c) => ({ code: c.code, kind: c.kind, value: c.value, maxOff: c.maxOff, minN: c.minN, maxN: c.maxN, until: c.until, first: c.first,
+  show: c.show, banner: c.banner, bannerText: c.bannerText });
 async function newReqId() {   // 8 digits no request has yet
   let id;
   do id = String(crypto.randomInt(10000000, 100000000)); while (await getReq(id));
@@ -756,6 +786,6 @@ async function getCand(id) {
 }
 
 module.exports = { buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
+  FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

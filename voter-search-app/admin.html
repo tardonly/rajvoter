@@ -322,10 +322,12 @@
           <label class="fr num"><span>किस तरह का</span><select id="cpnKind">
             <option value="pct">% छूट</option><option value="rs">₹ छूट</option><option value="bonus">ज़्यादा सर्च मुफ़्त (संख्या)</option><option value="bonuspct">ज़्यादा सर्च मुफ़्त (%)</option></select></label>
           <label class="fr num"><span id="cpnValText">कितना</span><input id="cpnValue" type="number" min="1" inputmode="numeric"></label>
+          <label class="fr num" id="cpnMaxOffRow"><span id="cpnMaxOffText">ज़्यादा से ज़्यादा</span><input id="cpnMaxOff" type="number" min="0" inputmode="numeric" placeholder="0"></label>
         </div>
         <div class="sub" style="margin:0">शर्तें (खाली या 0 = कोई शर्त नहीं):</div>
         <div class="row">
           <label class="fr num"><span>कम से कम पैक (सर्च)</span><input id="cpnMin" type="number" min="0" inputmode="numeric" placeholder="0"></label>
+          <label class="fr num"><span>ज़्यादा से ज़्यादा पैक (सर्च)</span><input id="cpnMaxN" type="number" min="0" inputmode="numeric" placeholder="0"></label>
           <label class="fr num"><span>कुल कितनी बार</span><input id="cpnMax" type="number" min="0" inputmode="numeric" placeholder="0"></label>
           <label class="fr num"><span>आखिरी दिन</span><input id="cpnUntil" type="date"></label>
         </div>
@@ -333,6 +335,8 @@
         <label class="fr"><input type="checkbox" id="cpnFirst"> <span>सिर्फ़ पहली खरीद पर</span></label>
         <label class="fr"><input type="checkbox" id="cpnOn" checked> <span>चालू</span></label>
         <label class="fr"><input type="checkbox" id="cpnShow" checked> <span>खरीद विंडो में सबको दिखाएं (नहीं तो सिर्फ़ जिसे कोड पता हो)</span></label>
+        <label class="fr"><input type="checkbox" id="cpnBanner"> <span>ऐप में बैनर दिखाएं — दबाने पर खरीद विंडो यह कूपन लगाकर खुलेगी</span></label>
+        <label class="fr num" id="cpnBannerRow"><span>बैनर पर लिखा संदेश (खाली = अपने आप)</span><input id="cpnBannerText" maxlength="120" placeholder="🎁 BONUS50: हर पैक पर 50 सर्च मुफ़्त — अभी लें"></label>
         <label class="fr num"><span>नोट (अपने लिए)</span><input id="cpnNote" maxlength="100"></label>
         <div class="row"><button class="btn" id="cpnSave" type="button">कूपन बनाएं</button><button class="btn ghost hidden" id="cpnCancel" type="button">रद्द</button></div>
         <div class="sub" id="cpnMsg" style="margin:0"></div>
@@ -349,6 +353,7 @@
           <label class="fr num"><span>लोग (X)</span><input id="freePeople" type="number" min="1" max="100000" inputmode="numeric"></label>
           <label class="fr num"><span>सर्च (Y)</span><input id="freeSearches" type="number" min="1" max="1000" inputmode="numeric"></label>
         </div>
+        <label class="fr num"><span>हर गाँव में कुल ज़्यादा से ज़्यादा मुफ़्त सर्च (0 = कोई सीमा नहीं)</span><input id="freeCap" type="number" min="0" max="10000000" inputmode="numeric" placeholder="0"></label>
         <div class="sub" id="freePreview" style="margin:0"></div>
         <button class="btn" id="freeSave" type="button">सेव करें</button>
         <div class="sub" id="freeMsg" style="margin:0"></div>
@@ -518,7 +523,9 @@ const store = {
   set(v) { try { localStorage.setItem('tok:admin', v); } catch (e) {} },
   del() { try { localStorage.removeItem('tok:admin'); sessionStorage.removeItem('tok:admin'); } catch (e) {} },
 };
-let MARKED = {}, STATS = null;   // from "stats" (api/admin.js), loaded after the page shows: slips marked per person; null = not yet
+let MARKED = {}, MARKED_IN = false, STATS = null, fullStats = false;   // fullStats: a marks tab was opened, so progress per ward too
+const MARK_TABS = ['prog', 'voters', 'clear'], SETTING_TABS = ['ref', 'cpn', 'free'];
+let settingsBusy = null, settingsIn = false;   // from "stats" (api/admin.js), loaded after the page shows: slips marked per person; null = not yet
 let token = store.get(), me = null, users = [], admins = [], reqs = [], collected = null, filter = 'on', villages = {}, progress = [], cands = [];
 const MSG = EN ? {
   wrong: 'Wrong password', too_many: 'Too many wrong passwords — try again in 15 minutes',
@@ -527,7 +534,7 @@ const MSG = EN ? {
   other_device: 'This password was opened on another phone — please log in again',
   offline: 'No internet', server: 'Server problem', name: 'Type a name', not_found: 'Person not found',
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
-  no_perm: 'You are not allowed to do this — ask the super admin', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000 and searches 1–1000',
+  no_perm: 'You are not allowed to do this — ask the super admin', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
   bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
@@ -538,7 +545,7 @@ const MSG = EN ? {
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
-  no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000 और सर्च 1–1000 डालें',
+  no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
   bad_credits: 'कितनी सर्च जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में सर्च नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
@@ -576,40 +583,71 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 // ---------- login ----------
 function showLogin(msg) {
   token = null; me = null; users = []; admins = []; reqs = []; showBell();
+  MARKED = {}; MARKED_IN = false; STATS = null; fullStats = false; settingsIn = false;
   $('list').innerHTML = ''; $('adminList').innerHTML = ''; $('newPw').classList.add('hidden'); $('addModal').classList.add('hidden');
   $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
   $('loginMsg').textContent = msg || '';
   if (APPROVE) $('loginMsg').textContent += (msg ? ' · ' : '') + approveHint();
 }
+// The page shows at once (with ⏳ in the person list); then the person list ("list"); then, without waiting, the 🔔
+// requests ("reqs") and how many slips each person marked ("stats" only: 'marked'). Progress per ward (the full
+// "stats") loads when a marks tab is first opened, and the superadmin's settings tabs ("settings") when one is opened.
 async function openPanel() {
+  $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
+  if (!me) {
+    $('list').replaceChildren(el('div', 'empty', L('⏳ लोड हो रहा है…', '⏳ Loading…')));
+    document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.dataset.tab === 'people'));
+    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === 'people'));
+  }
   const r = await api({ action: 'list' });
   if (['wrong', 'retired', 'logged_out', 'other_device'].includes(r.error)) { store.del(); return goHome(MSG[r.error]); }
   if (r.error) return showLogin(errText(r));
-  me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; progress = r.progress || []; reqs = r.reqs || []; collected = r.collected || null; showBell();
+  me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || [];
   for (const v of r.villageList || []) villages[v.slug] = v;
   setup(); showMarks(r);
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
-  showFreeRule(r.freeRule); showRefRule(r.refRule); showCoupons(r.coupons);
-  $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
+  for (const id of ['tabRef', 'tabCpn', 'tabFree']) $(id).classList.toggle('hidden', me.role !== 'super');   // filled when opened
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
   approveFromLink();
-  loadStats();   // progress and marks: slower, so after the page is up
+  loadReqs();
+  loadStats();   // how many slips each person marked (and progress, if a marks tab is open)
+}
+async function loadReqs() {   // the 🔔 requests and the money collected (api/admin.js "reqs")
+  const r = await api({ action: 'reqs' });
+  if (r.error) return;
+  reqs = r.reqs || []; collected = r.collected || null; showBell();
+}
+function loadSettings() {   // superadmin: free searches, referrals and coupons (api/admin.js "settings"), when a tab opens
+  if (settingsIn || settingsBusy) return settingsBusy;
+  for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = L('⏳ लोड हो रहा है…', '⏳ Loading…');
+  settingsBusy = (async () => {
+    const r = await api({ action: 'settings' });
+    if (r.error) { for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = errText(r); return; }
+    settingsIn = true;
+    showFreeRule(r.freeRule); showRefRule(r.refRule); showCoupons(r.coupons);
+  })();
+  return settingsBusy.finally(() => { settingsBusy = null; });
 }
 // "stats" (api/admin.js): progress per ward and slips marked per person; all = every village, not just those with marks
 let statsBusy = null;
 const STATS_PAGE = 30;   // villages more per "और गाँव दिखाएं" (STATS_ALL in api/admin.js)
 async function loadStats(all) {   // all: how many villages/candidates to show, those with marks first (0 = only those)
   if (statsBusy) return statsBusy;
+  const full = fullStats;
   statsBusy = (async () => {
     const n = all || (STATS && STATS.all) || 0;
-    const r = await api({ action: 'stats', all: n });
+    const r = await api(full ? { action: 'stats', all: n } : { action: 'stats', only: 'marked' });
     if (r.error) { $('progFoot').textContent = errText(r); return; }
+    const was = MARKED_IN && JSON.stringify(MARKED);
+    MARKED = r.marked || {}; MARKED_IN = true;
+    if (was !== JSON.stringify(MARKED)) render();   // the marks on each person's card
+    if (!full) { if (typeof r.survey === 'boolean') setMode(r.survey); return; }
     STATS = { partial: r.partial, groups: r.groups, all: n };
-    MARKED = r.marked || {};
     showMarks(r);
     if (document.querySelector('.pane.on[data-tab="voters"]') && !vs.loaded) loadVoters();
   })();
   try { await statsBusy; } finally { statsBusy = null; }
+  if (fullStats && !full) loadStats();   // a marks tab opened while the quick one was on its way
 }
 // move people's data from Upstash into USER_REDIS_URL (api/admin.js "db_copy"), step by step, then reload the lists
 $('dbCopyBtn').addEventListener('click', async () => {
@@ -643,11 +681,14 @@ function freeWords(mode, people, searches) {
 }
 function freeForm() {
   const mode = (document.querySelector('input[name=freeMode]:checked') || {}).value || 'direct';
-  return { mode, people: Math.floor(Number($('freePeople').value)), searches: Math.floor(Number($('freeSearches').value)) };
+  return { mode, people: Math.floor(Number($('freePeople').value)), searches: Math.floor(Number($('freeSearches').value)),
+    cap: Math.floor(Number($('freeCap').value) || 0) };
 }
+const freeCapWords = (cap) => (cap ? L(` · हर गाँव में कुल ${cap} तक, फिर 0`, ` · at most ${cap} in all per village, then 0`) : '');
 function freePreview() {
-  const f = freeForm(), ok = f.people >= 1 && f.people <= 100000 && f.searches >= 1 && f.searches <= 1000;
-  $('freePreview').textContent = ok ? freeWords(f.mode, f.people, f.searches) : L('लोग 1–100000 और सर्च 1–1000 डालें', 'Enter people 1–100000 and searches 1–1000');
+  const f = freeForm(), ok = f.people >= 1 && f.people <= 100000 && f.searches >= 1 && f.searches <= 1000 && f.cap >= 0 && f.cap <= 10000000;
+  $('freePreview').textContent = ok ? freeWords(f.mode, f.people, f.searches) + freeCapWords(f.cap)
+    : L('लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें', 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000');
   $('freeSave').disabled = !ok;
 }
 function showFreeRule(rule) {
@@ -656,11 +697,12 @@ function showFreeRule(rule) {
   if (!rule) return;
   $('freeNow').textContent = rule.mode === 'halving' ? L(`घटते हुए, ${rule.people} लोग, ${rule.searches} से`, `halving, ${rule.people} people, from ${rule.searches}`)
     : L(`सीधे, पहले ${rule.people} लोगों को ${rule.searches}`, `direct, first ${rule.people} people get ${rule.searches}`);
+  $('freeNow').textContent += rule.cap ? L(` · कुल ${rule.cap} तक`, ` · at most ${rule.cap}`) : '';
   for (const r of document.querySelectorAll('input[name=freeMode]')) r.checked = r.value === rule.mode;
-  $('freePeople').value = rule.people; $('freeSearches').value = rule.searches;
+  $('freePeople').value = rule.people; $('freeSearches').value = rule.searches; $('freeCap').value = rule.cap || 0;
   freePreview();
 }
-for (const e of document.querySelectorAll('input[name=freeMode], #freePeople, #freeSearches')) e.addEventListener('input', freePreview);
+for (const e of document.querySelectorAll('input[name=freeMode], #freePeople, #freeSearches, #freeCap')) e.addEventListener('input', freePreview);
 $('freeSave').addEventListener('click', async () => {
   $('freeSave').disabled = true; $('freeMsg').textContent = '';
   const r = await api({ action: 'free_rule', ...freeForm() });
@@ -691,8 +733,9 @@ $('refSave').addEventListener('click', async () => {
 });
 // coupons (getCoupon in api/_lib.js): the list, each with ✎ (into the form) and 🗑; the form makes or changes one
 let COUPONS = [], cpnEdit = null;
-const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट` : c.kind === 'rs' ? `₹${c.value} छूट` : c.kind === 'bonuspct' ? `${c.value}% ज़्यादा सर्च मुफ़्त` : `${c.value} सर्च मुफ़्त`);
-const cpnRules = (c) => [c.show ? 'खरीद विंडो में दिखता है' : 'छुपा (सिर्फ़ कोड से)', c.minN ? `${c.minN}+ सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
+const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट${c.maxOff ? ` (₹${c.maxOff} तक)` : ''}` : c.kind === 'rs' ? `₹${c.value} छूट`
+  : c.kind === 'bonuspct' ? `${c.value}% ज़्यादा सर्च मुफ़्त${c.maxOff ? ` (${c.maxOff} सर्च तक)` : ''}` : `${c.value} सर्च मुफ़्त`);
+const cpnRules = (c) => [c.show ? 'खरीद विंडो में दिखता है' : 'छुपा (सिर्फ़ कोड से)', c.minN && c.maxN ? `${c.minN}–${c.maxN} सर्च के पैक पर` : c.minN ? `${c.minN}+ सर्च के पैक पर` : c.maxN ? `${c.maxN} तक सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
   c.until ? `${c.until} तक` : '', `${c.used}${c.maxUses ? `/${c.maxUses}` : ''} बार इस्तेमाल`].filter(Boolean).join(' · ');
 function showCoupons(list) {
   $('cpnCard').classList.toggle('hidden', !list);
@@ -705,10 +748,14 @@ function showCoupons(list) {
     const row = el('div', 'sub');
     row.style.cssText = 'margin:0;padding:8px;border:1px solid #e5e7eb;border-radius:8px;display:flex;gap:8px;align-items:center';
     const txt = el('div'); txt.style.flex = '1';
-    txt.append(el('b', null, `${c.code} — ${cpnWhat(c)}`), c.on ? '' : el('span', null, ' (बंद)'), el('br'), cpnRules(c), c.note ? el('div', null, c.note) : '');
+    txt.append(el('b', null, `${c.code} — ${cpnWhat(c)}`), c.on ? '' : el('span', null, ' (बंद)'), el('br'), cpnRules(c), c.banner ? el('div', null, `📣 बैनर: ${c.bannerText || 'अपने आप'}`) : '', c.note ? el('div', null, c.note) : '');
     const ed = el('button', 'btn ghost', '✎'), del = el('button', 'btn ghost', '🗑');
     for (const x of [ed, del]) { x.type = 'button'; x.style.cssText = 'width:auto;padding:6px 10px;margin:0'; }
-    ed.addEventListener('click', () => cpnForm(c));
+    ed.addEventListener('click', () => {   // the form is below the list: bring it into sight, else nothing seems to happen
+      cpnForm(c);
+      $('cpnFormTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $('cpnValue').focus({ preventScroll: true });
+    });
     del.addEventListener('click', async () => {
       if (!confirm(`कूपन ${c.code} हटाएं? (जो अनुरोध इससे बन चुके हैं, उनकी कीमत वही रहेगी)`)) return;
       const r = await api({ action: 'coupon_del', code: c.code });
@@ -724,26 +771,36 @@ function cpnForm(c) {
   cpnEdit = c ? c.code : null;
   $('cpnFormTitle').textContent = c ? `कूपन ${c.code} बदलें` : 'नया कूपन';
   $('cpnCode').value = c ? c.code : ''; $('cpnCode').disabled = !!c;
-  $('cpnKind').value = c ? c.kind : 'pct'; $('cpnValue').value = c ? c.value : '';
-  $('cpnMin').value = c && c.minN ? c.minN : ''; $('cpnMax').value = c && c.maxUses ? c.maxUses : ''; $('cpnUntil').value = c ? c.until : '';
+  $('cpnKind').value = c ? c.kind : 'pct'; $('cpnValue').value = c ? c.value : ''; $('cpnMaxOff').value = c && c.maxOff ? c.maxOff : '';
+  $('cpnMin').value = c && c.minN ? c.minN : ''; $('cpnMaxN').value = c && c.maxN ? c.maxN : ''; $('cpnMax').value = c && c.maxUses ? c.maxUses : ''; $('cpnUntil').value = c ? c.until : '';
   $('cpnOnce').checked = c ? c.once : true; $('cpnFirst').checked = c ? c.first : false; $('cpnOn').checked = c ? c.on : true; $('cpnShow').checked = c ? c.show : true;
   $('cpnNote').value = c ? c.note || '' : '';
+  $('cpnBanner').checked = c ? !!c.banner : false; $('cpnBannerText').value = c ? c.bannerText || '' : '';
+  $('cpnBannerRow').classList.toggle('hidden', !$('cpnBanner').checked);
   $('cpnSave').textContent = c ? 'सेव करें' : 'कूपन बनाएं';
   $('cpnCancel').classList.toggle('hidden', !c);
   $('cpnMsg').textContent = '';
   cpnKindText();
 }
-const cpnKindText = () => { $('cpnValText').textContent = { pct: 'कितने % (1–99)', rs: 'कितने ₹', bonus: 'कितनी सर्च', bonuspct: 'कितने % सर्च ज़्यादा (1–1000)' }[$('cpnKind').value]; };
+const cpnKindText = () => {
+  const k = $('cpnKind').value;
+  $('cpnValText').textContent = { pct: 'कितने % (1–99)', rs: 'कितने ₹', bonus: 'कितनी सर्च', bonuspct: 'कितने % सर्च ज़्यादा (1–1000)' }[k];
+  // a % coupon's highest limit: the most ₹ off / the most extra searches (₹ and number coupons are fixed already)
+  $('cpnMaxOffRow').classList.toggle('hidden', k !== 'pct' && k !== 'bonuspct');
+  $('cpnMaxOffText').textContent = k === 'pct' ? 'ज़्यादा से ज़्यादा ₹ छूट (0 = कोई सीमा नहीं)' : 'ज़्यादा से ज़्यादा मुफ़्त सर्च (0 = कोई सीमा नहीं)';
+};
 $('cpnKind').addEventListener('change', cpnKindText);
 $('cpnCancel').addEventListener('click', () => cpnForm(null));
+$('cpnBanner').addEventListener('change', () => $('cpnBannerRow').classList.toggle('hidden', !$('cpnBanner').checked));
 $('cpnSave').addEventListener('click', async () => {
   $('cpnSave').disabled = true; $('cpnMsg').textContent = '';
-  const r = await api({ action: 'coupon_set', isNew: !cpnEdit, code: $('cpnCode').value, kind: $('cpnKind').value, value: $('cpnValue').value,
-    minN: $('cpnMin').value, maxUses: $('cpnMax').value, until: $('cpnUntil').value, once: $('cpnOnce').checked, first: $('cpnFirst').checked,
-    on: $('cpnOn').checked, show: $('cpnShow').checked, note: $('cpnNote').value });
+  const r = await api({ action: 'coupon_set', isNew: !cpnEdit, code: $('cpnCode').value, kind: $('cpnKind').value, value: $('cpnValue').value, maxOff: $('cpnMaxOff').value,
+    minN: $('cpnMin').value, maxN: $('cpnMaxN').value, maxUses: $('cpnMax').value, until: $('cpnUntil').value, once: $('cpnOnce').checked, first: $('cpnFirst').checked,
+    on: $('cpnOn').checked, show: $('cpnShow').checked, note: $('cpnNote').value,
+    banner: $('cpnBanner').checked, bannerText: $('cpnBannerText').value });
   $('cpnSave').disabled = false;
   if (r.error) {
-    $('cpnMsg').textContent = { cpn_code: 'कोड में 3 से 15 अंग्रेज़ी अक्षर या अंक हों', cpn_rule: 'कीमत/संख्या सही डालें (% 1 से 99 तक)', cpn_exists: 'यह कोड पहले से है' }[r.error] || errText(r);
+    $('cpnMsg').textContent = { cpn_code: 'कोड में 3 से 15 अंग्रेज़ी अक्षर या अंक हों', cpn_rule: 'कीमत/संख्या सही डालें (% 1 से 99 तक; ज़्यादा से ज़्यादा पैक, कम से कम पैक से छोटा न हो)', cpn_exists: 'यह कोड पहले से है' }[r.error] || errText(r);
     return;
   }
   showCoupons([...COUPONS.filter((x) => x.code !== r.coupon.code), r.coupon].sort((a, b) => (a.code < b.code ? -1 : 1)));
@@ -1101,6 +1158,9 @@ function showTab(name) {
   const bar = $('tabs'), on = bar.querySelector('button.on');   // keep the chosen tab in sight on a narrow phone
   bar.scrollLeft = on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2;
   saved.set('adminTab', btn);
+  if (!me) return;   // the person list is still on its way (openPanel)
+  if (MARK_TABS.includes(btn) && !fullStats) { fullStats = true; loadStats(); }   // progress per ward: only when wanted
+  if (SETTING_TABS.includes(btn) && me.role === 'super') loadSettings();
   if (btn === 'voters' && !vs.loaded && STATS) loadVoters();   // else once "stats" is in (loadStats)
 }
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -1132,9 +1192,9 @@ const checkedIn = (box) => [...box.querySelectorAll('input[value]:checked:not(:d
 const samitisIn = (box) => [...box.querySelectorAll('input[data-samiti]:checked')].map((c) => c.dataset.samiti);
 
 async function refresh(stats = false) {   // stats: progress and marks too (loadStats), when they may have changed
-  const r = await api({ action: 'list' });
+  const [r] = await Promise.all([api({ action: 'list' }), loadReqs()]);
   if (r.error) { $('listMsg').textContent = errText(r); return; }
-  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; reqs = r.reqs || []; collected = r.collected || null; showBell(); render();
+  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; render();
   if (typeof r.survey === 'boolean') setMode(r.survey);
   if (stats) loadStats();
 }
@@ -1718,7 +1778,7 @@ function person(u) {
     act({ action: 'phone', id: u.id, phone: v }).then((r) => { if (r && r.password) showPassword(r.user, r.password); });
   });
   ph.append(edit);
-  const use = el('div', 'info', STATS ? L(`${MARKED[u.id] || 0} पर्चियों पर इनके निशान`, `Their marks on ${MARKED[u.id] || 0} slips`) : L('निशान: ⏳', 'Marks: ⏳'));
+  const use = el('div', 'info', MARKED_IN ? L(`${MARKED[u.id] || 0} पर्चियों पर इनके निशान`, `Their marks on ${MARKED[u.id] || 0} slips`) : L('निशान: ⏳', 'Marks: ⏳'));
   const meter = isAdmin && u.limit == null ? null : useMeter(u);   // an admin: only with a limit from the superadmin
   // referrals: who invited this person, and the people they invited (refRule in api/_lib.js)
   const invited = users.filter((x) => x.refBy === u.id), invBought = invited.filter((x) => x.refPaid).length;
