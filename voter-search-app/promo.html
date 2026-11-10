@@ -41,7 +41,22 @@
   .cta.signup { background: var(--green); color: #fff; box-shadow: 0 4px 12px rgba(22, 163, 74, .3); }
   .cta.demo { background: #fff; color: var(--accent); border: 1.5px solid var(--accent); }
   .main-video { width: 100%; border-radius: 14px; background: #000; display: block; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
-  .main-video.phone { max-width: 340px; margin: 0 auto; }
+  .vwrap { position: relative; }
+  .vwrap.phone { width: 100%; max-width: 340px; margin: 0 auto; }
+
+  /* when a video ends: sign up, share it, or watch again */
+  .vend { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 14px;
+    background: rgba(17, 24, 39, .86); color: #fff; text-align: center; border-radius: 14px; }
+  .vend[hidden] { display: none; }
+  .vend p { margin: 0 0 4px; font-size: 18px; font-weight: 700; line-height: 1.35; }
+  .vend a, .vend button { display: block; width: 100%; max-width: 300px; margin: 0 auto; font: inherit; font-size: 16px; font-weight: 700; text-decoration: none;
+    padding: 12px 8px; border-radius: 10px; border: 0; cursor: pointer; }
+  .vend .su { background: var(--green); color: #fff; }
+  .vend .sh { background: #fff; color: #166534; }
+  .vend .again { background: none; color: #e5e7eb; font-weight: 600; padding: 6px; }
+  .short .vend { border-radius: 0; gap: 7px; padding: 8px; }
+  .short .vend p { font-size: 14px; }
+  .short .vend a, .short .vend button { font-size: 13.5px; padding: 9px 4px; }
 
   /* what it does */
   .feats { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 10px; }
@@ -188,13 +203,33 @@
   const wide = matchMedia('(min-width: 900px)').matches;
   const mv = $('mainVideo');
   mv.src = `/promo-${wide ? 'laptop' : 'phone'}.mp4#t=1`;
-  mv.classList.toggle('phone', !wide);
 
   // one video at a time
   const vids = document.querySelectorAll('video');
   vids.forEach((v) => v.addEventListener('play', () => vids.forEach((o) => { if (o !== v) o.pause(); })));
 
   const wa = (text) => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  const shortText = (path) => `${LINE}\nवीडियो: ${SITE.replace(/\/$/, '')}${path}\nऔर वीडियो: ${PAGE}\nशुरू करें: ${SITE}`;
+  const track = (name, video) => { try { window.va('event', { name, data: { video } }); } catch {} };
+
+  // when a video ends, a card over it: sign up, share it on WhatsApp, or watch again; it goes away when the video plays or is scrubbed
+  vids.forEach((v) => {
+    const short = v.closest('.short'), path = short ? short.querySelector('[data-wa]').dataset.wa : '/promo';
+    const box = document.createElement('div');
+    box.className = 'vwrap' + (v === mv && !wide ? ' phone' : '');
+    v.before(box); box.append(v);
+    const end = document.createElement('div');
+    end.className = 'vend'; end.hidden = true;
+    end.innerHTML = `<p>पसंद आया?</p><a class="su" href="/">📱 साइन अप करें</a><button class="sh" type="button">WhatsApp पर शेयर करें</button>`
+      + `<button class="again" type="button">↻ फिर से देखें</button>`;
+    box.append(end);
+    v.addEventListener('ended', () => { end.hidden = false; track('video_end', path); });
+    v.addEventListener('play', () => { end.hidden = true; });
+    v.addEventListener('seeking', () => { if (!v.ended) end.hidden = true; });
+    end.querySelector('.su').addEventListener('click', () => track('video_end_signup', path));
+    end.querySelector('.sh').addEventListener('click', () => { track('video_end_share', path); wa(short ? shortText(path) : TEXT); });
+    end.querySelector('.again').addEventListener('click', () => { v.currentTime = 0; v.play(); });
+  });
   $('shWa').addEventListener('click', (e) => { e.preventDefault(); wa(TEXT); });
   if (!navigator.share) $('shMore').style.display = 'none';
   $('shMore').addEventListener('click', () => navigator.share({ title: 'Voter Search', text: LINE, url: PAGE }).catch(() => {}));
@@ -207,7 +242,7 @@
   // a short on WhatsApp: its own link, and this page's (for a status, ⬇ सेव keeps the video on the phone)
   document.querySelectorAll('[data-wa]').forEach((a) => a.addEventListener('click', (e) => {
     e.preventDefault();
-    wa(`${LINE}\nवीडियो: ${SITE.replace(/\/$/, '')}${a.dataset.wa}\nऔर वीडियो: ${PAGE}\nशुरू करें: ${SITE}`);
+    wa(shortText(a.dataset.wa));
   }));
 
   // ⬇ सेव: the videos live in the public GitHub repo ramcala/rajelection-videos, served by jsDelivr (vercel.json sends /<name>.mp4 there), and a browser saves a link from another
