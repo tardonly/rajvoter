@@ -364,6 +364,7 @@
     #printArea .fth { font-size: 16px; font-weight: 700; margin: 0 0 3mm; }
     #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
     #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #printArea .pbreak { break-before: page; page-break-before: always; }
   }
 </style>
 </head>
@@ -1132,12 +1133,18 @@ async function toggleFamily(r, d, btn) {
       tree = treeView(x.results, (v) => slips.get(v.box));
       fh.after(tree); tb.classList.add('on');
       if (can('print')) {
-        pb = el('button', 'tbtn', L('प्रिंट / PDF', 'Print / PDF')); pb.type = 'button';
-        pb.addEventListener('click', () => printTree(tree, r));
+        pb = el('button', 'tbtn', L('वंशावली + पर्चियाँ · प्रिंट / PDF', 'Family tree + slips · Print / PDF')); pb.type = 'button';
+        pb.addEventListener('click', () => printTree(tree, r, x.results));
         tb.after(pb);
       }
     });
     fh.append(tb);
+  }
+  if (can('print') && x.results.some((v) => !v.del)) {   // every slip of the house in one PDF
+    const fp = el('button', 'tbtn', L('पूरे परिवार की पर्चियाँ · प्रिंट / PDF', "Whole family's slips · Print / PDF")); fp.type = 'button';
+    fp.addEventListener('click', () => printSlips(x.results.filter((v) => !v.del),
+      L(`परिवार ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`)));
+    fh.append(fp);
   }
   d.after(box);
   btn.classList.add('on'); btn.textContent = L('परिवार छुपाएं', 'Hide family');
@@ -1307,13 +1314,20 @@ function treeView(rows, slipOf) {
     '═ husband and wife. A guess from the names and ages on the list, not a record.')));
   return wrap;
 }
-function printTree(tree, r) {
+// the tree, then every slip of the house (struck-off voters left out) on the following page(s)
+function printTree(tree, r, rows) {
   const area = $('printArea'); area.innerHTML = '';
   const head = el('div', 'fth', L(`${VILLAGE.name} · वार्ड ${r.ward} · मकान नं. ${r.house} · वंशावली`,
     `${vn(VILLAGE)} · ward ${r.ward} · house no. ${r.house} · family tree`));
   const c = tree.cloneNode(true);
   c.querySelectorAll('.fnote').forEach((n, i, all) => { if (i < all.length - 1) n.remove(); });
   area.append(head, c);
+  const live = (rows || []).filter((v) => !v.del);
+  if (live.length) {
+    const sh = el('div', 'fth pbreak', L(`परिवार की पर्चियाँ (${live.length})`, `Family slips (${live.length})`));
+    area.append(sh);
+    for (const v of live) area.append(slip(v, true));
+  }
   const old = document.title;
   document.title = L(`वंशावली ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family tree ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`);
   window.addEventListener('afterprint', () => { document.title = old; area.innerHTML = ''; }, { once: true });
