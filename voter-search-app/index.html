@@ -58,7 +58,7 @@
   #signStep select + select { margin-top: 8px; }
   .movesel { width: 100%; padding: 10px 12px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   #signStep select { width: 100%; padding: 12px 14px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
-  .lockbox .phonenote:empty { display: none; }
+  .lockbox .phonenote:empty { margin: 0; height: 14px; }   /* nothing to say: just a gap between the number and the button */
   .lockalt { display: flex; justify-content: center; gap: 14px; margin-top: 10px; }
   .lockalt button { border: 0; background: none; color: var(--accent); font-size: 13.5px; text-decoration: underline; padding: 4px; }
   #buyPop .card { max-width: 440px; }
@@ -138,6 +138,15 @@
   .howcut { display: flex; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); }
   .howcut button { background: transparent; color: #fff; padding: 6px 12px; }
   .howcut button.on { background: #fff; color: #111; }
+  /* at the video's end: sign up, the demo, watch again */
+  .howend { position: absolute; left: 0; right: 0; bottom: 0; top: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 20px 16px; background: rgba(0, 0, 0, 0.72); }
+  .howend h3 { color: #fff; font-size: 24px; margin: 0 0 6px; text-align: center; }
+  .howend a, .howend button { width: 100%; max-width: 360px; box-sizing: border-box; padding: 14px 12px; border-radius: 12px; border: 0; text-align: center;
+    font-size: 18px; font-weight: 700; text-decoration: none; }
+  #howSignup { background: #16a34a; color: #fff; }
+  #howDemo { background: #fff; color: #1f4e8c; }
+  #howAgain { background: transparent; color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.6); font-size: 16px; padding: 10px 12px; }
   /* share: the promo video and the site's link, for WhatsApp status, a chat or any other app */
   #sharePop { z-index: 60; align-items: center; }
   #sharePop .card { max-width: 420px; }
@@ -414,9 +423,9 @@
     <img src="/icon-192.png" alt="">
     <h1>Voter Search</h1>
     <p id="lockSub"></p>
-    <form id="lockForm">
+    <form id="lockForm" novalidate>
       <!-- the mobile number first: a known number then gets the password box, a new one signs up -->
-      <input id="phone" type="tel" inputmode="numeric" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर डालें">
+      <input id="phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर डालें">
       <div class="phonenote" id="phoneNote"></div>
       <div id="pwStep" class="hidden">
         <input id="pw" type="password" autocomplete="current-password" placeholder="पासवर्ड डालें" autocapitalize="none" autocorrect="off" spellcheck="false">
@@ -442,7 +451,7 @@
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
     <div id="demoLink" class="demolink hidden"><span>खाता नहीं है? बिना खाते के असली मतदाता सूची में सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
-    <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
+    <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
 </section>
 
@@ -453,6 +462,12 @@
     <button id="howClose" type="button" aria-label="बंद करें">✕</button>
   </div>
   <video id="howVideo" controls playsinline preload="none"></video>
+  <div id="howEnd" class="howend hidden">
+    <h3>पसंद आया? अभी शुरू करें</h3>
+    <button id="howSignup" type="button">📱 मोबाइल नंबर से साइन अप करें</button>
+    <a id="howDemo" href="/demo">🔍 फ़्री डेमो आज़माएं</a>
+    <button id="howAgain" type="button">↻ फिर से देखें</button>
+  </div>
 </div>
 
 <div id="sharePop" class="progpop hidden" role="dialog" aria-label="शेयर करें">
@@ -520,7 +535,7 @@
     <img src="/icon-192.png" alt="">
     <h1>Voter Search</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
-    <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ वीडियो देखें</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
+    <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
     <div class="vfind hidden" id="vFind">
       <select id="vPs" aria-label="पंचायत समिति"></select>
       <input id="vSearch" type="search" placeholder="🔍 गाँव सर्च करें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -603,7 +618,9 @@ const STATIC_EN = {
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
   'डेमो देखें': 'Try the demo',
   'खाता नहीं है? बिना खाते के असली मतदाता सूची में सर्च करके देखें': 'No login? Try searching a real voter list without one',
-  '▶ वीडियो देखें': '▶ Watch the video', '↗ शेयर करें': '↗ Share', '↗ शेयर': '↗ Share', 'शेयर करें': 'Share',
+  '▶ 30 सेकंड में देखें ऐप का कमाल': '▶ See the app in action — 30 seconds',
+  '📱 मोबाइल नंबर से साइन अप करें': '📱 Sign up with your mobile number', '🔍 फ़्री डेमो आज़माएं': '🔍 Try the free demo', '↻ फिर से देखें': '↻ Watch again',
+  'पसंद आया? अभी शुरू करें': 'Liked it? Start now', '↗ शेयर करें': '↗ Share', '↗ शेयर': '↗ Share', 'शेयर करें': 'Share',
   'ऐप कैसे काम करता है': 'How the app works', 'वीडियो': 'Video', '📱 फ़ोन': '📱 Phone', '💻 लैपटॉप': '💻 Laptop', 'बंद करें': 'Close',
   'WhatsApp स्टेटस पर लगाएं': 'Post on WhatsApp status', 'ऐप का वीडियो और लिंक, फिर "My status" चुनें': 'The app\'s video and link, then choose "My status"',
   'WhatsApp पर भेजें': 'Send on WhatsApp', 'किसी चैट या ग्रुप में ऐप का लिंक': 'The app\'s link in a chat or group',
@@ -830,6 +847,19 @@ function howClose() {
   $('howVideo').pause();
   $('howPop').classList.add('hidden');
 }
+// at the end: sign up (the start page's mobile number box), the demo (not on the demo itself), or watch again
+$('howVideo').addEventListener('ended', () => {
+  $('howDemo').classList.toggle('hidden', DEMO);
+  $('howEnd').classList.remove('hidden');
+});
+$('howVideo').addEventListener('play', () => $('howEnd').classList.add('hidden'));
+$('howAgain').addEventListener('click', () => { $('howVideo').currentTime = 0; $('howVideo').play().catch(() => {}); });
+$('howSignup').addEventListener('click', () => {
+  if (DEMO || location.pathname !== '/' || $('lock').classList.contains('hidden')) { location.href = '/'; return; }
+  howClose();
+  const ph = $('phone');
+  if (ph && ph.offsetParent) { ph.scrollIntoView({ block: 'center' }); ph.focus(); }
+});
 $('homeHow').addEventListener('click', howOpen);
 $('demoHow').addEventListener('click', howOpen);
 $('howClose').addEventListener('click', howClose);
@@ -1731,7 +1761,7 @@ function demoBar() {
       if (!name) { gaon.focus(); gaon.placeholder = L('पहले अपने गाँव का नाम लिखें', 'First type your village\'s name'); return; }
       window.open(waLink(name), '_blank', 'noopener');
     });
-    const acts = el('div', 'homeacts'), how = el('button', null, L('▶ वीडियो देखें', '▶ Watch the video')), share = el('button', 'share', L('↗ शेयर करें', '↗ Share'));
+    const acts = el('div', 'homeacts'), how = el('button', null, L('▶ 30 सेकंड में देखें ऐप का कमाल', '▶ See the app in action — 30 seconds')), share = el('button', 'share', L('↗ शेयर करें', '↗ Share'));
     how.type = share.type = 'button';
     how.addEventListener('click', howOpen); share.addEventListener('click', shareOpen);
     acts.append(how, share);
