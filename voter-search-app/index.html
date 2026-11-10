@@ -360,6 +360,10 @@
   /* laptops and big tablets: the header's boxes on one line, the slips side by side, the village list in columns */
   @media (min-width: 900px) {
     header > * { max-width: 1240px; margin-left: auto; margin-right: auto; }
+    /* coupon banners: lined up with the header's content, cards of one size (a single one doesn't stretch across) */
+    #cpnBanners { padding-left: max(12px, calc((100% - 1240px) / 2)); padding-right: max(12px, calc((100% - 1240px) / 2));
+      scroll-padding: 0 max(12px, calc((100% - 1240px) / 2)); }
+    #cpnBanners .cpnbanner, #cpnBanners .cpnbanner:only-child { flex: 0 0 min(560px, 86%); max-width: 560px; }
     .fields { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; }
     .row2 { display: contents; }
     #qReset { order: 1; }   /* after the mark filter, at the end of the line */
