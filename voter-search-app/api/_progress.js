@@ -50,13 +50,14 @@ async function markedList(slug, candId, survey, status, ward, offset) {
   return { total: hits.length, more: from + rows.length < hits.length, rows };
 }
 
-// the candidates of these villages, oldest first
-async function candsOf(slugs) {
+// the candidates of these villages, oldest first; reach: also those whose workers only mark in them (a ZP / PS
+// candidate of another village, getCand in _lib.js)
+async function candsOf(slugs, reach) {
   const ids = (await redis('SMEMBERS', 'cands')) || [];
-  return (await Promise.all(ids.map(getCand))).filter((c) => c && slugs.includes(c.village))
+  return (await Promise.all(ids.map(getCand))).filter((c) => c && (reach ? c.villages : [c.village]).some((s) => slugs.includes(s)))
     .sort((x, y) => (x.created < y.created ? -1 : 1));
 }
 // every mark group of these villages: the village's own marks ({id: ''}) and then each of its candidates
-const groupsOf = (slugs, cands) => slugs.flatMap((s) => [{ slug: s, cand: { id: '' } }, ...cands.filter((c) => c.village === s).map((c) => ({ slug: s, cand: c }))]);
+const groupsOf = (slugs, cands) => slugs.flatMap((s) => [{ slug: s, cand: { id: '' } }, ...cands.filter((c) => c.villages.includes(s)).map((c) => ({ slug: s, cand: c }))]);
 
 module.exports = { markSummary, markedList, candsOf, groupsOf };

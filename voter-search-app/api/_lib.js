@@ -146,8 +146,11 @@ function village(slug) {
 const isDevice = (d) => /^[A-Za-z0-9_-]{16,64}$/.test(String(d || ''));
 const demoId = (device) => `demo_${device}`;
 // all villages, or only the given slugs (the villages one login may open)
-const villageList = (slugs) => Object.entries(VILLAGES).filter(([slug]) => !slugs || slugs.includes(slug))
-  .map(([slug, v]) => ({ slug, name: v.name, title: v.title, panchayatSamiti: v.panchayatSamiti || '', district: v.district || '' }));
+// (in the order given: a person's own village first)
+const villageList = (slugs) => (slugs || Object.keys(VILLAGES)).filter((slug) => Object.hasOwn(VILLAGES, slug)).map((slug) => {
+  const v = VILLAGES[slug];
+  return { slug, name: v.name, title: v.title, panchayatSamiti: v.panchayatSamiti || '', district: v.district || '', zp: v.zp ?? '', ps: v.ps ?? '' };
+});
 
 // A village admin looks after the villages given to them one by one (field villages "a,b") and every village of the
 // पंचायत समितियाँ given to them whole (field samitis, keys "<district>|<samiti>" joined by ","), so a village imported
@@ -159,6 +162,27 @@ function adminVillages(villages, samitis) {
   const whole = splitList(samitis);
   return [...new Set([...splitList(villages), ...Object.keys(VILLAGES).filter((s) => whole.includes(samitiKey(VILLAGES[s])))])];
 }
+// ज़िला परिषद / पंचायत समिति वार्ड: every village (gram panchayat) carries the number of the ZP ward (zp, numbered per
+// district) and of the PS ward (ps, numbered per samiti) it is in. A person working for a ZP or PS candidate opens every
+// village of that ward: key "zp:<district>|<zp>" or "ps:<district>|<samiti>|<ps>" (kept as the ward, like an admin's
+// samitis, so a village imported into it later is theirs too).
+const areaKeyOf = (kind, v) => (kind === 'zp' ? `zp:${v.district || ''}|${v.zp}` : `ps:${v.district || ''}|${v.panchayatSamiti || ''}|${v.ps}`);
+const areaVillages = (keys) => {
+  const want = splitList(keys);
+  return want.length ? Object.keys(VILLAGES).filter((s) => ['zp', 'ps'].some((k) => VILLAGES[s][k] != null && want.includes(areaKeyOf(k, VILLAGES[s])))) : [];
+};
+// how many villages each ZP / PS ward has, by key
+let AREA_SIZE = null;
+function areaSize(key) {
+  if (!AREA_SIZE) {
+    AREA_SIZE = {};
+    for (const v of Object.values(VILLAGES)) for (const k of ['zp', 'ps']) if (v[k] != null) AREA_SIZE[areaKeyOf(k, v)] = (AREA_SIZE[areaKeyOf(k, v)] || 0) + 1;
+  }
+  return AREA_SIZE[key] || 0;
+}
+// A person (role user) has their own village (field village: sign-ups, requests and their admin go by it) and may also
+// open more: villages given one by one (field more "a,b") and whole ZP / PS wards (field areas, keys joined by ",").
+const userVillages = (home, more, areas) => [...new Set([home, ...[...splitList(more), ...areaVillages(areas)].filter((s) => Object.hasOwn(VILLAGES, s))])].filter(Boolean);
 
 function dataKey() {
   const k = process.env.DATA_KEY;
@@ -189,7 +213,7 @@ function sameText(a, b) {
 //   superadmin  the ADMIN_PASSWORD; every village; creates village admins and assigns them villages
 //   admin       a village admin (user record with role 'admin' and villages 'a,b'); searches and adds/manages users
 //               only in those villages
-//   user        a person (role 'user' or missing, one village); searches only that village
+//   user        a person (role 'user' or missing, one village, maybe more: userVillages); searches only those villages
 // Logging into the app with the superadmin password gives a superadmin token. It is derived from the current admin password,
 // so changing ADMIN_PASSWORD in Vercel signs out every admin session.
 const isAdminPassword = (pw) => !!process.env.ADMIN_PASSWORD && !!pw && sameText(String(pw).trim(), process.env.ADMIN_PASSWORD.trim());
@@ -293,7 +317,9 @@ function userFrom(id, arr) {
   u.role = u.role === 'admin' ? 'admin' : 'user';
   u.ownVillages = u.role === 'admin' ? splitList(u.villages) : [];   // given one by one
   u.samitis = u.role === 'admin' ? splitList(u.samitis) : [];
-  u.villages = u.role === 'admin' ? adminVillages(u.villages, u.samitis.join(',')) : [u.village].filter(Boolean);
+  u.more = u.role === 'admin' ? [] : splitList(u.more);   // a person's extra villages, one by one
+  u.areas = u.role === 'admin' ? [] : splitList(u.areas);   // and whole ZP / PS wards
+  u.villages = u.role === 'admin' ? adminVillages(u.villages, u.samitis.join(',')) : userVillages(u.village, u.more.join(','), u.areas.join(','));
   return u;
 }
 
@@ -514,11 +540,11 @@ async function phoneLogins(phone) {
   await buildIndexes();
   const ids = (await redis('SMEMBERS', `phone:${phone}`)) || [];
   if (!ids.length) return [];
-  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'village', 'villages', 'retired', 'self', 'samitis']));
+  const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'village', 'villages', 'retired', 'self', 'samitis', 'more', 'areas']));
   return ids.map((id, i) => {
-    const [ph, role, vil, vils, retired, self, sams] = rows[i] || [];
+    const [ph, role, vil, vils, retired, self, sams, more, areas] = rows[i] || [];
     if (ph !== phone) return null;   // the number was changed since
-    return { id, role, village: vil, villages: role === 'admin' ? adminVillages(vils, sams) : [vil].filter(Boolean),
+    return { id, role, village: vil, villages: role === 'admin' ? adminVillages(vils, sams) : userVillages(vil, more, areas),
       retired, self };
   }).filter(Boolean);
 }
@@ -782,10 +808,20 @@ async function getCand(id) {
   if (!arr || !arr.length) return null;
   const c = { id };
   for (let i = 0; i < arr.length; i += 2) c[arr[i]] = arr[i + 1];
+  // where its workers mark: its own village and every other village one of them opens (field more, kept by candReach)
+  c.villages = [...new Set([c.village, ...splitList(c.more)])].filter(Boolean);
   return c;
 }
+// a candidate's worker opens these villages: their marks there belong to the candidate's group, so the admin page shows
+// the group in those villages too
+async function candReach(id, slugs) {
+  const c = await getCand(id);
+  if (!c) return;
+  const add = slugs.filter((s) => !c.villages.includes(s));
+  if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
+}
 
-module.exports = { buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

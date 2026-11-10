@@ -23,7 +23,7 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { ...list, wards: (await markSummary(v.slug, cand, user.survey)).wards, survey: user.survey });
   }
   if (v.demo || !user.perms.includes('progress')) return send(res, 403, { error: 'no_progress' });
-  const groups = user.admin ? groupsOf([v.slug], await candsOf([v.slug]))
+  const groups = user.admin ? groupsOf([v.slug], await candsOf([v.slug], true))
     : [{ slug: v.slug, cand: { id: user.cand || '', name: user.candName || '' } }];
   const progress = await Promise.all(groups.map((g) => markSummary(g.slug, g.cand, user.survey)));
   send(res, 200, { survey: user.survey, progress: progress.map(({ key, name, candName, marks, wards }) => ({ key, name, candName, marks, wards })) });

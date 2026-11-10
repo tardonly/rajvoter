@@ -448,6 +448,7 @@
       <select id="newVillage" required><option value="">गाँव चुनें</option></select>
       <input id="newName" type="text" placeholder="व्यक्ति का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
       <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
+      <div id="newAreas" class="checks hidden"></div>
       <select id="newCand" class="hidden" aria-label="उम्मीदवार"></select>
       <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
     </form>
@@ -526,7 +527,7 @@ const store = {
 let MARKED = {}, MARKED_IN = false, STATS = null, fullStats = false;   // fullStats: a marks tab was opened, so progress per ward too
 const MARK_TABS = ['prog', 'voters', 'clear'], SETTING_TABS = ['ref', 'cpn', 'free'];
 let settingsBusy = null, settingsIn = false;   // from "stats" (api/admin.js), loaded after the page shows: slips marked per person; null = not yet
-let token = store.get(), me = null, users = [], admins = [], reqs = [], collected = null, filter = 'on', villages = {}, progress = [], cands = [];
+let token = store.get(), me = null, users = [], admins = [], reqs = [], collected = null, filter = 'on', villages = {}, progress = [], cands = [], AREA_SIZE = {};
 const MSG = EN ? {
   wrong: 'Wrong password', too_many: 'Too many wrong passwords — try again in 15 minutes',
   not_admin: 'This is not an admin password', retired: 'This password has been switched off',
@@ -604,6 +605,7 @@ async function openPanel() {
   if (r.error) return showLogin(errText(r));
   me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || [];
   for (const v of r.villageList || []) villages[v.slug] = v;
+  AREA_SIZE = r.areaSize || {};
   setup(); showMarks(r);
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
   for (const id of ['tabRef', 'tabCpn', 'tabFree']) $(id).classList.toggle('hidden', me.role !== 'super');   // filled when opened
@@ -1534,6 +1536,36 @@ function newCandOptions() {
   $('newCand').classList.toggle('hidden', !list.length);
 }
 $('newVillage').addEventListener('change', newCandOptions);
+// ZP / PS wards (ज़िला परिषद / पंचायत समिति वार्ड, areaKeyOf in api/_lib.js): a ZP or PS candidate's worker opens every
+// village of the ward. A ward is offered whole only when all its villages are this admin's; else pick them one by one.
+const AREA_KINDS = ['zp', 'ps'];
+const areaKey = (kind, v) => (kind === 'zp' ? `zp:${v.district || ''}|${v.zp}` : `ps:${v.district || ''}|${v.panchayatSamiti || ''}|${v.ps}`);
+const hasArea = (kind, v) => !!v && v[kind] !== '' && v[kind] != null;
+function areaName(k) {
+  const p = k.slice(3).split('|');
+  return k.startsWith('zp:') ? L(`ज़िला परिषद वार्ड ${p[1]}${p[0] ? ` (${p[0]})` : ''}`, `Zila parishad ward ${p[1]}${p[0] ? ` (${p[0]})` : ''}`)
+    : L(`पंचायत समिति ${p[1]} वार्ड ${p[2]}`, `Panchayat samiti ${p[1]} ward ${p[2]}`);
+}
+const areaSlugs = (k) => Object.keys(villages).filter((s) => AREA_KINDS.some((kind) => hasArea(kind, villages[s]) && areaKey(kind, villages[s]) === k));
+const areaWhole = (k) => !!AREA_SIZE[k] && areaSlugs(k).length >= AREA_SIZE[k];
+const homeAreas = (slug) => AREA_KINDS.filter((kind) => hasArea(kind, villages[slug])).map((kind) => areaKey(kind, villages[slug]));
+const areaSort = (a, b) => (a.slice(0, 2) !== b.slice(0, 2) ? (a < b ? 1 : -1) : areaName(a).localeCompare(areaName(b), undefined, { numeric: true }));   // ZP first
+// a ward to tick: "ज़िला परिषद वार्ड 4 (जैसलमेर) · 12 गाँव"
+function areaCheck(k, on) {
+  const l = el('label'), c = el('input'); c.type = 'checkbox'; c.dataset.area = k; c.checked = on;
+  l.append(c, `${areaName(k)} · ${L(`${areaSlugs(k).length} गाँव`, `${areaSlugs(k).length} villages`)}`);
+  return l;
+}
+const areasIn = (box) => [...box.querySelectorAll('input[data-area]:checked')].map((c) => c.dataset.area);
+// the add form: the chosen village's own ZP and PS ward, to give whole
+function newAreaOptions() {
+  const box = $('newAreas'), slug = $('newVillage').value;
+  const list = slug ? homeAreas(slug).filter((k) => areaWhole(k) && AREA_SIZE[k] > 1) : [];
+  box.replaceChildren(...(list.length ? [el('div', 'sub', L('ZP / PS उम्मीदवार के कार्यकर्ता? पूरे वार्ड के गाँव भी दें:', 'Worker of a ZP / PS candidate? Give the whole ward\'s villages too:'))] : []),
+    ...list.map((k) => areaCheck(k, false)));
+  box.classList.toggle('hidden', !list.length);
+}
+$('newVillage').addEventListener('change', newAreaOptions);
 // the add form's village choice: first the पंचायत समिति (only when this admin's villages are in more than one), then
 // that samiti's villages, by name. Villages without a samiti are grouped as "अन्य गाँव".
 const addVillages = () => (me ? me.villages.filter((s) => villages[s]) : []);   // this admin's villages
@@ -1559,14 +1591,14 @@ function newVillageOptions(pick) {
   for (const s of list) sel.add(new Option(vName(s), s));
   sel.disabled = !list.length;
   sel.value = list.includes(pick) ? pick : list.length === 1 ? list[0] : '';
-  newCandOptions();
+  newCandOptions(); newAreaOptions();
 }
 $('newSamiti').addEventListener('change', () => newVillageOptions(''));
 function openAdd() {
   $('addMsg').textContent = '';
   const showing = $('fVillage').value;   // the village the list is showing
   if (showing && villages[showing]) { $('newSamiti').value = samitiOf(villages[showing]); newVillageOptions(showing); }
-  newCandOptions();
+  newCandOptions(); newAreaOptions();
   $('addModal').classList.remove('hidden');
   $('newName').focus();
 }
@@ -1581,7 +1613,7 @@ $('addForm').addEventListener('submit', async (e) => {
   if (!village) { $('addMsg').textContent = MSG.no_village; return; }
   if (!name) return;
   $('addBtn').disabled = true; $('addMsg').textContent = '';
-  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value });
+  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value, areas: areasIn($('newAreas')) });
   $('addBtn').disabled = false;
   if (r.error) { $('addMsg').textContent = errText(r); return; }
   $('newName').value = ''; $('newPhone').value = '';
@@ -1702,6 +1734,62 @@ function villageBox(u) {
   box.append(L('गाँव:', 'Village:'), sel);
   return box;
 }
+// more villages this person opens (a ZP / PS candidate's worker): whole wards and villages one by one, of this admin's
+function moreBox(u, row) {
+  const box = el('div', 'limit'), n = u.villages.length - 1;
+  const open = el('button', 'btn ghost', n ? L(`और गाँव: ${n} — बदलें`, `More villages: ${n} — change`) : L('+ और गाँव / ZP-PS वार्ड', '+ More villages / ZP-PS ward'));
+  open.type = 'button';
+  open.addEventListener('click', () => {
+    if (row.querySelector('.vedit')) return row.querySelector('.vedit').remove();
+    const ed = el('div', 'vedit'), pick = el('div', 'vpick'), wards = el('div', 'vgroup'), wl = el('div', 'checks');
+    // wards: the person's own village's ZP and PS ward, those already given, and any other ward chosen below
+    const mine = Object.keys(villages).filter((s) => villages[s]).flatMap(homeAreas);
+    const offer = [...new Set(mine)].filter((k) => areaWhole(k) && AREA_SIZE[k] > 1).sort(areaSort);
+    const first = [...new Set([...homeAreas(u.village).filter((k) => offer.includes(k)), ...(u.areas || [])])];
+    wl.append(...first.map((k) => areaCheck(k, (u.areas || []).includes(k))));
+    const other = el('select');
+    const fillOther = () => {
+      const shown = new Set([...wl.querySelectorAll('input[data-area]')].map((c) => c.dataset.area));
+      other.replaceChildren(new Option(L('+ दूसरा ZP / PS वार्ड जोड़ें…', '+ Add another ZP / PS ward…'), ''), ...offer.filter((k) => !shown.has(k)).map((k) => new Option(areaName(k), k)));
+      other.classList.toggle('hidden', other.length < 2);
+    };
+    other.addEventListener('change', () => { if (!other.value) return; wl.append(areaCheck(other.value, true)); fillOther(); sync(); });
+    fillOther();
+    wards.append(el('div', 'sam', L('पूरा ज़िला परिषद / पंचायत समिति वार्ड', 'Whole zila parishad / panchayat samiti ward')), wl, other);
+    // villages one by one (not their own), grouped by पंचायत समिति; those of a ticked ward are ticked and fixed
+    const groups = new Map();
+    for (const s of Object.keys(villages).filter((x) => x !== u.village)) { const k = samitiOf(villages[s]); (groups.get(k) || groups.set(k, []).get(k)).push(s); }
+    const near = samitiOf(villages[u.village] || {});
+    const vgroups = [...groups].sort((a, b) => (b[0] === near) - (a[0] === near) || (!a[0]) - (!b[0]) || a[0].localeCompare(b[0]));
+    pick.append(wards);
+    for (const [k, slugs] of vgroups) {
+      const g = el('div', 'vgroup'), list = el('div', 'checks');
+      g.append(el('div', 'sam', k ? `${L('पंचायत समिति', 'Panchayat samiti')} ${samitiName(k)}` : L('अन्य गाँव', 'Other villages')));
+      for (const s of slugs.sort((a, b) => vName(a).localeCompare(vName(b)))) {
+        const l = el('label'), c = el('input'); c.type = 'checkbox'; c.value = s; c.checked = (u.more || []).includes(s);
+        l.append(c, vName(s)); list.append(l);
+      }
+      g.append(list); pick.append(g);
+    }
+    const sync = () => {
+      const inAreas = new Set(areasIn(wl).flatMap(areaSlugs));
+      pick.querySelectorAll('input[value]').forEach((c) => { if (inAreas.has(c.value)) c.checked = true; c.disabled = inAreas.has(c.value); });
+    };
+    wl.addEventListener('change', () => {
+      pick.querySelectorAll('input[value]:disabled').forEach((c) => { c.checked = (u.more || []).includes(c.value); });   // a ward unticked: its villages as before
+      sync();
+    });
+    sync();
+    const save = el('button', 'btn', L('सेव करें', 'Save')); save.type = 'button';
+    save.addEventListener('click', () => act({ action: 'user_villages', id: u.id, more: checkedIn(pick), areas: areasIn(wl) }));
+    const r2 = el('div', 'row'); r2.append(save);
+    ed.append(el('div', 'sub', L(`${u.name} अपने गाँव ${vName(u.village)} के साथ ये गाँव भी खोल सकेंगे (ZP / PS उम्मीदवार के कार्यकर्ता के लिए):`,
+      `${u.name} can open these villages too, besides their own village ${vName(u.village)} (for a ZP / PS candidate's worker):`)), pick, r2);
+    row.querySelector('.actions').after(ed);
+  });
+  box.append(open);
+  return box;
+}
 function candBox(u) {
   const box = el('div', 'limit'), sel = el('select');
   sel.add(new Option(L('कोई नहीं', 'None'), ''));
@@ -1747,6 +1835,11 @@ function person(u) {
     for (const s of u.samitis ? u.ownVillages.filter((s) => !(villages[s] && u.samitis.includes(samitiOf(villages[s])))) : u.villages) nm.append(el('span', 'badge vil', vName(s)));
   }
   else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
+  if (!isAdmin) {   // the villages this person opens besides their own: whole ZP / PS wards, then one by one
+    for (const k of u.areas || []) nm.append(el('span', 'badge vil sam', `${areaName(k)} · ${L(`${areaSlugs(k).length} गाँव`, `${areaSlugs(k).length} villages`)}`));
+    const inAreas = new Set((u.areas || []).flatMap(areaSlugs));
+    for (const s of (u.more || []).filter((x) => !inAreas.has(x))) nm.append(el('span', 'badge vil', `+ ${vName(s)}`));
+  }
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
   if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} सर्च`, `₹ paid · ${u.credits} searches in all`)
     : L(`${u.credits} सर्च · अभी कुछ नहीं खरीदा`, `${u.credits} searches · nothing bought yet`)));
@@ -1794,7 +1887,7 @@ function person(u) {
   }
   if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
     ...(u.canBuy && mayDo('credits') ? [creditsBox(u, refresh)] : []),   // a daily limit, and bought searches for after it
-    ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
+    ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u), moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
   if (!isAdmin && !u.retired && me.role === 'super') {   // a user becomes a village admin of their village, same login

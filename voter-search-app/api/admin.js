@@ -11,7 +11,11 @@
 //   action "stats" [, all: n]          → {progress, marked: {id: slips marked}, partial, groups, survey}   the slow part,
 //                                         asked for after "list": progress per ward (only groups with marks when there
 //                                         are more than STATS_ALL, else the first n groups, those with marks first) and how many slips each person marked
-//   action "add", village, name, phone → {user, password}   new user of one village (must be one of the admin's villages)
+//   action "add", village, name, phone [, cand, more, areas] → {user, password}   new user of one village (must be one of
+//                                         the admin's villages); more: [slug, ...] extra villages they open too, areas:
+//                                         whole ZP / PS wards ["zp:<district>|<zp>" | "ps:<district>|<samiti>|<ps>", ...]
+//                                         (userVillages in _lib.js); every village these give must be the admin's
+//   action "user_villages", id, more, areas → {user}   change a user's extra villages (as in "add")
 //   action "add_admin", name, phone, villages: [slug, ...], samitis: ["<district>|<samiti>", ...] [, aperms] → {user, password}
 //                                         (superadmin only; samitis = whole पंचायत समितियाँ, villages added there later too)
 //   action "villages", id, villages, samitis               → {user}   change an admin's villages (superadmin only)
@@ -83,7 +87,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('./_lib.js');
 
 // admin permissions from the request → only known ones
@@ -94,6 +98,12 @@ const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : nul
 const villageSlugs = (list) => [...new Set((Array.isArray(list) ? list : []).filter((s) => realVillage(s)))];
 // list of whole पंचायत समितियाँ from the request ("<district>|<samiti>", see adminVillages in _lib.js) → only known ones
 const samitiList = (list) => { const all = samitiKeys(); return [...new Set((Array.isArray(list) ? list : []).filter((k) => all.includes(k)))]; };
+// how many villages each ZP / PS ward of these villages has in all (the admin page offers a ward whole only when every
+// one of its villages is the admin's)
+const areaSizes = (slugs) => Object.fromEntries(slugs.map(village).filter(Boolean)
+  .flatMap((v) => ['zp', 'ps'].filter((k) => v[k] != null).map((k) => areaKeyOf(k, v))).map((k) => [k, areaSize(k)]));
+// whole ZP / PS wards from the request (areaKeyOf in _lib.js) → only those with villages, no repeats
+const areaList = (list) => [...new Set((Array.isArray(list) ? list : []).map(String).filter((k) => /^(zp|ps):/.test(k) && areaVillages(k).length))];
 
 const view = (u) => ({
   perms: appPerms(u), aperms: adminPermsOf(u), cand: u.role === 'user' ? u.cand || '' : '',
@@ -102,6 +112,7 @@ const view = (u) => ({
   defaultLimit: DAILY_SEARCHES,
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   ownVillages: u.ownVillages || [], samitis: u.samitis || [],   // an admin's: given one by one, and whole samitis
+  more: u.more || [], areas: u.areas || [],   // a person's extra villages: one by one, and whole ZP / PS wards
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
   by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), canBuy: canBuy(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
@@ -138,6 +149,13 @@ module.exports = route(async (req, res, b) => {
   const now = new Date().toISOString();
   // a new login made by this admin: fields = role and village(s) [and more]; → {id, password}
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
+  // a person's extra villages from the request (b.more, b.areas) besides their own village home: → {more, areas, all} or
+  // {error} when one of the villages they give is not this admin's
+  const extraVillages = (home) => {
+    const more = villageSlugs(b.more).filter((s) => s !== home), areas = areaList(b.areas);
+    const all = userVillages(home, more.join(','), areas.join(','));
+    return all.every(mayUse) ? { more, areas, all } : { error: 'not_your_village' };
+  };
   const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
   if (b.action === 'ref_rule') {   // superadmin: referrals (refRule in _lib.js)
@@ -203,14 +221,15 @@ module.exports = route(async (req, res, b) => {
   // one round trip; with more than STATS_ALL groups (the superadmin has hundreds of villages) only the groups that have
   // marks, a backup or a candidate get a progress table (all: true asks for every one).
   const stats = async (all, onlyMarked) => {
-    const cands = await candsOf(me.villages), groups = groupsOf(me.villages, cands);
+    const cands = await candsOf(me.villages, true), groups = groupsOf(me.villages, cands);
     const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id, me.survey)], ['GET', `${markHash(g.slug, g.cand.id, me.survey)}:backup`]])) : [];
     const marksBy = groups.map((g, i) => marksFrom(read[2 * i]));
     const marked = {};
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
     if (onlyMarked) return { marked, survey: me.survey };   // the person list's numbers: no voter files read
     // all: how many groups to give (a page of STATS_ALL more each time the page asks), those with marks first
-    const busy = (i) => groups[i].cand.id || read[2 * i + 1] || Object.keys(marksBy[i]).length;
+    // a candidate shows in its own village even before any marks; in its workers' other villages only once marked there
+    const busy = (i) => (groups[i].cand.id && groups[i].cand.village === groups[i].slug) || read[2 * i + 1] || Object.keys(marksBy[i]).length;
     const idx = groups.map((g, i) => i);
     const keep = groups.length <= STATS_ALL ? idx
       : all ? [...idx.filter(busy), ...idx.filter((i) => !busy(i))].slice(0, Math.max(STATS_ALL, all)).sort((x, y) => x - y)
@@ -236,7 +255,7 @@ module.exports = route(async (req, res, b) => {
     const admins = isSuper ? shown.filter((u) => u.role === 'admin').map(withUse) : undefined;
     const dbCopy = isSuper && canMoveUserData() ? (moved ? 'done' : 'todo') : undefined;
     return send(res, 200, { dbCopy, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins,
-      villageList: villageList(me.villages), cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
+      villageList: villageList(me.villages), areaSize: areaSizes(me.villages), cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }
   if (b.action === 'settings') {   // superadmin, when a settings tab opens: free searches, referrals, coupons
@@ -283,7 +302,7 @@ module.exports = route(async (req, res, b) => {
     if (!mayUse(b.village)) return { error: [403, 'not_your_village'] };
     if (!b.cand) return { cand: { id: '' } };
     const c = await getCand(b.cand);
-    return c && c.village === b.village ? { cand: c } : { error: [404, 'no_cand'] };
+    return c && c.villages.includes(b.village) ? { cand: c } : { error: [404, 'no_cand'] };
   }
 
   if (b.action === 'marked') {
@@ -334,9 +353,9 @@ module.exports = route(async (req, res, b) => {
     if (!c || !mayUse(c.village)) return send(res, 404, { error: 'no_cand' });
     const ids = (await redis('SMEMBERS', 'users')) || [];
     for (const u of (await getUsers(ids)).filter((u) => u.cand === c.id)) await redis('HSET', `user:${u.id}`, 'cand', '');
-    for (const sv of [false, true]) {   // both sets of marks
-      await redis('DEL', markHash(c.village, c.id, sv));
-      await redis('DEL', `${markHash(c.village, c.id, sv)}:backup`);
+    for (const slug of c.villages) for (const sv of [false, true]) {   // both sets of marks, in every village it marked in
+      await redis('DEL', markHash(slug, c.id, sv));
+      await redis('DEL', `${markHash(slug, c.id, sv)}:backup`);
     }
     await redis('SREM', 'cands', c.id);
     await redis('DEL', `cand:${c.id}`);
@@ -354,11 +373,14 @@ module.exports = route(async (req, res, b) => {
       if (!may('add')) return send(res, 403, { error: 'no_perm' });
       if (!realVillage(b.village)) return send(res, 400, { error: 'no_village' });
       if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
-      fields = ['role', 'user', 'village', b.village];
+      const ex = extraVillages(b.village);
+      if (ex.error) return send(res, 403, { error: ex.error });
+      fields = ['role', 'user', 'village', b.village, ...(ex.more.length || ex.areas.length ? ['more', ex.more.join(','), 'areas', ex.areas.join(',')] : [])];
       if (b.cand) {   // straight into a candidate's group
         const c = await getCand(b.cand);
         if (!c || c.village !== b.village) return send(res, 404, { error: 'no_cand' });
         fields.push('cand', c.id);
+        await candReach(c.id, ex.all);
       }
     } else {
       if (!isSuper) return send(res, 403, { error: 'super_only' });
@@ -439,7 +461,7 @@ module.exports = route(async (req, res, b) => {
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     if (user.role !== 'user') return send(res, 400, { error: 'not_user' });
     if (!realVillage(user.village)) return send(res, 400, { error: 'no_village' });
-    await redis('HSET', `user:${user.id}`, 'role', 'admin', 'villages', user.village, 'samitis', '', 'cand', '',
+    await redis('HSET', `user:${user.id}`, 'role', 'admin', 'villages', user.villages.join(','), 'samitis', '', 'cand', '',
       'aperms', PROMOTED_PERMS.join(','), 'perms', appPerms(user).join(','), 'promotedAt', now);
     await buildIndexes();
     await redis('SADD', 'admins', user.id);
@@ -483,6 +505,19 @@ module.exports = route(async (req, res, b) => {
       id = c.id;
     }
     await redis('HSET', `user:${user.id}`, 'cand', id);
+    if (id) await candReach(id, user.villages);
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'user_villages') {   // the villages a person opens besides their own (ZP / PS candidates' workers)
+    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });
+    const ex = extraVillages(user.village);
+    if (ex.error) return send(res, 403, { error: ex.error });
+    // villages given by another admin (or the superadmin) that this admin doesn't look after stay as they are
+    const keepMore = user.more.filter((s) => !mayUse(s)), keepAreas = user.areas.filter((k) => !areaVillages(k).every(mayUse));
+    const more = [...new Set([...keepMore, ...ex.more])], areas = [...new Set([...keepAreas, ...ex.areas])];
+    await redis('HSET', `user:${user.id}`, 'more', more.join(','), 'areas', areas.join(','));
+    if (user.cand) await candReach(user.cand, userVillages(user.village, more.join(','), areas.join(',')));
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
