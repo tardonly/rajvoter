@@ -84,13 +84,20 @@
   .cpnlist .k { width: 100%; margin: 0; }
   .cpnchip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 10px; border: 1.5px dashed #a855f7;
     border-radius: 8px; background: #faf5ff; color: #581c87; font-size: 14px; text-align: left; }
-  .cpnbanners { position: relative; display: flex; flex-direction: column; gap: 6px; margin: 6px 0 2px; }
-  .cpnbanner { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 34px 9px 12px; border: 0; border-radius: 10px; text-align: left;
-    background: linear-gradient(90deg, #7c3aed, #db2777); color: #fff; font-size: 14.5px; font-weight: 600; box-shadow: 0 2px 8px rgba(124, 58, 237, .3); }
-  .cpnbanner span { flex: 1; }
-  .cpnbanner b { flex: none; padding: 3px 10px; border-radius: 999px; background: #fff; color: #7c3aed; font-size: 13px; white-space: nowrap; }
-  .cpnbanners .cpnbanner + .cpnbanner { padding-right: 12px; }
-  .cpnbannerx { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(255,255,255,.25); color: #fff; font-size: 13px; line-height: 1; }
+  /* coupon banners above the title: one row that scrolls sideways, the next card peeking in */
+  .cpnbanners { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px; background: var(--card); scroll-padding: 0 12px; }
+  .cpnbanners::-webkit-scrollbar { display: none; }
+  .cpnbanner { position: relative; flex: 0 0 86%; max-width: 420px; min-height: 92px; scroll-snap-align: start; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 40px 12px 14px;
+    border-radius: 14px; background: linear-gradient(120deg, #7c3aed, #db2777); color: #fff; box-shadow: 0 3px 10px rgba(124, 58, 237, .3); }
+  .cpnbanner:only-child { flex-basis: 100%; max-width: none; }
+  .cpnbanner:nth-child(3n+2) { background: linear-gradient(120deg, #0f766e, #2563eb); }
+  .cpnbanner:nth-child(3n) { background: linear-gradient(120deg, #c2410c, #db2777); }
+  .cpnbanner span { font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .cpnbanner b { align-self: flex-end; padding: 5px 14px; border-radius: 999px; background: #fff; color: #6d28d9; font-size: 14px; white-space: nowrap; }
+  .cpnbannerx { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(255,255,255,.25);
+    color: #fff; font-size: 13px; line-height: 1; }
   .cpnchip small { font-size: 12px; color: #6b21a8; }
   .cpnchip.on { border-style: solid; background: #7c3aed; color: #fff; } .cpnchip.on small { color: #ede9fe; }
   .moderow { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--muted); }
@@ -514,11 +521,11 @@
 </section>
 
 <section id="app" class="hidden">
+  <div class="cpnbanners hidden" id="cpnBanners"></div>
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
       <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
-    <div class="cpnbanners hidden" id="cpnBanners"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
       <div class="row2">
@@ -1935,26 +1942,29 @@ function buyClose() {
 function outOfSearches() { if (PREPAID && searchesLeft === 0 && !DEMO) buyOpen(); }
 $('buyMore').addEventListener('click', () => buyOpen());
 // coupon banners: coupons the superadmin marked "banner" (api/signup.js 'coupons', the ones this login may use, best
-// first); tapping one opens the buy window with it applied. ✕ hides them until the page is opened again.
+// first), above the title in a row that scrolls sideways; tapping one opens the buy window with it applied. ✕ on a
+// card hides all of them until the page is opened again.
 let cpnBannersShut = false;
 async function cpnBanners() {
   const box = $('cpnBanners');
   box.replaceChildren(); box.classList.add('hidden');
   if (!CAN_BUY || DEMO || cpnBannersShut) return;
   const r = await api('signup', { action: 'coupons', token: token() });
-  const list = (r.coupons || []).filter((c) => c.banner).slice(0, 2);
+  const list = (r.coupons || []).filter((c) => c.banner);
   if (!list.length || cpnBannersShut) return;
   for (const c of list) {
-    const b = el('button', 'cpnbanner'); b.type = 'button';
+    const b = el('div', 'cpnbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0;
     const packs = cpnPacks(c);
     b.append(el('span', null, c.bannerText || L(`🎟 कूपन ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`, `🎟 Coupon ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`)),
       el('b', null, L('अभी लें ›', 'Get it ›')));
+    const x = el('button', 'cpnbannerx', '✕'); x.type = 'button'; x.setAttribute('aria-label', L('बंद करें', 'Close'));
+    x.addEventListener('click', (e) => { e.stopPropagation(); cpnBannersShut = true; box.classList.add('hidden'); });
+    b.append(x);
     b.addEventListener('click', () => buyOpen(c.code));
+    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); buyOpen(c.code); } });
     box.append(b);
   }
-  const x = el('button', 'cpnbannerx', '✕'); x.type = 'button'; x.setAttribute('aria-label', L('बंद करें', 'Close'));
-  x.addEventListener('click', () => { cpnBannersShut = true; box.classList.add('hidden'); });
-  box.append(x);
+  box.scrollLeft = 0;
   box.classList.remove('hidden');
 }
 // 🎁 दोस्तों को बुलाएं: this login's invite link on WhatsApp; the inviter gets searches when the friend first buys some
