@@ -32,6 +32,10 @@
       "destination": "/admin.html"
     },
     {
+      "source": "/promo",
+      "destination": "/promo.html"
+    },
+    {
       "source": "/:req(\\d{8})",
       "destination": "/admin.html"
     },

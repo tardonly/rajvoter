@@ -110,6 +110,7 @@ http.createServer(async (req, res) => {
   if (seg && seg[1] !== 'api' && seg[2] === '/admin') { res.writeHead(307, { Location: '/admin' }); return res.end(); }
   if (seg && !seg[2] && seg[1].startsWith('demo-')) { res.writeHead(307, { Location: `/demo/${seg[1].slice(5)}` }); return res.end(); }
   if (/^\/demo\/[a-z0-9-]+$/.test(url.pathname)) url.pathname = '/index.html';   // a demo village: /demo/<village>
+  else if (url.pathname === '/promo') url.pathname = '/promo.html';   // the videos page
   else if (url.pathname === '/admin' || /^\/\d{8}$/.test(url.pathname)) url.pathname = '/admin.html';   // /<8 digits>: a search request
   else if (seg && seg[1] !== 'api' && !existsSync(join(root, url.pathname))) {
     if (seg[2] === '/manifest.webmanifest') { url.pathname = '/api/manifest'; url.searchParams.set('village', seg[1]); }

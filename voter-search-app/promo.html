@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#c2185b">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
+<title>Voter Search — वीडियो</title>
+<meta property="og:title" content="Voter Search — अपने गाँव की मतदाता सूची, फ़ोन में">
+<meta property="og:description" content="नाम लिखते ही पर्ची, मतदान के दिन वोट के निशान, वार्ड की पूरी रिपोर्ट। वीडियो देखें और फ़्री डेमो आज़माएं।">
+<meta property="og:image" content="https://www.rajelection.com/icon-512.png">
+<meta property="og:url" content="https://www.rajelection.com/promo">
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<style>
+  :root {
+    --bg: #f3f4f6; --card: #fff; --ink: #111; --muted: #6b7280; --line: #d1d5db;
+    --pink: #e0245e; --pink-dark: #c2185b; --accent: #1f4e8c; --green: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  main { flex: 1 0 auto; width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 16px 28px; }
+  a { color: inherit; }
+
+  /* top: the app's name, what it does, and the two ways in */
+  .hero { display: grid; gap: 18px; align-items: center; padding: 24px 0 8px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand img { width: 48px; height: 48px; border-radius: 12px; }
+  .brand b { font-size: 20px; }
+  .brand small { display: block; font-size: 13px; color: var(--muted); }
+  h1 { font-size: 27px; line-height: 1.35; margin: 14px 0 8px; }
+  h1 em { font-style: normal; color: var(--pink-dark); }
+  .lead { font-size: 16.5px; line-height: 1.6; color: #374151; margin: 0 0 16px; }
+  .ctas { display: grid; gap: 10px; }
+  .cta { display: block; text-align: center; text-decoration: none; padding: 14px 12px; border-radius: 12px; font-size: 17px; font-weight: 700; }
+  .cta.signup { background: var(--green); color: #fff; box-shadow: 0 4px 12px rgba(22, 163, 74, .3); }
+  .cta.demo { background: #fff; color: var(--accent); border: 1.5px solid var(--accent); }
+  .main-video { width: 100%; border-radius: 14px; background: #000; display: block; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
+  .main-video.phone { max-width: 340px; margin: 0 auto; }
+
+  /* what it does */
+  .feats { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 10px; }
+  .feats li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 15.5px; line-height: 1.5; }
+  .feats b { display: block; font-size: 16.5px; }
+
+  /* the short videos: upright, two to a row on phones, four on laptops */
+  h2 { font-size: 21px; margin: 30px 0 4px; }
+  .sub { margin: 0 0 14px; color: var(--muted); font-size: 14.5px; }
+  .shorts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .short { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .short video { width: 100%; aspect-ratio: 9 / 16; background: #000; display: block; }
+  .short .cap { padding: 8px 10px 4px; font-size: 14.5px; font-weight: 600; line-height: 1.35; }
+  .short .acts { display: flex; gap: 6px; padding: 4px 10px 10px; margin-top: auto; }
+  .short .acts a { flex: 1; text-align: center; text-decoration: none; font-size: 13px; font-weight: 600; padding: 7px 4px; border-radius: 8px; border: 1px solid var(--line); color: #374151; }
+  .short .acts a.wa { background: #dcfce7; border-color: #86efac; color: #166534; }
+
+  /* share this page */
+  .sharebox { margin: 30px 0 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .sharebox h2 { margin: 0 0 6px; }
+  .sharerow { display: grid; gap: 8px; margin-top: 10px; }
+  .sharerow a, .sharerow button { display: block; width: 100%; text-align: center; text-decoration: none; font: inherit; font-size: 16px; font-weight: 600;
+    padding: 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  .sharerow .wa { background: var(--green); border-color: var(--green); color: #fff; }
+  .sharerow small { display: block; font-weight: 400; font-size: 12.5px; color: var(--muted); }
+  #copyNote { min-height: 20px; margin-top: 6px; font-size: 14px; color: var(--green); }
+  .bottomcta { margin-top: 26px; text-align: center; }
+  .bottomcta p { font-size: 18px; font-weight: 700; margin: 0 0 12px; }
+
+  .footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 18px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; color: var(--muted); }
+  .footer a { color: inherit; text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+  .footer .by { display: inline-flex; align-items: center; gap: 6px; }
+  .footer .by img { width: 22px; height: 22px; border-radius: 6px; }
+  .footer .by b { color: #12473f; font-size: 14px; }
+
+  @media (min-width: 900px) {
+    .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 36px; padding-top: 40px; }
+    h1 { font-size: 34px; }
+    .hero .ctas { max-width: 440px; }
+    .feats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .shorts { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .sharerow { display: flex; }   /* the buttons there share the row (no "other apps" on most laptops) */
+    .sharerow > * { flex: 1; }
+    .bottomcta .ctas { grid-template-columns: 1fr 1fr; max-width: 680px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div>
+      <div class="brand"><img src="/icon-192.png" alt=""><span><b>Voter Search</b><small>www.rajelection.com</small></span></div>
+      <h1>अपने गाँव की मतदाता सूची — <em>अब आपके फ़ोन में</em></h1>
+      <p class="lead">नाम लिखते ही वोटर की पर्ची। मतदान के दिन कौन वोट दे आया, कौन बाकी — एक टैप में निशान। हर वार्ड, हर घर की पूरी रिपोर्ट।</p>
+      <div class="ctas">
+        <a class="cta signup" href="/">📱 मोबाइल नंबर से साइन अप करें</a>
+        <a class="cta demo" href="/demo">🔍 फ़्री डेमो आज़माएं</a>
+      </div>
+    </div>
+    <video id="mainVideo" class="main-video" controls playsinline preload="metadata"></video>
+  </section>
+
+  <ul class="feats">
+    <li><b>🔍 तुरंत सर्च</b>हिंदी या English में नाम, पिता का नाम, मकान नंबर या Voter ID — गलत स्पेलिंग भी चलेगी।</li>
+    <li><b>✅ मतदान दिवस</b>वोट दे आए, आने वाले, बाहर गए — हर वोटर पर निशान लगाएं।</li>
+    <li><b>📊 वार्ड रिपोर्ट</b>हर वार्ड में कितने वोट पड़े, कितने बाकी — पूरा हिसाब एक जगह।</li>
+    <li><b>👨‍👩‍👧 परिवार</b>एक नाम से पूरा परिवार, घर-घर का संपर्क आसान।</li>
+  </ul>
+
+  <h2>छोटे वीडियो</h2>
+  <p class="sub">देखें, और WhatsApp स्टेटस या ग्रुप में शेयर करें।</p>
+  <div class="shorts">
+    <div class="short"><video controls playsinline preload="metadata" src="/short-search.mp4#t=4"></video>
+      <div class="cap">नाम लिखो, पर्ची तुरंत</div>
+      <div class="acts"><a class="wa" data-wa="/short-search.mp4" href="#">WhatsApp</a><a href="/short-search.mp4" download="voter-search-1.mp4">⬇ सेव</a></div></div>
+    <div class="short"><video controls playsinline preload="metadata" src="/short-pollday.mp4#t=5"></video>
+      <div class="cap">मतदान का दिन: कौन आया, कौन बाकी</div>
+      <div class="acts"><a class="wa" data-wa="/short-pollday.mp4" href="#">WhatsApp</a><a href="/short-pollday.mp4" download="voter-search-2.mp4">⬇ सेव</a></div></div>
+    <div class="short"><video controls playsinline preload="metadata" src="/short-report.mp4#t=6"></video>
+      <div class="cap">हर वार्ड का पूरा हिसाब</div>
+      <div class="acts"><a class="wa" data-wa="/short-report.mp4" href="#">WhatsApp</a><a href="/short-report.mp4" download="voter-search-3.mp4">⬇ सेव</a></div></div>
+    <div class="short"><video controls playsinline preload="metadata" src="/short-dates.mp4#t=2"></video>
+      <div class="cap">चुनाव की तारीख़ें — तैयारी अभी</div>
+      <div class="acts"><a class="wa" data-wa="/short-dates.mp4" href="#">WhatsApp</a><a href="/short-dates.mp4" download="voter-search-4.mp4">⬇ सेव</a></div></div>
+  </div>
+
+  <section class="sharebox">
+    <h2>यह पेज शेयर करें</h2>
+    <p class="sub" style="margin:0">अपने गाँव के साथियों को भेजें।</p>
+    <div class="sharerow">
+      <a id="shWa" class="wa" href="#">WhatsApp पर भेजें<small style="color:#dcfce7">चैट या ग्रुप में इस पेज का लिंक</small></a>
+      <button id="shMore" type="button">दूसरे ऐप में शेयर करें<small>Facebook, Telegram, SMS…</small></button>
+      <button id="shCopy" type="button">लिंक कॉपी करें<small>www.rajelection.com/promo</small></button>
+    </div>
+    <div id="copyNote"></div>
+  </section>
+
+  <section class="bottomcta">
+    <p>पसंद आया? अभी शुरू करें</p>
+    <div class="ctas">
+      <a class="cta signup" href="/">📱 मोबाइल नंबर से साइन अप करें</a>
+      <a class="cta demo" href="/demo">🔍 फ़्री डेमो आज़माएं</a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
+  <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
+  <a href="mailto:ram@digyai.com">ram@digyai.com</a>
+  <span>Mon–Sat, 10:00–19:00 IST</span>
+</footer>
+
+<script>
+  const SITE = 'https://www.rajelection.com/';
+  const PAGE = SITE + 'promo';
+  const LINE = 'Voter Search — अपने गाँव की मतदाता सूची, फ़ोन और लैपटॉप पर। नाम लिखते ही पर्ची, वोट के निशान और वार्ड रिपोर्ट।';
+  const TEXT = `${LINE}\nवीडियो देखें: ${PAGE}\nशुरू करें: ${SITE}`;
+  const $ = (id) => document.getElementById(id);
+
+  // the main video: upright on phones, wide on laptops (a short pause on the first second as the cover)
+  const wide = matchMedia('(min-width: 900px)').matches;
+  const mv = $('mainVideo');
+  mv.src = `/promo-${wide ? 'laptop' : 'phone'}.mp4#t=1`;
+  mv.classList.toggle('phone', !wide);
+
+  // one video at a time
+  const vids = document.querySelectorAll('video');
+  vids.forEach((v) => v.addEventListener('play', () => vids.forEach((o) => { if (o !== v) o.pause(); })));
+
+  const wa = (text) => window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  $('shWa').addEventListener('click', (e) => { e.preventDefault(); wa(TEXT); });
+  if (!navigator.share) $('shMore').style.display = 'none';
+  $('shMore').addEventListener('click', () => navigator.share({ title: 'Voter Search', text: LINE, url: PAGE }).catch(() => {}));
+  $('shCopy').addEventListener('click', async () => {
+    let ok = false;
+    try { await navigator.clipboard.writeText(PAGE); ok = true; } catch {}
+    $('copyNote').textContent = ok ? '✓ लिंक कॉपी हो गया' : PAGE;
+  });
+
+  // a short on WhatsApp: its own link, and this page's (for a status, ⬇ सेव keeps the video on the phone)
+  document.querySelectorAll('[data-wa]').forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault();
+    wa(`${LINE}\nवीडियो: ${SITE.replace(/\/$/, '')}${a.dataset.wa}\nऔर वीडियो: ${PAGE}\nशुरू करें: ${SITE}`);
+  }));
+</script>
+</body>
+</html>
