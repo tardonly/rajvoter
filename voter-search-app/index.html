@@ -92,6 +92,11 @@
     display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 40px 12px 14px;
     border-radius: 14px; background: linear-gradient(120deg, #7c3aed, #db2777); color: #fff; box-shadow: 0 3px 10px rgba(124, 58, 237, .3); }
   .cpnbanner:only-child { flex-basis: 100%; max-width: none; }
+  .cpnbanners.inpop { padding: 4px 0 6px; margin: 4px 0 0; background: none; scroll-padding: 0; }
+  .cpnbanners.inpop .cpnbanner { min-height: 80px; padding-right: 14px; }
+  .cpnbanner.on { box-shadow: 0 0 0 3px #fff inset, 0 0 0 3px #16a34a; }
+  .cpnbanner.on b { background: #16a34a; color: #fff; }
+  .cpnlist .cpnbanners { width: 100%; }
   .cpnbanner:nth-child(3n+2) { background: linear-gradient(120deg, #0f766e, #2563eb); }
   .cpnbanner:nth-child(3n) { background: linear-gradient(120deg, #c2410c, #db2777); }
   .cpnbanner span { font-size: 16px; font-weight: 700; line-height: 1.35; }
@@ -1879,22 +1884,35 @@ function buyOpen(code) {
   cpnIn.placeholder = L('🎟 कूपन कोड (हो तो)', '🎟 Coupon code (if any)'); cpnIn.autocapitalize = 'characters'; cpnIn.maxLength = 15;
   cpnBtn.type = 'button';
   // the coupons the superadmin lists here (api/signup.js 'coupons'): tap one to apply it
-  const cpnList = el('div', 'cpnlist hidden');
-  const markChosen = () => cpnList.querySelectorAll('button').forEach((x) => x.classList.toggle('on', !!cpn && x.dataset.code === cpn.code));
+  const cpnList = el('div', 'cpnlist hidden'), cpnCards = el('div', 'cpnbanners inpop hidden');
+  const markChosen = () => {
+    cpnList.querySelectorAll('.cpnchip').forEach((x) => x.classList.toggle('on', !!cpn && x.dataset.code === cpn.code));
+    cpnCards.querySelectorAll('.cpnbanner').forEach((x) => {
+      const on = !!cpn && x.dataset.code === cpn.code;
+      x.classList.toggle('on', on); x.querySelector('b').textContent = on ? L('✓ लगा है', '✓ Applied') : L('लगाएं ›', 'Apply ›');
+      if (on) cpnCards.scrollTo({ left: x.offsetLeft - cpnCards.firstElementChild.offsetLeft, behavior: 'smooth' });   // the chosen card in sight
+    });
+  };
+  const pickCpn = (c) => {
+    if (cpn && cpn.code === c.code) return;
+    if (cpn) { cpn = null; cpnIn.disabled = false; }
+    cpnIn.value = c.code; cpnBtn.click();
+  };
   api('signup', { action: 'coupons', token: token() }).then((r) => {
     if (!r.coupons || !r.coupons.length) return;
     cpnList.append(el('div', 'k', L('🎟 आपके लिए कूपन — दबाकर लगाएं:', '🎟 Coupons for you — tap one to apply:')));
-    for (const c of r.coupons) {
+    // the banner coupons as the same cards as above the title (cpnBanners), in a row that scrolls sideways; the rest as chips
+    const cards = r.coupons.filter((c) => c.banner);
+    for (const c of cards) cpnCards.append(cpnCard(c, () => pickCpn(c), L('लगाएं ›', 'Apply ›')));
+    cpnCards.classList.toggle('hidden', !cards.length);
+    cpnList.append(cpnCards);
+    for (const c of r.coupons.filter((x) => !x.banner)) {
       const b = el('button', 'cpnchip'); b.type = 'button'; b.dataset.code = c.code;
       const top = el('span'); top.append(el('b', null, c.code), ` · ${cpnWhat(c)}`); b.append(top);
       const when = [cpnPacks(c), c.first ? L('पहली खरीद पर', 'first purchase') : '',
         c.until ? L(`${c.until} तक`, `until ${c.until}`) : ''].filter(Boolean).join(' · ');
       if (when) b.append(el('small', null, when));
-      b.addEventListener('click', () => {
-        if (cpn && cpn.code === c.code) return;
-        if (cpn) { cpn = null; cpnIn.disabled = false; }
-        cpnIn.value = c.code; cpnBtn.click();
-      });
+      b.addEventListener('click', () => pickCpn(c));
       cpnList.append(b);
     }
     cpnList.classList.remove('hidden');
@@ -1945,6 +1963,16 @@ $('buyMore').addEventListener('click', () => buyOpen());
 // first), above the title in a row that scrolls sideways; tapping one opens the buy window with it applied. ✕ on a
 // card hides all of them until the page is opened again.
 let cpnBannersShut = false;
+// one coupon's banner card: its banner words (or ones made from the coupon) and a button; go: what tapping it does
+function cpnCard(c, go, label = L('अभी लें ›', 'Get it ›')) {
+  const b = el('div', 'cpnbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0; b.dataset.code = c.code;
+  const packs = cpnPacks(c);
+  b.append(el('span', null, c.bannerText || L(`🎟 कूपन ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`, `🎟 Coupon ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`)),
+    el('b', null, label));
+  b.addEventListener('click', go);
+  b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  return b;
+}
 async function cpnBanners() {
   const box = $('cpnBanners');
   box.replaceChildren(); box.classList.add('hidden');
@@ -1953,15 +1981,10 @@ async function cpnBanners() {
   const list = (r.coupons || []).filter((c) => c.banner);
   if (!list.length || cpnBannersShut) return;
   for (const c of list) {
-    const b = el('div', 'cpnbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0;
-    const packs = cpnPacks(c);
-    b.append(el('span', null, c.bannerText || L(`🎟 कूपन ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`, `🎟 Coupon ${c.code}: ${cpnWhat(c)}${packs ? ` (${packs})` : ''}`)),
-      el('b', null, L('अभी लें ›', 'Get it ›')));
+    const b = cpnCard(c, () => buyOpen(c.code));
     const x = el('button', 'cpnbannerx', '✕'); x.type = 'button'; x.setAttribute('aria-label', L('बंद करें', 'Close'));
     x.addEventListener('click', (e) => { e.stopPropagation(); cpnBannersShut = true; box.classList.add('hidden'); });
     b.append(x);
-    b.addEventListener('click', () => buyOpen(c.code));
-    b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); buyOpen(c.code); } });
     box.append(b);
   }
   box.scrollLeft = 0;
