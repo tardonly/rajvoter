@@ -41,15 +41,12 @@
     border: 1.5px solid var(--line); border-radius: 10px; text-align: center; letter-spacing: 1px; }
   .lockbox .phonenote { margin: 5px 0 12px; font-size: 13px; color: var(--muted); }
   .lockbox label { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 12px 0; font-size: 14px; color: var(--muted); }
-  /* the demo: a real button, so people without a login see they can try it */
-  .demolink { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px; border-radius: 12px;
-    border: 0; background: #ea580c; color: #fff; font-size: 17px; font-weight: 700; text-decoration: none; text-align: left;
-    box-shadow: 0 3px 0 #9a3412, 0 4px 12px rgba(234, 88, 12, .3); }
-  .demolink:active { transform: translateY(2px); box-shadow: 0 1px 0 #9a3412; }
-  .demolink .play { flex: none; width: 38px; height: 38px; border-radius: 50%; background: #fff; color: #ea580c;
-    display: grid; place-items: center; font-size: 16px; padding-left: 3px; }
-  .demolink span:last-child { flex: 1; }
-  .demolink small { display: block; font-size: 12.5px; font-weight: 500; color: #ffedd5; margin-top: 2px; }
+  /* the demo: a short note with a small button, for people without a login */
+  .demolink { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 10px 12px; border-radius: 10px;
+    background: #fff7ed; border: 1px solid #fed7aa; font-size: 13.5px; color: #7c2d12; text-align: left; }
+  .demolink span { flex: 1; }
+  .demolink a { flex: none; padding: 6px 12px; border-radius: 8px; background: #ea580c; color: #fff; font-size: 14px;
+    font-weight: 600; text-decoration: none; white-space: nowrap; }
   /* हिंदी / English: the whole app in either language, remembered on this phone */
   .langbtn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px;
     color: var(--accent); font-weight: 600; white-space: nowrap; }
@@ -391,7 +388,7 @@
       <div class="lockalt"><button id="phoneBack" class="hidden" type="button">← नंबर बदलें</button><button id="pwOnly" type="button">एडमिन? सीधे पासवर्ड से खोलें</button></div>
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
-    <a id="demoLink" class="demolink hidden" href="/demo"><span class="play" aria-hidden="true">▶</span><span>डेमो देखें<small>बिना खाते के, असली मतदाता सूची में 10 सर्च</small></span></a>
+    <div id="demoLink" class="demolink hidden"><span>खाता नहीं है? बिना खाते के असली मतदाता सूची में 10 सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ वीडियो देखें</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
 </section>
@@ -549,7 +546,7 @@ const STATIC_EN = {
   'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
   'डेमो देखें': 'Try the demo',
-  'बिना खाते के, असली मतदाता सूची में 10 सर्च': 'No login needed: 10 searches in a real voter list',
+  'खाता नहीं है? बिना खाते के असली मतदाता सूची में 10 सर्च करके देखें': 'No login? Try 10 searches in a real voter list without one',
   '▶ वीडियो देखें': '▶ Watch the video', '↗ शेयर करें': '↗ Share', '↗ शेयर': '↗ Share', 'शेयर करें': 'Share',
   'ऐप कैसे काम करता है': 'How the app works', 'वीडियो': 'Video', '📱 फ़ोन': '📱 Phone', '💻 लैपटॉप': '💻 Laptop', 'बंद करें': 'Close',
   'WhatsApp स्टेटस पर लगाएं': 'Post on WhatsApp status', 'ऐप का वीडियो और लिंक, फिर "My status" चुनें': 'The app\'s video and link, then choose "My status"',
