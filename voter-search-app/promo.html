@@ -52,10 +52,11 @@
   .vend a, .vend button { display: block; width: 100%; max-width: 300px; margin: 0 auto; font: inherit; font-size: 16px; font-weight: 700; text-decoration: none;
     padding: 12px 8px; border-radius: 10px; border: 0; cursor: pointer; }
   .vend .su { background: var(--green); color: #fff; }
+  .vend .de { background: #fff; color: var(--accent); }
   .vend .sh { background: #fff; color: #166534; }
   .vend .again { background: none; color: #e5e7eb; font-weight: 600; padding: 6px; }
   .short .vend { border-radius: 0; gap: 7px; padding: 8px; }
-  .short .vend p { font-size: 14px; }
+  .short .vend p { display: none; }
   .short .vend a, .short .vend button { font-size: 13.5px; padding: 9px 4px; }
 
   /* what it does */
@@ -220,13 +221,14 @@
     v.before(box); box.append(v);
     const end = document.createElement('div');
     end.className = 'vend'; end.hidden = true;
-    end.innerHTML = `<p>पसंद आया?</p><a class="su" href="/">📱 साइन अप करें</a><button class="sh" type="button">WhatsApp पर शेयर करें</button>`
+    end.innerHTML = `<p>पसंद आया?</p><a class="su" href="/">📱 साइन अप करें</a><a class="de" href="/demo">🔍 फ़्री डेमो</a><button class="sh" type="button">WhatsApp पर शेयर करें</button>`
       + `<button class="again" type="button">↻ फिर से देखें</button>`;
     box.append(end);
     v.addEventListener('ended', () => { end.hidden = false; track('video_end', path); });
     v.addEventListener('play', () => { end.hidden = true; });
     v.addEventListener('seeking', () => { if (!v.ended) end.hidden = true; });
     end.querySelector('.su').addEventListener('click', () => track('video_end_signup', path));
+    end.querySelector('.de').addEventListener('click', () => track('video_end_demo', path));
     end.querySelector('.sh').addEventListener('click', () => { track('video_end_share', path); wa(short ? shortText(path) : TEXT); });
     end.querySelector('.again').addEventListener('click', () => { v.currentTime = 0; v.play(); });
   });
