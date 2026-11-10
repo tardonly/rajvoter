@@ -1802,6 +1802,7 @@ function buyOpen() {
     if (!cpn || (cpn.minN && n < cpn.minN)) return { rs, bonus: 0, on: false };
     if (cpn.kind === 'pct') return { rs: Math.max(1, Math.round(rs * (100 - cpn.value) / 100)), bonus: 0, on: true };
     if (cpn.kind === 'rs') return { rs: Math.max(1, rs - cpn.value), bonus: 0, on: true };
+    if (cpn.kind === 'bonuspct') return { rs, bonus: Math.floor(n * cpn.value / 100), on: true };
     return { rs, bonus: cpn.value, on: true };
   };
   const payBtn = (pk) => {
@@ -1846,7 +1847,7 @@ function buyOpen() {
     if (!r.coupon) { cpnMsg.textContent = CPN_MSG[r.error] ? CPN_MSG[r.error](r) : r.error === 'too_many' ? MSG.too_many : L('⚠ कूपन जाँच नहीं पाए — दोबारा दबाएं', '⚠ Could not check the coupon — tap again'); cpnMsg.className = 'k cpnmsg bad'; return; }
     cpn = r.coupon; cpnIn.value = cpn.code; cpnIn.disabled = true; cpnBtn.textContent = L('हटाएं', 'Remove');
     const what = cpn.kind === 'pct' ? L(`${cpn.value}% छूट`, `${cpn.value}% off`) : cpn.kind === 'rs' ? L(`₹${cpn.value} छूट`, `₹${cpn.value} off`)
-      : L(`${cpn.value} सर्च मुफ़्त`, `${cpn.value} searches free`);
+      : cpn.kind === 'bonuspct' ? L(`${cpn.value}% ज़्यादा सर्च मुफ़्त`, `${cpn.value}% extra searches free`) : L(`${cpn.value} सर्च मुफ़्त`, `${cpn.value} searches free`);
     cpnMsg.className = 'k cpnmsg good';
     cpnMsg.textContent = L(`✓ कूपन ${cpn.code} लगा: ${what}${cpn.minN ? ` (${cpn.minN} या ज़्यादा सर्च के पैक पर)` : ''}`,
       `✓ Coupon ${cpn.code} applied: ${what}${cpn.minN ? ` (on packs of ${cpn.minN} or more searches)` : ''}`);

@@ -35,7 +35,7 @@
   .btn.danger { background: #fff; color: var(--bad); border: 1px solid #fecaca; font-weight: 500; }
   .row { display: flex; gap: 8px; }
   .row input { flex: 1; }
-  #freeCard summary { cursor: pointer; }
+  .phead { font-size: 16px; margin-bottom: 4px; }
   .fr { display: flex; align-items: center; gap: 8px; font-size: 15px; }
   .fr.num { flex-direction: column; align-items: stretch; gap: 4px; flex: 1; font-size: 14px; color: var(--muted); }
   input[type=number] { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; }
@@ -264,9 +264,42 @@
       <div class="sub" id="dbCopyMsg"></div>
     </div>
 
+    <!-- superadmin: survey marks before the election, polling-day marks on the day (api/admin.js "mark_mode") -->
+    <div class="card hidden" id="modeCard">
+      <b id="modeTitle"></b> · <span id="modeNow"></span>
+      <div class="sub" id="modeHelp" style="margin:6px 0 8px"></div>
+      <div class="row"><button class="btn ghost" type="button" data-mode="survey"></button><button class="btn ghost" type="button" data-mode="poll"></button></div>
+      <div class="sub" id="modeMsg" style="margin:6px 0 0"></div>
+    </div>
+
+    <nav class="tabs" id="tabs" role="tablist">
+      <button type="button" data-tab="people">व्यक्ति</button>
+      <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
+      <button type="button" data-tab="cands">उम्मीदवार</button>
+      <button type="button" data-tab="prog">प्रगति</button>
+      <button type="button" data-tab="voters">मतदाता सूची</button>
+      <button type="button" data-tab="clear">निशान हटाएं</button>
+      <button type="button" data-tab="ref" class="hidden" id="tabRef">रेफ़रल (दोस्तों को बुलाएं)</button>
+      <button type="button" data-tab="cpn" class="hidden" id="tabCpn">कूपन</button>
+      <button type="button" data-tab="free" class="hidden" id="tabFree">साइन-अप पर मुफ़्त सर्च</button>
+    </nav>
+
+    <!-- a new password, from any tab (new person, new admin, नया पासवर्ड) -->
+    <div class="newpw hidden" id="newPw">
+      <div class="bar2"><div id="newPwFor"></div><button class="x" id="closePw" type="button" aria-label="बंद करें">✕</button></div>
+      <div class="pw" id="newPwText"></div>
+      <div class="row">
+        <button class="btn ghost" id="copyPw" type="button">कॉपी करें</button>
+        <button class="btn ghost" id="sharePw" type="button">WhatsApp पर भेजें</button>
+      </div>
+      <div class="permsbox hidden" id="newPwPerms"></div>
+      <div class="msg" id="newPwMsg" style="min-height:0"></div>
+      <div class="note">यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।</div>
+    </div>
+
     <!-- superadmin: referrals — searches for the inviter when a friend first buys, and for the friend (api/admin.js "ref_rule") -->
-    <details class="card hidden" id="refCard">
-      <summary><b id="refTitle"></b> · <span id="refNow"></span></summary>
+    <div class="card pane" data-tab="ref" id="refCard">
+      <div class="phead"><b id="refTitle"></b> · <span id="refNow"></span></div>
       <div class="stack" style="margin-top:12px">
         <label class="fr"><input type="checkbox" id="refOn"> <span id="refOnText"></span></label>
         <div class="row">
@@ -276,18 +309,18 @@
         <button class="btn" id="refSave" type="button"></button>
         <div class="sub" id="refMsg" style="margin:0"></div>
       </div>
-    </details>
+    </div>
 
     <!-- superadmin: coupons for buying searches, with their conditions (api/admin.js "coupon_set" / "coupon_del") -->
-    <details class="card hidden" id="cpnCard">
-      <summary><b>🎟 कूपन</b> · <span id="cpnNow"></span></summary>
+    <div class="card pane" data-tab="cpn" id="cpnCard">
+      <div class="phead"><b>🎟 कूपन</b> · <span id="cpnNow"></span></div>
       <div class="stack" style="margin-top:12px">
         <div id="cpnList" class="stack"></div>
         <b id="cpnFormTitle">नया कूपन</b>
         <div class="row">
           <label class="fr num"><span>कोड (3–15 अक्षर/अंक)</span><input id="cpnCode" maxlength="15" style="text-transform:uppercase" placeholder="DIWALI20"></label>
           <label class="fr num"><span>किस तरह का</span><select id="cpnKind">
-            <option value="pct">% छूट</option><option value="rs">₹ छूट</option><option value="bonus">ज़्यादा सर्च मुफ़्त</option></select></label>
+            <option value="pct">% छूट</option><option value="rs">₹ छूट</option><option value="bonus">ज़्यादा सर्च मुफ़्त (संख्या)</option><option value="bonuspct">ज़्यादा सर्च मुफ़्त (%)</option></select></label>
           <label class="fr num"><span id="cpnValText">कितना</span><input id="cpnValue" type="number" min="1" inputmode="numeric"></label>
         </div>
         <div class="sub" style="margin:0">शर्तें (खाली या 0 = कोई शर्त नहीं):</div>
@@ -303,19 +336,11 @@
         <div class="row"><button class="btn" id="cpnSave" type="button">कूपन बनाएं</button><button class="btn ghost hidden" id="cpnCancel" type="button">रद्द</button></div>
         <div class="sub" id="cpnMsg" style="margin:0"></div>
       </div>
-    </details>
-
-    <!-- superadmin: survey marks before the election, polling-day marks on the day (api/admin.js "mark_mode") -->
-    <div class="card hidden" id="modeCard">
-      <b id="modeTitle"></b> · <span id="modeNow"></span>
-      <div class="sub" id="modeHelp" style="margin:6px 0 8px"></div>
-      <div class="row"><button class="btn ghost" type="button" data-mode="survey"></button><button class="btn ghost" type="button" data-mode="poll"></button></div>
-      <div class="sub" id="modeMsg" style="margin:6px 0 0"></div>
     </div>
 
     <!-- superadmin: free searches for people who sign up themselves (api/admin.js "free_rule") -->
-    <details class="card hidden" id="freeCard">
-      <summary><b>साइन-अप पर मुफ़्त सर्च</b> · <span id="freeNow"></span></summary>
+    <div class="card pane" data-tab="free" id="freeCard">
+      <div class="phead"><b>साइन-अप पर मुफ़्त सर्च</b> · <span id="freeNow"></span></div>
       <div class="stack" style="margin-top:12px">
         <label class="fr"><input type="radio" name="freeMode" value="direct"> <span>सीधे: हर गाँव के पहले X लोगों को Y सर्च</span></label>
         <label class="fr"><input type="radio" name="freeMode" value="halving"> <span>घटते हुए: Y → Y/2 → … → 1, हर बार X लोगों को</span></label>
@@ -327,28 +352,6 @@
         <button class="btn" id="freeSave" type="button">सेव करें</button>
         <div class="sub" id="freeMsg" style="margin:0"></div>
       </div>
-    </details>
-
-    <nav class="tabs" id="tabs" role="tablist">
-      <button type="button" data-tab="people">व्यक्ति</button>
-      <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
-      <button type="button" data-tab="cands">उम्मीदवार</button>
-      <button type="button" data-tab="prog">प्रगति</button>
-      <button type="button" data-tab="voters">मतदाता सूची</button>
-      <button type="button" data-tab="clear">निशान हटाएं</button>
-    </nav>
-
-    <!-- a new password, from any tab (new person, new admin, नया पासवर्ड) -->
-    <div class="newpw hidden" id="newPw">
-      <div class="bar2"><div id="newPwFor"></div><button class="x" id="closePw" type="button" aria-label="बंद करें">✕</button></div>
-      <div class="pw" id="newPwText"></div>
-      <div class="row">
-        <button class="btn ghost" id="copyPw" type="button">कॉपी करें</button>
-        <button class="btn ghost" id="sharePw" type="button">WhatsApp पर भेजें</button>
-      </div>
-      <div class="permsbox hidden" id="newPwPerms"></div>
-      <div class="msg" id="newPwMsg" style="min-height:0"></div>
-      <div class="note">यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।</div>
     </div>
 
     <div class="card pane" data-tab="admins" id="adminCard">
@@ -513,6 +516,7 @@ const store = {
   set(v) { try { localStorage.setItem('tok:admin', v); } catch (e) {} },
   del() { try { localStorage.removeItem('tok:admin'); sessionStorage.removeItem('tok:admin'); } catch (e) {} },
 };
+let MARKED = {}, STATS = null;   // from "stats" (api/admin.js), loaded after the page shows: slips marked per person; null = not yet
 let token = store.get(), me = null, users = [], admins = [], reqs = [], collected = null, filter = 'on', villages = {}, progress = [], cands = [];
 const MSG = EN ? {
   wrong: 'Wrong password', too_many: 'Too many wrong passwords — try again in 15 minutes',
@@ -587,6 +591,23 @@ async function openPanel() {
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
   approveFromLink();
+  loadStats();   // progress and marks: slower, so after the page is up
+}
+// "stats" (api/admin.js): progress per ward and slips marked per person; all = every village, not just those with marks
+let statsBusy = null;
+const STATS_PAGE = 30;   // villages more per "और गाँव दिखाएं" (STATS_ALL in api/admin.js)
+async function loadStats(all) {   // all: how many villages/candidates to show, those with marks first (0 = only those)
+  if (statsBusy) return statsBusy;
+  statsBusy = (async () => {
+    const n = all || (STATS && STATS.all) || 0;
+    const r = await api({ action: 'stats', all: n });
+    if (r.error) { $('progFoot').textContent = errText(r); return; }
+    STATS = { partial: r.partial, groups: r.groups, all: n };
+    MARKED = r.marked || {};
+    showMarks(r);
+    if (document.querySelector('.pane.on[data-tab="voters"]') && !vs.loaded) loadVoters();
+  })();
+  try { await statsBusy; } finally { statsBusy = null; }
 }
 // move people's data from Upstash into USER_REDIS_URL (api/admin.js "db_copy"), step by step, then reload the lists
 $('dbCopyBtn').addEventListener('click', async () => {
@@ -629,6 +650,7 @@ function freePreview() {
 }
 function showFreeRule(rule) {
   $('freeCard').classList.toggle('hidden', !rule);
+  $('tabFree').classList.toggle('hidden', !rule);
   if (!rule) return;
   $('freeNow').textContent = rule.mode === 'halving' ? L(`घटते हुए, ${rule.people} लोग, ${rule.searches} से`, `halving, ${rule.people} people, from ${rule.searches}`)
     : L(`सीधे, पहले ${rule.people} लोगों को ${rule.searches}`, `direct, first ${rule.people} people get ${rule.searches}`);
@@ -647,6 +669,7 @@ $('freeSave').addEventListener('click', async () => {
 // referrals (refRule in api/_lib.js): the inviter's searches when a friend first buys, the friend's on joining
 function showRefRule(rule) {
   $('refCard').classList.toggle('hidden', !rule);
+  $('tabRef').classList.toggle('hidden', !rule);
   if (!rule) return;
   $('refTitle').textContent = L('रेफ़रल (दोस्तों को बुलाएं)', 'Referrals (invite friends)');
   $('refNow').textContent = rule.on ? L(`चालू · बुलाने वाले को ${rule.inviter}, दोस्त को ${rule.joiner}`, `on · inviter ${rule.inviter}, friend ${rule.joiner}`) : L('बंद', 'off');
@@ -666,11 +689,12 @@ $('refSave').addEventListener('click', async () => {
 });
 // coupons (getCoupon in api/_lib.js): the list, each with ✎ (into the form) and 🗑; the form makes or changes one
 let COUPONS = [], cpnEdit = null;
-const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट` : c.kind === 'rs' ? `₹${c.value} छूट` : `${c.value} सर्च मुफ़्त`);
+const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट` : c.kind === 'rs' ? `₹${c.value} छूट` : c.kind === 'bonuspct' ? `${c.value}% ज़्यादा सर्च मुफ़्त` : `${c.value} सर्च मुफ़्त`);
 const cpnRules = (c) => [c.minN ? `${c.minN}+ सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
   c.until ? `${c.until} तक` : '', `${c.used}${c.maxUses ? `/${c.maxUses}` : ''} बार इस्तेमाल`].filter(Boolean).join(' · ');
 function showCoupons(list) {
   $('cpnCard').classList.toggle('hidden', !list);
+  $('tabCpn').classList.toggle('hidden', !list);
   if (!list) return;
   COUPONS = list;
   const live = list.filter((c) => c.on).length;
@@ -707,7 +731,7 @@ function cpnForm(c) {
   $('cpnMsg').textContent = '';
   cpnKindText();
 }
-const cpnKindText = () => { $('cpnValText').textContent = { pct: 'कितने % (1–99)', rs: 'कितने ₹', bonus: 'कितनी सर्च' }[$('cpnKind').value]; };
+const cpnKindText = () => { $('cpnValText').textContent = { pct: 'कितने % (1–99)', rs: 'कितने ₹', bonus: 'कितनी सर्च', bonuspct: 'कितने % सर्च ज़्यादा (1–1000)' }[$('cpnKind').value]; };
 $('cpnKind').addEventListener('change', cpnKindText);
 $('cpnCancel').addEventListener('click', () => cpnForm(null));
 $('cpnSave').addEventListener('click', async () => {
@@ -802,7 +826,7 @@ function reqList() {
   const head = el('div', 'sub', reqs.length ? L(`${open} मंज़ूरी बाकी · ${reqs.length - open} निपटाए (पिछले 30 दिन)`, `${open} waiting · ${reqs.length - open} handled (last 30 days)`)
     : L('अभी कोई अनुरोध नहीं।', 'No requests yet.'));
   const list = el('div', 'reqs');
-  for (const r of reqs) {
+  paged(list, reqs, (r) => {
     const b = el('button', `req ${r.status === 'open' ? 'open' : r.status === 'rejected' ? 'rej' : 'fin'}`); b.type = 'button';
     const t = el('div', 't'); t.append(el('span', null, r.name),
       el('span', 'st', r.status === 'open' ? L('⏳ बाकी', '⏳ Waiting') : r.status === 'rejected' ? L('✕ अस्वीकार', '✕ Rejected')
@@ -820,8 +844,8 @@ function reqList() {
       $('apTitle').textContent = L('✅ सर्च मंज़ूरी', '✅ Approve searches');
       if (u) approveView(u, r, true); else $('apBody').replaceChildren(el('div', 'bad', MSG.not_found));
     });
-    list.append(b);
-  }
+    return b;
+  }, 'reqs');
   body.replaceChildren(head, ...collectedBox(), list);
 }
 // money collected so far (all time; api/admin.js "list" collected): the superadmin sees each admin, a village admin
@@ -1074,7 +1098,7 @@ function showTab(name) {
   const bar = $('tabs'), on = bar.querySelector('button.on');   // keep the chosen tab in sight on a narrow phone
   bar.scrollLeft = on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2;
   saved.set('adminTab', btn);
-  if (btn === 'voters' && !vs.loaded) loadVoters();
+  if (btn === 'voters' && !vs.loaded && STATS) loadVoters();   // else once "stats" is in (loadStats)
 }
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 // an admin's villages to tick, grouped by पंचायत समिति. "पूरी पंचायत समिति" gives the whole samiti (kept as the samiti,
@@ -1104,18 +1128,33 @@ function villageChecks(checked, samitis = []) {
 const checkedIn = (box) => [...box.querySelectorAll('input[value]:checked:not(:disabled)')].map((c) => c.value);   // villages one by one
 const samitisIn = (box) => [...box.querySelectorAll('input[data-samiti]:checked')].map((c) => c.dataset.samiti);
 
-async function refresh() {
+async function refresh(stats = false) {   // stats: progress and marks too (loadStats), when they may have changed
   const r = await api({ action: 'list' });
   if (r.error) { $('listMsg').textContent = errText(r); return; }
-  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; reqs = r.reqs || []; collected = r.collected || null; showBell(); render(); showMarks(r);
+  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; reqs = r.reqs || []; collected = r.collected || null; showBell(); render();
+  if (typeof r.survey === 'boolean') setMode(r.survey);
+  if (stats) loadStats();
 }
-$('reload').addEventListener('click', refresh);
-// polling day: keep the numbers fresh while the page is open
-setInterval(() => { if (!document.hidden && !$('panel').classList.contains('hidden')) refresh(); }, 60000);
+$('reload').addEventListener('click', () => refresh(true));
+// polling day: keep the numbers fresh while the page is open (progress only while a marks tab is open)
+setInterval(() => {
+  if (!document.hidden && !$('panel').classList.contains('hidden')) refresh(!!document.querySelector('.pane.on[data-tab="prog"], .pane.on[data-tab="voters"], .pane.on[data-tab="clear"]'));
+}, 60000);
 
 // ---------- progress per ward, one table per village ----------
 function showProgress() {
   const box = $('prog'); box.innerHTML = '';
+  if (!STATS) { box.append(el('div', 'empty', L('⏳ प्रगति लोड हो रही है…', '⏳ Loading progress…'))); $('progFoot').textContent = ''; return; }
+  let more = null;
+  if (STATS.partial) {   // many villages: only those with marks, or the first pages, came (api/admin.js "stats")
+    const left = STATS.groups - progress.length, step = Math.min(STATS_PAGE, left);
+    more = el('button', 'btn ghost', L(`और ${step} गाँव/उम्मीदवार दिखाएं (${left} बाकी)`, `Show ${step} more villages/candidates (${left} left)`));
+    more.type = 'button';
+    more.addEventListener('click', () => { more.disabled = true; more.textContent = L('⏳ लोड हो रहा है…', '⏳ Loading…'); loadStats(progress.length + STATS_PAGE); });
+    box.append(el('div', 'sub', STATS.all ? L(`${STATS.groups} में से ${progress.length} दिखाए — निशान वाले पहले।`, `${progress.length} of ${STATS.groups} shown — those with marks first.`)
+      : L(`सिर्फ़ वे ${progress.length} गाँव/उम्मीदवार जिनमें निशान लगे हैं (कुल ${STATS.groups})।`, `Only the ${progress.length} villages/candidates that have marks (${STATS.groups} in all).`)));
+  }
+  if (!progress.length) box.append(el('div', 'empty', L('अभी कहीं निशान नहीं लगे।', 'No marks anywhere yet.')));
   for (const v of progress) {
     const g = el('div');   // one village or candidate: its name and its table, kept together for the columns on a laptop
     if (progress.length > 1) g.append(el('div', 'vh', groupName(v)));
@@ -1145,8 +1184,9 @@ function showProgress() {
     }
     t.append(body); g.append(t); box.append(g);
   }
-  $('progFoot').textContent = L(`आपने ${me.marked || 0} पर्चियों पर निशान लगाए · हर मिनट अपने-आप ताज़ा होता है`,
-    `You marked ${me.marked || 0} slips · refreshes itself every minute`);
+  if (more) box.append(more);
+  $('progFoot').textContent = L(`आपने ${MARKED[me.id] || 0} पर्चियों पर निशान लगाए · हर मिनट अपने-आप ताज़ा होता है`,
+    `You marked ${MARKED[me.id] || 0} slips · refreshes itself every minute`);
 }
 
 // ---------- status marks on the slips: how many of each, and clearing them (the last clear can be undone) ----------
@@ -1180,9 +1220,10 @@ document.querySelectorAll('#modeCard button[data-mode]').forEach((b) => b.addEve
   const r = await api({ action: 'mark_mode', mode: to });
   if (r.error) { $('modeMsg').textContent = errText(r); return; }
   $('modeMsg').textContent = L('✓ बदल गया — फ़ोन पर अगली सर्च या एक मिनट में दिखेगा', '✓ Switched — phones show it on their next search, or within a minute');
-  refresh();
+  refresh(true);
 }));
 function showMarks(r) {
+  if (r.groups != null) { STATS = { partial: r.partial, groups: r.groups, all: (STATS && STATS.all) || 0 }; MARKED = r.marked || MARKED; }   // a "stats" answer
   if (typeof r.survey === 'boolean') setMode(r.survey);
   if (r.progress) progress = r.progress;
   for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id));   // candidates may have come or gone
@@ -1201,13 +1242,13 @@ async function clearMarks(status) {
   const what = status === 'all' ? L('सभी', 'all') : L(`"${MARK_NAME[status]}" के सभी`, `all "${MARK_NAME[status]}"`);
   if (!confirm(L(`${groupName(v)}: ${what} ${n} निशान हटाएं? गलती हो तो "वापस लाएं" से ये निशान लौट आएंगे (सिर्फ़ आखिरी बार हटाए गए)।`,
     `${groupName(v)}: clear ${what} ${n} marks? If it was a mistake, "Bring back" restores them (only the last clear).`))) return;
-  const r = await api({ action: 'clearMarks', ...groupArgs(key), status });
+  const r = await api({ action: 'clearMarks', ...groupArgs(key), status, all: (STATS && STATS.all) || 0 });
   if (r.error) { $('marksMsg').textContent = errText(r); return; }
   $('marksMsg').textContent = ''; showMarks(r);
 }
 $('restore').addEventListener('click', async () => {
   if (!confirm(L('आखिरी बार हटाए गए निशान वापस लाएं? उसके बाद लगे नए निशान भी बने रहेंगे।', 'Bring back the marks cleared last? Marks set since then stay too.'))) return;
-  const r = await api({ action: 'restoreMarks', ...groupArgs($('mkVillage').value) });
+  const r = await api({ action: 'restoreMarks', ...groupArgs($('mkVillage').value), all: (STATS && STATS.all) || 0 });
   if (r.error) { $('marksMsg').textContent = errText(r); return; }
   $('marksMsg').textContent = ''; showMarks(r);
 });
@@ -1272,7 +1313,7 @@ document.querySelectorAll('#vsStatus button').forEach((b) => b.addEventListener(
 $('vsVillage').addEventListener('change', () => { $('vsWard').value = ''; voterCounts(); loadVoters(); });
 $('vsWard').addEventListener('change', () => { voterCounts(); loadVoters(); });
 $('vsMore').addEventListener('click', () => loadVoters(true));
-$('vsReload').addEventListener('click', () => { refresh(); loadVoters(); });
+$('vsReload').addEventListener('click', () => { refresh(true); loadVoters(); });
 
 // what a user may do besides searching by name (the server checks these on every request)
 const PERM_NAME = EN ? { mark: 'Can set marks', ward: 'Can list a whole ward', wardPdf: 'All slips of a ward', print: 'Print slips',
@@ -1473,18 +1514,30 @@ document.querySelectorAll('.filter button[data-f]').forEach((b) => b.addEventLis
 $('fVillage').addEventListener('change', render);
 
 // ---------- lists ----------
+// long lists, PAGE rows at a time with "और दिखाएं" (the count shown is kept across refreshes); key names the list
+const PAGE = 50, pageShown = {};
+function paged(box, items, make, key) {
+  const add = (from, to) => {
+    for (const x of items.slice(from, to)) box.append(make(x));
+    if (items.length <= to) return;
+    const more = el('button', 'btn ghost full', L(`और दिखाएं (${items.length - to} बाकी)`, `Show more (${items.length - to} left)`)); more.type = 'button';
+    more.addEventListener('click', () => { more.remove(); pageShown[key] = to + PAGE; add(to, to + PAGE); });
+    box.append(more);
+  };
+  add(0, Math.max(PAGE, pageShown[key] || 0));
+}
 function render() {
   if (!me) return;
   const fv = $('fVillage').value;
   const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv));
   const list = $('list'); list.innerHTML = '';
   if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? L('कोई बंद पासवर्ड नहीं', 'No switched-off passwords') : L('अभी कोई व्यक्ति नहीं — "+ नया व्यक्ति" से जोड़ें', 'Nobody yet — add someone with "+ New person"')));
-  for (const u of shown) list.append(person(u));
+  paged(list, shown, person, `people:${filter}:${fv}`);
   renderCands();
   const al = $('adminList'); al.innerHTML = '';
   if (me.role === 'super') {
     if (!admins.length) al.append(el('div', 'empty', L('अभी कोई एडमिन नहीं', 'No admins yet')));
-    for (const u of admins) al.append(person(u));
+    paged(al, admins, person, 'admins');
   }
 }
 
@@ -1535,7 +1588,7 @@ $('candForm').addEventListener('submit', async (e) => {
   $('candBtn').disabled = false;
   if (r.error) { $('candMsg').textContent = errText(r); return; }
   $('candName').value = '';
-  refresh();
+  refresh(true);
 });
 
 // which candidate a user works for ('' = none: the village's own marks)
@@ -1567,7 +1620,7 @@ async function act(payload, ask) {
   if (ask && !confirm(ask)) return null;
   const r = await api(payload);
   if (r.error) { $('listMsg').textContent = errText(r); return null; }
-  refresh();
+  refresh(true);
   return r;
 }
 // how much of today's search limit a person has used: "आज की सर्च: 120 / 500 · 380 बाकी" over a bar that is
@@ -1627,7 +1680,7 @@ function person(u) {
     if (v !== null) act({ action: 'phone', id: u.id, phone: v });
   });
   ph.append(edit);
-  const use = el('div', 'info', L(`${u.marked} पर्चियों पर इनके निशान`, `Their marks on ${u.marked} slips`));
+  const use = el('div', 'info', STATS ? L(`${MARKED[u.id] || 0} पर्चियों पर इनके निशान`, `Their marks on ${MARKED[u.id] || 0} slips`) : L('निशान: ⏳', 'Marks: ⏳'));
   const meter = isAdmin && u.limit == null ? null : useMeter(u);   // an admin: only with a limit from the superadmin
   // referrals: who invited this person, and the people they invited (refRule in api/_lib.js)
   const invited = users.filter((x) => x.refBy === u.id), invBought = invited.filter((x) => x.refPaid).length;

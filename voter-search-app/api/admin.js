@@ -2,9 +2,12 @@
 // The superadmin manages everything. A village admin sees and manages users of their assigned villages as the superadmin
 // allows (ADMIN_PERMS in _lib.js, field "aperms"): 'own' the users they made, 'all' every user there; 'add' new users,
 // 'credits' searches for them, 'approve' their requests (and those sent to this admin). Without the permission → 'no_perm'.
-//   action "list" [, village]          → {me: {id, role, name, villages, marked}, users: [...], admins: [...] (superadmin only),
-//                                         progress}   users carry perms, searchesToday, limit (today's, with any extra),
-//                                         ownLimit ('' = default), extraToday and marked (slips with their marks)
+//   action "list" [, village]          → {me: {id, role, name, villages}, users: [...], admins: [...] (superadmin only), …}
+//                                         quick (no voter files read): users carry perms, searchesToday, limit (today's,
+//                                         with any extra), ownLimit ('' = default) and extraToday
+//   action "stats" [, all: n]          → {progress, marked: {id: slips marked}, partial, groups, survey}   the slow part,
+//                                         asked for after "list": progress per ward (only groups with marks when there
+//                                         are more than STATS_ALL, else the first n groups, those with marks first) and how many slips each person marked
 //   action "add", village, name, phone → {user, password}   new user of one village (must be one of the admin's villages)
 //   action "add_admin", name, phone, villages: [slug, ...], samitis: ["<district>|<samiti>", ...] [, aperms] → {user, password}
 //                                         (superadmin only; samitis = whole पंचायत समितियाँ, villages added there later too)
@@ -21,7 +24,7 @@
 //   ("limit" / "extra" on an admin: superadmin only; a village admin has no daily limit until one is set)
 //   action "limit",  id, limit  → {user}             (searches a user may start per day; 0 or '' = the default)
 //   action "extra",  id [, n]   → {user}             (n more searches, default 100, for today only)
-//   action "clearMarks", village [, cand], status → {progress}   (removes every 'done' | 'coming' | 'absent' mark of the
+//   action "clearMarks", village [, cand], status → {progress, …as "stats"}   (removes every 'done' | 'coming' | 'absent' mark of the
 //                                         village (of that candidate's group), or 'all' of them; kept as a backup first)
 //   action "restoreMarks", village [, cand]       → {progress}   (puts back the marks removed by the last clearMarks)
 //   action "marked", village [, cand], status [, ward, offset] → {total, more, rows}   voters carrying a mark ('done' |
@@ -49,7 +52,7 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
-//   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus'), value, minN, maxUses, until, once, first, on, note, isNew
+//   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, minN, maxUses, until, once, first, on, note, isNew
 //                                         → {coupon}   superadmin: a coupon (getCoupon in _lib.js); "list" gives coupons
 //   action "coupon_del", code → {ok}      superadmin
 //   action "ref_rule", on, inviter, joiner → {refRule}   superadmin: referral searches (refRule in _lib.js); "list" gives
@@ -107,7 +110,8 @@ const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, 
   ({ id, user, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
     doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1', online: !!gw,
     coupon: coupon || '', bonus: Number(bonus) || 0, doneCoupon: doneCoupon || '' });   // online: paid by UPI on JaduPe
-const REQ_DONE_DAYS = 30;   // approved requests stay in the list this long
+const REQ_DONE_DAYS = 30;
+const STATS_ALL = 30;   // "stats" gives every mark group's progress up to this many groups   // approved requests stay in the list this long
 
 module.exports = route(async (req, res, b) => {
   if (!process.env.ADMIN_PASSWORD) return send(res, 500, { error: 'server', detail: 'ADMIN_PASSWORD not set' });
@@ -140,8 +144,8 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'coupon_set') {   // superadmin: make or change a coupon (getCoupon in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const code = couponCode(b.code), num = (v, max) => { const x = Math.floor(Number(v) || 0); return x >= 0 && x <= max ? x : -1; };
-    const kind = ['pct', 'rs', 'bonus'].includes(b.kind) ? b.kind : '';
-    const value = num(b.value, kind === 'pct' ? 99 : 10000), minN = num(b.minN, 10000), maxUses = num(b.maxUses, 1000000);
+    const kind = ['pct', 'rs', 'bonus', 'bonuspct'].includes(b.kind) ? b.kind : '';
+    const value = num(b.value, kind === 'pct' ? 99 : kind === 'bonuspct' ? 1000 : 10000), minN = num(b.minN, 10000), maxUses = num(b.maxUses, 1000000);
     const until = String(b.until || '');
     if (!COUPON_RE.test(code)) return send(res, 400, { error: 'cpn_code' });
     if (!kind || value < 1 || minN < 0 || maxUses < 0 || (until && !/^\d{4}-\d{2}-\d{2}$/.test(until))) return send(res, 400, { error: 'cpn_rule' });
@@ -184,23 +188,36 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { ...r, done: r.next === '0' });
   }
 
-  if (b.action === 'list') {
-    const ids = (await redis('SMEMBERS', 'users')) || [];
-    const all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
-    // marks of my villages (each candidate's apart): progress, and how many slips each person marked; every village's
-    // marks and last-clear backup in one round trip (the superadmin has hundreds of villages)
+  // "stats": the slow part of the admin page, asked for after "list" has shown it: progress per ward (it reads each
+  // village's voter file) and how many slips each person marked. Every village's marks and last-clear backup are read in
+  // one round trip; with more than STATS_ALL groups (the superadmin has hundreds of villages) only the groups that have
+  // marks, a backup or a candidate get a progress table (all: true asks for every one).
+  const stats = async (all) => {
     const cands = await candsOf(me.villages), groups = groupsOf(me.villages, cands);
     const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id)], ['GET', `${markHash(g.slug, g.cand.id)}:backup`]])) : [];
     const marksBy = groups.map((g, i) => marksFrom(read[2 * i]));
-    const progress = await Promise.all(groups.map((g, i) => markSummary(g.slug, g.cand, marksBy[i], read[2 * i + 1])));
     const marked = {};
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
+    // all: how many groups to give (a page of STATS_ALL more each time the page asks), those with marks first
+    const busy = (i) => groups[i].cand.id || read[2 * i + 1] || Object.keys(marksBy[i]).length;
+    const idx = groups.map((g, i) => i);
+    const keep = groups.length <= STATS_ALL ? idx
+      : all ? [...idx.filter(busy), ...idx.filter((i) => !busy(i))].slice(0, Math.max(STATS_ALL, all)).sort((x, y) => x - y)
+      : idx.filter(busy);
+    const progress = await Promise.all(keep.map((i) => markSummary(groups[i].slug, groups[i].cand, marksBy[i], read[2 * i + 1])));
+    return { progress, marked, partial: keep.length < groups.length, groups: groups.length, survey: MODE.survey };
+  };
+  if (b.action === 'stats') return send(res, 200, await stats(Math.min(10000, Math.max(0, parseInt(b.all, 10) || 0))));
+  if (b.action === 'list') {   // quick: no voter files are read (see "stats")
+    const ids = (await redis('SMEMBERS', 'users')) || [];
+    const all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
+    const cands = await candsOf(me.villages);
     const day = today();
     const buyers = all.filter((u) => isPrepaid(u) || credits(u) > 0);
     const counts = ids.length ? await pipeline([...ids.map((id) => ['GET', `searches:${id}:${day}`]), ...buyers.map((u) => ['GET', paidKey(u.id)])]) : [];
     const searches = Object.fromEntries(ids.map((id, i) => [id, Number(counts[i]) || 0]));
     const paid = Object.fromEntries(buyers.map((u, i) => [u.id, Number(counts[ids.length + i]) || 0]));
-    const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0, marked: marked[u.id] || 0 });
+    const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0 });
     const users = all.filter((u) => mine(u) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? all.filter((u) => u.role === 'admin').map(withUse) : undefined;
     // pack requests of the people this admin manages: every open one, and those approved in the last REQ_DONE_DAYS
@@ -234,8 +251,8 @@ module.exports = route(async (req, res, b) => {
     }
     const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
     const freeRuleNow = isSuper ? await freeRule() : undefined;
-    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, coupons: isSuper ? (await Promise.all(((await redis('SMEMBERS', 'coupons')) || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1)) : undefined, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
-      villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
+    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, coupons: isSuper ? (await Promise.all(((await redis('SMEMBERS', 'coupons')) || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1)) : undefined, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
+      villageList: villageList(me.villages), cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }
 
@@ -277,8 +294,7 @@ module.exports = route(async (req, res, b) => {
       for (let i = 0; i < flat.length; i += 1000) await redis('HSET', key, ...flat.slice(i, i + 1000));
       await redis('DEL', backupKey);
     }
-    const groups = groupsOf(me.villages, await candsOf(me.villages));
-    return send(res, 200, { progress: await Promise.all(groups.map((x) => markSummary(x.slug, x.cand))) });
+    return send(res, 200, await stats(Math.min(10000, Math.max(0, parseInt(b.all, 10) || 0))));
   }
 
   if (b.action === 'cand_add') {

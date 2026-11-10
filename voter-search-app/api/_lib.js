@@ -484,7 +484,8 @@ const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
 // what a number of searches costs: the pack's price, else ₹1 a search
 const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
 // Coupons (कूपन), made by the superadmin on the admin page (api/admin.js "coupon_set"): hash coupon:<CODE> with kind
-// 'pct' (value % off the pack's price) | 'rs' (₹value off) | 'bonus' (value extra searches), and its conditions:
+// 'pct' (value % off the pack's price) | 'rs' (₹value off) | 'bonus' (value extra searches) | 'bonuspct' (value % of the
+// pack's searches extra), and its conditions:
 // minN (only packs of at least minN searches), until (last day, YYYY-MM-DD, '' = none), maxUses (total, 0 = no limit),
 // once '1' (once per person), first '1' (only a person's first purchase), on '1' / '0'; used = times used so far; note.
 // Set "coupons" lists the codes; cpnusers:<CODE> = who has used it. A request made with a coupon (api/signup.js
@@ -509,6 +510,7 @@ function couponPrice(c, n) {
   const base = packPrice(n);
   if (c.kind === 'pct') return { rs: Math.max(1, Math.round(base * (100 - c.value) / 100)), bonus: 0 };
   if (c.kind === 'rs') return { rs: Math.max(1, base - c.value), bonus: 0 };
+  if (c.kind === 'bonuspct') return { rs: base, bonus: Math.floor(Number(n) * c.value / 100) };
   return { rs: base, bonus: c.value };
 }
 // can person u use coupon `code` (for pack n, if given)? → {c} or {error}

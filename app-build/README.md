@@ -269,7 +269,7 @@ The superadmin makes coupons in the **🎟 कूपन** box on the admin page.
 
 - a **% discount** (1–99%);
 - a **₹ discount**;
-- **extra searches free** on top of the pack.
+- **extra searches free** on top of the pack, as a number or as a % of the pack (20% on the 500 pack = 100 extra).
 
 It can carry these conditions (blank or 0 = no condition):
 
