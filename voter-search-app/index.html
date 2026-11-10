@@ -200,6 +200,12 @@
   #qReset:active { background: #f3f4f6; }
   .row2 select { width: auto; }
   #count { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
+  /* election dates, with the days left to the सरपंच vote (ELECTIONS below) */
+  .elecbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 0 0 8px; padding: 6px 10px; border-radius: 10px;
+    background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 13px; line-height: 1.4; text-align: left; }
+  .elecbar .left { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: #1d4ed8; color: #fff; font-weight: 700; white-space: nowrap; }
+  .elecbar div { width: 100%; }
+  #lock .elecbar { margin: 4px 0 12px; }
   .demobar { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa;
     color: #9a3412; font-size: 13.5px; line-height: 1.5; }
   .demobar b { color: #7c2d12; }
@@ -363,6 +369,7 @@
     <img src="/icon-192.png" alt="">
     <h1>Voter Search</h1>
     <p id="lockSub"></p>
+    <div class="elecbar hidden"></div>
     <form id="lockForm">
       <!-- the mobile number first: a known number then gets the password box, a new one signs up -->
       <input id="phone" type="tel" inputmode="numeric" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर डालें">
@@ -483,6 +490,7 @@
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
       <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+    <div class="elecbar hidden"></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -672,6 +680,38 @@ function setMode(survey) {
   return changed;
 }
 setMode(false);
+
+// ---------- चुनाव की तारीखें: a banner on the login page and in the app, with the days left to the सरपंच vote ----------
+// Each election drops off the day after it; the banner goes once all are past. Dates are India dates (YYYY-MM-DD).
+const ELECTIONS = [
+  { date: '2026-11-14', hi: 'पंचायत समिति सदस्य व जिला परिषद सदस्य', en: 'Panchayat Samiti & Zila Parishad members' },
+  { date: '2026-11-16', hi: 'सरपंच व वार्ड पंच', en: 'Sarpanch & ward panch', count: true },
+];
+function electionBanner() {
+  const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);   // India's date
+  const days = (d) => Math.round((Date.parse(d) - Date.parse(today)) / 86400e3);
+  const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const next = ELECTIONS.filter((e) => days(e.date) >= 0);
+  for (const bar of document.querySelectorAll('.elecbar')) {
+    bar.classList.toggle('hidden', !next.length);
+    bar.replaceChildren();
+    if (!next.length) continue;
+    bar.append(el('b', null, L('🗳 चुनाव', '🗳 Elections')));
+    const c = next.find((e) => e.count);
+    if (c) {
+      const n = days(c.date);
+      bar.append(el('span', 'left', n === 0 ? L('सरपंच चुनाव आज', 'Sarpanch vote today') : n === 1 ? L('सरपंच चुनाव कल', 'Sarpanch vote tomorrow')
+        : L(`सरपंच चुनाव में ${n} दिन बाकी`, `${n} days to the sarpanch vote`)));
+    }
+    for (const e of next) {
+      const line = el('div');
+      line.append(`${L(e.hi, e.en)}: `, el('b', null, days(e.date) === 0 ? `${L('आज', 'today')}, ${fmtDate(e.date)}` : fmtDate(e.date)));
+      bar.append(line);
+    }
+  }
+}
+electionBanner();
+setInterval(electionBanner, 3600e3);   // a phone left open overnight moves on to the next day
 
 // ---------- login ----------
 function showLock(msg, info) {
