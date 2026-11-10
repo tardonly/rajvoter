@@ -574,9 +574,9 @@
 
 <script>
 'use strict';
-// The village comes from the address: raj-voter.vercel.app/<village>. Its details (name, पंचायत समिति / जिला परिषद
+// The village comes from the address: www.rajelection.com/<village>. Its details (name, पंचायत समिति / जिला परिषद
 // निर्वाचन क्षेत्र, polling time, wards) come from the server in VILLAGE once the page opens.
-// raj-voter.vercel.app/demo: pick a village; /demo/<village> (e.g. /demo/riri): its first 2 wards for anyone to try,
+// www.rajelection.com/demo: pick a village; /demo/<village> (e.g. /demo/riri): its first 2 wards for anyone to try,
 // no password, 10 searches per phone in all, read-only. Inside the app (and to the server) that village is "demo-riri".
 const [, PART1 = '', PART2 = ''] = location.pathname.split('/').map((p) => decodeURIComponent(p).toLowerCase());
 const SLUG = PART1 === 'demo' && PART2 ? `demo-${PART2}` : PART1.replace(/\.html$/, '').replace(/^index$/, '');
@@ -840,7 +840,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- share: the promo video with the site's link (never the demo's), for WhatsApp status, a chat or any app ----------
-const SITE = 'https://raj-voter.vercel.app/';   // the live site, also from test and preview copies
+const SITE = 'https://www.rajelection.com/';   // the live site, also from test and preview copies
 const SHARE_LINE = L('Voter Search — अपने गाँव की मतदाता सूची, फ़ोन और लैपटॉप पर। नाम लिखते ही पर्ची, वोट के निशान और वार्ड रिपोर्ट।',
   'Voter Search — your village\'s voter list on phone and laptop. Type a name for the slip, vote marks and a ward report.');
 const SHARE_TEXT = `${SHARE_LINE}\n${SITE}`;
