@@ -279,8 +279,8 @@ module.exports = route(async (req, res, b) => {
     // only the people these requests and payments name are read, not every login
     const who = new Map((await getUsers([...new Set([...rows.flatMap((r) => [r.user, r.to]), ...payIds].filter((id) => id && id !== 'admin'))])).map((u) => [u.id, u]));
     const reqs = may('approve') ? rows.map((r) => {
-      const u = who.get(r.user);   // a person of my villages, asking from one of my villages
-      if (!u || u.role !== 'user' || !mayUse(u.village)) return null;
+      const u = who.get(r.user);   // a person of my villages, asking from one of my villages; a village admin's: the superadmin's
+      if (!u || (u.role === 'admin' ? !isSuper : u.role !== 'user' || !mayUse(u.village))) return null;
       if (!(mine(u) || r.to === me.id)) return null;   // requests of my users, or sent to me
       if (!isSuper && r.to && r.to !== me.id && r.doneBy !== me.id) return null;   // sent to someone else
       if (!isSuper && r.gw && r.status === 'open') return null;   // being paid online: added by itself once paid
@@ -527,7 +527,8 @@ module.exports = route(async (req, res, b) => {
 
   if (b.action === 'credits_add') {
     if (!may('credits')) return send(res, 403, { error: 'no_perm' });
-    if (!canBuy(user)) return send(res, 400, { error: 'not_prepaid' });   // admins and demo logins
+    if (!canBuy(user)) return send(res, 400, { error: 'not_prepaid' });   // demo logins
+    if (user.role === 'admin' && !isSuper) return send(res, 403, { error: 'super_only' });   // an admin's searches: the superadmin
     const n = parseInt(b.n, 10);
     if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
     await paidIn(user, n, null);

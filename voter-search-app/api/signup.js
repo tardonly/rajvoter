@@ -35,7 +35,7 @@
 //     (सर्वे / मतदान दिवस, markModeOf in _lib.js), until the superadmin next switches everyone
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { getCoupon, couponHold, selfCount, afterMove, couponFor, couponPrice, couponView, refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, freeLeft, takeFree, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
+const { buyVillage, getCoupon, couponHold, selfCount, afterMove, couponFor, couponPrice, couponView, refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, freeLeft, takeFree, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -201,7 +201,7 @@ module.exports = route(async (req, res, b) => {
     if (old && old.status === 'open' && old.user === me.id) {
       // e.g. their admin or village has changed since, or a coupon was added or taken off
       if (c) { const held = await couponHold(c, me.id, old.id); if (held) return send(res, 409, { error: held }); }
-      await redis('HSET', `req:${old.id}`, 'to', to.id, 'village', me.village, ...fields);
+      await redis('HSET', `req:${old.id}`, 'to', to.id, 'village', buyVillage(me, b.village), ...fields);
       return send(res, 200, { id: old.id, phone: to.phone, rs: fields[1], bonus: fields[5] });
     }
     const k = `reqs:${me.id}:${today()}`;
@@ -209,7 +209,7 @@ module.exports = route(async (req, res, b) => {
     await redis('EXPIRE', k, 86400);
     const id = await newReqId();
     if (c) { const held = await couponHold(c, me.id, id); if (held) return send(res, 409, { error: held }); }
-    await redis('HSET', `req:${id}`, 'user', me.id, 'village', me.village, 'n', pk[0], 'created', new Date().toISOString(), 'status', 'open',
+    await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, b.village), 'n', pk[0], 'created', new Date().toISOString(), 'status', 'open',
       'to', to.id, ...fields);
     await redis('SET', openKey, id);
     await redis('SADD', 'reqs', id);   // every request, for the admin page's list (api/admin.js "list")

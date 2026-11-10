@@ -449,18 +449,22 @@ const adminPermsOf = (u) => (u.role !== 'admin' ? [] : u.aperms === undefined ? 
 const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
 // Searches a user may start per day (see api/search.js for what one search is): their own limit if their admin set one
 // (user field "limit"), else DAILY_SEARCHES, plus any extra the admin gave for today (field "extra" = "<day>:<n>").
-// A village admin has no limit unless the superadmin set one (adminLimited); then the same rule.
+// A village admin has the same daily limit (adminLimited; the superadmin may change it) and may buy more searches, or
+// ask the superadmin for them on WhatsApp (adminFor). The superadmin has no limit.
 const DAILY_SEARCHES = 500;
 const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
-const adminLimited = (u) => u.role === 'admin' && Number(u.limit) > 0;
+const adminLimited = (u) => u.role === 'admin';
 // Prepaid searches (api/signup.js): a user who signed up by themselves (field "self") may start "credits" searches in all
 // (free ones from signing up plus paid ones an admin added, api/admin.js "credits_add") instead of a daily limit; they
 // never expire and are counted for good under "paid:<id>". Users made by an admin have a daily limit instead, and may
 // buy searches too (canBuy): theirs are used once the day's limit is used up, and counted the same way.
 const credits = (u) => Number(u && u.credits) || 0;
 const isPrepaid = (u) => !!u && u.role === 'user' && !u.demo && u.self === '1';
-const canBuy = (u) => !!u && u.role === 'user' && !u.demo;
+const canBuy = (u) => !!u && (u.role === 'user' || u.role === 'admin') && !u.demo;   // not the superadmin
+// the village a login's pack request is filed under: a person's own village; a village admin's, the one they are in
+// (slug) when it is theirs, else their first
+const buyVillage = (u, slug) => u.village || (slug && (u.villages || []).includes(slug) ? slug : (u.villages || [])[0]) || '';
 // a signed-up login that picked the wrong village may move itself to another one this many times (api/signup.js "move")
 const MOVES = 3;
 const movesLeft = (u) => (isPrepaid(u) ? Math.max(0, MOVES - (Number(u.moves) || 0)) : 0);
@@ -523,7 +527,7 @@ async function refRule() {
 }
 // what the app needs for the invite button: this login's code and what the inviter gets; null for those who can't invite
 async function refFor(u) {
-  if (!canBuy(u)) return null;
+  if (!canBuy(u) || u.role !== 'user') return null;   // admins don't invite
   const rule = await refRule();
   return rule.on ? { code: u.id, give: rule.inviter, joiner: rule.joiner } : null;
 }
@@ -531,7 +535,7 @@ async function refFor(u) {
 async function refInviter(code, phone) {
   if (!/^[0-9a-f]{10}$/.test(String(code || ''))) return null;
   const u = await getUser(code);
-  return u && canBuy(u) && u.retired !== '1' && u.phone !== phone ? u : null;
+  return u && canBuy(u) && u.role === 'user' && u.retired !== '1' && u.phone !== phone ? u : null;
 }
 
 // every login with this mobile number (normPhone form): [{id, role, village, villages, retired, self}]
@@ -555,7 +559,7 @@ async function phoneLogins(phone) {
 // uses its own number)
 const SUPER = { id: 'admin', phone: '' };
 async function adminFor(u) {
-  if (u.by === 'admin') return SUPER;
+  if (u.role === 'admin' || u.by === 'admin') return SUPER;   // a village admin asks the superadmin
   await buildIndexes();
   const ids = (await redis('SMEMBERS', 'admins')) || [];
   if (!ids.length) return SUPER;
@@ -699,7 +703,7 @@ async function addPaid(u, n, r, by) {
   await redis('SREM', 'free', u.id);
   const id = r ? r.id : await newReqId();
   if (!r) {
-    await redis('HSET', `req:${id}`, 'user', u.id, 'village', u.village, 'n', n, 'rs', rs, 'created', now, 'hand', '1');
+    await redis('HSET', `req:${id}`, 'user', u.id, 'village', buyVillage(u), 'n', n, 'rs', rs, 'created', now, 'hand', '1');
     await redis('SADD', 'reqs', id);
   }
   await redis('HSET', `req:${id}`, 'status', 'done', 'doneAt', now, 'doneN', n + bonus, 'doneRs', rs, 'doneCoupon', cpn, 'doneBy', by.id, 'doneByName', by.name);
@@ -821,7 +825,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

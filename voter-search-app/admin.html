@@ -1439,10 +1439,8 @@ function limitBox(u, msg = 'listMsg', saved) {
   inp.value = u.ownLimit || ''; inp.placeholder = String(u.defaultLimit);
   save.type = more.type = 'button';
   const note = el('span', 'note');
-  const admin = u.role === 'admin';   // empty = no limit for a village admin
-  if (admin) inp.placeholder = '—';
-  const show = () => { note.textContent = (u.ownLimit ? '' : admin ? L('(खाली = कोई सीमा नहीं)', '(empty = no limit)') : L(`(खाली = ${u.defaultLimit})`, `(empty = ${u.defaultLimit})`))
-    + (u.extraToday && (!admin || u.ownLimit) ? L(` · आज +${u.extraToday}`, ` · today +${u.extraToday}`) : ''); };
+  const show = () => { note.textContent = (u.ownLimit ? '' : L(`(खाली = ${u.defaultLimit})`, `(empty = ${u.defaultLimit})`))
+    + (u.extraToday ? L(` · आज +${u.extraToday}`, ` · today +${u.extraToday}`) : ''); };
   show();
   async function send(payload, btn) {
     btn.disabled = true;
@@ -1499,7 +1497,7 @@ function showPassword(u, pw) {
   $('newPwText').textContent = pw;
   $('sharePw').textContent = `${L('WhatsApp पर भेजें', 'Send on WhatsApp')}${shareTo ? ` (${showPhone(shareTo)})` : ''}`;
   $('sharePw').classList.toggle('wa', !!shareTo);
-  // a new user starts with the default permissions and search limit, a new admin with all of them and no limit: the
+  // a new user starts with the default permissions and search limit, a new admin with all of them and the same limit: the
   // superadmin can change an admin's right here too
   const isUser = u.role === 'user' && u.perms, isAdm = u.role === 'admin' && u.perms && me.role === 'super';
   $('newPwPerms').classList.toggle('hidden', !isUser && !isAdm);
@@ -1843,7 +1841,7 @@ function person(u) {
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
   if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} सर्च`, `₹ paid · ${u.credits} searches in all`)
     : L(`${u.credits} सर्च · अभी कुछ नहीं खरीदा`, `${u.credits} searches · nothing bought yet`)));
-  else if (!isAdmin && u.credits) nm.append(el('span', 'badge paid', L(`₹ खरीदी · ${Math.max(0, u.credits - (u.paidUsed || 0))} सर्च बाकी`, `₹ bought · ${Math.max(0, u.credits - (u.paidUsed || 0))} searches left`)));
+  else if (u.credits) nm.append(el('span', 'badge paid', L(`₹ खरीदी · ${Math.max(0, u.credits - (u.paidUsed || 0))} सर्च बाकी`, `₹ bought · ${Math.max(0, u.credits - (u.paidUsed || 0))} searches left`)));
   if (u.limit != null && !u.prepaid && u.searchesToday >= u.limit) nm.append(el('span', 'badge warn', L('आज की सर्च सीमा पूरी', 'Today\'s search limit used up')));
   if (!isAdmin && candOf(u.cand)) nm.append(el('span', 'badge cand', `${L('उम्मीदवार', 'Candidate')} ${candOf(u.cand).name}`));
   // who made this login: the admin's current name when they are in the list, else the name kept when it was made
@@ -1872,7 +1870,7 @@ function person(u) {
   });
   ph.append(edit);
   const use = el('div', 'info', MARKED_IN ? L(`${MARKED[u.id] || 0} पर्चियों पर इनके निशान`, `Their marks on ${MARKED[u.id] || 0} slips`) : L('निशान: ⏳', 'Marks: ⏳'));
-  const meter = isAdmin && u.limit == null ? null : useMeter(u);   // an admin: only with a limit from the superadmin
+  const meter = u.limit == null ? null : useMeter(u);
   // referrals: who invited this person, and the people they invited (refRule in api/_lib.js)
   const invited = users.filter((x) => x.refBy === u.id), invBought = invited.filter((x) => x.refPaid).length;
   const refLine = u.refByName || invited.length || u.refEarned ? el('div', 'info', [
@@ -1883,7 +1881,7 @@ function person(u) {
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use, ...(refLine ? [refLine] : []));
   if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
-      limitBox(u, 'listMsg', refresh));
+      limitBox(u, 'listMsg', refresh), creditsBox(u, refresh));   // a daily limit, and searches they bought (or the superadmin gave)
   }
   if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
     ...(u.canBuy && mayDo('credits') ? [creditsBox(u, refresh)] : []),   // a daily limit, and bought searches for after it

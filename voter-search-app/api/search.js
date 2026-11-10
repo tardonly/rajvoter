@@ -46,12 +46,12 @@ async function countSearch(req, user, b, named) {
   const prepaid = isPrepaid(user);   // signed-up / bought searches: counted for good, not per day
   const dayKey = user.demo ? `searches:${user.id}` : prepaid ? paidKey(user.id) : `searches:${user.id}:${today()}`, findKey = `find:${user.id}`;
   const ipKey = `demo-ip:${clientIp(req)}:${today()}`;
-  // a daily limit plus bought searches, used after the day's (not an admin's: a user made admin keeps none of theirs)
-  const extra = !user.demo && !prepaid && !user.admin && credits(user) > 0;
+  // a daily limit plus bought searches, used after the day's (village admins too; the superadmin has no limit)
+  const extra = !user.demo && !prepaid && user.role !== 'super' && credits(user) > 0;
   const [, perMinute, curRaw, usedRaw, ipRaw, paidRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
     ['GET', findKey], ['GET', dayKey], ['GET', ipKey], ['GET', paidKey(user.id)]]);
   if (perMinute > PER_MINUTE) return { error: 'slow_down' };
-  if (user.admin && !adminLimited(user)) return {};   // the superadmin, and village admins without a limit
+  if (user.admin && !adminLimited(user)) return {};   // the superadmin
 
   let cur = null;
   try { cur = curRaw && JSON.parse(curRaw); } catch (e) { /* start a new search */ }
