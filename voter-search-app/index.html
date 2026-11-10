@@ -693,8 +693,14 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().the
 if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
 
 // A person's login is kept per village; an admin's login (superadmin or village admin) is shared by all village pages.
+// A person with several villages (extra villages, a whole ZP / PS ward) logs in once: their other village pages use
+// the login kept under its first village (openVillage checks this page is one of theirs).
 let tokKey = `tok:${SLUG}`;
-const token = () => { if (DEMO) return store.get('tok:demo'); tokKey = store.get(`tok:${SLUG}`) ? `tok:${SLUG}` : 'tok:admin'; return store.get(tokKey); };
+const token = () => {
+  if (DEMO) return store.get('tok:demo');
+  tokKey = store.get(`tok:${SLUG}`) ? `tok:${SLUG}` : store.get('tok:admin') ? 'tok:admin' : savedLogin() || `tok:${SLUG}`;
+  return store.get(tokKey);
+};
 
 const MSG = {
   wrong: L('पासवर्ड गलत है', 'Wrong password'),
@@ -2331,6 +2337,8 @@ async function openVillage(v) {
   showLoading(L('जाँच रहे हैं…', 'Checking…'));
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
+  // another village's login that doesn't open this one: keep it, and ask for this village's login
+  if (!r.active && tokKey !== `tok:${SLUG}` && tokKey !== 'tok:admin') { tokKey = `tok:${SLUG}`; return showLock(''); }
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
   MY_REF = r.ref || null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
