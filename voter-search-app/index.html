@@ -138,14 +138,17 @@
   .howcut { display: flex; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); }
   .howcut button { background: transparent; color: #fff; padding: 6px 12px; }
   .howcut button.on { background: #fff; color: #111; }
-  /* at the video's end: sign up, the demo, watch again */
+  /* at the video's end: sign up, the demo, share it, the other videos, watch again */
   .howend { position: absolute; left: 0; right: 0; bottom: 0; top: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 12px; padding: 20px 16px; background: rgba(0, 0, 0, 0.72); }
   .howend h3 { color: #fff; font-size: 24px; margin: 0 0 6px; text-align: center; }
+  @media (max-height: 640px) { .howend { gap: 8px; } .howend h3 { font-size: 20px; margin: 0; } .howend a, .howend button { padding: 10px 12px; font-size: 16px; } }
   .howend a, .howend button { width: 100%; max-width: 360px; box-sizing: border-box; padding: 14px 12px; border-radius: 12px; border: 0; text-align: center;
     font-size: 18px; font-weight: 700; text-decoration: none; }
   #howSignup { background: #16a34a; color: #fff; }
   #howDemo { background: #fff; color: #1f4e8c; }
+  #howWa { background: #fff; color: #166534; }
+  #howMore { background: #fff; color: #c2185b; }
   #howAgain { background: transparent; color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.6); font-size: 16px; padding: 10px 12px; }
   /* share: the promo video and the site's link, for WhatsApp status, a chat or any other app */
   #sharePop { z-index: 60; align-items: center; }
@@ -473,6 +476,8 @@
     <h3>पसंद आया? अभी शुरू करें</h3>
     <button id="howSignup" type="button">📱 मोबाइल नंबर से साइन अप करें</button>
     <a id="howDemo" href="/demo">🔍 फ़्री डेमो आज़माएं</a>
+    <button id="howWa" type="button">WhatsApp पर शेयर करें</button>
+    <a id="howMore" href="/promo">▶ और वीडियो देखें</a>
     <button id="howAgain" type="button">↻ फिर से देखें</button>
   </div>
 </div>
@@ -861,12 +866,13 @@ function howClose() {
   $('howVideo').pause();
   $('howPop').classList.add('hidden');
 }
-// at the end: sign up (the start page's mobile number box), the demo (not on the demo itself), or watch again
+// at the end: sign up (the start page's mobile number box), the demo (not on the demo itself), share it on WhatsApp, the videos page, or watch again
 $('howVideo').addEventListener('ended', () => {
   $('howDemo').classList.toggle('hidden', DEMO);
   $('howEnd').classList.remove('hidden');
 });
 $('howVideo').addEventListener('play', () => $('howEnd').classList.add('hidden'));
+$('howWa').addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(SHARE_TEXT)}`, '_blank', 'noopener'));
 $('howAgain').addEventListener('click', () => { $('howVideo').currentTime = 0; $('howVideo').play().catch(() => {}); });
 $('howSignup').addEventListener('click', () => {
   if (DEMO || location.pathname !== '/' || $('lock').classList.contains('hidden')) { location.href = '/'; return; }
