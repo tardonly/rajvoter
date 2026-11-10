@@ -1,5 +1,6 @@
 {
   "cleanUrls": false,
+  "regions": ["bom1"],
   "functions": {
     "api/data.js": {
       "includeFiles": "api/_data/**"
@@ -98,6 +99,15 @@
         {
           "key": "Cache-Control",
           "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/:icon([a-z0-9-]+).png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
     },
