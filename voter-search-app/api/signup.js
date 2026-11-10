@@ -6,7 +6,8 @@
 // number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
 // an admin adds them on the admin page (api/admin.js "credits_add").
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
-//   POST {action: 'lookup', village (optional on the start page), phone} → {exists, free, rule, otp}   otp: a forgotten
+//   POST {action: 'lookup', village (optional on the start page), phone [, ref]} → {exists, free, rule, otp, refBy}   ref: the
+//     invite link's code (refInviter in _lib.js); refBy: the inviter's name, free then includes the referral bonus;   otp: a forgotten
 //     password can be reset with a one-time code sent to the number (OTP_SEND_URL is set, see _lib.js)
 //   POST {action: 'otp', village (optional), phone} → {sent: true}   sends the code for a password reset, only to a number
 //     with a login (there); errors 'no_login', 'wait' (asked again within OTP.gap seconds, with wait = seconds left),
@@ -15,8 +16,8 @@
 //     start page an admin login first, else the newest) gets the password it chose; errors 'otp_wrong' | 'otp_expired' |
 //     'otp_tries', 'pw_short', 'pw_taken'. The page then logs in with it (api/unlock.js)
 //   POST {action: 'password', token, village, password} → {ok}   a logged-in person chooses a new password (पासवर्ड बदलें)
-//   POST {action: 'signup', village, phone, name, password} → {password, token, name, phone, villages, list, perms,
-//     prepaid, left, adminPhone}   password: the one the person chose (setOwnPassword in _lib.js)
+//   POST {action: 'signup', village, phone, name, password [, ref]} → {password, token, name, phone, villages, list, perms,
+//     prepaid, left, adminPhone, ref}   ref (answer): this login's own invite code and reward (refFor in _lib.js)   password: the one the person chose (setOwnPassword in _lib.js)
 //   POST {action: 'move', token, village, to} → {village, list, movesLeft}   a signed-up login picked the wrong village:
 //     it moves itself to village "to" (its searches and password go along, it stays logged in), up to MOVES times; after
 //     that its admin moves it (api/admin.js "move")
@@ -26,15 +27,16 @@
 //     the same pack is reused. 20 new requests a day per login.
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
+const { refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
 
 
 // free searches for a new login in this village: freeFor(rule, logins made by signing up there so far, retired ones
-// too), none if this number signed up before
-async function freeSearches(phone, slug, rule) {
+// too), none if this number signed up before; plus the referral bonus (refRule in _lib.js) when it came through a
+// friend's link (ref: the inviter)
+async function freeSearches(phone, slug, rule, ref) {
   const ids = (await redis('SMEMBERS', 'users')) || [];
   const rows = ids.length ? await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'village', 'self'])) : [];
   let n = 0;
@@ -43,7 +45,8 @@ async function freeSearches(phone, slug, rule) {
     if (ph === phone) return 0;
     if (vil === slug) n++;
   }
-  return freeFor(rule || await freeRule(), n);
+  const rr = ref ? await refRule() : null;
+  return freeFor(rule || await freeRule(), n) + (rr && rr.on ? rr.joiner : 0);
 }
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 // the login a password reset is for: this number's active login of that village; without a village (the start page) an
@@ -67,9 +70,10 @@ module.exports = route(async (req, res, b) => {
     const v = b.village ? realVillage(b.village) : null;
     if (b.village && !v) return send(res, 404, { error: 'no_village' });
     await failed(req, 'lookup');
-    const rule = await freeRule();
+    const rule = await freeRule(), inv = await refInviter(b.ref, phone);
     const mine = (await phoneLogins(phone)).filter((u) => u.retired !== '1' && (!v || u.villages.includes(v.slug)));
-    return send(res, 200, { exists: mine.length > 0, free: mine.length ? 0 : v ? await freeSearches(phone, v.slug, rule) : null, rule, otp: otpOn() });
+    return send(res, 200, { exists: mine.length > 0, free: mine.length ? 0 : v ? await freeSearches(phone, v.slug, rule, inv) : null, rule, otp: otpOn(),
+      refBy: inv && !mine.length ? inv.name : '' });
   }
 
   if (b.action === 'otp') {
@@ -99,8 +103,10 @@ module.exports = route(async (req, res, b) => {
     const k = `signups:${clientIp(req)}:${today()}`, n = await redis('INCR', k);
     await redis('EXPIRE', k, 86400);
     if (n > SIGNUPS_PER_DAY) return send(res, 429, { error: 'too_many' });
-    const free = await freeSearches(phone, v.slug);
-    const { id } = await newLogin(['role', 'user', 'village', v.slug, 'credits', free, 'self', '1'], name, phone, 'self', '');
+    const inv = await refInviter(b.ref, phone);   // came through a friend's invite link
+    const free = await freeSearches(phone, v.slug, null, inv);
+    const { id } = await newLogin(['role', 'user', 'village', v.slug, 'credits', free, 'self', '1', ...(inv ? ['refBy', inv.id, 'refByName', inv.name] : [])],
+      name, phone, 'self', '');
     await setOwnPassword(await getUser(id), b.password);   // instead of the made-up one
     const password = String(b.password).trim();
     await redis('SADD', 'free', id);
@@ -109,7 +115,7 @@ module.exports = route(async (req, res, b) => {
       'lastSeen', now, 'logins', 1);
     return send(res, 200, { password, token: makeToken(id, sid), name, phone, role: 'user', admin: false, villages: [v.slug],
       list: villageList([v.slug]), perms: permsOf({}), prepaid: true, canBuy: true, online: payOnline(), left: free, movesLeft: movesLeft({ role: 'user', self: '1' }),
-      adminPhone: await adminPhone({ village: v.slug }) });
+      adminPhone: await adminPhone({ village: v.slug }), ref: await refFor({ id, role: 'user' }) });
   }
   if (b.action === 'reset') {   // forgotten password: the code sent to the number, then the new password
     if (!otpOn()) return send(res, 400, { error: 'no_otp' });

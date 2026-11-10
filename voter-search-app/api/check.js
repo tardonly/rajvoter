@@ -5,7 +5,7 @@
 //   The app calls this when it opens.
 // POST {token} (the start page) → the same, with list = the villages this login opens.
 // reason when not active: 'login' (unknown/old token) | 'retired' | 'logged_out' | 'other_device' | 'other_village'
-const { DEMO, village, villageList, movesLeft, isPrepaid, canBuy, payOnline, adminPhone, creditsLeft, redis, whoIs, send, route } = require('./_lib.js');
+const { refFor, DEMO, village, villageList, movesLeft, isPrepaid, canBuy, payOnline, adminPhone, creditsLeft, redis, whoIs, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, { token, village: slug }) => {
   const v = slug ? village(slug) : null;
@@ -17,7 +17,7 @@ module.exports = route(async (req, res, { token, village: slug }) => {
   const prepaid = isPrepaid(user), buys = canBuy(user);
   const left = user.demo ? Math.max(0, DEMO.searches - (Number(await redis('GET', `searches:${user.id}`)) || 0))
     : prepaid ? await creditsLeft(user) : undefined;
-  send(res, 200, { active: true, demo: !!user.demo, prepaid, left, canBuy: buys, online: buys && payOnline(), bought: buys && !prepaid ? await creditsLeft(user) : undefined,
+  send(res, 200, { active: true, demo: !!user.demo, ref: user.demo ? null : await refFor(user), prepaid, left, canBuy: buys, online: buys && payOnline(), bought: buys && !prepaid ? await creditsLeft(user) : undefined,
     name: user.name, phone: user.phone || '', adminPhone: buys ? await adminPhone(user) : '', admin: !!user.admin, role: user.role, villages: user.villages,
     list: villageList(user.villages), perms: user.perms, cand: user.candName || '', movesLeft: movesLeft(user) });
 });

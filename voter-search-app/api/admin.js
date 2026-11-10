@@ -49,6 +49,8 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
+//   action "ref_rule", on, inviter, joiner → {refRule}   superadmin: referral searches (refRule in _lib.js); "list" gives
+//                                         refRule to the superadmin
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   superadmin: which set of marks the whole app uses (MODE in
 //                                         _lib.js); "list" says it as survey: true | false
 //   action "free_rule", mode, people, searches → {freeRule}   superadmin: free searches for sign-ups (freeRule in _lib.js):
@@ -68,7 +70,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { MODE, freeRule, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { REF_MAX, refRule, MODE, freeRule, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('./_lib.js');
 
 // admin permissions from the request → only known ones
@@ -90,6 +92,8 @@ const view = (u) => ({
   phone: u.phone || '', created: u.created, lastSeen: u.lastSeen || null,
   by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), canBuy: canBuy(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
+  // referrals: who invited this login, and what this login's invites earned (refRule in _lib.js)
+  refBy: u.refBy || '', refByName: u.refByName || '', refPaid: u.refPaid === '1', refBought: Number(u.refBought) || 0, refEarned: Number(u.refEarned) || 0,
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
   logins: Number(u.logins || 0), kicks: Number(u.kicks || 0),
@@ -121,6 +125,14 @@ module.exports = route(async (req, res, b) => {
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
   const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
+  if (b.action === 'ref_rule') {   // superadmin: referrals (refRule in _lib.js)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const n = (v) => { const x = Math.floor(Number(v)); return x >= 0 && x <= REF_MAX ? x : -1; };
+    const inviter = n(b.inviter), joiner = n(b.joiner);
+    if (inviter < 0 || joiner < 0) return send(res, 400, { error: 'ref_rule' });
+    await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'inviter', inviter, 'joiner', joiner, 'at', now, 'by', me.id);
+    return send(res, 200, { refRule: await refRule() });
+  }
   if (b.action === 'mark_mode') {   // superadmin: survey marks or polling-day marks, for the whole app (MODE in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     if (b.mode !== 'survey' && b.mode !== 'poll') return send(res, 400, { error: 'bad_mark' });
@@ -194,7 +206,7 @@ module.exports = route(async (req, res, b) => {
     }
     const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
     const freeRuleNow = isSuper ? await freeRule() : undefined;
-    return send(res, 200, { dbCopy, freeRule: freeRuleNow, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
+    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }

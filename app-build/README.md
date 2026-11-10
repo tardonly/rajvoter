@@ -263,6 +263,15 @@ from JaduPe with our token, never taken from the webhook's own data, so a made-u
 "💳 UPI ऑनलाइन". JaduPe needs a mobile number: a login without one is sent as `JADUPE_MOBILE` (default 9999999999);
 the email sent is `JADUPE_EMAIL` (default noreply@raj-voter.vercel.app).
 
+## Referrals (दोस्तों को बुलाएं)
+Every user login has a **🎁 दोस्तों को बुलाएं** button in the app (next to the search count). It sends their link
+`<site>/<village>?ref=<their id>` on WhatsApp. A new number that signs up through it gets **joiner** extra searches on
+top of the free ones (not a number that signed up before, and never your own number), and the login remembers who
+invited it. The inviter gets **inviter** searches only when that person **first buys** searches (by an admin's
+approval, "add searches", or online payment); later purchases give nothing more. The superadmin sets both numbers and
+on/off in the **रेफ़रल** box at the top of the admin page (inviter 20, joiner 5, on until set). Each person on the admin
+page shows whose link they joined through and how many they invited, how many bought, and the reward earned.
+
 ## Survey and polling-day marks
 The slips have two sets of marks, kept apart: **सर्वे** before the election (**अपना वोट** green, **सोच रहे हैं** yellow,
 **विपक्ष** red) and **मतदान दिवस** on the day (**वोट दिया**, **आ रहे हैं**, **वोटर नहीं है**). The superadmin switches the whole

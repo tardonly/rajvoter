@@ -84,6 +84,7 @@
     background: #e0f2fe; color: #075985; }
   #leftBadge.low { background: #fef3c7; color: #92400e; }
   #leftBadge.none { background: #fee2e2; color: #991b1b; }
+  #invite { border: 1px solid #c4b5fd; border-radius: 8px; padding: 5px 10px; margin: 6px 0 0 6px; font-size: 13px; background: #f5f3ff; color: #5b21b6; font-weight: 600; }
   #buyMore { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: #16a34a; color: #fff; font-weight: 600; }
   .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .homeacts button { padding: 11px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
@@ -507,7 +508,7 @@
         <option value="absent">सिर्फ़ वोटर नहीं है</option>
       </select>
     </div>
-    <div class="countrow"><div id="count"></div><span><b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button>
+    <div class="countrow"><div id="count"></div><span><b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button>
       <button id="wardPrint" class="hidden" type="button"></button></span></div>
   </header>
   <main>
@@ -610,6 +611,13 @@ const store = {  // localStorage can be blocked (private mode); then the user ju
   set(k, v, keep) { try { (keep ? localStorage : sessionStorage).setItem(k, v); } catch (e) {} },
   del(k) { try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch (e) {} },
 };
+// a friend's invite link (<site>/<village>?ref=<code>): kept on this phone for the sign-up (api/signup.js), and taken
+// off the address
+{
+  const u = new URL(location.href), ref = u.searchParams.get('ref');
+  if (ref && /^[0-9a-f]{10}$/.test(ref)) store.set('ref', ref, true);
+  if (ref != null) { u.searchParams.delete('ref'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+}
 // this app is online-only: remove any offline cache an older version may have installed
 if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
 if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
@@ -929,7 +937,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  MY_REF = r.ref || null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   MOVES_LEFT = r.movesLeft || 0;
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   outOfSearches();
@@ -945,6 +953,7 @@ let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: a signed-
 // CAN_BUY: any user login may buy searches; BOUGHT: a login with a daily limit, its bought searches left (used after the day's)
 // ONLINE: packs can also be paid here by UPI (JaduPe, api/pay.js)
 let CAN_BUY = false, BOUGHT = null, ONLINE = false;
+let MY_REF = null;   // this login's invite code and reward ({code, give, joiner}; refFor in api/_lib.js), null: no invites
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
   if (r.left != null) searchesLeft = r.left;
@@ -1706,6 +1715,7 @@ const SIGN_ERR = {
 function buyMoreButton() {
   const show = PREPAID && !DEMO && searchesLeft != null, b = $('leftBadge');
   $('buyMore').classList.toggle('hidden', !CAN_BUY || DEMO);
+  $('invite').classList.toggle('hidden', !MY_REF || DEMO);
   b.classList.toggle('hidden', !show);
   if (!show) return;
   b.textContent = L(`🔍 ${searchesLeft} सर्च बाकी`, `🔍 ${searchesLeft} searches left`);
@@ -1805,6 +1815,17 @@ function buyClose() {
 // a signed-up login with no searches left gets this window straight away
 function outOfSearches() { if (PREPAID && searchesLeft === 0 && !DEMO) buyOpen(); }
 $('buyMore').addEventListener('click', buyOpen);
+// 🎁 दोस्तों को बुलाएं: this login's invite link on WhatsApp; the inviter gets searches when the friend first buys some
+$('invite').addEventListener('click', () => {
+  if (!MY_REF) return;
+  const give = MY_REF.give, gets = MY_REF.joiner;
+  if (!confirm(L(`अपना लिंक WhatsApp पर भेजें। जो दोस्त इस लिंक से जुड़ेगा${gets ? ` उसे ${gets} सर्च ज़्यादा मिलेंगी, और` : ','} जब वह पहली बार सर्च खरीदेगा तब आपको ${give} सर्च मुफ़्त मिलेंगी।`,
+    `Send your link on WhatsApp. A friend who joins through it ${gets ? `gets ${gets} extra searches, and ` : ''}when they first buy searches you get ${give} free.`))) return;
+  const link = `${location.origin}/${SLUG}?ref=${MY_REF.code}`;
+  const text = L(`Voter Search — ${VILLAGE ? VILLAGE.name : ''} की मतदाता सूची में नाम, पर्ची और परिवार खोजें।${gets ? ` मेरे लिंक से जुड़ने पर ${gets} सर्च ज़्यादा मिलेंगी:` : ' मेरे लिंक से जुड़ें:'}\n${link}`,
+    `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
+  location.href = 'https://wa.me/?text=' + encodeURIComponent(text);
+});
 $('buyClose').addEventListener('click', buyClose);
 // after signing up the window shows the new password: only its Continue button closes it (and logs in)
 const signedUp = () => !!$('buyPop').dataset.go;
@@ -1841,19 +1862,20 @@ async function lockPhone() {
   const phone = $('phone').value.replace(/\D/g, '');
   if (!/^[6-9]\d{9}$/.test(phone)) return showLock(SIGN_ERR.phone);
   $('unlockBtn').disabled = true; showLock(L('जाँच रहे हैं…', 'Checking…'), true);
-  const r = await api('signup', { action: 'lookup', phone, village: HOME ? '' : SLUG });
+  const r = await api('signup', { action: 'lookup', phone, village: HOME ? '' : SLUG, ref: store.get('ref') || '' });
   $('unlockBtn').disabled = false;
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
   showLock('');
   OTP_ON = !!r.otp;
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   await signVillages();
-  lockStepTo('sign', r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद ₹1 प्रति सर्च।`,
+  const invited = r.refBy ? L(`${r.refBy} ने आपको बुलाया है। `, `${r.refBy} invited you. `) : '';
+  lockStepTo('sign', invited + (r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद ₹1 प्रति सर्च।`,
     `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that ₹1 per search.`)
     : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति सर्च।`,
     `New number — type your name: your login is made at once with ${r.free} free searches. After that ₹1 per search.`)
     : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (₹1 प्रति सर्च)।',
-      'New number — type your name: your login is made at once; then buy searches (₹1 per search).'));
+      'New number — type your name: your login is made at once; then buy searches (₹1 per search).')));
 }
 // the superadmin's free-search rule for sign-ups (freeRule in api/_lib.js) in words: "the first 10 people of each village
 // get 10 free searches", or with halving "… get 10, the next 10 get 5, then 2, then 1"
@@ -1981,8 +2003,9 @@ async function lockSignup() {
   const password = $('signPw').value.trim();
   if (password.length < 6) { $('signPw').focus(); return showLock(SIGN_ERR.pw_short); }
   $('unlockBtn').disabled = true; showLock(L('खाता बन रहा है…', 'Making your login…'), true);
-  const r = await api('signup', { action: 'signup', village: slug, name, phone: $('phone').value, password });
+  const r = await api('signup', { action: 'signup', village: slug, name, phone: $('phone').value, password, ref: store.get('ref') || '' });
   $('unlockBtn').disabled = false;
+  if (!r.error) store.del('ref');
   if (r.error === 'exists') { showLock(''); return lockStepTo('pw', PW_NOTE()); }
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
   showLock('');
@@ -2068,7 +2091,7 @@ async function openVillage(v) {
   if (r.error) return showLock(MSG[r.error] || MSG.server);
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
-  PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  MY_REF = r.ref || null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   MOVES_LEFT = r.movesLeft || 0;
   showApp(r.name, r.admin, r.villages, r.perms, r.cand);
   const paid = new URLSearchParams(location.search).get('pay');

@@ -414,6 +414,32 @@ function freeFor(rule, n) {
   if (rule.mode !== 'halving') return n < rule.people ? rule.searches : 0;
   return Math.floor(rule.searches / 2 ** Math.floor(n / rule.people));
 }
+// Referrals (रेफ़रल): a user's invite link is <site>/<village>?ref=<their id> (the app's 🎁 दोस्तों को बुलाएं button). A new
+// number that signs up through it gets `joiner` extra searches (not a number that signed up before), and the login
+// keeps refBy / refByName. When that person first buys searches (addPaid), the inviter gets `inviter` searches, once
+// (field refPaid on the new login; the inviter counts refBought and refEarned). The superadmin sets it on the admin page
+// (key "refrule", api/admin.js "ref_rule"), REF until then.
+const REF = { on: true, inviter: 20, joiner: 5 };
+const REF_MAX = 1000;
+async function refRule() {
+  const h = (await redis('HGETALL', 'refrule')) || [], o = {};
+  for (let i = 0; i < h.length; i += 2) o[h[i]] = h[i + 1];
+  const num = (v, d) => { const n = Math.floor(Number(v)); return n >= 0 && n <= REF_MAX && v !== undefined && v !== '' ? n : d; };
+  return { on: o.on === undefined ? REF.on : o.on === '1', inviter: num(o.inviter, REF.inviter), joiner: num(o.joiner, REF.joiner) };
+}
+// what the app needs for the invite button: this login's code and what the inviter gets; null for those who can't invite
+async function refFor(u) {
+  if (!canBuy(u)) return null;
+  const rule = await refRule();
+  return rule.on ? { code: u.id, give: rule.inviter, joiner: rule.joiner } : null;
+}
+// the inviter behind a ?ref= code, for a new number: an active user login with another number, or null
+async function refInviter(code, phone) {
+  if (!/^[0-9a-f]{10}$/.test(String(code || ''))) return null;
+  const u = await getUser(code);
+  return u && canBuy(u) && u.retired !== '1' && u.phone !== phone ? u : null;
+}
+
 // every login with this mobile number (normPhone form): [{id, role, village, villages, retired, self}]
 async function phoneLogins(phone) {
   if (!phone) return [];
@@ -481,6 +507,7 @@ async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await re
 // recorded in request r (none: a hand-added one, which gets its own request, already approved) and in the pay:* totals
 async function addPaid(u, n, r, by) {
   const rs = packPrice(n), now = new Date().toISOString();
+  await refReward(u.id);
   await redis('HINCRBY', `user:${u.id}`, 'credits', n);
   await redis('HSET', `user:${u.id}`, 'bought', '1');
   await redis('SREM', 'free', u.id);
@@ -494,6 +521,17 @@ async function addPaid(u, n, r, by) {
   await redis('HINCRBY', 'pay:n', by.id, n);
   await redis('HINCRBY', 'pay:count', by.id, 1);
   if (by.id !== 'admin') await redis('HSET', 'pay:name', by.id, by.name);
+}
+// a login's first purchase: its inviter (refBy) gets the rule's searches, once
+async function refReward(id) {
+  const refBy = await redis('HGET', `user:${id}`, 'refBy');
+  if (!refBy || !(await redis('HSETNX', `user:${id}`, 'refPaid', '1'))) return;
+  const rule = await refRule(), inv = await getUser(refBy);
+  if (!rule.on || !rule.inviter || !inv || inv.retired === '1') return;
+  await redis('HINCRBY', `user:${inv.id}`, 'credits', rule.inviter);
+  await redis('HINCRBY', `user:${inv.id}`, 'refEarned', rule.inviter);
+  await redis('HINCRBY', `user:${inv.id}`, 'refBought', 1);
+  await redis('HSET', `user:${id}`, 'refGave', rule.inviter);
 }
 // Online UPI payment through JaduPe (jadupe.com, api/pay.js), when JADUPE_TOKEN (the API token from JaduPe's "APIs and
 // Documentation" page) is set. The money goes to the superadmin's JaduPe merchant account, so it counts as collected
@@ -581,7 +619,7 @@ async function getCand(id) {
   return c;
 }
 
-module.exports = { MARKS, MODE, readMarkMode, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { REF, REF_MAX, refRule, refFor, refInviter, MARKS, MODE, readMarkMode, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

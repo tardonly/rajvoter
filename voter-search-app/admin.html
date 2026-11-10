@@ -264,6 +264,20 @@
       <div class="sub" id="dbCopyMsg"></div>
     </div>
 
+    <!-- superadmin: referrals — searches for the inviter when a friend first buys, and for the friend (api/admin.js "ref_rule") -->
+    <details class="card hidden" id="refCard">
+      <summary><b id="refTitle"></b> · <span id="refNow"></span></summary>
+      <div class="stack" style="margin-top:12px">
+        <label class="fr"><input type="checkbox" id="refOn"> <span id="refOnText"></span></label>
+        <div class="row">
+          <label class="fr num"><span id="refInvText"></span><input id="refInviter" type="number" min="0" max="1000" inputmode="numeric"></label>
+          <label class="fr num"><span id="refJoinText"></span><input id="refJoiner" type="number" min="0" max="1000" inputmode="numeric"></label>
+        </div>
+        <button class="btn" id="refSave" type="button"></button>
+        <div class="sub" id="refMsg" style="margin:0"></div>
+      </div>
+    </details>
+
     <!-- superadmin: survey marks before the election, polling-day marks on the day (api/admin.js "mark_mode") -->
     <div class="card hidden" id="modeCard">
       <b id="modeTitle"></b> · <span id="modeNow"></span>
@@ -542,7 +556,7 @@ async function openPanel() {
   for (const v of r.villageList || []) villages[v.slug] = v;
   setup(); showMarks(r);
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
-  showFreeRule(r.freeRule);
+  showFreeRule(r.freeRule); showRefRule(r.refRule);
   $('login').classList.add('hidden'); $('panel').classList.remove('hidden');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
   approveFromLink();
@@ -602,6 +616,26 @@ $('freeSave').addEventListener('click', async () => {
   if (r.error) { $('freeMsg').textContent = errText(r); $('freeSave').disabled = false; return; }
   showFreeRule(r.freeRule);
   $('freeMsg').textContent = L('✓ सेव हो गया — अब से नए साइन-अप पर लागू', '✓ Saved — applies to new sign-ups from now');
+});
+// referrals (refRule in api/_lib.js): the inviter's searches when a friend first buys, the friend's on joining
+function showRefRule(rule) {
+  $('refCard').classList.toggle('hidden', !rule);
+  if (!rule) return;
+  $('refTitle').textContent = L('रेफ़रल (दोस्तों को बुलाएं)', 'Referrals (invite friends)');
+  $('refNow').textContent = rule.on ? L(`चालू · बुलाने वाले को ${rule.inviter}, दोस्त को ${rule.joiner}`, `on · inviter ${rule.inviter}, friend ${rule.joiner}`) : L('बंद', 'off');
+  $('refOnText').textContent = L('चालू — ऐप में 🎁 दोस्तों को बुलाएं बटन दिखेगा', 'On — the app shows the 🎁 Invite friends button');
+  $('refInvText').textContent = L('बुलाने वाले को सर्च (दोस्त की पहली खरीद पर)', 'Searches for the inviter (on the friend\'s first purchase)');
+  $('refJoinText').textContent = L('दोस्त को सर्च (जुड़ने पर, मुफ़्त सर्च के अलावा)', 'Searches for the friend (on joining, besides the free ones)');
+  $('refSave').textContent = L('सेव करें', 'Save');
+  $('refOn').checked = rule.on; $('refInviter').value = rule.inviter; $('refJoiner').value = rule.joiner;
+}
+$('refSave').addEventListener('click', async () => {
+  $('refSave').disabled = true; $('refMsg').textContent = '';
+  const r = await api({ action: 'ref_rule', on: $('refOn').checked, inviter: $('refInviter').value, joiner: $('refJoiner').value });
+  $('refSave').disabled = false;
+  if (r.error) { $('refMsg').textContent = L('0 से 1000 तक की संख्या डालें', 'Enter numbers from 0 to 1000'); return; }
+  showRefRule(r.refRule);
+  $('refMsg').textContent = L('✓ सेव हो गया', '✓ Saved');
 });
 // search packs [searches, ₹], as in index.html
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
@@ -1505,7 +1539,14 @@ function person(u) {
   ph.append(edit);
   const use = el('div', 'info', L(`${u.marked} पर्चियों पर इनके निशान`, `Their marks on ${u.marked} slips`));
   const meter = isAdmin && u.limit == null ? null : useMeter(u);   // an admin: only with a limit from the superadmin
-  row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use);
+  // referrals: who invited this person, and the people they invited (refRule in api/_lib.js)
+  const invited = users.filter((x) => x.refBy === u.id), invBought = invited.filter((x) => x.refPaid).length;
+  const refLine = u.refByName || invited.length || u.refEarned ? el('div', 'info', [
+    u.refByName && L(`🎁 ${u.refByName} के लिंक से जुड़े`, `🎁 Joined through ${u.refByName}'s link`),
+    (invited.length || u.refEarned) && L(`इनके बुलाए: ${invited.length} लोग · ${u.refBought || invBought} ने सर्च खरीदीं · इनाम ${u.refEarned} सर्च`,
+      `Invited ${invited.length} · ${u.refBought || invBought} bought searches · reward ${u.refEarned} searches`),
+  ].filter(Boolean).join(' · ')) : null;
+  row.append(nm, ph, info, sess, ...(meter ? [meter] : []), use, ...(refLine ? [refLine] : []));
   if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
       limitBox(u, 'listMsg', refresh));
