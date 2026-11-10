@@ -339,7 +339,7 @@
     .family .fh { margin: 0; }
     #more { margin-top: 14px; }
     #home .lockbox:has(#vFind:not(.hidden)) { max-width: 1100px; }
-    .vfind { grid-template-columns: 1fr 280px; }
+    .vfind { grid-template-columns: 280px 1fr; }
     .vfind .vcount { grid-column: 1 / -1; }
     .villages { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
     #listPop .card { max-width: 860px; }
@@ -484,8 +484,8 @@
     <p id="homeMsg">अपना गाँव चुनें</p>
     <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ वीडियो देखें</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
     <div class="vfind hidden" id="vFind">
-      <input id="vSearch" type="search" placeholder="🔍 गाँव सर्च करें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
       <select id="vPs" aria-label="पंचायत समिति"></select>
+      <input id="vSearch" type="search" placeholder="🔍 गाँव सर्च करें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
       <div class="vcount" id="vCount"></div>
     </div>
     <div class="villages" id="villages"></div>
