@@ -285,6 +285,8 @@
   .marks .done { border: 1.5px solid #16a34a; color: #15803d; }  .marks .done.on { background: #16a34a; color: #fff; }
   .marks .coming { border: 1.5px solid #ca8a04; color: #854d0e; } .marks .coming.on { background: #facc15; color: #422006; }
   .marks .absent { border: 1.5px solid #dc2626; color: #dc2626; } .marks .absent.on { background: #dc2626; color: #fff; }
+  .stag { padding: 4px 8px; border-top: 1px dashed var(--line); font-size: 13px; font-weight: 600; background: #fafafa; }
+  .stag.c-done { color: #15803d; } .stag.c-coming { color: #854d0e; } .stag.c-absent { color: #b91c1c; }
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
@@ -644,8 +646,32 @@ async function api(path, payload) {
   try {
     r = await fetch(`/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ village: SLUG, ...payload }) });
   } catch (e) { return { error: 'offline' }; }
-  try { return await r.json(); } catch (e) { return { error: 'server' }; }
+  try { r = await r.json(); } catch (e) { return { error: 'server' }; }
+  if (typeof r.survey === 'boolean') setMode(r.survey);   // the superadmin's choice: survey or polling-day marks
+  return r;
 }
+
+// The marks on a slip: before the election a survey (अपना वोट / सोच रहे हैं / विपक्ष), on polling day वोट दिया / आ रहे हैं /
+// वोटर नहीं है. The two are kept apart on the server; the superadmin switches the app between them (MODE in api/_lib.js)
+// and every answer says which is in use. On polling day a slip also shows its survey mark, as a small tag.
+const MARK_SETS = {
+  poll: EN ? { done: '✓ Voted', coming: 'Coming', absent: 'Not a voter' } : { done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' },
+  survey: EN ? { done: '✓ Our vote', coming: 'Undecided', absent: 'Opposition' } : { done: '✓ अपना वोट', coming: 'सोच रहे हैं', absent: 'विपक्ष' },
+};
+let SURVEY = false, MARKS = MARK_SETS.poll, MARK_NAME = {}, FILTER = {};
+function setMode(survey) {
+  const changed = SURVEY !== survey;
+  SURVEY = survey; MARKS = MARK_SETS[survey ? 'survey' : 'poll'];
+  MARK_NAME = Object.fromEntries(Object.entries(MARKS).map(([k, t]) => [k, t.replace('✓ ', '')]));
+  FILTER = { none: L('बिना निशान वाले', 'unmarked'), ...(EN ? Object.fromEntries(Object.entries(MARKS).map(([k, t]) => [k, t.toLowerCase()])) : MARKS) };
+  // the page's own words for the marks: the मतदाता सूची buttons and the filter under the ward
+  document.querySelectorAll('#listStatus button[data-s]').forEach((b) => { if (MARK_NAME[b.dataset.s]) b.firstChild.nodeValue = `${MARK_NAME[b.dataset.s]} `; });
+  document.querySelectorAll('#qMark option').forEach((o) => { if (MARKS[o.value]) o.textContent = `${L('सिर्फ़', 'Only')} ${FILTER[o.value]}`; });
+  // slips already on screen: new words on their buttons (their marks of the new set come with the same answer)
+  if (changed) document.querySelectorAll('.slip .marks button[data-m]').forEach((x) => { x.textContent = MARK_NAME[x.dataset.m]; });
+  return changed;
+}
+setMode(false);
 
 // ---------- login ----------
 function showLock(msg, info) {
@@ -900,8 +926,6 @@ function hint() {
     'You can also search by house number (e.g. <b>512</b>, with a ward if you like) or Voter ID (e.g. <b>XHE1102649</b>).' +
     (can('ward') ? '<br>Choose only a ward to see all its voters in box order.' : '')) + '</div>';
 }
-const FILTER = EN ? { none: 'unmarked', done: '✓ voted', coming: 'coming', absent: 'not a voter' }
-  : { none: 'बिना निशान वाले', done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // a name with one letter matches nearly everyone: wait for a second one (a house number like 5 is fine)
 const tooShort = (s) => s && !/^\d+$/.test(s) && s.replace(/\s/g, '').length < 2;
 async function search(more = false, force = false) {
@@ -958,7 +982,6 @@ function updatePerms(p) {
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function kv(label, value) { const f = document.createDocumentFragment(); f.append(label, el('b', null, value)); return f; }
 
-const MARKS = EN ? { done: '✓ Voted', coming: 'Coming', absent: 'Not a voter' } : { done: '✓ वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 // voters struck off the roll in the list's supplement: still found, shown greyed with the reason, no marks or printing
 const DELETED = EN ? { E: 'death', S: 'shifted', R: 'repeated', O: 'other reason' } : { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend; X: no reason known
 
@@ -1022,6 +1045,7 @@ function slip(r, forPrint, inFamily) {
     d.append(row);
   }
   d.dataset.by = r.markBy || ''; d.dataset.at = r.markAt || '';
+  if (!forPrint) showSurvey(d, r.sm);
   if (DEMO) [r.mark, r.markBy, r.markAt] = demoMarks()[`${r.ward}:${r.box}`] || [];
   showMark(d, r.mark, r.markBy, r.markAt);
   return d;
@@ -1243,6 +1267,14 @@ function printTree(tree, r) {
 
 // ---------- status marks (set by admins and people allowed to; everyone sees the bar, who set it and when) ----------
 const when = (iso) => new Date(iso).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+// polling day: the slip's survey mark (अपना वोट …) as a small tag above the buttons, apart from the day's mark
+function showSurvey(d, sm) {
+  let tag = d.querySelector('.stag');
+  const text = !SURVEY && MARK_SETS.survey[sm] ? `${L('सर्वे', 'Survey')}: ${MARK_SETS.survey[sm].replace('✓ ', '')}` : '';
+  if (!text) { if (tag) tag.remove(); return; }
+  if (!tag) { tag = el('div', 'stag'); const row = d.querySelector('.marks'); if (row) row.before(tag); else d.append(tag); }
+  tag.className = `stag c-${sm}`; tag.textContent = text;
+}
 function showMark(d, m, by, at) {
   if (MARKS[m]) d.dataset.mark = m; else delete d.dataset.mark;
   const bar = d.querySelector('.bar');
@@ -1282,6 +1314,7 @@ async function refreshMarks() {
     if (!k) continue;
     d.dataset.by = k.by; d.dataset.at = k.at;
     showMark(d, k.m, k.by, k.at);
+    showSurvey(d, k.sm);
   }
   if (x.perms) updatePerms(x.perms);
 }
@@ -1314,8 +1347,10 @@ async function progLoad() {
     if (r.progress.length > 1) body.append(el('div', 'vh', g.candName ? `${L('उम्मीदवार', 'Candidate')} ${g.candName}` : L('आम निशान', 'Common marks')));
     else if (g.candName) body.append(el('div', 'vh', `${L('उम्मीदवार', 'Candidate')} ${g.candName}`));
     const t = el('table', 'prog');
-    t.innerHTML = L('<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ वोट दिया</th><th class="c-coming">आ रहे</th><th class="c-absent">वोटर नहीं</th><th>बाकी</th></tr></thead>',
-      '<thead><tr><th>Ward</th><th>Total</th><th class="c-done">✓ Voted</th><th class="c-coming">Coming</th><th class="c-absent">Not voter</th><th>Left</th></tr></thead>');
+    const hr = el('tr');
+    for (const [c, txt] of [[null, L('वार्ड', 'Ward')], [null, L('कुल', 'Total')], ['c-done', MARKS.done], ['c-coming', MARK_NAME.coming],
+      ['c-absent', MARK_NAME.absent], [null, L('बाकी', 'Left')]]) hr.append(el('th', c, txt));
+    const th = el('thead'); th.append(hr); t.append(th);
     const tb = el('tbody'), sum = { total: 0, done: 0, coming: 0, absent: 0 };
     for (const w of g.wards) for (const k of Object.keys(sum)) sum[k] += w[k];
     for (const w of [...g.wards, sum]) {
@@ -1347,7 +1382,6 @@ setInterval(() => { if (!document.hidden && !$('progPop').classList.contains('hi
 
 // ---------- मतदाता सूची: voters by mark (वोट दिया / आ रहे हैं / वोटर नहीं है / बाकी), 100 at a time, as on the admin
 // page; for admins and people with the "list" permission (not in the demo) ----------
-const MARK_NAME = EN ? { done: 'Voted', coming: 'Coming', absent: 'Not a voter' } : { done: 'वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
 const ls = { status: 'done', rows: [], seq: 0 };
 function listButton() {
   const ok = !DEMO && can('list');

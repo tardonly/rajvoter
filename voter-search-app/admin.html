@@ -55,6 +55,7 @@
   .filter { display: flex; gap: 6px; margin-bottom: 10px; }
   .filter button { padding: 5px 12px; font-size: 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
   .filter button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #modeCard .row button { flex: 1; } #modeCard button.on, #modeCard button.on:disabled { background: var(--accent); color: #fff; border-color: var(--accent); opacity: 1; }
   .person { padding: 12px 0; border-top: 1px solid var(--line); }
   .person:first-child { border-top: 0; }
   .person .name { font-weight: 600; font-size: 16px; }
@@ -261,6 +262,14 @@
       <div class="sub">पहले बने व्यक्ति, एडमिन, उनके पासवर्ड, अनुरोध और भुगतान अभी Upstash में हैं — तब तक वे लॉगिन नहीं कर पाएंगे। एक बार नीचे दबाएं: ये सब नए डेटाबेस में चले जाएंगे और Upstash से हट जाएंगे। पर्चियों के निशान और उम्मीदवार Upstash में ही रहेंगे।</div>
       <button class="btn" id="dbCopyBtn" type="button">लोगों का डेटा नए डेटाबेस में ले जाएं</button>
       <div class="sub" id="dbCopyMsg"></div>
+    </div>
+
+    <!-- superadmin: survey marks before the election, polling-day marks on the day (api/admin.js "mark_mode") -->
+    <div class="card hidden" id="modeCard">
+      <b id="modeTitle"></b> · <span id="modeNow"></span>
+      <div class="sub" id="modeHelp" style="margin:6px 0 8px"></div>
+      <div class="row"><button class="btn ghost" type="button" data-mode="survey"></button><button class="btn ghost" type="button" data-mode="poll"></button></div>
+      <div class="sub" id="modeMsg" style="margin:6px 0 0"></div>
     </div>
 
     <!-- superadmin: free searches for people who sign up themselves (api/admin.js "free_rule") -->
@@ -987,8 +996,10 @@ function showProgress() {
     const g = el('div');   // one village or candidate: its name and its table, kept together for the columns on a laptop
     if (progress.length > 1) g.append(el('div', 'vh', groupName(v)));
     const t = el('table', 'prog');
-    t.innerHTML = L('<thead><tr><th>वार्ड</th><th>कुल</th><th class="c-done">✓ वोट दिया</th><th class="c-coming">आ रहे</th><th class="c-absent">वोटर नहीं</th><th>बाकी</th></tr></thead>',
-      '<thead><tr><th>Ward</th><th>Total</th><th class="c-done">✓ Voted</th><th class="c-coming">Coming</th><th class="c-absent">Not voter</th><th>Left</th></tr></thead>');
+    const hr = el('tr');
+    for (const [c, txt] of [[null, L('वार्ड', 'Ward')], [null, L('कुल', 'Total')], ['c-done', `✓ ${MARK_NAME.done}`], ['c-coming', MARK_NAME.coming],
+      ['c-absent', MARK_NAME.absent], [null, L('बाकी', 'Left')]]) hr.append(el('th', c, txt));
+    const th = el('thead'); th.append(hr); t.append(th);
     const body = el('tbody');
     const sum = { total: 0, done: 0, coming: 0, absent: 0 };
     for (const w of v.wards) for (const k of Object.keys(sum)) sum[k] += w[k];
@@ -1015,8 +1026,40 @@ function showProgress() {
 }
 
 // ---------- status marks on the slips: how many of each, and clearing them (the last clear can be undone) ----------
-const MARK_NAME = EN ? { done: 'Voted', coming: 'Coming', absent: 'Not a voter' } : { done: 'वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' };
+// Survey marks before the election, polling-day marks on the day: kept apart, the superadmin switches the whole app
+// (MODE in api/_lib.js); this page counts, lists and clears the set in use.
+const MARK_SETS = {
+  poll: EN ? { done: 'Voted', coming: 'Coming', absent: 'Not a voter' } : { done: 'वोट दिया', coming: 'आ रहे हैं', absent: 'वोटर नहीं है' },
+  survey: EN ? { done: 'Our vote', coming: 'Undecided', absent: 'Opposition' } : { done: 'अपना वोट', coming: 'सोच रहे हैं', absent: 'विपक्ष' },
+};
+let SURVEY = false, MARK_NAME = MARK_SETS.poll;
+function setMode(survey) {
+  SURVEY = survey; MARK_NAME = MARK_SETS[survey ? 'survey' : 'poll'];
+  document.querySelectorAll('#vsStatus button[data-s]').forEach((b) => { if (MARK_NAME[b.dataset.s]) b.firstChild.nodeValue = `${MARK_NAME[b.dataset.s]} `; });
+  document.querySelectorAll('.marks button[data-s]').forEach((b) => { b.childNodes[1].nodeValue = MARK_NAME[b.dataset.s]; });
+  $('modeCard').classList.toggle('hidden', !me || me.role !== 'super');
+  $('modeTitle').textContent = L('पर्ची के निशान', 'Marks on the slips');
+  $('modeNow').textContent = survey ? L('अभी: सर्वे', 'now: survey') : L('अभी: मतदान दिवस', 'now: polling day');
+  $('modeHelp').textContent = L('सर्वे (चुनाव से पहले): अपना वोट / सोच रहे हैं / विपक्ष। मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है। दोनों के निशान अलग रखे जाते हैं — बदलने पर कोई निशान नहीं मिटता, और मतदान दिवस पर हर पर्ची पर उसका सर्वे का निशान भी दिखता है। यह सब गाँवों पर लागू होता है।',
+    'Survey (before the election): our vote / undecided / opposition. Polling day: voted / coming / not a voter. The two are kept apart — switching erases no mark, and on polling day each slip also shows its survey mark. Applies to every village.');
+  document.querySelectorAll('#modeCard button[data-mode]').forEach((b) => {
+    b.textContent = b.dataset.mode === 'survey' ? L('सर्वे', 'Survey') : L('मतदान दिवस', 'Polling day');
+    b.classList.toggle('on', (b.dataset.mode === 'survey') === survey);
+    b.disabled = (b.dataset.mode === 'survey') === survey;
+  });
+}
+document.querySelectorAll('#modeCard button[data-mode]').forEach((b) => b.addEventListener('click', async () => {
+  const to = b.dataset.mode;
+  if (!confirm(to === 'survey' ? L('पूरे ऐप में सर्वे के निशान (अपना वोट / सोच रहे हैं / विपक्ष) चालू करें?', 'Switch the whole app to survey marks (our vote / undecided / opposition)?')
+    : L('पूरे ऐप में मतदान दिवस के निशान (वोट दिया / आ रहे हैं / वोटर नहीं है) चालू करें?', 'Switch the whole app to polling-day marks (voted / coming / not a voter)?'))) return;
+  $('modeMsg').textContent = '';
+  const r = await api({ action: 'mark_mode', mode: to });
+  if (r.error) { $('modeMsg').textContent = errText(r); return; }
+  $('modeMsg').textContent = L('✓ बदल गया — फ़ोन पर अगली सर्च या एक मिनट में दिखेगा', '✓ Switched — phones show it on their next search, or within a minute');
+  refresh();
+}));
 function showMarks(r) {
+  if (typeof r.survey === 'boolean') setMode(r.survey);
   if (r.progress) progress = r.progress;
   for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id));   // candidates may have come or gone
   showProgress();

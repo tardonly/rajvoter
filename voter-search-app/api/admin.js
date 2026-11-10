@@ -49,6 +49,8 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
+//   action "mark_mode", mode ('survey' | 'poll') → {survey}   superadmin: which set of marks the whole app uses (MODE in
+//                                         _lib.js); "list" says it as survey: true | false
 //   action "free_rule", mode, people, searches → {freeRule}   superadmin: free searches for sign-ups (freeRule in _lib.js):
 //                                               mode 'direct' | 'halving', people 1–100000, searches 1–1000; "list" gives
 //                                               freeRule to the superadmin
@@ -66,7 +68,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { freeRule, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { MODE, freeRule, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('./_lib.js');
 
 // admin permissions from the request → only known ones
@@ -119,6 +121,12 @@ module.exports = route(async (req, res, b) => {
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
   const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
+  if (b.action === 'mark_mode') {   // superadmin: survey marks or polling-day marks, for the whole app (MODE in _lib.js)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    if (b.mode !== 'survey' && b.mode !== 'poll') return send(res, 400, { error: 'bad_mark' });
+    await redis('SET', 'markmode', b.mode);
+    return send(res, 200, { survey: b.mode === 'survey' });
+  }
   if (b.action === 'free_rule') {   // superadmin: free searches for sign-ups (freeRule in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const n = (v, max) => { const x = Math.floor(Number(v)); return x >= 1 && x <= max ? x : 0; };
@@ -186,7 +194,7 @@ module.exports = route(async (req, res, b) => {
     }
     const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
     const freeRuleNow = isSuper ? await freeRule() : undefined;
-    return send(res, 200, { dbCopy, freeRule: freeRuleNow, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
+    return send(res, 200, { dbCopy, freeRule: freeRuleNow, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, marked: marked[me.id] || 0, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
       villageList: villageList(me.villages), progress, cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }
@@ -249,8 +257,10 @@ module.exports = route(async (req, res, b) => {
     if (!c || !mayUse(c.village)) return send(res, 404, { error: 'no_cand' });
     const ids = (await redis('SMEMBERS', 'users')) || [];
     for (const u of (await Promise.all(ids.map(getUser))).filter((u) => u && u.cand === c.id)) await redis('HSET', `user:${u.id}`, 'cand', '');
-    await redis('DEL', markHash(c.village, c.id));
-    await redis('DEL', `${markHash(c.village, c.id)}:backup`);
+    for (const sv of [false, true]) {   // both sets of marks
+      await redis('DEL', markHash(c.village, c.id, sv));
+      await redis('DEL', `${markHash(c.village, c.id, sv)}:backup`);
+    }
     await redis('SREM', 'cands', c.id);
     await redis('DEL', `cand:${c.id}`);
     return send(res, 200, { ok: true });

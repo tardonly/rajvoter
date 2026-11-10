@@ -9,7 +9,7 @@
 // A password of another village → 403 {error: 'other_village', village, villageName} so the app can point there.
 // Each login starts a new session; a phone still using an older session of the same password is logged out
 // on its next request. The token is sent with every search; an admin token also opens the admin page.
-const { isPrepaid, movesLeft, canBuy, payOnline, adminPhone, creditsLeft, getCand, DEMO, demoSlugs, isDevice, demoId, village, villageList, PERMS, appPerms, redis, pwHash, ownPwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
+const { readMarkMode, isPrepaid, movesLeft, canBuy, payOnline, adminPhone, creditsLeft, getCand, DEMO, demoSlugs, isDevice, demoId, village, villageList, PERMS, appPerms, redis, pwHash, ownPwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
   deviceName, normPhone, blocked, failed, send, route } = require('./_lib.js');
 
 const STILL_IN_USE_MS = 30 * 60 * 1000;   // previous phone used within 30 min → counts as "two phones at once"
@@ -28,7 +28,7 @@ module.exports = route(async (req, res, { password, phone, village: slug, home, 
   if (await blocked(req, 'unlock')) return send(res, 429, { error: 'too_many' });
   if (isAdminPassword(password)) {
     const list = villageList();
-    return send(res, 200, { name: 'सुपर एडमिन', token: adminToken(), admin: true, role: 'super', villages: list.map((x) => x.slug), list, perms: PERMS.slice() });
+    return send(res, 200, { name: 'सुपर एडमिन', token: adminToken(), admin: true, role: 'super', villages: list.map((x) => x.slug), list, perms: PERMS.slice(), survey: await readMarkMode() });
   }
   // a password the person chose is kept with their number (ownPwHash in _lib.js), a made-up one on its own
   const own = password && normPhone(phone) ? await redis('GET', `pw:${ownPwHash(normPhone(phone), password)}`) : null;
@@ -57,6 +57,6 @@ module.exports = route(async (req, res, { password, phone, village: slug, home, 
   send(res, 200, { name: user.name, phone: user.phone || '', token: makeToken(id, sid), admin: user.role === 'admin', role: user.role, villages: user.villages,
     prepaid, left: prepaid ? await creditsLeft(user) : undefined, canBuy: buys, online: buys && payOnline(), bought: buys && !prepaid ? await creditsLeft(user) : undefined,
     adminPhone: buys ? await adminPhone(user) : '',
-    list: villageList(user.villages), perms: appPerms(user),
+    list: villageList(user.villages), perms: appPerms(user), survey: await readMarkMode(),
     cand: cand && cand.village === user.village ? cand.name : '', movesLeft: movesLeft(user) });
 });

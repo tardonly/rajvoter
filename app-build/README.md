@@ -263,6 +263,14 @@ from JaduPe with our token, never taken from the webhook's own data, so a made-u
 "💳 UPI ऑनलाइन". JaduPe needs a mobile number: a login without one is sent as `JADUPE_MOBILE` (default 9999999999);
 the email sent is `JADUPE_EMAIL` (default noreply@raj-voter.vercel.app).
 
+## Survey and polling-day marks
+The slips have two sets of marks, kept apart: **सर्वे** before the election (**अपना वोट** green, **सोच रहे हैं** yellow,
+**विपक्ष** red) and **मतदान दिवस** on the day (**वोट दिया**, **आ रहे हैं**, **वोटर नहीं है**). The superadmin switches the whole
+app between them in the **पर्ची के निशान** box at the top of the admin page (polling day until first switched). The
+buttons, वोटर रिपोर्ट, मतदाता सूची and निशान हटाएं all work on the set in use; switching erases nothing. On polling day
+every slip also shows its survey mark as a small tag (सर्वे: अपना वोट), so workers know whom to bring. Kept in
+`mark:<village>…` (polling day) and `smark:<village>…` (survey); the switch is the key `markmode`.
+
 ## Admin page
 Log in with the superadmin password or a village admin's password (or log into a village with it and press **एडमिन**).
 - **+ नया व्यक्ति** (व्यक्ति tab): choose the village, type the person's name → you get their password once → Copy or send by

@@ -1,5 +1,5 @@
 // POST {village, token, name, rel, ward, mark, offset, after} → {total, more, results: [...up to 10 voters, each with its
-//   status mark and who set it], wards, perms}
+//   status mark and who set it, and on polling day its survey mark sm], wards, perms, survey (see MODE in _lib.js)}
 // POST {village, token, family: "<ward>:<box>"} → {total, results: everyone at that voter's house number in that ward}
 // POST {village, token, ward, all: true} → {total, results: [every voter of that ward]}   (people allowed 'wardPdf')
 // A ward with no name lists the whole ward in box order (only for people allowed 'ward'); it pages with after = the last
@@ -21,7 +21,7 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
+const { DEMO, village, whoIs, MARKS, MODE, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
 const { load, search, family, publicFields } = require('./_search.js');
 
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
@@ -76,7 +76,8 @@ async function countSearch(req, user, b, named) {
 async function withMarks(slug, list, cand) {   // cand: the searcher's candidate group, whose marks they see
   const results = list.map(publicFields);
   const marks = await marksFor(slug, results.map(markKey), cand);
-  results.forEach((r, i) => { r.mark = marks[i].m; r.markBy = marks[i].by; r.markAt = marks[i].at; });
+  const sv = MODE.survey ? [] : await marksFor(slug, results.map(markKey), cand, true);   // polling day: the survey mark too
+  results.forEach((r, i) => { r.mark = marks[i].m; r.markBy = marks[i].by; r.markAt = marks[i].at; r.sm = sv[i] ? sv[i].m : ''; });
   return results;
 }
 
@@ -103,7 +104,7 @@ module.exports = route(async (req, res, b) => {
 
   if (b.family) {
     const results = await withMarks(v.slug, family(v.data, b.family).slice(0, MAX_FAMILY), user.cand);
-    return send(res, 200, { total: results.length, results, perms: user.perms, ...left });
+    return send(res, 200, { total: results.length, results, perms: user.perms, survey: MODE.survey, ...left });
   }
 
   let hits = search(v.data, b);
@@ -125,5 +126,5 @@ module.exports = route(async (req, res, b) => {
     page = rest.slice(0, PAGE);
     more = rest.length > PAGE;
   }
-  send(res, 200, { total, more, results: await withMarks(v.slug, page, user.cand), wards: load(v.data).wards, perms: user.perms, ...left });
+  send(res, 200, { total, more, results: await withMarks(v.slug, page, user.cand), wards: load(v.data).wards, perms: user.perms, survey: MODE.survey, ...left });
 });

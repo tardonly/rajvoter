@@ -333,6 +333,7 @@ function route(fn) {
 //         | 'other_device' (this password has since been opened on another phone)
 //         | 'other_village' (slug given and this login is not for that village)
 async function whoIs(token, slug) {
+  await readMarkMode();
   if (isAdminToken(token)) {
     return { id: 'admin', name: 'सुपर एडमिन', role: 'super', admin: true, villages: Object.keys(VILLAGES), status: 'ok', perms: PERMS.slice() };
   }
@@ -546,15 +547,22 @@ function normPhone(s) {
 // one candidate's workers never see another's marks. Everyone else (users without a candidate, and admins searching
 // the village) uses the village's own "mark:<village>". The admin page shows every group's marks separately.
 const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the way · red: not a voter here (वोटर नहीं है)
+// Two sets of marks, kept apart: the survey before the election (सर्वे: done = अपना वोट, coming = सोच रहे हैं,
+// absent = विपक्ष; hashes "smark:…") and polling day (मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है; "mark:…"). The
+// superadmin switches the whole app between them (key "markmode": 'survey' | 'poll', api/admin.js "mark_mode"); the
+// buttons, reports, lists and "clear" work on the set in use, and on polling day each slip also shows its survey mark.
+// whoIs reads the mode at the start of every request (MODE.survey), so markHash follows it.
+const MODE = { survey: false };
+const readMarkMode = async () => { MODE.survey = (await redis('GET', 'markmode')) === 'survey'; return MODE.survey; };
 const markKey = (v) => `${parseInt(v.ward, 10)}:${parseInt(v.box, 10)}`;
-const markHash = (slug, cand) => (cand ? `mark:${slug}:c:${cand}` : `mark:${slug}`);
+const markHash = (slug, cand, survey = MODE.survey) => `${survey ? 'smark' : 'mark'}:${slug}${cand ? `:c:${cand}` : ''}`;
 function parseMark(val) {
   const [m = '', at = '', byId = '', by = ''] = val ? String(val).split('|') : [];
   return { m, at, byId, by };
 }
-async function marksFor(slug, keys, cand) {
+async function marksFor(slug, keys, cand, survey = MODE.survey) {
   if (!keys.length) return [];
-  const vals = (await redis('HMGET', markHash(slug, cand), ...keys)) || [];
+  const vals = (await redis('HMGET', markHash(slug, cand, survey), ...keys)) || [];
   return keys.map((k, i) => parseMark(vals[i]));
 }
 const allMarks = async (slug, cand) => marksFrom(await redis('HGETALL', markHash(slug, cand)));
@@ -573,7 +581,7 @@ async function getCand(id) {
   return c;
 }
 
-module.exports = { MARKS, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { MARKS, MODE, readMarkMode, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };
