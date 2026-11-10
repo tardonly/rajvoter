@@ -1125,7 +1125,7 @@ async function toggleFamily(r, d, btn) {
   const slips = new Map([[r.box, d]]);
   for (const v of others) { const s = slip(v, false, true); slips.set(v.box, s); box.append(s); }
   if (others.length) {   // वंशावली: the house's voters arranged by father and husband, above the slips
-    const tb = el('button', 'tbtn', L('🌳 वंशावली', '🌳 Family tree')); tb.type = 'button';
+    const tb = el('button', 'tbtn', L('🌳 वंशावली खोलें', '🌳 Open family tree')); tb.type = 'button';
     let tree = null, pb = null;
     tb.addEventListener('click', () => {
       if (tree) { tree.remove(); if (pb) pb.remove(); tree = pb = null; tb.classList.remove('on'); return; }
