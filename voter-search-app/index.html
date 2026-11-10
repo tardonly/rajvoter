@@ -96,7 +96,8 @@
   .cpnbanners.inpop .cpnbanner { min-height: 80px; padding-right: 14px; }
   .cpnbanner.on { box-shadow: 0 0 0 3px #fff inset, 0 0 0 3px #16a34a; }
   .cpnbanner.on b { background: #16a34a; color: #fff; }
-  .cpnlist .cpnbanners { width: 100%; }
+  .cpnlist { min-width: 0; }   /* a grid item of the buy window: the side-scrolling cards must not widen it */
+  .cpnlist .cpnbanners { width: 100%; min-width: 0; }
   .cpnbanner:nth-child(3n+2) { background: linear-gradient(120deg, #0f766e, #2563eb); }
   .cpnbanner:nth-child(3n) { background: linear-gradient(120deg, #c2410c, #db2777); }
   .cpnbanner span { font-size: 16px; font-weight: 700; line-height: 1.35; }
