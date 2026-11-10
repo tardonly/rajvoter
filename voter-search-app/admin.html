@@ -332,6 +332,7 @@
         <label class="fr"><input type="checkbox" id="cpnOnce" checked> <span>एक व्यक्ति सिर्फ़ एक बार</span></label>
         <label class="fr"><input type="checkbox" id="cpnFirst"> <span>सिर्फ़ पहली खरीद पर</span></label>
         <label class="fr"><input type="checkbox" id="cpnOn" checked> <span>चालू</span></label>
+        <label class="fr"><input type="checkbox" id="cpnShow" checked> <span>खरीद विंडो में सबको दिखाएं (नहीं तो सिर्फ़ जिसे कोड पता हो)</span></label>
         <label class="fr num"><span>नोट (अपने लिए)</span><input id="cpnNote" maxlength="100"></label>
         <div class="row"><button class="btn" id="cpnSave" type="button">कूपन बनाएं</button><button class="btn ghost hidden" id="cpnCancel" type="button">रद्द</button></div>
         <div class="sub" id="cpnMsg" style="margin:0"></div>
@@ -438,6 +439,7 @@
   <div class="card">
     <div class="bar2"><h2 id="addTitle">नया व्यक्ति जोड़ें</h2><button class="x" id="closeAdd" type="button" aria-label="बंद करें">✕</button></div>
     <form id="addForm" class="stack" autocomplete="off">
+      <select id="newSamiti" class="hidden" aria-label="पंचायत समिति"></select>
       <select id="newVillage" required><option value="">गाँव चुनें</option></select>
       <input id="newName" type="text" placeholder="व्यक्ति का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
       <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
@@ -486,7 +488,7 @@ const STATIC_EN = {
   'ताज़ा करें': 'Refresh', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards', 'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter',
   'बाकी': 'Remaining', 'और दिखाएं': 'Show more', 'पर्चियों के निशान हटाएं': 'Clear the marks on the slips',
   'बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।': 'A button clears all marks of that colour in that village, on everyone\'s phone.',
-  'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया व्यक्ति जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village',
+  'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया व्यक्ति जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village', 'पंचायत समिति': 'Panchayat samiti',
   'व्यक्ति का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'पासवर्ड बनाएं': 'Make password',
 };
 (function translatePage() {
@@ -690,7 +692,7 @@ $('refSave').addEventListener('click', async () => {
 // coupons (getCoupon in api/_lib.js): the list, each with ✎ (into the form) and 🗑; the form makes or changes one
 let COUPONS = [], cpnEdit = null;
 const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट` : c.kind === 'rs' ? `₹${c.value} छूट` : c.kind === 'bonuspct' ? `${c.value}% ज़्यादा सर्च मुफ़्त` : `${c.value} सर्च मुफ़्त`);
-const cpnRules = (c) => [c.minN ? `${c.minN}+ सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
+const cpnRules = (c) => [c.show ? 'खरीद विंडो में दिखता है' : 'छुपा (सिर्फ़ कोड से)', c.minN ? `${c.minN}+ सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
   c.until ? `${c.until} तक` : '', `${c.used}${c.maxUses ? `/${c.maxUses}` : ''} बार इस्तेमाल`].filter(Boolean).join(' · ');
 function showCoupons(list) {
   $('cpnCard').classList.toggle('hidden', !list);
@@ -724,7 +726,7 @@ function cpnForm(c) {
   $('cpnCode').value = c ? c.code : ''; $('cpnCode').disabled = !!c;
   $('cpnKind').value = c ? c.kind : 'pct'; $('cpnValue').value = c ? c.value : '';
   $('cpnMin').value = c && c.minN ? c.minN : ''; $('cpnMax').value = c && c.maxUses ? c.maxUses : ''; $('cpnUntil').value = c ? c.until : '';
-  $('cpnOnce').checked = c ? c.once : true; $('cpnFirst').checked = c ? c.first : false; $('cpnOn').checked = c ? c.on : true;
+  $('cpnOnce').checked = c ? c.once : true; $('cpnFirst').checked = c ? c.first : false; $('cpnOn').checked = c ? c.on : true; $('cpnShow').checked = c ? c.show : true;
   $('cpnNote').value = c ? c.note || '' : '';
   $('cpnSave').textContent = c ? 'सेव करें' : 'कूपन बनाएं';
   $('cpnCancel').classList.toggle('hidden', !c);
@@ -738,7 +740,7 @@ $('cpnSave').addEventListener('click', async () => {
   $('cpnSave').disabled = true; $('cpnMsg').textContent = '';
   const r = await api({ action: 'coupon_set', isNew: !cpnEdit, code: $('cpnCode').value, kind: $('cpnKind').value, value: $('cpnValue').value,
     minN: $('cpnMin').value, maxUses: $('cpnMax').value, until: $('cpnUntil').value, once: $('cpnOnce').checked, first: $('cpnFirst').checked,
-    on: $('cpnOn').checked, note: $('cpnNote').value });
+    on: $('cpnOn').checked, show: $('cpnShow').checked, note: $('cpnNote').value });
   $('cpnSave').disabled = false;
   if (r.error) {
     $('cpnMsg').textContent = { cpn_code: 'कोड में 3 से 15 अंग्रेज़ी अक्षर या अंक हों', cpn_rule: 'कीमत/संख्या सही डालें (% 1 से 99 तक)', cpn_exists: 'यह कोड पहले से है' }[r.error] || errText(r);
@@ -1071,7 +1073,8 @@ function setup() {
   $('meText').textContent = me.role === 'super' ? L('सुपर एडमिन · सभी गाँव', 'Super admin · all villages') : `${me.name} · ${mine.map(vName).join(', ')}`;
   const pick = mine.length === 1 ? mine[0] : '';
   for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id), `${pick || mine[0] || ''}|`);
-  for (const id of ['newVillage', 'fVillage', 'candVillage']) {
+  newSamitiOptions(mine, pick);
+  for (const id of ['fVillage', 'candVillage']) {
     const sel = $(id);
     sel.length = id === 'candVillage' ? 0 : 1;
     for (const s of mine) sel.add(new Option(vName(s), s));
@@ -1201,11 +1204,14 @@ function setMode(survey) {
   SURVEY = survey; MARK_NAME = MARK_SETS[survey ? 'survey' : 'poll'];
   document.querySelectorAll('#vsStatus button[data-s]').forEach((b) => { if (MARK_NAME[b.dataset.s]) b.firstChild.nodeValue = `${MARK_NAME[b.dataset.s]} `; });
   document.querySelectorAll('.marks button[data-s]').forEach((b) => { b.childNodes[1].nodeValue = MARK_NAME[b.dataset.s]; });
-  $('modeCard').classList.toggle('hidden', !me || me.role !== 'super');
+  $('modeCard').classList.toggle('hidden', !me);
+  const forAll = !!me && me.role === 'super';
   $('modeTitle').textContent = L('पर्ची के निशान', 'Marks on the slips');
   $('modeNow').textContent = survey ? L('अभी: सर्वे', 'now: survey') : L('अभी: मतदान दिवस', 'now: polling day');
-  $('modeHelp').textContent = L('सर्वे (चुनाव से पहले): अपना वोट / सोच रहे हैं / विपक्ष। मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है। दोनों के निशान अलग रखे जाते हैं — बदलने पर कोई निशान नहीं मिटता, और मतदान दिवस पर हर पर्ची पर उसका सर्वे का निशान भी दिखता है। यह सब गाँवों पर लागू होता है।',
-    'Survey (before the election): our vote / undecided / opposition. Polling day: voted / coming / not a voter. The two are kept apart — switching erases no mark, and on polling day each slip also shows its survey mark. Applies to every village.');
+  $('modeHelp').textContent = L('सर्वे (चुनाव से पहले): अपना वोट / सोच रहे हैं / विपक्ष। मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है। दोनों के निशान अलग रखे जाते हैं — बदलने पर कोई निशान नहीं मिटता, और मतदान दिवस पर हर पर्ची पर उसका सर्वे का निशान भी दिखता है। ' +
+    (forAll ? 'यहाँ बदलने पर सबके फ़ोन बदल जाते हैं; उसके बाद हर व्यक्ति ऐप में अपने लिए फिर बदल सकता है।' : 'यह सिर्फ़ आपके लिए है — ऐप में भी बदल सकते हैं।'),
+    'Survey (before the election): our vote / undecided / opposition. Polling day: voted / coming / not a voter. The two are kept apart — switching erases no mark, and on polling day each slip also shows its survey mark. ' +
+    (forAll ? 'Switching here switches every phone; after that each person can switch back for themself in the app.' : 'This is only for you — you can switch in the app too.'));
   document.querySelectorAll('#modeCard button[data-mode]').forEach((b) => {
     b.textContent = b.dataset.mode === 'survey' ? L('सर्वे', 'Survey') : L('मतदान दिवस', 'Polling day');
     b.classList.toggle('on', (b.dataset.mode === 'survey') === survey);
@@ -1214,12 +1220,13 @@ function setMode(survey) {
 }
 document.querySelectorAll('#modeCard button[data-mode]').forEach((b) => b.addEventListener('click', async () => {
   const to = b.dataset.mode;
-  if (!confirm(to === 'survey' ? L('पूरे ऐप में सर्वे के निशान (अपना वोट / सोच रहे हैं / विपक्ष) चालू करें?', 'Switch the whole app to survey marks (our vote / undecided / opposition)?')
-    : L('पूरे ऐप में मतदान दिवस के निशान (वोट दिया / आ रहे हैं / वोटर नहीं है) चालू करें?', 'Switch the whole app to polling-day marks (voted / coming / not a voter)?'))) return;
+  if (me.role === 'super' && !confirm(to === 'survey' ? L('सबके फ़ोन पर सर्वे के निशान (अपना वोट / सोच रहे हैं / विपक्ष) चालू करें?', 'Switch every phone to survey marks (our vote / undecided / opposition)?')
+    : L('सबके फ़ोन पर मतदान दिवस के निशान (वोट दिया / आ रहे हैं / वोटर नहीं है) चालू करें?', 'Switch every phone to polling-day marks (voted / coming / not a voter)?'))) return;
   $('modeMsg').textContent = '';
   const r = await api({ action: 'mark_mode', mode: to });
   if (r.error) { $('modeMsg').textContent = errText(r); return; }
-  $('modeMsg').textContent = L('✓ बदल गया — फ़ोन पर अगली सर्च या एक मिनट में दिखेगा', '✓ Switched — phones show it on their next search, or within a minute');
+  $('modeMsg').textContent = me.role === 'super' ? L('✓ बदल गया — फ़ोन पर अगली सर्च या एक मिनट में दिखेगा', '✓ Switched — phones show it on their next search, or within a minute')
+    : L('✓ बदल गया', '✓ Switched');
   refresh(true);
 }));
 function showMarks(r) {
@@ -1467,9 +1474,38 @@ function newCandOptions() {
   $('newCand').classList.toggle('hidden', !list.length);
 }
 $('newVillage').addEventListener('change', newCandOptions);
+// the add form's village choice: first the पंचायत समिति (only when this admin's villages are in more than one), then
+// that samiti's villages, by name. Villages without a samiti are grouped as "अन्य गाँव".
+const addVillages = () => (me ? me.villages.filter((s) => villages[s]) : []);   // this admin's villages
+function newSamitiOptions(mine, pick) {
+  const keys = [...new Set(mine.map((s) => samitiOf(villages[s])))].sort((a, b) => (!a) - (!b) || samitiName(a).localeCompare(samitiName(b)));
+  const sel = $('newSamiti');
+  sel.length = 0;
+  if (keys.length > 1) sel.add(new Option(L('पंचायत समिति चुनें', 'Choose panchayat samiti'), ''));
+  for (const k of keys) {
+    const n = mine.filter((s) => samitiOf(villages[s]) === k).length;
+    sel.add(new Option(k ? `${L('पंचायत समिति', 'Panchayat samiti')} ${samitiName(k)} · ${n} ${L('गाँव', 'villages')}` : L(`अन्य गाँव · ${n}`, `Other villages · ${n}`), k));
+  }
+  sel.value = pick ? samitiOf(villages[pick]) : keys.length === 1 ? keys[0] : '';
+  sel.classList.toggle('hidden', keys.length < 2);
+  newVillageOptions(pick);
+}
+function newVillageOptions(pick) {
+  const sel = $('newVillage'), many = $('newSamiti').length > 1, k = $('newSamiti').value;
+  const list = many && !$('newSamiti').selectedIndex ? []
+    : addVillages().filter((s) => samitiOf(villages[s]) === k).sort((a, b) => vName(a).localeCompare(vName(b)));
+  sel.length = 0;
+  sel.add(new Option(many && !$('newSamiti').selectedIndex ? L('पहले पंचायत समिति चुनें', 'Choose the panchayat samiti first') : L('गाँव चुनें', 'Choose village'), ''));
+  for (const s of list) sel.add(new Option(vName(s), s));
+  sel.disabled = !list.length;
+  sel.value = list.includes(pick) ? pick : list.length === 1 ? list[0] : '';
+  newCandOptions();
+}
+$('newSamiti').addEventListener('change', () => newVillageOptions(''));
 function openAdd() {
   $('addMsg').textContent = '';
-  if ($('fVillage').value) $('newVillage').value = $('fVillage').value;   // the village the list is showing
+  const showing = $('fVillage').value;   // the village the list is showing
+  if (showing && villages[showing]) { $('newSamiti').value = samitiOf(villages[showing]); newVillageOptions(showing); }
   newCandOptions();
   $('addModal').classList.remove('hidden');
   $('newName').focus();
@@ -1677,7 +1713,9 @@ function person(u) {
   edit.type = 'button';
   edit.addEventListener('click', () => {
     const v = prompt(L(`${u.name} का WhatsApp मोबाइल नंबर:`, `${u.name}'s WhatsApp mobile number:`), u.phone ? showPhone(u.phone) : '');
-    if (v !== null) act({ action: 'phone', id: u.id, phone: v });
+    if (v === null) return;
+    // a password the person chose works only with their old number: the server then makes a new one, shown here once
+    act({ action: 'phone', id: u.id, phone: v }).then((r) => { if (r && r.password) showPassword(r.user, r.password); });
   });
   ph.append(edit);
   const use = el('div', 'info', STATS ? L(`${MARKED[u.id] || 0} पर्चियों पर इनके निशान`, `Their marks on ${MARKED[u.id] || 0} slips`) : L('निशान: ⏳', 'Marks: ⏳'));

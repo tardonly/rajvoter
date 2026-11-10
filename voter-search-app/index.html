@@ -80,6 +80,15 @@
   .cpnrow input { flex: 1; min-width: 0; text-transform: uppercase; font-size: 15px; padding: 8px 10px; border: 1.5px dashed #a855f7; border-radius: 8px; }
   .cpnbtn { border: 0; border-radius: 8px; padding: 8px 14px; background: #7c3aed; color: #fff; font-weight: 600; font-size: 14px; }
   .cpnbtn:disabled { opacity: .6; }
+  .cpnlist { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+  .cpnlist .k { width: 100%; margin: 0; }
+  .cpnchip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 10px; border: 1.5px dashed #a855f7;
+    border-radius: 8px; background: #faf5ff; color: #581c87; font-size: 14px; text-align: left; }
+  .cpnchip small { font-size: 12px; color: #6b21a8; }
+  .cpnchip.on { border-style: solid; background: #7c3aed; color: #fff; } .cpnchip.on small { color: #ede9fe; }
+  .moderow { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .moderow button { flex: 1; padding: 5px 8px; border: 1.5px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font-size: 13.5px; font-weight: 600; }
+  .moderow button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .cpnmsg.good { color: #15803d; font-weight: 600; }
   .cpnmsg.bad { color: #b91c1c; }
   .pack.on { border-color: #16a34a; background: #f0fdf4; box-shadow: 0 0 0 2px #16a34a inset; }
@@ -304,9 +313,13 @@
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
   /* install as an app: a button at the top of every page (and a link in the footer), and the steps */
-  .topinstall { display: block; margin: 10px auto 0; padding: 7px 18px; border-radius: 999px; border: 1.5px solid var(--pink-dark);
-    background: #fdf2f8; color: #9d174d; font-size: 15px; font-weight: 600; }
-  html.noinstall .topinstall, html.noinstall .footinstall { display: none !important; }   /* opened as the app, or iPhone/iPad */
+  .fabinstall { position: fixed; right: 12px; bottom: 14px; z-index: 30; display: flex; align-items: center; gap: 2px; padding: 3px;
+    border-radius: 999px; border: 1.5px solid var(--pink-dark); background: #fdf2f8; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+  .fabinstall [data-install] { border: 0; background: none; padding: 6px 6px 6px 12px; color: #9d174d; font-size: 15px; font-weight: 600; }
+  #installHide { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #fce7f3; color: #9d174d; font-size: 14px; line-height: 1; }
+  html.noinstall .fabinstall, html.noinstall .footinstall, html.installhidden .fabinstall { display: none !important; }   /* opened as the app, or iPhone/iPad; or put away */
+  html:not(.noinstall):not(.installhidden) body { padding-bottom: 64px; }   /* room for the floating button */
+  .topelec { width: calc(100% - 24px); max-width: 720px; margin: 10px auto 0; }
   #installPop .card { max-width: 480px; }
   #installClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
   #installPop h3 { font-size: 15px; margin: 12px 0 4px; }
@@ -353,7 +366,7 @@
   @media print {
     @page { size: A4; margin: 8mm; }
     html, body { background: #fff; }
-    body > section, .footer, .topinstall { display: none !important; }
+    body > section, .footer, .fabinstall, .topelec { display: none !important; }
     #printArea { display: block; font-size: 0; }
     #printArea .slip { display: inline-block; vertical-align: top; width: 94mm; margin: 0 2mm 2mm 0; font-size: 13px;
       break-inside: avoid; page-break-inside: avoid; }
@@ -367,7 +380,9 @@
 </style>
 </head>
 <body>
-<button class="topinstall" data-install type="button">📲 ऐप इंस्टॉल करें</button>
+<!-- install as an app: a floating button (✕ puts it away on this phone; the footer link stays), then the election dates -->
+<div class="fabinstall" id="installFab"><button data-install type="button">📲 ऐप इंस्टॉल करें</button><button id="installHide" type="button" aria-label="हटाएं" title="हटाएं">✕</button></div>
+<div class="elecbar topelec hidden"></div>
 
 <section id="lock" class="loading">
   <div class="lockbox">
@@ -375,7 +390,6 @@
     <img src="/icon-192.png" alt="">
     <h1>Voter Search</h1>
     <p id="lockSub"></p>
-    <div class="elecbar hidden"></div>
     <form id="lockForm">
       <!-- the mobile number first: a known number then gets the password box, a new one signs up -->
       <input id="phone" type="tel" inputmode="numeric" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर डालें">
@@ -496,7 +510,6 @@
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
       <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
-    <div class="elecbar hidden"></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -512,6 +525,8 @@
         <option value="coming">सिर्फ़ आ रहे हैं</option>
         <option value="absent">सिर्फ़ वोटर नहीं है</option>
       </select>
+      <!-- which marks this person uses: the survey before the election or polling day (api/signup.js 'mark_mode') -->
+      <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
     <div class="countrow"><div id="count"></div><span><b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button>
       <button id="wardPrint" class="hidden" type="button"></button></span></div>
@@ -558,7 +573,7 @@ const STATIC_EN = {
   'पासवर्ड भूल गए? OTP से नया बनाएं': 'Forgot your password? Make a new one with an OTP', 'OTP डालें': 'Enter the OTP',
   'OTP फिर भेजें': 'Send the OTP again', 'नया पासवर्ड (कम से कम 6 अक्षर)': 'New password (at least 6 characters)',
   'अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)': 'Choose a password (at least 6 characters)', 'पासवर्ड बदलें': 'Change password',
-  '📲 ऐप इंस्टॉल करें': '📲 Install the app', 'ऐप इंस्टॉल करें': 'Install the app',
+  '📲 ऐप इंस्टॉल करें': '📲 Install the app', 'ऐप इंस्टॉल करें': 'Install the app', 'निशान:': 'Marks:', 'सर्वे': 'Survey', 'मतदान दिवस': 'Polling day', 'हटाएं': 'Put away', 'निशान': 'Marks',
   'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
   'डेमो देखें': 'Try the demo',
@@ -688,6 +703,7 @@ function setMode(survey) {
   // the page's own words for the marks: the मतदाता सूची buttons and the filter under the ward
   document.querySelectorAll('#listStatus button[data-s]').forEach((b) => { if (MARK_NAME[b.dataset.s]) b.firstChild.nodeValue = `${MARK_NAME[b.dataset.s]} `; });
   document.querySelectorAll('#qMark option').forEach((o) => { if (MARKS[o.value]) o.textContent = `${L('सिर्फ़', 'Only')} ${FILTER[o.value]}`; });
+  document.querySelectorAll('#modeRow button[data-mode]').forEach((b) => b.classList.toggle('on', (b.dataset.mode === 'survey') === survey));
   // slips already on screen: new words on their buttons (their marks of the new set come with the same answer)
   if (changed) document.querySelectorAll('.slip .marks button[data-m]').forEach((x) => { x.textContent = MARK_NAME[x.dataset.m]; });
   return changed;
@@ -755,7 +771,7 @@ function logoutAll() {
   store.del('villages');
 }
 let MY_NAME = '', MY_PHONE = '', ADMIN_PHONE = '';   // this login's name and mobile number, and its admin's (WhatsApp for more searches)
-function showApp(name, admin, villages, perms, cand) {
+function showApp(name, admin, villages, perms, cand, role) {
   PERMS = perms || []; MY_NAME = name || ''; MY_VILLAGES = villages || [];
   $('who').textContent = (name ? `${L('उपयोगकर्ता', 'User')}: ${who(name)}` : '') + (cand ? ` · ${L('उम्मीदवार', 'Candidate')}: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
@@ -763,6 +779,7 @@ function showApp(name, admin, villages, perms, cand) {
   // logins with several villages, and a signed-up login that may still move itself to another village
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1) && !MOVES_LEFT);
   IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); buyMoreButton();
+  $('modeRow').classList.toggle('hidden', DEMO || role === 'super');   // the superadmin switches everyone on the admin page
   if (DEMO) {   // ← वापस: back to the start page; गाँव बदलें: back to the demo's villages
     $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); $('switchBtn').href = '/demo'; demoBar();
   }
@@ -916,6 +933,11 @@ async function installOpen() {
 function installClose() { $('installPop').classList.add('hidden'); }
 document.addEventListener('click', (e) => { if (e.target.closest('[data-install]')) installOpen(); });
 $('installClose').addEventListener('click', installClose);
+try { if (localStorage.getItem('installHidden')) document.documentElement.classList.add('installhidden'); } catch (e) {}
+$('installHide').addEventListener('click', () => {
+  document.documentElement.classList.add('installhidden');
+  try { localStorage.setItem('installHidden', '1'); } catch (e) {}
+});
 $('installPop').addEventListener('click', (e) => { if (e.target === $('installPop')) installClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') installClose(); });
 $('howShare').addEventListener('click', shareOpen);
@@ -944,7 +966,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
   MY_REF = r.ref || null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   MOVES_LEFT = r.movesLeft || 0;
-  showApp(r.name, r.admin, r.villages, r.perms, r.cand);
+  showApp(r.name, r.admin, r.villages, r.perms, r.cand, r.role);
   outOfSearches();
 });
 $('lockBtn').addEventListener('click', () => { logoutAll(); goHome(''); });
@@ -1361,6 +1383,14 @@ async function refreshMarks() {
   if (x.perms) updatePerms(x.perms);
 }
 setInterval(refreshMarks, 60000);
+// सर्वे / मतदान दिवस: this person's own choice (until the superadmin next switches everyone); the slips on screen then
+// show the marks of the chosen set
+document.querySelectorAll('#modeRow button[data-mode]').forEach((b) => b.addEventListener('click', async () => {
+  if ((b.dataset.mode === 'survey') === SURVEY) return;
+  const r = await api('signup', { action: 'mark_mode', token: token(), mode: b.dataset.mode });   // api() switches the words
+  if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
+  if (!r.error) refreshMarks();
+}));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarks(); });
 
 // ---------- printing / saving slips as PDF (the phone's print screen also offers "Save as PDF") ----------
@@ -1712,6 +1742,7 @@ const CPN_MSG = {
   cpn_used_up: () => L('⚠ यह कूपन पूरा इस्तेमाल हो चुका है', '⚠ This coupon has been used up'),
   cpn_used: () => L('⚠ आप यह कूपन पहले इस्तेमाल कर चुके हैं', '⚠ You have already used this coupon'),
   cpn_first: () => L('⚠ यह कूपन सिर्फ़ पहली खरीद पर है', '⚠ This coupon is only for a first purchase'),
+  cpn_pending: () => L('⚠ इस कूपन से एक UPI भुगतान अभी चल रहा है — पहले उसे पूरा करें या थोड़ी देर बाद फिर कोशिश करें', '⚠ A UPI payment with this coupon is still open — finish it first, or try again a little later'),
   cpn_min: (r) => L(`⚠ यह कूपन ${r.minN} या ज़्यादा सर्च के पैक पर है`, `⚠ This coupon is for packs of ${r.minN} or more searches`),
 };
 // a signed-up login: how many searches are left (amber at 3 or fewer, red at none) and the button for more
@@ -1822,9 +1853,33 @@ function buyOpen() {
   const cpnRow = el('div', 'cpnrow'), cpnIn = el('input'), cpnBtn = el('button', 'cpnbtn', L('लागू करें', 'Apply')), cpnMsg = el('div', 'k cpnmsg');
   cpnIn.placeholder = L('🎟 कूपन कोड (हो तो)', '🎟 Coupon code (if any)'); cpnIn.autocapitalize = 'characters'; cpnIn.maxLength = 15;
   cpnBtn.type = 'button';
+  const cpnWhat = (c) => (c.kind === 'pct' ? L(`${c.value}% छूट`, `${c.value}% off`) : c.kind === 'rs' ? L(`₹${c.value} छूट`, `₹${c.value} off`)
+    : c.kind === 'bonuspct' ? L(`${c.value}% ज़्यादा सर्च मुफ़्त`, `${c.value}% extra searches free`) : L(`${c.value} सर्च मुफ़्त`, `${c.value} searches free`));
+  // the coupons the superadmin lists here (api/signup.js 'coupons'): tap one to apply it
+  const cpnList = el('div', 'cpnlist hidden');
+  const markChosen = () => cpnList.querySelectorAll('button').forEach((x) => x.classList.toggle('on', !!cpn && x.dataset.code === cpn.code));
+  api('signup', { action: 'coupons', token: token() }).then((r) => {
+    if (!r.coupons || !r.coupons.length) return;
+    cpnList.append(el('div', 'k', L('🎟 आपके लिए कूपन — दबाकर लगाएं:', '🎟 Coupons for you — tap one to apply:')));
+    for (const c of r.coupons) {
+      const b = el('button', 'cpnchip'); b.type = 'button'; b.dataset.code = c.code;
+      const top = el('span'); top.append(el('b', null, c.code), ` · ${cpnWhat(c)}`); b.append(top);
+      const when = [c.minN ? L(`${c.minN}+ सर्च के पैक पर`, `on packs of ${c.minN}+`) : '', c.first ? L('पहली खरीद पर', 'first purchase') : '',
+        c.until ? L(`${c.until} तक`, `until ${c.until}`) : ''].filter(Boolean).join(' · ');
+      if (when) b.append(el('small', null, when));
+      b.addEventListener('click', () => {
+        if (cpn && cpn.code === c.code) return;
+        if (cpn) { cpn = null; cpnIn.disabled = false; }
+        cpnIn.value = c.code; cpnBtn.click();
+      });
+      cpnList.append(b);
+    }
+    cpnList.classList.remove('hidden');
+    markChosen();
+  });
   cpnBtn.addEventListener('click', async () => {
     if (cpn) {   // remove it
-      cpn = null; cpnIn.value = ''; cpnIn.disabled = false; cpnBtn.textContent = L('लागू करें', 'Apply'); cpnMsg.textContent = ''; drawPacks(); return;
+      cpn = null; cpnIn.value = ''; cpnIn.disabled = false; cpnBtn.textContent = L('लागू करें', 'Apply'); cpnMsg.textContent = ''; markChosen(); drawPacks(); return;
     }
     const code = cpnIn.value.trim().toUpperCase();
     if (!code) { cpnIn.focus(); return; }
@@ -1832,9 +1887,8 @@ function buyOpen() {
     const r = await api('signup', { action: 'coupon', token: token(), code });
     cpnBtn.disabled = false;
     if (!r.coupon) { cpnMsg.textContent = CPN_MSG[r.error] ? CPN_MSG[r.error](r) : r.error === 'too_many' ? MSG.too_many : L('⚠ कूपन जाँच नहीं पाए — दोबारा दबाएं', '⚠ Could not check the coupon — tap again'); cpnMsg.className = 'k cpnmsg bad'; return; }
-    cpn = r.coupon; cpnIn.value = cpn.code; cpnIn.disabled = true; cpnBtn.textContent = L('हटाएं', 'Remove');
-    const what = cpn.kind === 'pct' ? L(`${cpn.value}% छूट`, `${cpn.value}% off`) : cpn.kind === 'rs' ? L(`₹${cpn.value} छूट`, `₹${cpn.value} off`)
-      : cpn.kind === 'bonuspct' ? L(`${cpn.value}% ज़्यादा सर्च मुफ़्त`, `${cpn.value}% extra searches free`) : L(`${cpn.value} सर्च मुफ़्त`, `${cpn.value} searches free`);
+    cpn = r.coupon; cpnIn.value = cpn.code; cpnIn.disabled = true; cpnBtn.textContent = L('हटाएं', 'Remove'); markChosen();
+    const what = cpnWhat(cpn);
     cpnMsg.className = 'k cpnmsg good';
     cpnMsg.textContent = L(`✓ कूपन ${cpn.code} लगा: ${what}${cpn.minN ? ` (${cpn.minN} या ज़्यादा सर्च के पैक पर)` : ''}`,
       `✓ Coupon ${cpn.code} applied: ${what}${cpn.minN ? ` (on packs of ${cpn.minN} or more searches)` : ''}`);
@@ -1849,7 +1903,7 @@ function buyOpen() {
       'Choose how many searches and pay by UPI — they are added by themselves.')
       : L('कितनी सर्च चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे सर्च जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
         'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
-    packs, cpnRow, cpnMsg, pay);
+    packs, cpnList, cpnRow, cpnMsg, pay);
   $('buyBody').replaceChildren(box);
   $('buyNote').textContent = L('खरीदी सर्च कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की सर्च पूरी होने के बाद इस्तेमाल होती हैं') + '। एक सर्च = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
     'Bought searches never expire' + (PREPAID ? '' : ' — they are used once the day\'s searches are used') + '. One search = typing a name until the box is cleared; family and more pages are free.');
@@ -2140,7 +2194,7 @@ async function openVillage(v) {
   if (r.left != null) searchesLeft = r.left;
   MY_REF = r.ref || null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   MOVES_LEFT = r.movesLeft || 0;
-  showApp(r.name, r.admin, r.villages, r.perms, r.cand);
+  showApp(r.name, r.admin, r.villages, r.perms, r.cand, r.role);
   const paid = new URLSearchParams(location.search).get('pay');
   if (paid) payReturn(paid); else outOfSearches();
 }

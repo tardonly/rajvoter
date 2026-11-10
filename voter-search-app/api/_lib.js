@@ -77,8 +77,9 @@ const USER_DB = !USER_URL ? null : /^rediss?:\/\//i.test(USER_URL) ? tcpDb(USER_
   : restDb(USER_URL.replace(/\/+$/, ''), process.env.USER_REDIS_TOKEN);
 const MAIN_DB = KV_URL || !USER_DB ? restDb(KV_URL, KV_TOKEN) : USER_DB;   // only USER_REDIS_URL set: everything there
 // People's data (keys without KEY_PREFIX): logins, password index, the sign-up set, bought searches used, pack requests,
-// online payments, payments per admin and their handovers, OTP codes, and the "moved" marker
-const USER_KEYS = /^(user:|pw:|users$|free$|paid:|req:|reqs$|reqopen:|reqlock:|jtxn:|pay:|settle:|otp:|usermoved$)/;
+// online payments, payments per admin and their handovers, OTP codes, the "moved" marker, and the indexes of logins by
+// mobile number and of the admins (buildIndexes below)
+const USER_KEYS = /^(user:|pw:|users$|free$|paid:|req:|reqs$|reqopen:|reqlock:|jtxn:|pay:|settle:|otp:|usermoved$|phone:|admins$|idxbuilt$)/;
 const dbOf = (key) => (USER_DB && USER_KEYS.test(key) ? USER_DB : MAIN_DB);
 
 // Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
@@ -213,11 +214,48 @@ async function freshPassword() {   // a new password no one has yet
 async function newLogin(fields, name, phone, by, byName) {
   const id = crypto.randomBytes(5).toString('hex');
   const password = await freshPassword(), hash = pwHash(password);
+  await buildIndexes();   // before this login is added to them
   await redis('HSET', `user:${id}`, ...fields, 'name', name, 'phone', phone, 'created', new Date().toISOString(),
-    'retired', '0', 'hash', hash, 'by', by, 'byName', byName);
+    'retired', '0', 'hash', hash, 'ownpw', '0', 'by', by, 'byName', byName);
   await redis('SET', `pw:${hash}`, id);
   await redis('SADD', 'users', id);
+  if (phone) await redis('SADD', `phone:${phone}`, id);
+  if (fields[fields.indexOf('role') + 1] === 'admin') await redis('SADD', 'admins', id);
   return { id, password };
+}
+
+// Indexes, so a login, a sign-up or opening the app doesn't read every login: "phone:<number>" → the ids of that number's
+// logins, "admins" → the village admins' ids, "selfcount:<village>" → how many logins were made there by signing up
+// (free searches go by it, freeFor). Built once from every login when the marker "idxbuilt" is missing (a database from
+// before them), then kept up to date: newLogin, signup.js "signup" / "move", admin.js "phone" / "promote" / "move".
+let indexed = false;
+async function buildIndexes() {
+  if (indexed || (indexed = !!(await redis('GET', 'idxbuilt')))) return;
+  const ids = (await redis('SMEMBERS', 'users')) || [];
+  const rows = ids.length ? await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'village', 'self'])) : [];
+  const cmds = [], self = {};
+  ids.forEach((id, i) => {
+    const [ph, role, vil, s] = rows[i] || [];
+    if (ph) cmds.push(['SADD', `phone:${ph}`, id]);
+    if (role === 'admin') cmds.push(['SADD', 'admins', id]);
+    if (s === '1' && vil) self[vil] = (self[vil] || 0) + 1;
+  });
+  for (const [vil, n] of Object.entries(self)) cmds.push(['SET', `selfcount:${vil}`, n, 'NX']);
+  for (let i = 0; i < cmds.length; i += 1000) await pipeline(cmds.slice(i, i + 1000));
+  await redis('SET', 'idxbuilt', new Date().toISOString());
+  indexed = true;
+}
+const selfCount = async (slug) => { await buildIndexes(); return Number(await redis('GET', `selfcount:${slug}`)) || 0; };
+// a person's login moved from village `from` to `to` (signup.js "move", admin.js "move"): the sign-up count of both
+// villages, and their open pack requests now belong to the new village and go to its admin (adminFor)
+async function afterMove(u, from, to) {
+  await buildIndexes();
+  if (u.self === '1') await pipeline([['DECR', `selfcount:${from}`], ['INCR', `selfcount:${to}`]]);
+  const open = await pipeline(PACKS.map(([n]) => ['GET', `reqopen:${u.id}:${n}`]));
+  const admin = await adminFor({ ...u, village: to });
+  for (const r of await Promise.all(open.filter(Boolean).map(getReq))) {
+    if (r && r.user === u.id && r.status === 'open') await redis('HSET', `req:${r.id}`, 'village', to, 'to', admin.id);
+  }
 }
 
 // A password the person chose (sign-up, or पासवर्ड बदलें in the app) is kept under pw:<hash of number + password>, so two
@@ -227,16 +265,20 @@ const PW_MIN = 6, PW_MAX = 40;
 const ownPwHash = (phone, pw) => pwHash(`${phone}:${String(pw || '').trim()}`);
 const badOwnPassword = (pw) => { const n = String(pw || '').trim().length; return n < PW_MIN || n > PW_MAX; };
 // → '' when set, else 'pw_short' | 'pw_taken' (this number's other login already has it) | 'phone'
+// The login is marked ownpw '1': its password works only with this number (hasOwnPassword).
 async function setOwnPassword(u, pw) {
   if (badOwnPassword(pw)) return 'pw_short';
   if (!u.phone) return 'phone';
   const hash = ownPwHash(u.phone, pw), was = await redis('GET', `pw:${hash}`);
   if (was && was !== u.id) return 'pw_taken';
   if (u.hash && u.hash !== hash) await redis('DEL', `pw:${u.hash}`);
-  await redis('HSET', `user:${u.id}`, 'hash', hash);
+  await redis('HSET', `user:${u.id}`, 'hash', hash, 'ownpw', '1');
   await redis('SET', `pw:${hash}`, u.id);
   return '';
 }
+// is this login's password one the person chose (kept with their number)? Logins from before the "ownpw" mark: the
+// signed-up ones are
+const hasOwnPassword = (u) => u.ownpw === '1' || (u.ownpw === undefined && u.self === '1');
 
 const getUser = async (id) => userFrom(id, await redis('HGETALL', `user:${id}`));
 // many logins in one round trip (the admin page's lists)
@@ -333,17 +375,18 @@ function route(fn) {
 //         | 'other_device' (this password has since been opened on another phone)
 //         | 'other_village' (slug given and this login is not for that village)
 async function whoIs(token, slug) {
-  await readMarkMode();
   if (isAdminToken(token)) {
-    return { id: 'admin', name: 'सुपर एडमिन', role: 'super', admin: true, villages: Object.keys(VILLAGES), status: 'ok', perms: PERMS.slice() };
+    return { id: 'admin', name: 'सुपर एडमिन', role: 'super', admin: true, villages: Object.keys(VILLAGES), status: 'ok', perms: PERMS.slice(),
+      survey: await markModeOf(null) };
   }
   const t = parseToken(token);
   if (t && t.id.startsWith('demo_')) {   // a demo phone: no user record, nothing it may do but search
     return { id: t.id, name: 'डेमो', role: 'user', demo: true, admin: false, villages: demoSlugs(), perms: [], sid: t.sid,
-      status: slug != null && slug !== DEMO.slug && !demoOf(slug) ? 'other_village' : 'ok' };
+      status: slug != null && slug !== DEMO.slug && !demoOf(slug) ? 'other_village' : 'ok', survey: await markModeOf(null) };
   }
   const user = t && t.id !== 'admin' ? await getUser(t.id) : null;
   if (!user) return null;
+  user.survey = await markModeOf(user);
   user.admin = user.role === 'admin';
   user.perms = appPerms(user);
   user.aperms = adminPermsOf(user);
@@ -443,12 +486,13 @@ async function refInviter(code, phone) {
 // every login with this mobile number (normPhone form): [{id, role, village, villages, retired, self}]
 async function phoneLogins(phone) {
   if (!phone) return [];
-  const ids = (await redis('SMEMBERS', 'users')) || [];
+  await buildIndexes();
+  const ids = (await redis('SMEMBERS', `phone:${phone}`)) || [];
   if (!ids.length) return [];
   const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'village', 'villages', 'retired', 'self', 'samitis']));
   return ids.map((id, i) => {
     const [ph, role, vil, vils, retired, self, sams] = rows[i] || [];
-    if (ph !== phone) return null;
+    if (ph !== phone) return null;   // the number was changed since
     return { id, role, village: vil, villages: role === 'admin' ? adminVillages(vils, sams) : [vil].filter(Boolean),
       retired, self };
   }).filter(Boolean);
@@ -461,7 +505,8 @@ async function phoneLogins(phone) {
 const SUPER = { id: 'admin', phone: '' };
 async function adminFor(u) {
   if (u.by === 'admin') return SUPER;
-  const ids = (await redis('SMEMBERS', 'users')) || [];
+  await buildIndexes();
+  const ids = (await redis('SMEMBERS', 'admins')) || [];
   if (!ids.length) return SUPER;
   const rows = await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'role', 'villages', 'retired', 'samitis']));
   const admins = ids.map((id, i) => {
@@ -487,7 +532,9 @@ const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); retu
 // 'pct' (value % off the pack's price) | 'rs' (₹value off) | 'bonus' (value extra searches) | 'bonuspct' (value % of the
 // pack's searches extra), and its conditions:
 // minN (only packs of at least minN searches), until (last day, YYYY-MM-DD, '' = none), maxUses (total, 0 = no limit),
-// once '1' (once per person), first '1' (only a person's first purchase), on '1' / '0'; used = times used so far; note.
+// once '1' (once per person), first '1' (only a person's first purchase), on '1' / '0', show '1' (listed in the buy
+// window for everyone it fits, api/signup.js "coupons"; else only someone who has the code can use it); used = times
+// used so far; note.
 // Set "coupons" lists the codes; cpnusers:<CODE> = who has used it. A request made with a coupon (api/signup.js
 // 'request', api/pay.js 'start') keeps coupon, bonus and the lower rs; the coupon is counted as used when it is paid
 // (addPaid). A price never goes below ₹1.
@@ -501,7 +548,7 @@ async function getCoupon(code) {
   const c = { code };
   for (let i = 0; i < arr.length; i += 2) c[arr[i]] = arr[i + 1];
   for (const k of ['value', 'minN', 'maxUses', 'used']) c[k] = Number(c[k]) || 0;
-  for (const k of ['once', 'first', 'on']) c[k] = c[k] === '1';
+  for (const k of ['once', 'first', 'on', 'show']) c[k] = c[k] === '1';
   c.until = c.until || '';
   return c;
 }
@@ -525,8 +572,41 @@ async function couponFor(code, u, n) {
   if (n != null && c.minN && Number(n) < c.minN) return { error: 'cpn_min', minN: c.minN };
   return { c };
 }
+// One open request per person per coupon, and one per person with any "first purchase" coupon, so the same coupon
+// can't be put on several requests and all of them paid: cpnhold:<CODE>:<user> and cpnhold:first:<user> → the request
+// holding it. A newer WhatsApp request takes the coupon over (the older one goes back to the pack's own price); an
+// online payment still open keeps it → 'cpn_pending' until it is paid or closed. → '' when request rid may carry c.
+async function couponHold(c, uid, rid) {
+  const keys = [`cpnhold:${c.code}:${uid}`, ...(c.first ? [`cpnhold:first:${uid}`] : [])];
+  for (const k of keys) {
+    const held = await redis('GET', k);
+    if (!held || held === rid) continue;
+    let r = await getReq(held);
+    if (r && r.gw && r.status === 'open') r = await settleOnline(r.id);
+    if (!r || r.status !== 'open' || r.user !== uid || !r.coupon) continue;
+    if (r.gw) return 'cpn_pending';
+    await redis('HSET', `req:${r.id}`, 'coupon', '', 'rs', packPrice(r.n), 'bonus', 0);
+  }
+  for (const k of keys) await redis('SET', k, rid, 'EX', 90 * 86400);
+  return '';
+}
+// counts coupon `code` as used by person uid when a request carrying it is paid, keeping its limits even then: once per
+// person (cpnusers:<CODE>), maxUses in all, first purchase only (first: this payment is the person's first). false when
+// it can't be used any more: the payment then gets no bonus searches (its price was already asked for and paid). A
+// coupon deleted since keeps what it promised.
+async function useCoupon(code, uid, first) {
+  const c = await getCoupon(code);
+  if (!c) return true;
+  if (c.first && !first) return false;
+  if (!(await redis('SADD', `cpnusers:${c.code}`, uid)) && c.once) return false;
+  if (Number(await redis('HINCRBY', `coupon:${c.code}`, 'used', 1)) > c.maxUses && c.maxUses) {
+    await redis('HINCRBY', `coupon:${c.code}`, 'used', -1);
+    return false;
+  }
+  return true;
+}
 // the coupon as the buy window sees it
-const couponView = (c) => ({ code: c.code, kind: c.kind, value: c.value, minN: c.minN });
+const couponView = (c) => ({ code: c.code, kind: c.kind, value: c.value, minN: c.minN, until: c.until, first: c.first });
 async function newReqId() {   // 8 digits no request has yet
   let id;
   do id = String(crypto.randomInt(10000000, 100000000)); while (await getReq(id));
@@ -549,18 +629,17 @@ const paidKey = (id) => `paid:${id}`;
 async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
 // n bought searches for person u, collected by `by` ({id, name}: an admin, or GATEWAY): the searches, and the payment
 // recorded in request r (none: a hand-added one, which gets its own request, already approved) and in the pay:* totals
-// A request made with a coupon and approved for the pack it asked for: its own (lower) price and bonus searches, and the
-// coupon is counted as used; approved for another number of searches, the coupon is dropped.
+// A request approved for the pack it asked for keeps its own price; made with a coupon, it also gets the bonus searches
+// once the coupon is counted as used (useCoupon: no bonus when its limits are used up meanwhile). Approved for another
+// number of searches, the coupon is dropped and the price is the pack's.
 async function addPaid(u, n, r, by) {
-  const cpn = r && r.coupon && Number(n) === Number(r.n) ? r.coupon : '';
-  const rs = cpn ? Number(r.rs) : packPrice(n), bonus = cpn ? Number(r.bonus) || 0 : 0, now = new Date().toISOString();
+  const asked = !!r && Number(n) === Number(r.n), now = new Date().toISOString();
+  const rs = asked ? Number(r.rs) || packPrice(n) : packPrice(n);
+  const first = await redis('HSETNX', `user:${u.id}`, 'bought', '1');   // 1: this is the login's first purchase
+  const cpn = asked && r.coupon && (await useCoupon(r.coupon, u.id, Number(first) === 1)) ? r.coupon : '';
+  const bonus = cpn ? Number(r.bonus) || 0 : 0;
   await refReward(u.id);
-  if (cpn) {
-    await redis('HINCRBY', `coupon:${cpn}`, 'used', 1);
-    await redis('SADD', `cpnusers:${cpn}`, u.id);
-  }
   await redis('HINCRBY', `user:${u.id}`, 'credits', n + bonus);
-  await redis('HSET', `user:${u.id}`, 'bought', '1');
   await redis('SREM', 'free', u.id);
   const id = r ? r.id : await newReqId();
   if (!r) {
@@ -638,23 +717,29 @@ function normPhone(s) {
 const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the way · red: not a voter here (वोटर नहीं है)
 // Two sets of marks, kept apart: the survey before the election (सर्वे: done = अपना वोट, coming = सोच रहे हैं,
 // absent = विपक्ष; hashes "smark:…") and polling day (मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है; "mark:…"). The
-// superadmin switches the whole app between them (key "markmode": 'survey' | 'poll', api/admin.js "mark_mode"); the
 // buttons, reports, lists and "clear" work on the set in use, and on polling day each slip also shows its survey mark.
-// whoIs reads the mode at the start of every request (MODE.survey), so markHash follows it.
-const MODE = { survey: false };
-const readMarkMode = async () => { MODE.survey = (await redis('GET', 'markmode')) === 'survey'; return MODE.survey; };
+// Which set: each person switches for themself in the app (user fields markmode 'survey' | 'poll' and markmodeAt,
+// api/signup.js "mark_mode"; a village admin also on the admin page), and the superadmin for everyone (keys "markmode"
+// and "markmodeat", api/admin.js "mark_mode"): the newer of the two wins, so the superadmin's switch on polling day
+// reaches every phone, and anyone may switch back afterwards. whoIs gives it as .survey, which the routes pass on.
+async function markModeOf(u) {   // u: a login's record, or null (the superadmin, a demo phone) → true for the survey
+  const [g, gAt] = await pipeline([['GET', 'markmode'], ['GET', 'markmodeat']]);
+  const all = g === 'survey';
+  if (!u || (u.markmode !== 'survey' && u.markmode !== 'poll')) return all;
+  return String(u.markmodeAt || '') > String(gAt || '') ? u.markmode === 'survey' : all;
+}
 const markKey = (v) => `${parseInt(v.ward, 10)}:${parseInt(v.box, 10)}`;
-const markHash = (slug, cand, survey = MODE.survey) => `${survey ? 'smark' : 'mark'}:${slug}${cand ? `:c:${cand}` : ''}`;
+const markHash = (slug, cand, survey) => `${survey ? 'smark' : 'mark'}:${slug}${cand ? `:c:${cand}` : ''}`;
 function parseMark(val) {
   const [m = '', at = '', byId = '', by = ''] = val ? String(val).split('|') : [];
   return { m, at, byId, by };
 }
-async function marksFor(slug, keys, cand, survey = MODE.survey) {
+async function marksFor(slug, keys, cand, survey) {
   if (!keys.length) return [];
   const vals = (await redis('HMGET', markHash(slug, cand, survey), ...keys)) || [];
   return keys.map((k, i) => parseMark(vals[i]));
 }
-const allMarks = async (slug, cand) => marksFrom(await redis('HGETALL', markHash(slug, cand)));
+const allMarks = async (slug, cand, survey) => marksFrom(await redis('HGETALL', markHash(slug, cand, survey)));
 function marksFrom(flat) {   // "<ward>:<box>" → parsed mark, for every marked slip of the village (of that group)
   flat ||= [];
   const out = {};
@@ -670,7 +755,7 @@ async function getCand(id) {
   return c;
 }
 
-module.exports = { REF, REF_MAX, refRule, refFor, refInviter, MARKS, MODE, readMarkMode, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

@@ -5,8 +5,9 @@ const { village, MARKS, allMarks, markHash, getCand, redis } = require('./_lib.j
 
 // how many slips of a village (of one candidate's group) carry each mark, overall and per ward, and the backup its last
 // "clear" left
-async function markSummary(slug, cand, all, bk) {   // all, bk: already read (the admin page reads every village at once)
-  all ||= await allMarks(slug, cand.id);
+// survey: which set of marks (markModeOf in _lib.js); all, bk: already read (the admin page reads every village at once)
+async function markSummary(slug, cand, survey, all, bk) {
+  all ||= await allMarks(slug, cand.id, survey);
   const zero = () => Object.fromEntries(MARKS.map((m) => [m, 0]));
   const marks = zero(), perWard = {};
   const onRoll = new Set();
@@ -22,7 +23,7 @@ async function markSummary(slug, cand, all, bk) {   // all, bk: already read (th
     const w = perWard[key.split(':')[0]];
     if (w) w[m]++;
   }
-  if (bk === undefined) bk = await redis('GET', `${markHash(slug, cand.id)}:backup`);
+  if (bk === undefined) bk = await redis('GET', `${markHash(slug, cand.id, survey)}:backup`);
   let backup = null;
   try { if (bk) { const j = JSON.parse(bk); backup = { n: j.flat.length / 2, at: j.at }; } } catch (e) { /* ignore a broken backup */ }
   return { key: `${slug}|${cand.id}`, slug, cand: cand.id, name: village(slug).name, candName: cand.name || '', marks,
@@ -32,9 +33,9 @@ async function markSummary(slug, cand, all, bk) {   // all, bk: already read (th
 // मतदाता सूची: voters of a village (of one candidate's group) carrying a mark ('done' | 'coming' | 'absent') or none yet
 // ('none'), in ward and box order, LIST_PAGE at a time from offset; null for an unknown status
 const LIST_PAGE = 100;
-async function markedList(slug, candId, status, ward, offset) {
+async function markedList(slug, candId, survey, status, ward, offset) {
   if (status !== 'none' && !MARKS.includes(status)) return null;
-  const all = await allMarks(slug, candId);
+  const all = await allMarks(slug, candId, survey);
   const want = (r) => {
     const m = all[`${r.ward}:${r.box}`];
     return status === 'none' ? !(m && MARKS.includes(m.m)) : !!m && m.m === status;

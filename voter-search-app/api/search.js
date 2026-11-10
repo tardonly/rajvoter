@@ -1,5 +1,5 @@
 // POST {village, token, name, rel, ward, mark, offset, after} → {total, more, results: [...up to 10 voters, each with its
-//   status mark and who set it, and on polling day its survey mark sm], wards, perms, survey (see MODE in _lib.js)}
+//   status mark and who set it, and on polling day its survey mark sm], wards, perms, survey (markModeOf in _lib.js)}
 // POST {village, token, family: "<ward>:<box>"} → {total, results: everyone at that voter's house number in that ward}
 // POST {village, token, ward, all: true} → {total, results: [every voter of that ward]}   (people allowed 'wardPdf')
 // A ward with no name lists the whole ward in box order (only for people allowed 'ward'); it pages with after = the last
@@ -21,7 +21,7 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, MARKS, MODE, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, pipeline, send, route } = require('./_lib.js');
+const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('./_lib.js');
 const { load, search, family, publicFields } = require('./_search.js');
 
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
@@ -29,6 +29,15 @@ const SEARCH_STEPS = 25, SEARCH_MINUTES = 10;
 
 const fold = (s) => String(s || '').toLowerCase().replace(/\s+/g, '');
 const follows = (a, b) => a.startsWith(b) || b.startsWith(a);   // "mangi" ↔ "mangilal"; '' follows anything
+// takes one from a counter only while it stays within max: INCR first, and back (DECR) when that went over, so two
+// searches at the same moment can't both use the last one. ttl (seconds): the counter's life when it is new.
+// → the new count, or 0 when it was used up
+async function takeOne(key, max, ttl) {
+  const n = Number((await pipeline([...(ttl ? [['SET', key, 0, 'EX', ttl, 'NX']] : []), ['INCR', key]])).pop());
+  if (n <= max) return n;
+  await redis('DECR', key);
+  return 0;
+}
 
 // Counts this request against the person's limits: {searchId, left} to send back, or {error}.
 async function countSearch(req, user, b, named) {
@@ -56,14 +65,15 @@ async function countSearch(req, user, b, named) {
   let next = cur;
   if (goesOn) next = { ...cur, n: cur.n + 1, ...(b.family ? {} : q) };
   else {
-    if (used >= limit && extra && paidUsed < credits(user)) { paidUsed++; cmds.push(['INCR', paidKey(user.id)]); }
+    // a new search: one from the day's (or a demo phone's, or a signed-up login's) searches, else one bought search
+    const refused = { error: user.demo ? 'demo_limit' : prepaid ? 'credits' : 'limit', left: 0, ...(extra ? { bought: 0 } : {}) };
+    if (user.demo && Number(ipRaw) >= DEMO.perIp) return refused;
+    const n = await takeOne(dayKey, limit, prepaid ? 0 : (user.demo ? 30 : 3) * 86400);
+    if (n) used = n;
     else {
-      if (used >= limit || (user.demo && Number(ipRaw) >= DEMO.perIp)) {
-        return { error: user.demo ? 'demo_limit' : prepaid ? 'credits' : 'limit', left: 0, ...(extra ? { bought: 0 } : {}) };
-      }
-      used++;
-      if (!prepaid) cmds.push(['SET', dayKey, 0, 'EX', (user.demo ? 30 : 3) * 86400, 'NX']);
-      cmds.push(['INCR', dayKey]);
+      const p = extra ? await takeOne(paidKey(user.id), credits(user), 0) : 0;
+      if (!p) return refused;
+      used = Math.max(used, limit); paidUsed = p;
     }
     if (user.demo) cmds.push(['SET', ipKey, 0, 'EX', 86400, 'NX'], ['INCR', ipKey]);
     if (!b.all) next = { id: crypto.randomBytes(8).toString('base64url'), n: 1, start: now, ...q };
@@ -73,10 +83,10 @@ async function countSearch(req, user, b, named) {
   return { searchId: next ? next.id : '', left: Math.max(0, limit - used), ...(extra ? { bought: credits(user) - paidUsed } : {}) };
 }
 
-async function withMarks(slug, list, cand) {   // cand: the searcher's candidate group, whose marks they see
+async function withMarks(slug, list, cand, survey) {   // cand: the searcher's candidate group, whose marks they see
   const results = list.map(publicFields);
-  const marks = await marksFor(slug, results.map(markKey), cand);
-  const sv = MODE.survey ? [] : await marksFor(slug, results.map(markKey), cand, true);   // polling day: the survey mark too
+  const marks = await marksFor(slug, results.map(markKey), cand, survey);
+  const sv = survey ? [] : await marksFor(slug, results.map(markKey), cand, true);   // polling day: the survey mark too
   results.forEach((r, i) => { r.mark = marks[i].m; r.markBy = marks[i].by; r.markAt = marks[i].at; r.sm = sv[i] ? sv[i].m : ''; });
   return results;
 }
@@ -103,14 +113,14 @@ module.exports = route(async (req, res, b) => {
   }
 
   if (b.family) {
-    const results = await withMarks(v.slug, family(v.data, b.family).slice(0, MAX_FAMILY), user.cand);
-    return send(res, 200, { total: results.length, results, perms: user.perms, survey: MODE.survey, ...left });
+    const results = await withMarks(v.slug, family(v.data, b.family).slice(0, MAX_FAMILY), user.cand, user.survey);
+    return send(res, 200, { total: results.length, results, perms: user.perms, survey: user.survey, ...left });
   }
 
   let hits = search(v.data, b);
   const filter = String(b.mark || '');
   if (filter === 'none' || MARKS.includes(filter)) {
-    const marks = await allMarks(v.slug, user.cand);
+    const marks = await allMarks(v.slug, user.cand, user.survey);
     hits = hits.filter((r) => !r.del && ((marks[markKey(r)] || {}).m || 'none') === filter);
   }
   const total = hits.length;
@@ -126,5 +136,5 @@ module.exports = route(async (req, res, b) => {
     page = rest.slice(0, PAGE);
     more = rest.length > PAGE;
   }
-  send(res, 200, { total, more, results: await withMarks(v.slug, page, user.cand), wards: load(v.data).wards, perms: user.perms, survey: MODE.survey, ...left });
+  send(res, 200, { total, more, results: await withMarks(v.slug, page, user.cand, user.survey), wards: load(v.data).wards, perms: user.perms, survey: user.survey, ...left });
 });

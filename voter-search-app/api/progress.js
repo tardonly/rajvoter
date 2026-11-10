@@ -6,7 +6,7 @@
 // मतदाता सूची in the app: the voters carrying that mark ('done' | 'coming' | 'absent') or none yet ('none'), 100 at a
 // time, as in the admin page's मतदाता सूची tab, plus the per-ward counts for its buttons. Needs the "list" permission;
 // a person sees their own group's marks, an admin the village's own. Not in the demo.
-const { village, whoIs, MODE, send, route } = require('./_lib.js');
+const { village, whoIs, send, route } = require('./_lib.js');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
 
 module.exports = route(async (req, res, b) => {
@@ -18,13 +18,13 @@ module.exports = route(async (req, res, b) => {
   if (b.status) {
     if (v.demo || !user.perms.includes('list')) return send(res, 403, { error: 'no_list' });
     const cand = { id: user.admin ? '' : user.cand || '' };
-    const list = await markedList(v.slug, cand.id, b.status, b.ward, b.offset);
+    const list = await markedList(v.slug, cand.id, user.survey, b.status, b.ward, b.offset);
     if (!list) return send(res, 400, { error: 'bad_mark' });
-    return send(res, 200, { ...list, wards: (await markSummary(v.slug, cand)).wards, survey: MODE.survey });
+    return send(res, 200, { ...list, wards: (await markSummary(v.slug, cand, user.survey)).wards, survey: user.survey });
   }
   if (v.demo || !user.perms.includes('progress')) return send(res, 403, { error: 'no_progress' });
   const groups = user.admin ? groupsOf([v.slug], await candsOf([v.slug]))
     : [{ slug: v.slug, cand: { id: user.cand || '', name: user.candName || '' } }];
-  const progress = await Promise.all(groups.map((g) => markSummary(g.slug, g.cand)));
-  send(res, 200, { survey: MODE.survey, progress: progress.map(({ key, name, candName, marks, wards }) => ({ key, name, candName, marks, wards })) });
+  const progress = await Promise.all(groups.map((g) => markSummary(g.slug, g.cand, user.survey)));
+  send(res, 200, { survey: user.survey, progress: progress.map(({ key, name, candName, marks, wards }) => ({ key, name, candName, marks, wards })) });
 });

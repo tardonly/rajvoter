@@ -26,29 +26,28 @@
 //     id goes in the WhatsApp message to phone ('' = the app's own number) as <site>/<id>; the person's open request for
 //     the same pack is reused. 20 new requests a day per login. With coupon: its price and bonus (couponFor in _lib.js),
 //     → also {rs, bonus}; a coupon that can't be used → {error: 'cpn_…'}.
+//     A person has one open request per coupon (couponHold in _lib.js): asking with it again moves it to the new request,
+//     or → 'cpn_pending' while an online payment with it is still open.
 //   POST {action: 'coupon', token, village, code} → {coupon: {code, kind, value, minN}} or {error: 'cpn_…'}
+//   POST {action: 'coupons', token, village} → {coupons: [{code, kind, value, minN, until, first}]}   the coupons the
+//     superadmin lists in the buy window (show) that this login can use now, best first
+//   POST {action: 'mark_mode', token, village, mode: 'survey' | 'poll'} → {survey}   this person's own choice of marks
+//     (सर्वे / मतदान दिवस, markModeOf in _lib.js), until the superadmin next switches everyone
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { couponFor, couponPrice, couponView, refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
+const { getCoupon, couponHold, selfCount, afterMove, couponFor, couponPrice, couponView, refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
 
 
 // free searches for a new login in this village: freeFor(rule, logins made by signing up there so far, retired ones
-// too), none if this number signed up before; plus the referral bonus (refRule in _lib.js) when it came through a
-// friend's link (ref: the inviter)
+// too: selfcount in _lib.js), none if this number signed up before; plus the referral bonus (refRule in _lib.js) when it
+// came through a friend's link (ref: the inviter)
 async function freeSearches(phone, slug, rule, ref) {
-  const ids = (await redis('SMEMBERS', 'users')) || [];
-  const rows = ids.length ? await pipeline(ids.map((id) => ['HMGET', `user:${id}`, 'phone', 'village', 'self'])) : [];
-  let n = 0;
-  for (const [ph, vil, self] of rows) {
-    if (self !== '1') continue;
-    if (ph === phone) return 0;
-    if (vil === slug) n++;
-  }
+  if ((await phoneLogins(phone)).some((u) => u.self === '1')) return 0;
   const rr = ref ? await refRule() : null;
-  return freeFor(rule || await freeRule(), n) + (rr && rr.on ? rr.joiner : 0);
+  return freeFor(rule || await freeRule(), await selfCount(slug)) + (rr && rr.on ? rr.joiner : 0);
 }
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 // the login a password reset is for: this number's active login of that village; without a village (the start page) an
@@ -109,6 +108,7 @@ module.exports = route(async (req, res, b) => {
     const free = await freeSearches(phone, v.slug, null, inv);
     const { id } = await newLogin(['role', 'user', 'village', v.slug, 'credits', free, 'self', '1', ...(inv ? ['refBy', inv.id, 'refByName', inv.name] : [])],
       name, phone, 'self', '');
+    await redis('INCR', `selfcount:${v.slug}`);   // this village's sign-ups (freeSearches)
     await setOwnPassword(await getUser(id), b.password);   // instead of the made-up one
     const password = String(b.password).trim();
     await redis('SADD', 'free', id);
@@ -150,7 +150,27 @@ module.exports = route(async (req, res, b) => {
     if (v.slug === me.village) return send(res, 400, { error: 'same_village' });
     if ((await phoneLogins(me.phone)).some((u) => u.id !== me.id && u.retired !== '1' && u.villages.includes(v.slug))) return send(res, 409, { error: 'exists' });
     await redis('HSET', `user:${me.id}`, 'village', v.slug, 'cand', '', 'moves', (Number(me.moves) || 0) + 1);
+    await afterMove(me, me.village, v.slug);   // its open requests go along, to the new village's admin
     return send(res, 200, { village: v.slug, list: villageList([v.slug]), movesLeft: movesLeft(me) - 1 });
+  }
+  if (b.action === 'mark_mode') {   // सर्वे / मतदान दिवस: which marks this person uses (markModeOf in _lib.js)
+    const me = await whoIs(b.token, b.village);
+    if (!me || me.status !== 'ok' || me.demo) return send(res, 401, { error: 'login' });
+    if (me.role === 'super') return send(res, 403, { error: 'super_only' });   // the superadmin: on the admin page, for everyone
+    if (b.mode !== 'survey' && b.mode !== 'poll') return send(res, 400, { error: 'bad_mark' });
+    await redis('HSET', `user:${me.id}`, 'markmode', b.mode, 'markmodeAt', new Date().toISOString());
+    return send(res, 200, { survey: b.mode === 'survey' });
+  }
+  if (b.action === 'coupons') {   // the buy window's list of coupons to tap
+    const me = await whoIs(b.token, b.village);
+    if (!me || me.status !== 'ok') return send(res, 401, { error: 'login' });
+    if (!canBuy(me)) return send(res, 200, { coupons: [] });
+    const codes = (await redis('SMEMBERS', 'coupons')) || [];
+    const all = (await Promise.all(codes.map(getCoupon))).filter((c) => c && c.show);
+    const fits = (await Promise.all(all.map((c) => couponFor(c.code, me)))).filter((r) => r.c).map((r) => r.c);
+    const worth = (c) => couponPrice(c, 1000);   // best first: the most off (or the most extra) on the biggest pack
+    fits.sort((x, y) => (worth(x).rs - worth(y).rs) || (worth(y).bonus - worth(x).bonus));
+    return send(res, 200, { coupons: fits.slice(0, 10).map(couponView) });
   }
   if (b.action === 'coupon') {   // the buy window's "कूपन लागू करें": is this code good for this login?
     const me = await whoIs(b.token, b.village);
@@ -166,24 +186,27 @@ module.exports = route(async (req, res, b) => {
     if (!canBuy(me)) return send(res, 400, { error: 'not_prepaid' });
     const pk = PACKS.find(([n]) => n === Number(b.n));
     if (!pk) return send(res, 400, { error: 'bad_credits' });
-    let cpn = null;
+    let cpn = null, c = null;
     if (b.coupon) {
       const r = await couponFor(b.coupon, me, pk[0]);
       if (r.error) return send(res, 400, r);
-      cpn = { coupon: r.c.code, ...couponPrice(r.c, pk[0]) };
+      c = r.c;
+      cpn = { coupon: c.code, ...couponPrice(c, pk[0]) };
     }
     const fields = cpn ? ['rs', cpn.rs, 'coupon', cpn.coupon, 'bonus', cpn.bonus] : ['rs', pk[1], 'coupon', '', 'bonus', 0];
     const openKey = `reqopen:${me.id}:${pk[0]}`, old = await getReq(await redis('GET', openKey));
     const to = await adminFor(me);
     if (old && old.status === 'open' && old.user === me.id) {
-      // e.g. their admin has changed since, or a coupon was added or taken off
-      await redis('HSET', `req:${old.id}`, 'to', to.id, ...fields);
+      // e.g. their admin or village has changed since, or a coupon was added or taken off
+      if (c) { const held = await couponHold(c, me.id, old.id); if (held) return send(res, 409, { error: held }); }
+      await redis('HSET', `req:${old.id}`, 'to', to.id, 'village', me.village, ...fields);
       return send(res, 200, { id: old.id, phone: to.phone, rs: fields[1], bonus: fields[5] });
     }
     const k = `reqs:${me.id}:${today()}`;
     if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
     await redis('EXPIRE', k, 86400);
     const id = await newReqId();
+    if (c) { const held = await couponHold(c, me.id, id); if (held) return send(res, 409, { error: held }); }
     await redis('HSET', `req:${id}`, 'user', me.id, 'village', me.village, 'n', pk[0], 'created', new Date().toISOString(), 'status', 'open',
       'to', to.id, ...fields);
     await redis('SET', openKey, id);

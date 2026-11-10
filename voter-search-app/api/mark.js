@@ -22,7 +22,7 @@ module.exports = route(async (req, res, b) => {
   if (mark && !MARKS.includes(mark)) return send(res, 400, { error: 'bad_mark' });
 
   const at = new Date().toISOString(), by = String(user.name || '').replace(/\|/g, '/');
-  const hash = markHash(v.slug, user.cand);
+  const hash = markHash(v.slug, user.cand, user.survey);   // the set this person is using
   if (mark) await redis('HSET', hash, key, `${mark}|${at}|${user.id}|${by}`);
   else await redis('HDEL', hash, key);
   send(res, 200, { ok: true, mark, by: mark ? by : '', at: mark ? at : '' });

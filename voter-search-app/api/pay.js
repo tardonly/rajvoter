@@ -7,7 +7,7 @@
 //     after coming back; the server asks JaduPe (settleOnline in _lib.js).
 //   POST <JaduPe's webhook: {txn_id, status, …}> → {ok}   set https://<site>/api/pay as the webhook URL on JaduPe. Only
 //     the txn_id is used: the payment is checked with JaduPe itself, so a made-up webhook can't add searches.
-const { couponFor, couponPrice, PACKS, GATEWAY, payOnline, jadupe, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+const { couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, jadupe, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 const site = (req) => {
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'raj-voter.vercel.app');
@@ -36,17 +36,19 @@ module.exports = route(async (req, res, b) => {
   if (!canBuy(me)) return send(res, 400, { error: 'not_prepaid' });
   const pk = PACKS.find(([n]) => n === Number(b.n));
   if (!pk) return send(res, 400, { error: 'bad_credits' });
-  let cpn = null;   // a coupon: its lower price and bonus searches (couponFor in _lib.js)
+  let cpn = null, c = null;   // a coupon: its lower price and bonus searches (couponFor in _lib.js)
   if (b.coupon) {
     const r = await couponFor(b.coupon, me, pk[0]);
     if (r.error) return send(res, 400, r);
-    cpn = { coupon: r.c.code, ...couponPrice(r.c, pk[0]) };
+    c = r.c;
+    cpn = { coupon: c.code, ...couponPrice(c, pk[0]) };
   }
   const rs = cpn ? cpn.rs : pk[1];
   const k = `reqs:${me.id}:${today()}`;
   if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
   await redis('EXPIRE', k, 86400);
   const id = await newReqId();
+  if (c) { const held = await couponHold(c, me.id, id); if (held) return send(res, 409, { error: held }); }   // one open request per coupon
   const mobile = String(me.phone || '').slice(-10);
   const j = await jadupe('transactions/create', {
     type: 'any', user_name: me.name || 'User', user_email: process.env.JADUPE_EMAIL || 'noreply@raj-voter.vercel.app',

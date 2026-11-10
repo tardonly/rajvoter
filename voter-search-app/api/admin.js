@@ -15,7 +15,9 @@
 //   action "reset",  id         → {user, password}   (new password for the same person; the old one stops working)
 //   action "retire", id         → {ok}               (password stops working; the phone is logged out at once)
 //   action "logout", id         → {ok}               (ends the person's current session; they can log in again)
-//   action "phone",  id, phone  → {user}             (add or change the person's WhatsApp number; "" removes it)
+//   action "phone",  id, phone  → {user [, password]} (add or change the person's WhatsApp number; "" removes it). A
+//                                                       password the person chose works only with their old number
+//                                                       (ownPwHash in _lib.js), so they then get a new made-up one, shown once
 //   action "perms",  id, perms  → {user}             (what a user may do: any of PERMS in _lib.js; an admin's in the app:
 //                                                       superadmin only)
 //   action "aperms", id, aperms → {user}             superadmin: what a village admin may do here (ADMIN_PERMS)
@@ -52,13 +54,14 @@
 //                                               doneByName}; someone else's → not_found
 //   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
 //                                               a done or rejected request → already_done with {req}
-//   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, minN, maxUses, until, once, first, on, note, isNew
+//   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, minN, maxUses, until, once, first, on, show, note, isNew
 //                                         → {coupon}   superadmin: a coupon (getCoupon in _lib.js); "list" gives coupons
 //   action "coupon_del", code → {ok}      superadmin
 //   action "ref_rule", on, inviter, joiner → {refRule}   superadmin: referral searches (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
-//   action "mark_mode", mode ('survey' | 'poll') → {survey}   superadmin: which set of marks the whole app uses (MODE in
-//                                         _lib.js); "list" says it as survey: true | false
+//   action "mark_mode", mode ('survey' | 'poll') → {survey}   the superadmin: which set of marks everyone uses from now on
+//                                         (each person may switch back for themself); a village admin: their own choice
+//                                         (markModeOf in _lib.js). "list" says what this admin uses as survey: true | false
 //   action "free_rule", mode, people, searches → {freeRule}   superadmin: free searches for sign-ups (freeRule in _lib.js):
 //                                               mode 'direct' | 'halving', people 1–100000, searches 1–1000; "list" gives
 //                                               freeRule to the superadmin
@@ -76,7 +79,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('./_progress.js');
-const { COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, MODE, freeRule, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('./_lib.js');
 
 // admin permissions from the request → only known ones
@@ -152,7 +155,7 @@ module.exports = route(async (req, res, b) => {
     const old = await getCoupon(code);
     if (b.isNew && old) return send(res, 409, { error: 'cpn_exists' });
     await redis('HSET', `coupon:${code}`, 'kind', kind, 'value', value, 'minN', minN, 'maxUses', maxUses, 'until', until,
-      'once', b.once ? '1' : '0', 'first', b.first ? '1' : '0', 'on', b.on ? '1' : '0', 'note', String(b.note || '').slice(0, 100),
+      'once', b.once ? '1' : '0', 'first', b.first ? '1' : '0', 'on', b.on ? '1' : '0', 'show', b.show ? '1' : '0', 'note', String(b.note || '').slice(0, 100),
       ...(old ? [] : ['used', 0, 'created', now]), 'at', now);
     await redis('SADD', 'coupons', code);
     return send(res, 200, { coupon: await getCoupon(code) });
@@ -165,10 +168,10 @@ module.exports = route(async (req, res, b) => {
     await redis('SREM', 'coupons', code);
     return send(res, 200, { ok: true });
   }
-  if (b.action === 'mark_mode') {   // superadmin: survey marks or polling-day marks, for the whole app (MODE in _lib.js)
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
+  if (b.action === 'mark_mode') {   // survey marks or polling-day marks (markModeOf in _lib.js)
     if (b.mode !== 'survey' && b.mode !== 'poll') return send(res, 400, { error: 'bad_mark' });
-    await redis('SET', 'markmode', b.mode);
+    if (isSuper) await pipeline([['SET', 'markmode', b.mode], ['SET', 'markmodeat', now]]);   // everyone, from now on
+    else await redis('HSET', `user:${me.id}`, 'markmode', b.mode, 'markmodeAt', now);   // this admin only
     return send(res, 200, { survey: b.mode === 'survey' });
   }
   if (b.action === 'free_rule') {   // superadmin: free searches for sign-ups (freeRule in _lib.js)
@@ -194,7 +197,7 @@ module.exports = route(async (req, res, b) => {
   // marks, a backup or a candidate get a progress table (all: true asks for every one).
   const stats = async (all) => {
     const cands = await candsOf(me.villages), groups = groupsOf(me.villages, cands);
-    const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id)], ['GET', `${markHash(g.slug, g.cand.id)}:backup`]])) : [];
+    const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id, me.survey)], ['GET', `${markHash(g.slug, g.cand.id, me.survey)}:backup`]])) : [];
     const marksBy = groups.map((g, i) => marksFrom(read[2 * i]));
     const marked = {};
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
@@ -204,8 +207,8 @@ module.exports = route(async (req, res, b) => {
     const keep = groups.length <= STATS_ALL ? idx
       : all ? [...idx.filter(busy), ...idx.filter((i) => !busy(i))].slice(0, Math.max(STATS_ALL, all)).sort((x, y) => x - y)
       : idx.filter(busy);
-    const progress = await Promise.all(keep.map((i) => markSummary(groups[i].slug, groups[i].cand, marksBy[i], read[2 * i + 1])));
-    return { progress, marked, partial: keep.length < groups.length, groups: groups.length, survey: MODE.survey };
+    const progress = await Promise.all(keep.map((i) => markSummary(groups[i].slug, groups[i].cand, me.survey, marksBy[i], read[2 * i + 1])));
+    return { progress, marked, partial: keep.length < groups.length, groups: groups.length, survey: me.survey };
   };
   if (b.action === 'stats') return send(res, 200, await stats(Math.min(10000, Math.max(0, parseInt(b.all, 10) || 0))));
   if (b.action === 'list') {   // quick: no voter files are read (see "stats")
@@ -251,7 +254,7 @@ module.exports = route(async (req, res, b) => {
     }
     const dbCopy = isSuper && canMoveUserData() ? ((await redis('GET', 'usermoved')) ? 'done' : 'todo') : undefined;
     const freeRuleNow = isSuper ? await freeRule() : undefined;
-    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, coupons: isSuper ? (await Promise.all(((await redis('SMEMBERS', 'coupons')) || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1)) : undefined, survey: MODE.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
+    return send(res, 200, { dbCopy, freeRule: freeRuleNow, refRule: isSuper ? await refRule() : undefined, coupons: isSuper ? (await Promise.all(((await redis('SMEMBERS', 'coupons')) || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1)) : undefined, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins, reqs, collected,
       villageList: villageList(me.villages), cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
       // villageList: names of my villages (the list is not public)
   }
@@ -268,7 +271,7 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'marked') {
     const g = await groupOf();
     if (g.error) return send(res, g.error[0], { error: g.error[1] });
-    const list = await markedList(b.village, g.cand.id, b.status, b.ward, b.offset);
+    const list = await markedList(b.village, g.cand.id, me.survey, b.status, b.ward, b.offset);
     if (!list) return send(res, 400, { error: 'bad_mark' });
     return send(res, 200, list);
   }
@@ -276,7 +279,7 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'clearMarks' || b.action === 'restoreMarks') {
     const g = await groupOf();
     if (g.error) return send(res, g.error[0], { error: g.error[1] });
-    const key = markHash(b.village, g.cand.id), backupKey = `${key}:backup`;
+    const key = markHash(b.village, g.cand.id, me.survey), backupKey = `${key}:backup`;
     if (b.action === 'clearMarks') {
       if (b.status !== 'all' && !MARKS.includes(b.status)) return send(res, 400, { error: 'bad_mark' });
       const flat = (await redis('HGETALL', key)) || [];
@@ -312,7 +315,7 @@ module.exports = route(async (req, res, b) => {
     const c = await getCand(b.cand);
     if (!c || !mayUse(c.village)) return send(res, 404, { error: 'no_cand' });
     const ids = (await redis('SMEMBERS', 'users')) || [];
-    for (const u of (await Promise.all(ids.map(getUser))).filter((u) => u && u.cand === c.id)) await redis('HSET', `user:${u.id}`, 'cand', '');
+    for (const u of (await getUsers(ids)).filter((u) => u.cand === c.id)) await redis('HSET', `user:${u.id}`, 'cand', '');
     for (const sv of [false, true]) {   // both sets of marks
       await redis('DEL', markHash(c.village, c.id, sv));
       await redis('DEL', `${markHash(c.village, c.id, sv)}:backup`);
@@ -398,7 +401,7 @@ module.exports = route(async (req, res, b) => {
       for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
       return r;
     }).filter((r) => r.status === 'done' && r.doneBy === by);
-    const people = new Map(await Promise.all([...new Set(done.map((r) => r.user))].map(async (id) => [id, await getUser(id)])));
+    const people = new Map((await getUsers([...new Set(done.map((r) => r.user))])).map((u) => [u.id, u]));
     const pays = done.map((r) => {
       const u = people.get(r.user) || {};
       return { id: r.id, at: r.doneAt, name: u.name || '?', phone: u.phone || '', village: r.village, n: Number(r.doneN) || 0, rs: Number(r.doneRs) || 0, hand: r.hand === '1' };
@@ -420,6 +423,8 @@ module.exports = route(async (req, res, b) => {
     if (!realVillage(user.village)) return send(res, 400, { error: 'no_village' });
     await redis('HSET', `user:${user.id}`, 'role', 'admin', 'villages', user.village, 'samitis', '', 'cand', '',
       'aperms', PROMOTED_PERMS.join(','), 'perms', appPerms(user).join(','), 'promotedAt', now);
+    await buildIndexes();
+    await redis('SADD', 'admins', user.id);
     await redis('SREM', 'free', user.id);
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
@@ -443,7 +448,11 @@ module.exports = route(async (req, res, b) => {
     if (user.role !== 'user') return send(res, 400, { error: 'not_user' });
     if (!realVillage(b.village)) return send(res, 400, { error: 'no_village' });
     if (!mayUse(b.village)) return send(res, 403, { error: 'not_your_village' });
-    if (b.village !== user.village) await redis('HSET', `user:${user.id}`, 'village', b.village, 'cand', '', 'session', '');
+    if (b.village !== user.village) {
+      if ((await phoneLogins(user.phone)).some((x) => x.id !== user.id && x.retired !== '1' && x.villages.includes(b.village))) return send(res, 409, { error: 'exists' });
+      await redis('HSET', `user:${user.id}`, 'village', b.village, 'cand', '', 'session', '');
+      await afterMove(user, user.village, b.village);   // sign-up count, and their open requests go to the new village
+    }
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
@@ -492,7 +501,7 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'reset') {
     const password = await freshPassword(), hash = pwHash(password);
     if (user.hash) await redis('DEL', `pw:${user.hash}`);
-    await redis('HSET', `user:${user.id}`, 'hash', hash, 'retired', '0', 'session', '');
+    await redis('HSET', `user:${user.id}`, 'hash', hash, 'ownpw', '0', 'retired', '0', 'session', '');
     await redis('SET', `pw:${hash}`, user.id);
     return send(res, 200, { user: view(await getUser(user.id)), password });
   }
@@ -500,8 +509,20 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'phone') {
     const phone = normPhone(b.phone);
     if (phone === null || (user.role === 'user' && !phone)) return send(res, 400, { error: 'phone' });   // see 'add'
+    if (phone === (user.phone || '')) return send(res, 200, { user: view(user) });
+    await buildIndexes();
+    let password;   // a password the person chose is kept with the old number: a new made-up one instead
+    if (hasOwnPassword(user)) {
+      password = await freshPassword();
+      const hash = pwHash(password);
+      if (user.hash) await redis('DEL', `pw:${user.hash}`);
+      await redis('HSET', `user:${user.id}`, 'hash', hash, 'ownpw', '0', 'session', '');
+      await redis('SET', `pw:${hash}`, user.id);
+    }
     await redis('HSET', `user:${user.id}`, 'phone', phone);
-    return send(res, 200, { user: view(await getUser(user.id)) });
+    if (user.phone) await redis('SREM', `phone:${user.phone}`, user.id);
+    if (phone) await redis('SADD', `phone:${phone}`, user.id);
+    return send(res, 200, { user: view(await getUser(user.id)), password });
   }
 
   if (b.action === 'retire') {
