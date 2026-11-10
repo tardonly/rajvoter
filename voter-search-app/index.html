@@ -684,8 +684,8 @@ setMode(false);
 // ---------- चुनाव की तारीखें: a banner on the login page and in the app, with the days left to the सरपंच vote ----------
 // Each election drops off the day after it; the banner goes once all are past. Dates are India dates (YYYY-MM-DD).
 const ELECTIONS = [
-  { date: '2026-11-14', hi: 'पंचायत समिति सदस्य व जिला परिषद सदस्य', en: 'Panchayat Samiti & Zila Parishad members' },
-  { date: '2026-11-16', hi: 'सरपंच व वार्ड पंच', en: 'Sarpanch & ward panch', count: true },
+  { date: '2026-11-14', hi: 'जिला परिषद सदस्य व पंचायत समिति सदस्य', en: 'Zila Parishad & Panchayat Samiti members' },
+  { date: '2026-11-16', hi: 'सरपंच', en: 'Sarpanch', count: true },
 ];
 function electionBanner() {
   const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);   // India's date
