@@ -236,7 +236,7 @@
   .prog .c-done { color: #15803d; } .prog .c-coming { color: #854d0e; } .prog .c-absent { color: #b91c1c; }
   .pmeter { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
   .pmeter i { display: block; } .pmeter .done { background: #16a34a; } .pmeter .coming { background: #facc15; } .pmeter .absent { background: #dc2626; }
-  /* मतदाता सूची: the voters behind the report's numbers, by mark, in the same kind of popup */
+  /* वोटर लिस्ट: the voters behind the report's numbers, by mark, in the same kind of popup */
   #listBtn { border: 1px solid #93c5fd; background: #eff6ff; color: #1d4ed8; font-weight: 600; }
   .prog td.go { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
   .lpick { display: flex; gap: 6px; }
@@ -533,7 +533,7 @@
       <div class="lockalt"><button id="phoneBack" class="hidden" type="button">← नंबर बदलें</button><button id="pwOnly" type="button">एडमिन? सीधे पासवर्ड से खोलें</button></div>
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
-    <div id="demoLink" class="demolink hidden"><span>खाता नहीं है? बिना खाते के असली मतदाता सूची में सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
+    <div id="demoLink" class="demolink hidden"><span>खाता नहीं है? बिना खाते के असली वोटर लिस्ट में सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
 </section>
@@ -615,9 +615,9 @@
   <input id="posterFile" type="file" accept="image/*" hidden>
 </div>
 
-<div id="listPop" class="progpop hidden" role="dialog" aria-label="मतदाता सूची">
+<div id="listPop" class="progpop hidden" role="dialog" aria-label="वोटर लिस्ट">
   <div class="card">
-    <div class="head"><h2>मतदाता सूची</h2>
+    <div class="head"><h2>वोटर लिस्ट</h2>
       <span><button id="listReload" type="button">↻ रिफ्रेश</button> <button id="listClose" type="button" aria-label="बंद करें">✕</button></span></div>
     <div class="lpick"><select id="listWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select></div>
     <div class="chips" id="listStatus">
@@ -652,7 +652,7 @@
   <div class="cpnbanners hidden" id="cpnBanners"></div>
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">मतदाता सूची</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
@@ -716,7 +716,7 @@ const STATIC_EN = {
   'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
   'डेमो देखें': 'Try the demo',
-  'खाता नहीं है? बिना खाते के असली मतदाता सूची में सर्च करके देखें': 'No login? Try searching a real voter list without one',
+  'खाता नहीं है? बिना खाते के असली वोटर लिस्ट में सर्च करके देखें': 'No login? Try searching a real voter list without one',
   '▶ 30 सेकंड में देखें ऐप का कमाल': '▶ See the app in action — 30 seconds', '🔑 लॉगिन / साइन-अप करें': '🔑 Log in / sign up',
   '📱 मोबाइल नंबर से साइन अप करें': '📱 Sign up with your mobile number', '🔍 फ़्री डेमो आज़माएं': '🔍 Try the free demo', '↻ फिर से देखें': '↻ Watch again',
   'पसंद आया? अभी शुरू करें': 'Liked it? Start now', '↗ शेयर करें': '↗ Share', '↗ शेयर': '↗ Share', 'शेयर करें': 'Share',
@@ -726,7 +726,7 @@ const STATIC_EN = {
   'दूसरे ऐप में शेयर करें': 'Share in another app', 'लिंक कॉपी करें': 'Copy link', 'वीडियो पेज का लिंक कॉपी करें': 'Copy the videos page link',
   '⬇ वीडियो (फ़ोन)': '⬇ Video (phone)', '⬇ वीडियो (लैपटॉप)': '⬇ Video (laptop)',
   'आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।': 'The icon opens this page without the browser. Internet is still needed.',
-  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'मतदाता सूची': 'Voter list', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
+  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
   'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव सर्च करें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
@@ -812,10 +812,10 @@ const MSG = {
   other_village: L('यह पासवर्ड इस गाँव का नहीं है', 'This password is not for this village'),
   not_admin: L('यह काम सिर्फ़ एडमिन कर सकते हैं', 'Only admins can do this'),
   not_found: L('यह मतदाता नहीं मिला', 'Voter not found'),
-  deleted: L('यह मतदाता सूची से हटाया गया है — निशान नहीं लग सकता', 'This voter was struck off the list — no mark can be set'),
+  deleted: L('यह वोटर लिस्ट से हटाया गया है — निशान नहीं लग सकता', 'This voter was struck off the list — no mark can be set'),
   no_mark: L('निशान लगाने की अनुमति नहीं है — एडमिन से पूछें', 'You may not set marks — ask your admin'),
   no_progress: L('प्रगति देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the report — ask your admin'),
-  no_list: L('मतदाता सूची देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter list — ask your admin'),
+  no_list: L('वोटर लिस्ट देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter list — ask your admin'),
   no_pdf: L('पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें', 'You may not print a whole ward\'s slips — ask your admin'),
   no_ward_list: L('पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर सर्च करें', 'You may not list a whole ward — search by name'),
   credits: L('आपकी सभी सर्च इस्तेमाल हो गईं — और सर्च खरीदें', 'All your searches are used — buy more'),
@@ -847,7 +847,7 @@ function setMode(survey) {
   SURVEY = survey; MARKS = MARK_SETS[survey ? 'survey' : 'poll'];
   MARK_NAME = Object.fromEntries(Object.entries(MARKS).map(([k, t]) => [k, t.replace('✓ ', '')]));
   FILTER = { none: L('बिना निशान वाले', 'unmarked'), ...(EN ? Object.fromEntries(Object.entries(MARKS).map(([k, t]) => [k, t.toLowerCase()])) : MARKS) };
-  // the page's own words for the marks: the मतदाता सूची buttons and the filter under the ward
+  // the page's own words for the marks: the वोटर लिस्ट buttons and the filter under the ward
   document.querySelectorAll('#listStatus button[data-s]').forEach((b) => { if (MARK_NAME[b.dataset.s]) b.firstChild.nodeValue = `${MARK_NAME[b.dataset.s]} `; });
   document.querySelectorAll('#qMark option').forEach((o) => { if (MARKS[o.value]) o.textContent = `${L('सिर्फ़', 'Only')} ${FILTER[o.value]}`; });
   document.querySelectorAll('#modeRow button[data-mode]').forEach((b) => b.classList.toggle('on', (b.dataset.mode === 'survey') === survey));
@@ -977,7 +977,7 @@ document.addEventListener('keydown', (e) => {
 
 // ---------- share: the promo video with the site's link (never the demo's), for WhatsApp status, a chat or any app ----------
 const SITE = 'https://www.rajelection.com/';   // the live site, also from test and preview copies
-const SHARE_LINE = L('Voter Search — अपने गाँव की मतदाता सूची, फ़ोन और लैपटॉप पर। नाम लिखते ही पर्ची, वोट के निशान और वार्ड रिपोर्ट।',
+const SHARE_LINE = L('Voter Search — अपने गाँव की वोटर लिस्ट, फ़ोन और लैपटॉप पर। नाम लिखते ही पर्ची, वोट के निशान और वार्ड रिपोर्ट।',
   'Voter Search — your village\'s voter list on phone and laptop. Type a name for the slip, vote marks and a ward report.');
 const PROMO_PAGE = `${SITE}promo`;   // the videos page: the promo, the shorts, sign-up and demo
 const SHARE_TEXT = `${SHARE_LINE}\n${SITE}\n${L('वीडियो देखें', 'Watch the videos')}: ${PROMO_PAGE}`;
@@ -1753,7 +1753,7 @@ async function progLoad() {
     for (const w of [...g.wards, sum]) {
       const tr = el('tr', w === sum ? 'sum' : null);
       tr.append(el('td', null, w === sum ? L('कुल', 'Total') : `${L('वार्ड', 'Ward')} ${w.ward}`), el('td', null, w.total));
-      // with the "list" permission a tap on a number opens those voters in the मतदाता सूची (own group's marks only)
+      // with the "list" permission a tap on a number opens those voters in the वोटर लिस्ट (own group's marks only)
       const tap = can('list') && !(IS_ADMIN && g.candName);   // an admin's list is the village's own marks
       for (const [k, n] of [['done', w.done], ['coming', w.coming], ['absent', w.absent], ['none', w.total - w.done - w.coming - w.absent]]) {
         const c = el('td', `c-${k}${tap && n ? ' go' : ''}`, n);
@@ -1777,7 +1777,7 @@ $('progPop').addEventListener('click', (e) => { if (e.target === $('progPop')) p
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') progClose(); });
 setInterval(() => { if (!document.hidden && !$('progPop').classList.contains('hidden')) progLoad(); }, 60000);
 
-// ---------- मतदाता सूची: voters by mark (वोट दिया / आ रहे हैं / वोटर नहीं है / बाकी), 100 at a time, as on the admin
+// ---------- वोटर लिस्ट: voters by mark (वोट दिया / आ रहे हैं / वोटर नहीं है / बाकी), 100 at a time, as on the admin
 // page; for admins and people with the "list" permission (not in the demo) ----------
 const ls = { status: 'done', rows: [], seq: 0 };
 function listButton() {
@@ -2065,7 +2065,7 @@ function demoBar() {
     acts.append(login, how, share);
     bar.append(el('div'), acts);
   }
-  bar.firstChild.replaceChildren(el('b', null, L('डेमो', 'Demo')), L(` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में सर्च करके देखें`,
+  bar.firstChild.replaceChildren(el('b', null, L('डेमो', 'Demo')), L(` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली वोटर लिस्ट में सर्च करके देखें`,
     ` · try a search in the real voter list of the first ${VILLAGE.wards.length} wards of ${vn(VILLAGE)}`),
     searchesLeft != null ? L(` · ${searchesLeft} सर्च बाकी`, ` · ${searchesLeft} searches left`) : '');
   bar.classList.remove('hidden');
@@ -2359,7 +2359,7 @@ $('invite').addEventListener('click', () => {
   if (!confirm(L(`🤑 दोस्त जोड़ो, पैसे कमाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} वो जब भी सर्च ख़रीदे, ${pct}% कैशबैक आपके वॉलेट में! 💰${bon ? `\n🎉 ${refBonusText()} — बस ${refToBonus()} दोस्त और!` : ''}\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतनी ज़्यादा कमाई।`,
     `🤑 Bring friends, earn cash!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} every time they buy, ${pct}% comes to your wallet as cashback! 💰${bon ? `\n🎉 ${refBonusText()} — just ${refToBonus()} more friends!` : ''}\nTake the wallet money to UPI or turn it into searches. The more friends, the more you earn.`))) return;
   const link = `${location.origin}/${SLUG}?ref=${MY_REF.code}`;
-  const text = L(`🗳️ ${VILLAGE ? VILLAGE.name : ''} की पूरी मतदाता सूची अब फ़ोन पर! नाम लिखते ही पर्ची, परिवार और बूथ — सेकंडों में।${gets ? `\n🎁 मेरे लिंक से जुड़ें और पाएं ${gets} सर्च बोनस:` : '\n👉 मेरे लिंक से जुड़ें:'}\n${link}`,
+  const text = L(`🗳️ ${VILLAGE ? VILLAGE.name : ''} की पूरी वोटर लिस्ट अब फ़ोन पर! नाम लिखते ही पर्ची, परिवार और बूथ — सेकंडों में।${gets ? `\n🎁 मेरे लिंक से जुड़ें और पाएं ${gets} सर्च बोनस:` : '\n👉 मेरे लिंक से जुड़ें:'}\n${link}`,
     `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
   location.href = 'https://wa.me/?text=' + encodeURIComponent(text);
 });

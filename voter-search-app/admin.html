@@ -280,7 +280,7 @@
       <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
       <button type="button" data-tab="cands">उम्मीदवार</button>
       <button type="button" data-tab="prog">प्रगति</button>
-      <button type="button" data-tab="voters">मतदाता सूची</button>
+      <button type="button" data-tab="voters">वोटर लिस्ट</button>
       <button type="button" data-tab="clear">निशान हटाएं</button>
       <button type="button" data-tab="sell" class="hidden" id="tabSell">💳 QR से भुगतान</button>
       <button type="button" data-tab="ref" class="hidden" id="tabRef">रेफ़रल · वॉलेट</button>
@@ -471,7 +471,7 @@
     </div>
 
     <div class="card pane" data-tab="voters">
-      <div class="bar2"><h2>मतदाता सूची</h2><button class="btn ghost" id="vsReload" type="button">ताज़ा करें</button></div>
+      <div class="bar2"><h2>वोटर लिस्ट</h2><button class="btn ghost" id="vsReload" type="button">ताज़ा करें</button></div>
       <div class="row pick">
         <select id="vsVillage" aria-label="गाँव"></select>
         <select id="vsWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
@@ -544,7 +544,7 @@ const STATIC_EN = {
   'सेव करें': 'Save',
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
   'एडमिन पासवर्ड': 'Admin password', 'मोबाइल नंबर (अपना बनाया पासवर्ड हो तो)': 'Mobile number (if you chose your own password)', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
-  'व्यक्ति': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'मतदाता सूची': 'Voter list', 'निशान हटाएं': 'Clear marks',
+  'व्यक्ति': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'वोटर लिस्ट': 'Voter list', 'निशान हटाएं': 'Clear marks',
   'बंद करें': 'Close', 'कॉपी करें': 'Copy', 'WhatsApp पर भेजें': 'Send on WhatsApp',
   'यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।': 'This password is shown only now. If it is forgotten, make another with "New password".',
   'नया एडमिन जोड़ें': 'Add a new admin', 'एडमिन सिर्फ़ अपने गाँवों में लोग जोड़ और बंद कर सकता है।': 'An admin can add and switch off people only in their own villages.',
@@ -1337,7 +1337,7 @@ function showProgress() {
       const left = w.total - w.done - w.coming - w.absent;
       const tr = el('tr', w === sum ? 'sum' : null);
       tr.append(el('td', null, w === sum ? L('कुल', 'Total') : `${L('वार्ड', 'Ward')} ${w.ward}`), el('td', null, w.total));
-      // a tap on a number opens those voters in the मतदाता सूची tab
+      // a tap on a number opens those voters in the वोटर लिस्ट tab
       for (const [k, n] of [['done', w.done], ['coming', w.coming], ['absent', w.absent], ['none', left]]) {
         const td = el('td', `c-${k}${n ? ' go' : ''}`, n);
         if (n) td.addEventListener('click', () => openVoters(v.key, w === sum ? '' : w.ward, k));
@@ -1494,7 +1494,7 @@ const reqWhat = (r) => (r.kind === 'ward' ? L(`वार्ड ${r.ward} की 
 const PERM_NAME = EN ? { mark: 'Can set marks', print: 'Print slips',
   progress: 'Can see progress by ward', list: 'Can see the voter list' }
   : { mark: 'निशान लगा सकते हैं', print: 'पर्ची प्रिंट',
-  progress: 'वार्ड अनुसार प्रगति देख सकते हैं', list: 'मतदाता सूची देख सकते हैं' };
+  progress: 'वार्ड अनुसार प्रगति देख सकते हैं', list: 'वोटर लिस्ट देख सकते हैं' };
 function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
   for (const [p, label] of Object.entries(PERM_NAME)) {
