@@ -177,17 +177,6 @@
   #apBody .req.rej { opacity: .75; }
   #apBody .req.rej .st { color: var(--bad); }
   #apBody .req .sub { margin: 0; }
-  #apBody .paid { border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; }
-  #apBody .paid .pt { font-weight: 700; font-size: 16px; }
-  #apBody .paid .pr { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; border-top: 1px dashed #bbf7d0; padding-top: 4px; }
-  #apBody .paid .pr small { grid-column: 1 / -1; color: var(--muted); }
-  #apBody .paid button.pr { border: 0; border-top: 1px dashed #bbf7d0; background: none; font: inherit; color: var(--ink); text-align: left;
-    padding: 4px 0 0; cursor: pointer; }
-  #apBody .paid .pr.owes small, #apBody .owes, #apBody .paid .due { color: #b45309; font-weight: 700; }
-  #apBody .figs { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 8px; font-size: 13px; color: var(--muted); }
-  #apBody .figs b { font-size: 18px; color: var(--ink); }
-  #apBody .figs b.owes { color: #b45309; }
-  #apBody .settle { display: grid; gap: 6px; }
   #apBody .req.set { background: #eff6ff; border-color: #bfdbfe; cursor: default; }
   #apBody .req.set .st { color: #1d4ed8; }
   #apBody div.req { cursor: default; }
@@ -536,7 +525,7 @@ const store = {
 let MARKED = {}, MARKED_IN = false, STATS = null, fullStats = false;   // fullStats: a marks tab was opened, so progress per ward too
 const MARK_TABS = ['prog', 'voters', 'clear'], SETTING_TABS = ['ref', 'cpn', 'free'];
 let settingsBusy = null, settingsIn = false;   // from "stats" (api/_routes/admin.js), loaded after the page shows: slips marked per person; null = not yet
-let token = store.get(), me = null, users = [], admins = [], reqs = [], collected = null, filter = 'on', villages = {}, progress = [], cands = [], AREA_SIZE = {};
+let token = store.get(), me = null, users = [], admins = [], reqs = [], filter = 'on', villages = {}, progress = [], cands = [], AREA_SIZE = {};
 const MSG = EN ? {
   wrong: 'Wrong password', too_many: 'Too many wrong passwords — try again in 15 minutes',
   not_admin: 'This is not an admin password', retired: 'This password has been switched off',
@@ -597,7 +586,6 @@ function showLogin(msg) {
   $('list').innerHTML = ''; $('adminList').innerHTML = ''; $('newPw').classList.add('hidden'); $('addModal').classList.add('hidden');
   $('panel').classList.add('hidden'); $('login').classList.remove('hidden');
   $('loginMsg').textContent = msg || '';
-  if (APPROVE) $('loginMsg').textContent += (msg ? ' · ' : '') + approveHint();
 }
 // The page shows at once (with ⏳ in the person list); then the person list ("list"); then, without waiting, the 🔔
 // requests ("reqs") and how many slips each person marked ("stats" only: 'marked'). Progress per ward (the full
@@ -619,14 +607,13 @@ async function openPanel() {
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
   for (const id of ['tabRef', 'tabCpn', 'tabFree']) $(id).classList.toggle('hidden', me.role !== 'super');   // filled when opened
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
-  approveFromLink();
   loadReqs();
   loadStats();   // how many slips each person marked (and progress, if a marks tab is open)
 }
-async function loadReqs() {   // the 🔔 requests and the money collected (api/_routes/admin.js "reqs")
+async function loadReqs() {   // the 🔔 online purchases (api/_routes/admin.js "reqs"; superadmin only)
   const r = await api({ action: 'reqs' });
   if (r.error) return;
-  reqs = r.reqs || []; collected = r.collected || null; showBell();
+  reqs = r.reqs || []; showBell();
 }
 function loadSettings() {   // superadmin: free searches, referrals and coupons (api/_routes/admin.js "settings"), when a tab opens
   if (settingsIn || settingsBusy) return settingsBusy;
@@ -818,30 +805,9 @@ $('cpnSave').addEventListener('click', async () => {
   cpnForm(null);
   $('cpnMsg').textContent = `✓ कूपन ${r.coupon.code} सेव हो गया`;
 });
-// search packs [searches, ₹], as in index.html
-const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
-// A person's WhatsApp request carries <site>/<request id> (api/signup.js 'request'), which serves this page; older ones
-// carried /admin#add=<mobile>&n=<searches>&v=<village>. Read once when the page opens (and taken off the address so a
-// reload doesn't ask again); only an admin's password gets past the login, and the approval popup then shows who it is,
-// their searches so far, the pack asked for, and whether the request was already approved (then nothing to do). The
-// server only shows a request of a person this admin manages (api/_routes/admin.js "req_get" / "req_approve").
-const APPROVE = (() => {
-  const m = location.pathname.match(/^\/(\d{8})$/);
-  if (m) { history.replaceState(null, '', '/admin'); return { rid: m[1] }; }
-  const h = new URLSearchParams(location.hash.slice(1));
-  if (!h.get('add')) return null;
-  history.replaceState(null, '', location.pathname);
-  return { phone: h.get('add'), n: parseInt(h.get('n'), 10) || 0, v: h.get('v') || '' };
-})();
-const approveHint = () => (APPROVE.rid
-  ? L(`सर्च अनुरोध #${APPROVE.rid}: मंज़ूर करने के लिए एडमिन पासवर्ड से लॉगिन करें`, `Search request #${APPROVE.rid}: log in with an admin password to approve it`)
-  : L(`सर्च मंज़ूर करने के लिए एडमिन पासवर्ड से लॉगिन करें (${APPROVE.n} सर्च · ${showPhone(APPROVE.phone)})`,
-    `Log in with an admin password to approve searches (${APPROVE.n} searches · ${showPhone(APPROVE.phone)})`));
-if (APPROVE) $('loginMsg').textContent = approveHint();
-const packPrice = (n) => { const pk = PACKS.find((x) => x[0] === n); return pk ? pk[1] : null; };
 function apClose() { $('apModal').classList.add('hidden'); }
 $('apClose').addEventListener('click', apClose);
-// ↻ in the popup: fetches the lists again and redraws what it shows (the request list, or one request)
+// ↻ in the popup: fetches the lists again and redraws what it shows (the purchase list, or one purchase)
 let apAgain = null;
 $('apRefresh').addEventListener('click', async () => {
   $('apRefresh').disabled = true;
@@ -849,39 +815,9 @@ $('apRefresh').addEventListener('click', async () => {
   if (apAgain) await apAgain();
   $('apRefresh').disabled = false;
 });
-async function approveFromLink() {
-  if (!APPROVE) return;
-  apAgain = approveFromLink;
-  const body = $('apBody');
-  showTab('people');
-  $('apTitle').textContent = L('✅ सर्च मंज़ूरी', '✅ Approve searches');
-  body.replaceChildren(el('div', 'sub', L('खुल रहा है…', 'Opening…')));
-  $('apModal').classList.remove('hidden');
-  const notMine = el('div', 'sub', L('सर्च सिर्फ़ उस गाँव का एडमिन या सुपर एडमिन जोड़ सकता है।', "Only that village's admin or the super admin can add searches."));
-  let req, u;
-  if (APPROVE.rid) {
-    const r = await api({ action: 'req_get', rid: APPROVE.rid });
-    if (r.error) {
-      body.replaceChildren(el('div', 'bad', r.error === 'not_found' ? L(`अनुरोध #${APPROVE.rid} आपकी सूची के किसी व्यक्ति का नहीं (या मौजूद नहीं)।`,
-        `Request #${APPROVE.rid} is not from anyone in your list (or does not exist).`) : errText(r)), notMine);
-      return;
-    }
-    req = r.req;
-    u = users.find((x) => x.id === req.user);
-  } else {
-    req = { n: APPROVE.n, status: 'open' };
-    u = users.find((x) => x.phone === APPROVE.phone && x.village === APPROVE.v && !x.retired)
-      || users.find((x) => x.phone === APPROVE.phone && !x.retired);
-  }
-  if (!u) {
-    body.replaceChildren(el('div', 'bad', APPROVE.rid ? MSG.not_found : L(`मोबाइल ${showPhone(APPROVE.phone)} (${vName(APPROVE.v)}) का कोई व्यक्ति आपकी सूची में नहीं।`,
-      `No one with mobile ${showPhone(APPROVE.phone)} (${vName(APPROVE.v)}) in your list.`)), notMine);
-    return;
-  }
-  approveView(u, req);
-}
-// 🔔 in the header: how many requests wait for approval; tapping it lists them (open ones first, then the approved ones
-// of the last 30 days, from api/_routes/admin.js "list"), and a request opens the approval view
+// 🔔 in the header (superadmin only): searches bought online through Razorpay (api/pay.js), open ones first, then those
+// paid or closed in the last 30 days (api/_routes/admin.js "reqs"). Searches are only ever added by a payment: nothing
+// here adds any. An open one can be checked with Razorpay again, or closed (e.g. a payment that never came).
 function showBell() {
   const open = reqs.filter((r) => r.status === 'open').length;
   $('bellN').textContent = open > 99 ? '99+' : open;
@@ -890,133 +826,33 @@ function showBell() {
 function reqList() {
   apAgain = reqList;
   const body = $('apBody');
-  $('apTitle').textContent = L('🔔 सर्च अनुरोध', '🔔 Search requests');
+  $('apTitle').textContent = L('🔔 ऑनलाइन खरीद', '🔔 Online purchases');
   $('apModal').classList.remove('hidden');
-  const open = reqs.filter((r) => r.status === 'open').length;
-  const head = el('div', 'sub', reqs.length ? L(`${open} मंज़ूरी बाकी · ${reqs.length - open} निपटाए (पिछले 30 दिन)`, `${open} waiting · ${reqs.length - open} handled (last 30 days)`)
-    : L('अभी कोई अनुरोध नहीं।', 'No requests yet.'));
+  const open = reqs.filter((r) => r.status === 'open').length, paid = reqs.filter((r) => r.status === 'done');
+  const head = el('div', 'sub', reqs.length ? L(`${open} भुगतान बाकी · ${paid.length} भुगतान मिले, ₹${paid.reduce((t, r) => t + r.doneRs, 0)} (पिछले 30 दिन)`,
+    `${open} awaiting payment · ${paid.length} paid, ₹${paid.reduce((t, r) => t + r.doneRs, 0)} (last 30 days)`) : L('अभी कोई खरीद नहीं।', 'No purchases yet.'));
   const list = el('div', 'reqs');
   paged(list, reqs, (r) => {
     const b = el('button', `req ${r.status === 'open' ? 'open' : r.status === 'rejected' ? 'rej' : 'fin'}`); b.type = 'button';
     const t = el('div', 't'); t.append(el('span', null, r.name),
-      el('span', 'st', r.status === 'open' ? L('⏳ बाकी', '⏳ Waiting') : r.status === 'rejected' ? L('✕ अस्वीकार', '✕ Rejected')
-        : L(`✓ ${r.doneN} जोड़ी गईं`, `✓ ${r.doneN} added`)));
-    b.append(t, el('div', null, r.status === 'open' ? L(`माँगी: ${r.n}${r.bonus ? ` + ${r.bonus}` : ''} सर्च · ₹${r.rs}`, `Asked: ${r.n}${r.bonus ? ` + ${r.bonus}` : ''} searches · ₹${r.rs}`)
-        + (r.coupon ? ` · 🎟 ${r.coupon}` : '')
-        + (r.online ? L(' · 💳 UPI ऑनलाइन, भुगतान का इंतज़ार', ' · 💳 online UPI, waiting for the payment') : '')
-      : r.status === 'rejected' ? L(`माँगी: ${r.n} सर्च · अस्वीकार — ${r.doneByName}`, `Asked: ${r.n} searches · rejected — ${r.doneByName}`)
-      : L(`₹${r.doneRs} वसूले — ${r.doneByName}${r.hand ? ' (हाथ से जोड़ी)' : ''}`, `₹${r.doneRs} collected — ${r.doneByName}${r.hand ? ' (added by hand)' : ''}`)
-        + (r.doneCoupon ? ` · 🎟 ${r.doneCoupon}` : '')),
-      el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`
-        + (r.toName ? L(` · भेजा: ${r.toName}`, ` · sent to: ${r.toName}`) : '')));
-    b.addEventListener('click', () => {
-      const u = users.find((x) => x.id === r.user);
-      $('apTitle').textContent = L('✅ सर्च मंज़ूरी', '✅ Approve searches');
-      if (u) approveView(u, r, true); else $('apBody').replaceChildren(el('div', 'bad', MSG.not_found));
-    });
+      el('span', 'st', r.status === 'open' ? L('⏳ भुगतान बाकी', '⏳ Awaiting payment') : r.status === 'rejected' ? L('✕ बंद', '✕ Closed')
+        : r.kind === 'ward' ? `✓ ₹${r.doneRs}` : L(`✓ ₹${r.doneRs} · ${r.doneN} सर्च`, `✓ ₹${r.doneRs} · ${r.doneN} searches`)));
+    b.append(t, el('div', null, reqWhat(r)
+        + (r.coupon ? ` · 🎟 ${r.coupon}` : '') + (r.status === 'rejected' ? ` · ${r.doneByName}` : '') + (r.online ? '' : L(' · (पुराना अनुरोध)', ' · (old request)'))),
+      el('div', 'sub', `${showPhone(r.phone)} · ${vName(r.village)} · #${r.id} · ${fmt(r.status === 'open' ? r.created : r.doneAt)}`));
+    b.addEventListener('click', () => reqView(r));
     return b;
   }, 'reqs');
-  body.replaceChildren(head, ...collectedBox(), list);
-}
-// money collected so far (all time; api/_routes/admin.js "list" collected): the superadmin sees each admin, a village admin
-// only their own total; with what was handed over to the superadmin and what is still due. A tap opens the हिसाब.
-function collectedBox() {
-  if (!collected) return [];
-  const box = el('div', 'paid'), all = me.role === 'super';
-  const sum = (k) => collected.reduce((t, c) => t + c[k], 0), total = sum('rs'), n = sum('n'), count = sum('count');
-  box.append(el('div', 'pt', all ? L(`💰 कुल वसूली: ₹${total} · ${n} सर्च`, `💰 Collected in all: ₹${total} · ${n} searches`)
-    : L(`💰 आपकी वसूली: ₹${total} · ${count} भुगतान · ${n} सर्च`, `💰 You collected: ₹${total} · ${count} payment${count === 1 ? '' : 's'} · ${n} searches`)));
-  if (all && sum('due')) box.append(el('div', 'due', L(`एडमिन से आना बाकी: ₹${sum('due')}`, `Still to come from admins: ₹${sum('due')}`)));
-  if (!collected.length) box.append(el('div', 'sub', L('अभी कोई भुगतान नहीं।', 'No payments yet.')));
-  const settledLine = (c) => (c.by === 'admin' ? L('आपके पास', 'with you')
-    : L(`जमा ₹${c.settled} · बाकी ₹${c.due}`, `handed over ₹${c.settled} · due ₹${c.due}`));
-  for (const c of collected) {
-    if (!all && c.by !== me.id) continue;
-    const row = el('button', 'pr'); row.type = 'button';
-    row.append(el('span', null, all ? c.name : L('📒 हिसाब देखें', '📒 See the ledger')), el('b', null, all ? `₹${c.rs}` : '›'),
-      el('small', null, (all ? L(`${c.count} भुगतान · ${c.n} सर्च · `, `${c.count} payment${c.count === 1 ? '' : 's'} · ${c.n} searches · `) : '') + settledLine(c)));
-    if (c.due) row.classList.add('owes');
-    row.addEventListener('click', () => ledgerView(c.by));
-    box.append(row);
-  }
-  return [box];
-}
-// हिसाब (api/_routes/admin.js "ledger"): every payment one admin collected and every handover to the superadmin, newest first,
-// with the balance still due. The superadmin records a handover here (₹ received, a note) or takes one back.
-async function ledgerView(by, got) {
-  apAgain = () => ledgerView(by);
-  const body = $('apBody'), all = me.role === 'super';
-  $('apTitle').textContent = L('📒 हिसाब', '📒 Ledger');
-  const back = el('button', 'btn ghost', L('← सभी अनुरोध', '← All requests')); back.type = 'button';
-  back.addEventListener('click', reqList);
-  if (!got) { body.replaceChildren(back, el('div', 'sub', L('आ रहा है…', 'Loading…'))); got = await api({ action: 'ledger', by }); }
-  if (got.error) { body.replaceChildren(back, el('div', 'bad', errText(got))); return; }
-  const g = got.ledger, self = g.by === 'admin';
-  const sum = el('div', 'paid');
-  sum.append(el('div', 'pt', g.name));
-  const fig = el('div', 'figs');
-  fig.append(el('div', null, L('वसूली', 'Collected')), el('div', null, L('जमा किया', 'Handed over')), el('div', null, L('बाकी', 'Due')),
-    el('b', null, `₹${g.collected}`), el('b', null, self ? '—' : `₹${g.settled}`), el('b', g.due ? 'owes' : null, self ? '—' : `₹${g.due}`));
-  sum.append(fig);
-  if (self) sum.append(el('div', 'sub', L('आपकी अपनी वसूली — किसी को जमा नहीं करनी।', 'Your own collections — nothing to hand over.')));
-  const parts = [back, sum];
-  if (all && !self) {   // ₹ received from this admin
-    const form = el('div', 'settle'), rs = el('input'), note = el('input'), go = el('button', 'btn full'), msg = el('div', 'msg');
-    rs.type = 'number'; rs.min = 1; rs.inputMode = 'numeric'; rs.placeholder = '₹'; rs.value = g.due > 0 ? g.due : '';
-    note.placeholder = L('नोट (जैसे नकद / UPI)', 'Note (e.g. cash / UPI)'); note.maxLength = 100;
-    go.type = 'button';
-    const show = () => { const v = parseInt(rs.value, 10) || 0; go.disabled = !(v > 0); go.textContent = v > 0 ? L(`✓ ₹${v} मिले — जमा करें`, `✓ Received ₹${v} — record it`) : L('राशि डालें', 'Enter the amount'); };
-    rs.addEventListener('input', show);
-    go.addEventListener('click', async () => {
-      go.disabled = true; msg.textContent = '';
-      const r = await api({ action: 'settle_add', by, rs: parseInt(rs.value, 10), note: note.value });
-      if (r.error) { msg.textContent = errText(r); go.disabled = false; return; }
-      await refresh();
-      ledgerView(by, r);
-    });
-    form.append(el('div', 'sub', L(`${g.name} से पैसे मिले तो यहाँ लिखें:`, `Money received from ${g.name}? Record it here:`)), rs, note, go, msg);
-    parts.push(form);
-    show();
-  }
-  const items = [...g.pays.map((p) => ({ p, at: p.at })), ...g.settles.map((x) => ({ x, at: x.at }))].sort((a, b) => (a.at < b.at ? 1 : -1));
-  const list = el('div', 'reqs');
-  for (const it of items) {
-    const row = el('div', `req ${it.p ? 'fin' : 'set'}`), t = el('div', 't');
-    if (it.p) {
-      const p = it.p;
-      t.append(el('span', null, p.name), el('span', 'st', `+ ₹${p.rs}`));
-      row.append(t, el('div', 'sub', `${showPhone(p.phone)} · ${vName(p.village)} · ${L(`${p.n} सर्च`, `${p.n} searches`)}${p.hand ? L(' (हाथ से)', ' (by hand)') : ` · #${p.id}`} · ${fmt(p.at)}`));
-    } else {
-      const x = it.x;
-      t.append(el('span', null, L('सुपर एडमिन को जमा', 'Handed to the superadmin')), el('span', 'st', `− ₹${x.rs}`));
-      row.append(t, el('div', 'sub', [x.note, x.byName, fmt(x.at)].filter(Boolean).join(' · ')));
-      if (all) {   // taken back with a second tap
-        const del = el('button', 'btn ghost rejbtn', L('✕ हटाएं', '✕ Remove')); del.type = 'button';
-        del.addEventListener('click', async () => {
-          if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = L('✕ पक्का? दोबारा दबाएं', '✕ Sure? Tap again'); return; }
-          del.disabled = true;
-          const r = await api({ action: 'settle_remove', by, sid: x.id });
-          if (r.error) { del.textContent = errText(r); return; }
-          await refresh();
-          ledgerView(by, r);
-        });
-        row.append(del);
-      }
-    }
-    list.append(row);
-  }
-  if (!items.length) list.append(el('div', 'sub', L('अभी कुछ नहीं।', 'Nothing yet.')));
-  body.replaceChildren(...parts, list);
+  body.replaceChildren(head, list);
 }
 $('bell').addEventListener('click', reqList);
-// the approval popup for one request: who asked (with call and WhatsApp buttons to follow up), their searches so far,
-// and either the pack to approve or, for a request already approved, when and by whom
-function approveView(u, req, fromList) {
-  const body = $('apBody');
-  apAgain = async () => {
-    const r = req.id ? await api({ action: 'req_get', rid: req.id }) : {};
-    approveView(users.find((x) => x.id === u.id) || u, r.req || req, fromList);
-  };
+// one purchase: who, what, how it stands; an open one: ask Razorpay again (req_get settles it) or close it
+function reqView(req) {
+  const body = $('apBody'), u = users.find((x) => x.id === req.user) || { name: req.name, phone: req.phone };
+  apAgain = async () => { const r = await api({ action: 'req_get', rid: req.id }); reqView(r.req ? { ...req, ...r.req } : req); };
+  $('apTitle').textContent = L('🔔 ऑनलाइन खरीद', '🔔 Online purchase');
+  const back = el('button', 'btn ghost', L('← सभी खरीद', '← All purchases')); back.type = 'button';
+  back.addEventListener('click', reqList);
   const contact = el('div', 'row');
   if (u.phone) {
     const call = el('a', 'btn ghost', L('📞 कॉल करें', '📞 Call')), chat = el('a', 'btn ghost', L('💬 WhatsApp', '💬 WhatsApp'));
@@ -1024,89 +860,31 @@ function approveView(u, req, fromList) {
     chat.href = `https://wa.me/${u.phone}`; chat.target = '_blank'; chat.rel = 'noopener';
     contact.append(call, chat);
   }
-  const head = [el('div', 'who', u.name),
-    el('div', 'sub', `${showPhone(u.phone)} · ${vName(u.village)}${u.bought ? L(' · पहले भी खरीदा', ' · bought before') : L(' · पहली खरीद', ' · first purchase')}`
-      + (req.id ? L(` · अनुरोध #${req.id}, ${fmt(req.created)}`, ` · request #${req.id}, ${fmt(req.created)}`) : '')),
-    contact, useMeter(u)];
-  if (fromList) {
-    const back = el('button', 'btn ghost', L('← सभी अनुरोध', '← All requests')); back.type = 'button';
-    back.addEventListener('click', reqList);
-    head.unshift(back);
-  }
-  const ask = el('div', 'ask'), askPrice = req.coupon ? req.rs : packPrice(req.n);
-  ask.append(L('माँगी: ', 'Asked for: '), el('b', null, L(`${req.n} सर्च`, `${req.n} searches`)),
-    askPrice != null ? ` · ₹${askPrice}` : L(' · (यह पैक सूची में नहीं)', ' · (not one of the packs)'),
-    req.coupon ? L(` · 🎟 कूपन ${req.coupon}${req.bonus ? ` (+${req.bonus} सर्च मुफ़्त)` : ''}`, ` · 🎟 coupon ${req.coupon}${req.bonus ? ` (+${req.bonus} free searches)` : ''}`) : '');
+  const parts = [back, el('div', 'who', u.name), el('div', 'sub', `${showPhone(u.phone)} · ${vName(req.village)} · #${req.id} · ${fmt(req.created)}`), contact,
+    el('div', 'ask', reqWhat(req) + (req.coupon ? ` · 🎟 ${req.coupon}${req.bonus ? ` (+${req.bonus})` : ''}` : ''))];
   if (req.status === 'done') {
-    body.replaceChildren(...head, ask, el('div', 'done', L(`✓ यह अनुरोध मंज़ूर हो चुका है: ${req.doneN} सर्च जोड़ी गईं`, `✓ This request is already approved: ${req.doneN} searches added`)),
-      el('div', 'sub', L(`₹${req.doneRs} वसूले — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`, `₹${req.doneRs} collected — ${req.doneByName || '?'} · ${fmt(req.doneAt)}`)));
+    body.replaceChildren(...parts, el('div', 'done', req.kind === 'ward' ? L(`✓ भुगतान मिला: ₹${req.doneRs} · वार्ड की पर्चियाँ खुलीं`, `✓ Paid: ₹${req.doneRs} · the ward's slips unlocked`)
+      : L(`✓ भुगतान मिला: ₹${req.doneRs} · ${req.doneN} सर्च जुड़ीं`, `✓ Paid: ₹${req.doneRs} · ${req.doneN} searches added`)),
+      el('div', 'sub', `${req.doneByName || ''} · ${fmt(req.doneAt)}`));
     return;
   }
   if (req.status === 'rejected') {
-    body.replaceChildren(...head, ask, el('div', 'bad', L('✕ यह अनुरोध अस्वीकार किया जा चुका है', '✕ This request was rejected')),
-      el('div', 'sub', `${req.doneByName || '?'} · ${fmt(req.doneAt)}`));
+    body.replaceChildren(...parts, el('div', 'bad', L('✕ बंद — कोई सर्च नहीं जुड़ी', '✕ Closed — no searches added')), el('div', 'sub', `${req.doneByName || '?'} · ${fmt(req.doneAt)}`));
     return;
   }
-  // ✕ अस्वीकार: closes the request without searches (e.g. no payment came); a second tap confirms
-  const no = el('button', 'btn ghost full rejbtn', L('✕ अस्वीकार करें', '✕ Reject')); no.type = 'button';
+  const again = el('button', 'btn full', L('↻ Razorpay से फिर जाँचें', '↻ Check with Razorpay again')); again.type = 'button';
+  again.addEventListener('click', async () => { again.disabled = true; await refresh(); await apAgain(); });
+  // ✕ बंद करें: closes it without searches (a payment that never came); a second tap confirms
+  const no = el('button', 'btn ghost full rejbtn', L('✕ बंद करें', '✕ Close it')); no.type = 'button';
   no.addEventListener('click', async () => {
-    if (!no.dataset.sure) { no.dataset.sure = '1'; no.textContent = L('✕ पक्का अस्वीकार करें? दोबारा दबाएं', '✕ Really reject? Tap again'); return; }
+    if (!no.dataset.sure) { no.dataset.sure = '1'; no.textContent = L('✕ पक्का बंद करें? दोबारा दबाएं', '✕ Really close it? Tap again'); return; }
     no.disabled = true;
     const r = await api({ action: 'req_reject', rid: req.id });
     if (r.error && !r.req) { no.disabled = false; no.textContent = errText(r); return; }
     await refresh();
-    approveView(users.find((x) => x.id === u.id) || u, r.req, fromList);
-    if (!r.error && u.phone) {
-      const tell = el('a', 'btn ghost full', L('💬 उपयोगकर्ता को WhatsApp पर बताएं', '💬 Tell them on WhatsApp'));
-      tell.href = `https://wa.me/${u.phone}?text=` + encodeURIComponent(L(
-        `नमस्ते ${u.name}, Voter Search में ${req.n} सर्च का आपका अनुरोध (#${req.id}) स्वीकार नहीं हुआ — भुगतान नहीं मिला। सवाल हो तो इसी नंबर पर बात करें।`,
-        `Hello ${u.name}, your Voter Search request for ${req.n} searches (#${req.id}) was not approved — no payment was received. Reply here if you have a question.`));
-      tell.target = '_blank'; tell.rel = 'noopener';
-      $('apBody').append(tell);
-    }
+    reqView({ ...req, ...r.req });
   });
-  if (!u.canBuy) { body.replaceChildren(...head, el('div', 'bad', MSG.not_prepaid), ...(req.id ? [no] : [])); return; }
-  let n = req.n;
-  const packs = el('div', 'packs'), inp = el('input'), price = el('div', 'price'), go = el('button', 'btn full'), msg = el('div', 'msg');
-  inp.type = 'number'; inp.min = 1; inp.max = 10000; inp.inputMode = 'numeric';
-  go.type = 'button';
-  const show = () => {
-    packs.querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === n));
-    if (Number(inp.value) !== n) inp.value = n || '';
-    const cp = req.coupon && n === req.n, rs = cp ? req.rs : packPrice(n), add = n + (cp ? req.bonus : 0);   // a coupon counts only for the pack asked for
-    price.textContent = n > 0 ? L(`जोड़ी जाएंगी: ${add} सर्च${rs != null ? ` · भुगतान ₹${rs} होना चाहिए` : ''}${req.coupon && !cp ? ' · (दूसरी संख्या पर कूपन नहीं लगेगा)' : ''}`,
-      `Will add: ${add} searches${rs != null ? ` · payment should be ₹${rs}` : ''}${req.coupon && !cp ? ' · (the coupon does not apply to another number)' : ''}`) : '';
-    go.textContent = n > 0 ? L(`✓ भुगतान मिल गया — ${n} सर्च जोड़ें`, `✓ Payment received — add ${n} searches`) : L('संख्या डालें', 'Enter a number');
-    go.disabled = !(n > 0 && n <= 10000);
-  };
-  for (const [k] of PACKS) {
-    const b = el('button', 'btn ghost', `${k}`); b.type = 'button'; b.dataset.n = k;
-    b.addEventListener('click', () => { n = k; show(); });
-    packs.append(b);
-  }
-  packs.append(inp);
-  inp.addEventListener('input', () => { n = parseInt(inp.value, 10) || 0; show(); });
-  go.addEventListener('click', async () => {
-    go.disabled = true; msg.textContent = '';
-    const r = req.id ? await api({ action: 'req_approve', rid: req.id, n }) : await api({ action: 'credits_add', id: u.id, n });
-    if (r.error === 'already_done' && r.req) { await refresh(); return approveView(users.find((x) => x.id === u.id) || u, r.req, fromList); }
-    if (r.error) { msg.textContent = errText(r); go.disabled = false; return; }
-    await refresh();
-    const fresh = users.find((x) => x.id === u.id) || u;
-    const left = Math.max(0, fresh.credits - (fresh.paidUsed || 0));
-    const tell = el('a', 'btn wa full', L('💬 उपयोगकर्ता को WhatsApp पर बताएं', '💬 Tell them on WhatsApp'));
-    tell.href = `https://wa.me/${u.phone}?text=` + encodeURIComponent(L(
-      `नमस्ते ${u.name}, आपके Voter Search खाते में ${n} सर्च जोड़ दी गई हैं। अब ${left} सर्च बाकी हैं।\n${location.origin}/${u.village}`,
-      `Hello ${u.name}, ${n} searches have been added to your Voter Search login. You now have ${left} searches left.\n${location.origin}/${u.village}`));
-    tell.target = '_blank'; tell.rel = 'noopener';
-    body.replaceChildren(el('div', 'who', u.name),
-      el('div', 'done', L(`✓ ${n} सर्च जोड़ दी गईं · अब ${left} बाकी`, `✓ ${n} searches added · ${left} left now`)), contact, tell);
-    if (fromList) body.prepend(head[0]);   // ← सभी अनुरोध
-    $('listMsg').textContent = L(`✓ ${u.name} को ${n} सर्च मिल गईं`, `✓ ${u.name} got ${n} searches`);
-  });
-  body.replaceChildren(...head, ask, el('div', 'sub', L('भुगतान देखकर संख्या चुनें या बदलें:', 'Check the payment, then pick or change the number:')),
-    packs, price, go, ...(req.id ? [no] : []), msg);
-  show();
+  body.replaceChildren(...parts, el('div', 'sub', L('भुगतान अभी नहीं मिला। पैसे मिलते ही सर्च अपने आप जुड़ जाएंगी।', 'No payment yet. The searches are added by themselves once it is paid.')), again, no);
 }
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1114,7 +892,7 @@ $('loginForm').addEventListener('submit', async (e) => {
   // a password the admin chose themself opens only with their number (ownPwHash in api/_lib.js)
   const r = await post('unlock', { password: $('adminPw').value, phone: $('adminPhone').value.replace(/\D/g, '') });
   $('loginBtn').disabled = false;
-  if (r.error) { $('loginMsg').textContent = errText(r) + (APPROVE ? ` · ${approveHint()}` : ''); return; }
+  if (r.error) { $('loginMsg').textContent = errText(r); return; }
   $('adminPw').value = '';
   token = r.token; store.set(token);
   openPanel();
@@ -1136,7 +914,7 @@ function goHome(msg) {
 const mayDo = (p) => !!me && (me.role === 'super' || (me.aperms || []).includes(p));
 function setup() {
   $('openAdd').classList.toggle('hidden', !mayDo('add'));
-  $('bell').classList.toggle('hidden', !mayDo('approve'));
+  $('bell').classList.toggle('hidden', me.role !== 'super');
   const mine = me.villages.filter((s) => villages[s]);
   $('meText').textContent = me.role === 'super' ? L('सुपर एडमिन · सभी गाँव', 'Super admin · all villages')
     : `${me.name} · ${L(`${mine.length} गाँव`, `${mine.length} village${mine.length === 1 ? '' : 's'}`)}`;
@@ -1397,9 +1175,13 @@ $('vsMore').addEventListener('click', () => loadVoters(true));
 $('vsReload').addEventListener('click', () => { refresh(true); loadVoters(); });
 
 // what a user may do besides searching by name (the server checks these on every request)
-const PERM_NAME = EN ? { mark: 'Can set marks', ward: 'Can list a whole ward', wardPdf: 'All slips of a ward', print: 'Print slips',
+// what a purchase was for: a pack of searches, or a whole ward's slips (kind 'ward', api/pay.js wardStart)
+const reqWhat = (r) => (r.kind === 'ward' ? L(`वार्ड ${r.ward} की सभी पर्चियाँ (${vName(r.wv)}) · ₹${r.rs}`, `All slips of ward ${r.ward} (${vName(r.wv)}) · ₹${r.rs}`)
+  : L(`${r.n}${r.bonus ? ` + ${r.bonus}` : ''} सर्च · ₹${r.rs}`, `${r.n}${r.bonus ? ` + ${r.bonus}` : ''} searches · ₹${r.rs}`));
+// no ward / wardPdf boxes any more: anyone may open a ward's first slips and buy the rest (api/_routes/search.js)
+const PERM_NAME = EN ? { mark: 'Can set marks', print: 'Print slips',
   progress: 'Can see progress by ward', list: 'Can see the voter list' }
-  : { mark: 'निशान लगा सकते हैं', ward: 'पूरा वार्ड देख सकते हैं', wardPdf: 'वार्ड की सभी पर्चियाँ', print: 'पर्ची प्रिंट',
+  : { mark: 'निशान लगा सकते हैं', print: 'पर्ची प्रिंट',
   progress: 'वार्ड अनुसार प्रगति देख सकते हैं', list: 'मतदाता सूची देख सकते हैं' };
 function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
@@ -1421,10 +1203,8 @@ function permBoxes(u, msg = 'listMsg', saved) {
 }
 
 // superadmin: what a village admin may do here (ADMIN_PERMS in api/_lib.js)
-const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they made', all: 'Sees every user of their villages',
-  credits: 'Can add searches to their users', approve: 'Can approve their users\' requests' }
-  : { add: 'नए व्यक्ति बना सकते हैं', own: 'अपने बनाए व्यक्ति देख सकते हैं', all: 'अपने गाँवों के सभी व्यक्ति देख सकते हैं',
-  credits: 'अपने व्यक्तियों को सर्च जोड़ सकते हैं', approve: 'अपने व्यक्तियों के अनुरोध मंज़ूर कर सकते हैं' };
+const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they made', all: 'Sees every user of their villages' }
+  : { add: 'नए व्यक्ति बना सकते हैं', own: 'अपने बनाए व्यक्ति देख सकते हैं', all: 'अपने गाँवों के सभी व्यक्ति देख सकते हैं' };
 function adminPermBoxes(u, msg = 'listMsg') {
   const box = el('div', 'perms'), keys = Object.keys(APERM_NAME);
   for (const p of keys) {
@@ -1467,34 +1247,6 @@ function limitBox(u, msg = 'listMsg', saved) {
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save.click(); } });
   more.addEventListener('click', () => send({ action: 'extra', n: 100 }, more));
   box.append(L('रोज़ की सर्च सीमा:', 'Searches per day:'), inp, save, more, note);
-  return box;
-}
-
-// searches an admin adds to a signed-up login once it has paid them (₹1 a search, asked for on WhatsApp): quick packs or any number
-function creditsBox(u, saved) {
-  const box = el('div', 'limit'), inp = el('input'), add = el('button', 'btn ghost', L('जोड़ें', 'Add'));
-  inp.type = 'number'; inp.min = 1; inp.max = 10000; inp.inputMode = 'numeric'; inp.placeholder = L('संख्या', 'number');
-  add.type = 'button';
-  async function send(n, btn) {
-    if (!confirm(L(`${u.name} को ${n} सर्च और दें?`, `Give ${u.name} ${n} more searches?`))) return;
-    btn.disabled = true;
-    const r = await api({ action: 'credits_add', id: u.id, n });
-    btn.disabled = false;
-    if (r.error) { $('listMsg').textContent = errText(r); return; }
-    inp.value = '';
-    Object.assign(u, r.user);
-    if (saved) await saved();   // the list again, with the new count
-    $('listMsg').textContent = L(`${u.name} को ${n} सर्च और मिल गईं`, `${u.name} got ${n} more searches`);
-  }
-  box.append(L('सर्च जोड़ें:', 'Add searches:'));
-  for (const [n] of PACKS) {
-    const b = el('button', 'btn ghost', `+${n}`); b.type = 'button';
-    b.addEventListener('click', () => send(n, b));
-    box.append(b);
-  }
-  add.addEventListener('click', () => { const n = parseInt(inp.value, 10); if (n > 0) send(n, add); else $('listMsg').textContent = MSG.bad_credits; });
-  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add.click(); } });
-  box.append(inp, add);
   return box;
 }
 
@@ -1913,17 +1665,16 @@ function person(u) {
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), noteBox(u), use, ...(refLine ? [refLine] : []));
   if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
-      limitBox(u, 'listMsg', refresh), creditsBox(u, refresh));   // a daily limit, and searches they bought (or the superadmin gave)
+      limitBox(u, 'listMsg', refresh));   // a daily limit
   }
   if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
-    ...(u.canBuy && mayDo('credits') ? [creditsBox(u, refresh)] : []),   // a daily limit, and bought searches for after it
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(me.role === 'super' ? [moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
   if (!isAdmin && !u.retired && me.role === 'super') {   // a user becomes a village admin of their village, same login
     const up = el('button', 'btn ghost', L('एडमिन बनाएं', 'Make admin'));
-    up.addEventListener('click', () => act({ action: 'promote', id: u.id }, L(`${u.name} को ${vName(u.village)} का एडमिन बनाएं? वही नंबर और पासवर्ड रहेगा; वे नए व्यक्ति बना सकेंगे, अपने व्यक्ति देख सकेंगे, उन्हें सर्च जोड़ सकेंगे और उनके अनुरोध मंज़ूर कर सकेंगे। बाद में "एडमिन" टैब में बदल सकते हैं।`,
-      `Make ${u.name} an admin of ${vName(u.village)}? Same number and password; they can make new users, see their own users, add searches to them and approve their requests. Change this later in the Admins tab.`)));
+    up.addEventListener('click', () => act({ action: 'promote', id: u.id }, L(`${u.name} को ${vName(u.village)} का एडमिन बनाएं? वही नंबर और पासवर्ड रहेगा; वे नए व्यक्ति बना सकेंगे और अपने व्यक्ति देख सकेंगे। बाद में "एडमिन" टैब में बदल सकते हैं।`,
+      `Make ${u.name} an admin of ${vName(u.village)}? Same number and password; they can make new users and see their own users. Change this later in the Admins tab.`)));
     actions.append(up);
   }
   if (isAdmin) {   // superadmin: change which villages this admin looks after

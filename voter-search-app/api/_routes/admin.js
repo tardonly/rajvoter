@@ -1,11 +1,12 @@
 // POST {token, action, ...}   token = from logging in (api/unlock) as the superadmin or a village admin
 // The superadmin manages everything. A village admin sees and manages users of their assigned villages as the superadmin
-// allows (ADMIN_PERMS in _lib.js, field "aperms"): 'own' the users they made, 'all' every user there; 'add' new users,
-// 'credits' searches for them, 'approve' their requests (and those sent to this admin). Without the permission → 'no_perm'.
+// allows (ADMIN_PERMS in _lib.js, field "aperms"): 'own' the users they made, 'all' every user there; 'add' new users.
+// Without the permission → 'no_perm'. Nobody adds searches by hand: they come only from free sign-up searches, invites
+// and coupons, and from paying online through Razorpay (api/pay.js).
 //   action "list" [, village]          → {me: {id, role, name, villages}, users: [...], admins: [...] (superadmin only), …}
 //                                         quick (no voter files read): users carry perms, searchesToday, limit (today's,
 //                                         with any extra), ownLimit ('' = default) and extraToday
-//   action "reqs"                      → {reqs, collected}   pack requests (the 🔔) and money collected, asked for after "list"
+//   action "reqs"                      → {reqs}   superadmin: online purchases (the 🔔), asked for after "list"
 //   action "settings"                  → {freeRule, refRule, coupons}   superadmin, when one of those tabs opens
 //   action "stats" [, all: n] [, only: 'marked'] (only: just {marked, survey}, no voter files read)
 //   action "stats" [, all: n]          → {progress, marked: {id: slips marked}, partial, groups, survey}   the slow part,
@@ -44,23 +45,10 @@
 //   action "cand_set", id, cand      → {user}   puts a user of the candidate's village in that group ('' = no candidate)
 //   action "move", id, village       → {user}   moves a user to another village (both must be the admin's): their
 //                                               candidate is cleared and their phone is logged out
-//   action "credits_add", id, n      → {user}   n more searches (1–10000) for a login made by signing up (api/signup.js),
-//                                               e.g. paid to the admin; takes it out of the set "free" (signed up, nothing bought)
-//   (in "list": reqs = those requests of this admin's people that were sent to them (to, see adminFor in _lib.js; the
-//    superadmin sees every one, with toName), open ones first, plus the ones approved or rejected in the last 30 days,
-//    each with the person's name and phone; doneRs = ₹ collected, doneByName = by whom; hand = added with सर्च जोड़ें)
-//   and collected: [{by, name, rs, n, count, settled, due}] payments collected so far by each admin (all time), what they
-//   handed over to the superadmin and what is still due; a village admin gets only their own row
-//   action "ledger" [, by]            → {ledger}  हिसाब of one admin (by = admin id, superadmin only; a village admin gets
-//                                               their own): {by, name, collected, settled, due, pays: [{id, at, name, phone,
-//                                               village, n, rs, hand}], settles: [{id, at, rs, note, byName}]}, newest first
-//   action "settle_add", by, rs [, note] → {ledger}   superadmin: ₹rs received from that admin
-//   action "settle_remove", by, sid      → {ledger}   superadmin: takes back a handover recorded by mistake
-//   action "req_get", rid            → {req}    a pack request (api/signup.js 'request') of a person this admin manages:
-//                                               {id, user, village, n, rs, created, status 'open' | 'done', doneAt, doneN,
-//                                               doneByName}; someone else's → not_found
-//   action "req_approve", rid, n     → {req, user}   adds n searches (as credits_add) and marks the request done, once:
-//                                               a done or rejected request → already_done with {req}
+//   (reqs: every online purchase (api/pay.js), open ones first, plus those paid or closed in the last 30 days, each with
+//    the person's name and phone; doneRs = ₹ paid. Older requests, from before searches could only be bought online, show
+//    too until they are closed.)
+//   action "req_get", rid            → {req}    superadmin: one purchase, asking Razorpay how its payment stands first
 //   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, maxOff, minN, maxN, maxUses, until, once, first, on, show, note, banner, bannerText, isNew
 //                                         → {coupon}   superadmin: a coupon (getCoupon in _lib.js); "list" gives coupons
 //   action "coupon_del", code → {ok}      superadmin
@@ -77,8 +65,8 @@
 //                                               into USER_REDIS_URL (moveUserData in _lib.js); the admin page repeats it
 //                                               from cursor '0' until next is '0'. "list" says dbCopy: 'todo' | 'done'
 //                                               while both databases are set (key "usermoved" = when it finished)
-//   action "req_reject", rid         → {req}    closes an open request without searches (status 'rejected', doneAt,
-//                                               doneByName = who rejected it)
+//   action "req_reject", rid         → {req}    superadmin: closes an open purchase without searches (status 'rejected',
+//                                               doneAt, doneByName = who closed it), e.g. a payment that never came
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
 //   backup: {n, at} | null}]   one entry per village of this admin and per candidate of it (cand '' = the village's own
 //   marks): how many slips carry each mark, overall and per ward.
@@ -124,10 +112,11 @@ const view = (u) => ({
 });
 
 // a pack request as the admin page sees it
-const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw, coupon, bonus, doneCoupon }) =>
+const reqView = ({ id, user, village: v, kind, ward, wv, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw, coupon, bonus, doneCoupon }) =>
   ({ id, user, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
     doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1', online: !!gw,
-    coupon: coupon || '', bonus: Number(bonus) || 0, doneCoupon: doneCoupon || '' });   // online: paid by UPI through a gateway (gw)
+    coupon: coupon || '', bonus: Number(bonus) || 0, doneCoupon: doneCoupon || '',
+    ...(kind === 'ward' ? { kind, ward: Number(ward), wv: wv || v } : {}) });   // kind 'ward': a whole ward's slips (api/pay.js wardStart)   // online: paid by UPI through a gateway (gw)
 const REQ_DONE_DAYS = 30;
 const STATS_ALL = 30;   // "stats" gives every mark group's progress up to this many groups   // approved requests stay in the list this long
 
@@ -156,7 +145,6 @@ module.exports = route(async (req, res, b) => {
     if ((more.length || areas.length) && !isSuper) return { error: 'super_only' };
     return { more, areas, all: userVillages(home, more.join(','), areas.join(',')) };
   };
-  const paidIn = (u, n, r) => addPaid(u, n, r, me);   // n bought searches for u, paid to this admin (see _lib.js)
 
   if (b.action === 'ref_rule') {   // superadmin: referrals (refRule in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
@@ -268,39 +256,20 @@ module.exports = route(async (req, res, b) => {
     const coupons = (await Promise.all((codes || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1));
     return send(res, 200, { freeRule: free, refRule: ref, coupons });
   }
-  if (b.action === 'reqs') {   // pack requests (the 🔔) and money collected; after "list", so the page shows first
-    // pack requests of the people this admin manages: every open one, and those approved in the last REQ_DONE_DAYS
+  if (b.action === 'reqs') {   // online purchases (the 🔔), superadmin only; after "list", so the page shows first
+    if (!isSuper) return send(res, 200, { reqs: [] });
     const since = new Date(Date.now() - REQ_DONE_DAYS * 864e5).toISOString();
-    const [reqIds, payH] = await Promise.all([
-      redis('SMEMBERS', 'reqs').then((x) => x || []),
-      pipeline(['pay:rs', 'pay:n', 'pay:count', 'pay:name', 'pay:settled'].map((k) => ['HGETALL', k]))]);
+    const reqIds = (await redis('SMEMBERS', 'reqs')) || [];
     const reqRows = reqIds.length ? await pipeline(reqIds.map((id) => ['HGETALL', `req:${id}`])) : [];
     const h = (arr) => { const o = {}; for (let k = 0; k < (arr || []).length; k += 2) o[arr[k]] = arr[k + 1]; return o; };
-    const rows = reqIds.map((id, i) => ({ id, ...h(reqRows[i]) }))
-      .filter((r) => r.user && mayUse(r.village) && (r.status === 'open' || r.doneAt > since));
-    const [rsO, nO, cO, nameO, sO] = payH.map(h);
-    const payIds = Object.keys(rsO).filter((id) => isSuper || id === me.id);
-    // only the people these requests and payments name are read, not every login
-    const who = new Map((await getUsers([...new Set([...rows.flatMap((r) => [r.user, r.to]), ...payIds].filter((id) => id && id !== 'admin'))])).map((u) => [u.id, u]));
-    // a village admin does not see another admin's person login (same mobile number; see "list")
-    const adminPhones = isSuper ? new Set() : new Set((await getUsers((await redis('SMEMBERS', 'admins')) || [])).filter((u) => u.role === 'admin' && u.phone).map((u) => u.phone));
-    const reqs = may('approve') ? rows.map((r) => {
-      const u = who.get(r.user);   // a person of my villages, asking from one of my villages; a village admin's: the superadmin's
-      if (!u || (u.role === 'admin' ? !isSuper : u.role !== 'user' || !mayUse(u.village))) return null;
-      if (u.phone && adminPhones.has(u.phone)) return null;
-      if (!(mine(u) || r.to === me.id)) return null;   // requests of my users, or sent to me
-      if (!isSuper && r.to && r.to !== me.id && r.doneBy !== me.id) return null;   // sent to someone else
-      if (!isSuper && r.gw && r.status === 'open') return null;   // being paid online: added by itself once paid
-      const to = r.to === 'admin' ? 'सुपर एडमिन' : r.to ? (who.get(r.to) || {}).name || '' : '';
-      return { ...reqView(r), name: u.name, phone: u.phone || '', toName: isSuper ? to : '' };
+    const rows = reqIds.map((id, i) => ({ id, ...h(reqRows[i]) })).filter((r) => r.user && (r.status === 'open' || r.doneAt > since));
+    const who = new Map((await getUsers([...new Set(rows.map((r) => r.user))])).map((u) => [u.id, u]));   // only the people named
+    const reqs = rows.map((r) => {
+      const u = who.get(r.user);
+      return u ? { ...reqView(r), name: u.name, phone: u.phone || '' } : null;
     }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
-      : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300) : [];
-    // payments collected so far, per admin (pay:* in _lib.js), and what each has handed over; a village admin sees only
-    // their own
-    const nameOf = (id) => (id === 'admin' ? 'सुपर एडमिन' : (who.get(id) || {}).name || nameO[id] || id);
-    const collected = payIds.map((id) => ({ by: id, name: nameOf(id), rs: Number(rsO[id]) || 0, n: Number(nO[id]) || 0, count: Number(cO[id]) || 0,
-      settled: Number(sO[id]) || 0, due: id === 'admin' ? 0 : (Number(rsO[id]) || 0) - (Number(sO[id]) || 0) })).sort((a, b) => b.rs - a.rs);
-    return send(res, 200, { reqs, collected });
+      : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
+    return send(res, 200, { reqs });
   }
 
   // the mark group a request names: the village's own marks (no cand) or one of its candidates'
@@ -399,65 +368,16 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { user: view(await getUser(id)), password });
   }
 
-  if (b.action === 'req_get' || b.action === 'req_approve' || b.action === 'req_reject') {
-    const r = await settleOnline(b.rid), u = r ? await getUser(r.user) : null;   // an online one: how its payment stands now
-    if (!u || !(isSuper || (u.role === 'user' && mayUse(u.village) && mayUse(r.village) && may('approve') && (mine(u) || r.to === me.id)))) return send(res, 404, { error: 'not_found' });
+  if (b.action === 'req_get' || b.action === 'req_reject') {   // superadmin: one online purchase
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const r = await settleOnline(b.rid), u = r ? await getUser(r.user) : null;   // how its payment stands now
+    if (!u) return send(res, 404, { error: 'not_found' });
     if (b.action === 'req_get') return send(res, 200, { req: reqView(r) });
     if (r.status !== 'open') return send(res, 409, { error: 'already_done', req: reqView(r) });
-    if (b.action === 'req_reject') {   // e.g. no payment came: closed without searches, kept in the list as rejected
-      if (!(await redis('SET', `reqlock:${r.id}`, me.id, 'NX'))) return send(res, 409, { error: 'already_done', req: reqView(await getReq(r.id)) });
-      await redis('HSET', `req:${r.id}`, 'status', 'rejected', 'doneAt', now, 'doneBy', me.id, 'doneByName', me.name);
-      await redis('DEL', `reqopen:${u.id}:${r.n}`);
-      return send(res, 200, { req: reqView(await getReq(r.id)) });
-    }
-    if (!canBuy(u)) return send(res, 400, { error: 'not_prepaid' });
-    const n = parseInt(b.n, 10);
-    if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
     if (!(await redis('SET', `reqlock:${r.id}`, me.id, 'NX'))) return send(res, 409, { error: 'already_done', req: reqView(await getReq(r.id)) });
-    await paidIn(u, n, r);
+    await redis('HSET', `req:${r.id}`, 'status', 'rejected', 'doneAt', now, 'doneBy', me.id, 'doneByName', me.name);
     await redis('DEL', `reqopen:${u.id}:${r.n}`);
-    return send(res, 200, { req: reqView(await getReq(r.id)), user: view(await getUser(u.id)) });
-  }
-
-  // हिसाब: one admin's payments (every approved request and hand-added pack) and the money they handed over to the
-  // superadmin (hash settle:<admin id>: entry id → JSON {id, at, rs, note, byName}; pay:settled adds them up), so the two can be
-  // squared: due = collected − handed over. The superadmin's own collections need no handover.
-  if (b.action === 'ledger' || b.action === 'settle_add' || b.action === 'settle_remove') {
-    const by = isSuper ? String(b.by || '') : me.id;
-    const admin = by === 'admin' ? null : await getUser(by);
-    if (by !== 'admin' && !(admin && admin.role === 'admin')) return send(res, 404, { error: 'not_found' });
-    const sKey = `settle:${by}`;
-    if (b.action !== 'ledger') {
-      if (!isSuper) return send(res, 403, { error: 'super_only' });
-      if (by === 'admin') return send(res, 400, { error: 'action' });
-      if (b.action === 'settle_add') {
-        const rs = parseInt(b.rs, 10);
-        if (!(rs > 0 && rs <= 10000000)) return send(res, 400, { error: 'bad_amount' });
-        const entry = { id: crypto.randomBytes(4).toString('hex'), at: now, rs, note: String(b.note || '').trim().slice(0, 100), byName: me.name };
-        await redis('HSET', sKey, entry.id, JSON.stringify(entry));
-        await redis('HINCRBY', 'pay:settled', by, rs);
-      } else {
-        const sid = String(b.sid || ''), raw = sid && ((await redis('HMGET', sKey, sid)) || [])[0];
-        if (raw && Number(await redis('HDEL', sKey, sid)) === 1) await redis('HINCRBY', 'pay:settled', by, -JSON.parse(raw).rs);
-      }
-    }
-    const reqIds = (await redis('SMEMBERS', 'reqs')) || [];
-    const rows = reqIds.length ? await pipeline(reqIds.map((id) => ['HGETALL', `req:${id}`])) : [];
-    const done = reqIds.map((id, i) => {
-      const r = { id }, arr = rows[i] || [];
-      for (let k = 0; k < arr.length; k += 2) r[arr[k]] = arr[k + 1];
-      return r;
-    }).filter((r) => r.status === 'done' && r.doneBy === by);
-    const people = new Map((await getUsers([...new Set(done.map((r) => r.user))])).map((u) => [u.id, u]));
-    const pays = done.map((r) => {
-      const u = people.get(r.user) || {};
-      return { id: r.id, at: r.doneAt, name: u.name || '?', phone: u.phone || '', village: r.village, n: Number(r.doneN) || 0, rs: Number(r.doneRs) || 0, hand: r.hand === '1' };
-    }).sort((x, y) => (x.at < y.at ? 1 : -1));
-    const sArr = (await redis('HGETALL', sKey)) || [];
-    const settles = sArr.filter((x, k) => k % 2).map((x) => JSON.parse(x)).sort((x, y) => (x.at < y.at ? 1 : -1));
-    const collectedRs = pays.reduce((t, p) => t + p.rs, 0), settled = settles.reduce((t, x) => t + x.rs, 0);
-    return send(res, 200, { ledger: { by, name: admin ? admin.name : 'सुपर एडमिन', collected: collectedRs, settled,
-      due: by === 'admin' ? 0 : collectedRs - settled, pays, settles } });
+    return send(res, 200, { req: reqView(await getReq(r.id)) });
   }
 
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
@@ -536,16 +456,6 @@ module.exports = route(async (req, res, b) => {
     if (user.role !== 'user' && !isSuper) return send(res, 400, { error: 'not_user' });   // an admin's: the superadmin sets them
     const perms = PERMS.filter((p) => Array.isArray(b.perms) && b.perms.includes(p));
     await redis('HSET', `user:${user.id}`, 'perms', perms.join(','));
-    return send(res, 200, { user: view(await getUser(user.id)) });
-  }
-
-  if (b.action === 'credits_add') {
-    if (!may('credits')) return send(res, 403, { error: 'no_perm' });
-    if (!canBuy(user)) return send(res, 400, { error: 'not_prepaid' });   // demo logins
-    if (user.role === 'admin' && !isSuper) return send(res, 403, { error: 'super_only' });   // an admin's searches: the superadmin
-    const n = parseInt(b.n, 10);
-    if (!(n > 0 && n <= 10000)) return send(res, 400, { error: 'bad_credits' });
-    await paidIn(user, n, null);
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

@@ -68,7 +68,6 @@
   .paybox a.btn { display: block; text-decoration: none; }
   .buyback { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 10px; font-size: 13px; color: var(--accent); font-weight: 600; }
   .buyback { justify-self: start; }
-  .paybox .wabtn { display: block; width: 100%; background: #16a34a; }   /* WhatsApp green */
   .paybox .upibtn { display: block; width: 100%; }
   .packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 6px 0 4px; }
   .pack { display: grid; gap: 1px; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 8px 6px; color: var(--ink); }
@@ -100,6 +99,8 @@
   .cpnlist .cpnbanners { width: 100%; min-width: 0; }
   .cpnbanner:nth-child(3n+2) { background: linear-gradient(120deg, #0f766e, #2563eb); }
   .cpnbanner:nth-child(3n) { background: linear-gradient(120deg, #c2410c, #db2777); }
+  .cpnbanner.refbanner { background: linear-gradient(120deg, #15803d, #0d9488); box-shadow: 0 3px 10px rgba(21, 128, 61, .3); }
+  .cpnbanner.refbanner b { color: #15803d; }
   .cpnbanner span { font-size: 16px; font-weight: 700; line-height: 1.35; }
   .cpnbanner b { align-self: flex-end; padding: 5px 14px; border-radius: 999px; background: #fff; color: #6d28d9; font-size: 14px; white-space: nowrap; }
   .cpnbannerx { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(255,255,255,.25);
@@ -287,6 +288,13 @@
   .slip .kendra { border-top: 1px solid #222; margin: 6px 6px 0; padding: 4px 4px 3px; font-size: 13px; text-align: center; }
   .slip .time { background: var(--pink); color: #fff; text-align: center; font-size: 13px; padding: 3px 4px; }
   #more { margin: 4px auto 0; display: block; width: auto; padding: 10px 22px; font-size: 16px; }
+  /* a ward's free slips are over: unlock the rest for ₹100 */
+  .wardlock { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; margin: 14px 0 4px; padding: 18px 16px;
+    border-radius: 14px; background: linear-gradient(135deg, #fdf2f8, #ede9fe); border: 1.5px dashed #b4235a; }
+  .wardlock .big { font-size: 30px; line-height: 1; }
+  .wardlock b { font-size: 17px; }
+  .wardlock .k { font-size: 14px; color: var(--muted); max-width: 460px; }
+  .wardlock .btn { width: auto; padding: 10px 22px; margin-top: 4px; }
   #qMark { font-size: 15px; padding: 8px 10px; }
   #bigBtn { font-weight: 700; color: var(--ink); }
   #bigBtn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -343,7 +351,7 @@
   .stag { padding: 4px 8px; border-top: 1px dashed var(--line); font-size: 13px; font-weight: 600; background: #fafafa; }
   .stag.c-done { color: #15803d; } .stag.c-coming { color: #854d0e; } .stag.c-absent { color: #b91c1c; }
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-  #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
+  #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin: 6px 6px 0 0; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
   /* install as an app: a button at the top of every page (and a link in the footer), and the steps */
   .fabinstall { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 40; display: flex; width: max-content; max-width: calc(100% - 24px);
@@ -379,18 +387,20 @@
     .topelec div { width: auto; }
     .topelec .left { order: 1; }
     .fabinstall { top: auto; bottom: 16px; left: auto; right: 16px; transform: none; }   /* off the strip: the bottom corner */
-    /* coupon banners: lined up with the header's content, cards of one size (a single one doesn't stretch across) */
+    /* coupon banners: as wide as the search row under them (the header's content), growing and shrinking with the window */
     #cpnBanners { padding-left: max(12px, calc((100% - 1240px) / 2)); padding-right: max(12px, calc((100% - 1240px) / 2));
       scroll-padding: 0 max(12px, calc((100% - 1240px) / 2)); }
-    #cpnBanners .cpnbanner, #cpnBanners .cpnbanner:only-child { flex: 0 0 min(560px, 86%); max-width: 560px; }
+    #cpnBanners .cpnbanner, #cpnBanners .cpnbanner:only-child { flex: 0 0 100%; max-width: none; min-height: 76px; }
     .fields { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; }
     .row2 { display: contents; }
     #qReset { order: 1; }   /* after the mark filter, at the end of the line */
+    .fields > *, .row2 > * { grid-row: 1; }
+    #modeRow { grid-row: 2; grid-column: 1 / -1; justify-self: start; width: 340px; margin-top: 0; }   /* सर्वे / मतदान दिवस: its own line under the search */
     main { max-width: 1272px; padding: 14px 16px 28px; }
     #results, .family { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; align-items: start; }
     html.big #results, html.big .family { grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); }
     #results .slip { margin: 0; }
-    #results > .hint, #results > .family, .family .fh { grid-column: 1 / -1; }
+    #results > .hint, #results > .family, #results > .wardlock, .family .fh { grid-column: 1 / -1; }
     .family { margin: 0 0 4px 10px; }
     .family .fh { margin: 0; }
     #more { margin-top: 14px; }
@@ -581,8 +591,8 @@
       <!-- which marks this person uses: the survey before the election or polling day (api/signup.js 'mark_mode') -->
       <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
-    <div class="countrow"><div id="count"></div><span><b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button>
-      <button id="wardPrint" class="hidden" type="button"></button></span></div>
+    <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button>
+      <b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button></span></div>
   </header>
   <main>
     <div id="results"></div>
@@ -1073,7 +1083,7 @@ let seq = 0, shown = 0, total = 0, lastBox = 0, lastAsked = '', timer;   // last
 let MOVES_LEFT = 0, MY_VILLAGES = [];   // a signed-up login: how many more times it may change its own village (api/signup.js 'move')
 let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: a signed-up login's free + bought searches, counted for good
 // CAN_BUY: any user login may buy searches; BOUGHT: a login with a daily limit, its bought searches left (used after the day's)
-// ONLINE: packs can also be paid here by UPI (JaduPe, api/pay.js)
+// ONLINE: packs can also be paid here online through Razorpay: UPI, card, net banking, wallet (api/pay.js)
 let CAN_BUY = false, BOUGHT = null, ONLINE = false;
 let MY_REF = null;   // this login's invite code and reward ({code, give, joiner}; refFor in api/_lib.js), null: no invites
 function counted(r) {
@@ -1091,11 +1101,11 @@ function hint() {
   $('results').innerHTML = '<div class="hint">' + L('नाम या पिता/पति का नाम हिंदी या English में लिखें।<br>' +
     'गलत स्पेलिंग भी चलेगी, जैसे <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>।<br>' +
     'मकान नंबर (जैसे <b>512</b>, चाहें तो वार्ड चुनकर) या Voter ID (जैसे <b>XHE1102649</b>) से भी सर्च कर सकते हैं।' +
-    (can('ward') ? '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के सभी मतदाता बॉक्स नंबर के क्रम में दिखेंगे।' : ''),
+    (DEMO ? '' : '<br>सिर्फ़ वार्ड चुनें तो उस वार्ड के मतदाता बॉक्स नंबर के क्रम में दिखेंगे।'),
     'Type a name or the father\'s / husband\'s name, in English or Hindi.<br>' +
     'Spelling need not be exact, e.g. <b>bhanvarlal</b>, <b>mangi lal</b>, <b>मांगीलाल</b>.<br>' +
     'You can also search by house number (e.g. <b>512</b>, with a ward if you like) or Voter ID (e.g. <b>XHE1102649</b>).' +
-    (can('ward') ? '<br>Choose only a ward to see all its voters in box order.' : '')) + '</div>';
+    (DEMO ? '' : '<br>Choose only a ward to see its voters in box order.')) + '</div>';
 }
 // a name with one letter matches nearly everyone: wait for a second one (a house number like 5 is fine)
 const tooShort = (s) => s && !/^\d+$/.test(s) && s.replace(/\s/g, '').length < 2;
@@ -1113,7 +1123,7 @@ async function search(more = false, force = false) {
   if (tooShort(q.name) || tooShort(q.rel)) { ++seq; $('results').innerHTML = '';
     $('count').textContent = L('कम से कम दो अक्षर लिखें', 'Type at least two letters'); $('more').classList.add('hidden'); return; }
   if (!named && !q.ward) { ++seq; hint(); $('count').textContent = ''; $('more').classList.add('hidden'); return; }   // ++seq: drop a search still on its way
-  if (!named && !can('ward')) { ++seq; $('results').innerHTML = '';
+  if (!named && DEMO) { ++seq; $('results').innerHTML = '';
     $('count').textContent = MSG.no_ward_list; $('more').classList.add('hidden'); return; }
   const mine = ++seq;
   if (!more) $('count').textContent = L('सर्च कर रहे हैं…', 'Searching…');
@@ -1126,6 +1136,7 @@ async function search(more = false, force = false) {
   if (r.error === 'credits' || (r.error === 'limit' && CAN_BUY && !DEMO)) buyOpen();   // no searches left: the buying window
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   if (r.perms) updatePerms(r.perms);
+  if (r.wp != null) { WARD_PAID = r.wp; wardButton(); }
   total = r.total;
   if (!more) { $('results').innerHTML = ''; shown = 0; }
   const frag = document.createDocumentFragment();
@@ -1140,6 +1151,18 @@ async function search(more = false, force = false) {
     : q.mark ? L(`वार्ड ${q.ward} में ${which}कोई मतदाता नहीं`, `No ${which}voters in ward ${q.ward}`)
     : L('कोई मतदाता नहीं मिला — स्पेलिंग बदलकर देखें', 'No voter found — try another spelling')) + leftNote();
   $('more').classList.toggle('hidden', !r.more);
+  if (r.locked) $('results').appendChild(wardLock(q.ward, total - shown, r.rs || WARD_RS));
+}
+// the free slips of a ward are over (FREE_WARD in api/_routes/search.js): the rest, and the download, for ₹100
+function wardLock(w, rest, rs) {
+  const d = el('div', 'wardlock');
+  d.append(el('div', 'big', '🔒'), el('b', null, L(`वार्ड ${w} की ${rest} पर्चियाँ और हैं`, `${rest} more slips in ward ${w}`)),
+    el('div', 'k', L(`सिर्फ़ ₹${rs} में पूरा वार्ड खोलें — सभी पर्चियाँ देखें, निशान लगाएं और PDF डाउनलोड करें। एक बार खरीदें, हमेशा के लिए।`,
+      `Unlock the whole ward for just ₹${rs} — see every slip, mark them and download the PDF. Buy once, yours for good.`)));
+  const b = el('button', 'btn', L(`🔓 ₹${rs} में पूरा वार्ड खोलें`, `🔓 Unlock the ward for ₹${rs}`)); b.type = 'button';
+  b.addEventListener('click', () => wardPay(w, b));
+  d.append(b);
+  return d;
 }
 // the admin (for a village admin: the superadmin) can change what this login may do at any time; the next answer from the
 // server says so
@@ -1619,19 +1642,55 @@ document.querySelectorAll('#listStatus button').forEach((b) => b.addEventListene
 $('listPop').addEventListener('click', (e) => { if (e.target === $('listPop')) listClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') listClose(); });
 
+// A whole ward's slips cost WARD_RS once per ward (api/pay.js wardStart): the button says the price until this login has
+// paid for that ward (WARD_PAID: the wards paid for in this village, from every search answer; true = admins, who don't pay)
+const WARD_RS = 100;
+let WARD_PAID = [];
+const wardPaid = (w) => WARD_PAID === true || (Array.isArray(WARD_PAID) && WARD_PAID.map(String).includes(String(w)));
 function wardButton() {
   const w = $('qWard').value;
-  $('wardPrint').classList.toggle('hidden', !can('wardPdf') || !w);
-  $('wardPrint').textContent = L(`वार्ड ${w} की सभी पर्चियाँ · प्रिंट / PDF`, `All slips of ward ${w} · Print / PDF`);
+  $('wardPrint').classList.toggle('hidden', DEMO || !w || !(wardPaid(w) || (CAN_BUY && ONLINE)));
+  $('wardPrint').textContent = wardPaid(w) ? L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें (PDF)`, `⬇ Download ward ${w} slips (PDF)`)
+    : L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें · ₹${WARD_RS}`, `⬇ Download ward ${w} slips · ₹${WARD_RS}`);
+}
+// a ward just paid for: if it is the one on screen, list it again, now with every slip
+function wardOpened(w) {
+  wardButton();
+  if (String($('qWard').value) === String(w) && !$('qName').value.trim() && !$('qRel').value.trim()) search(false, true);
+}
+// pay ₹WARD_RS for ward w in Razorpay's window (locked name and number, as for a pack); payReturn then offers the download
+async function wardPay(w, from = null) {   // from: the 🔓 button under a ward's free slips (else the download button)
+  const btn = from || $('wardPrint'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = L('⏳ भुगतान खुल रहा है…', '⏳ Opening the payment…');
+  const [r] = await Promise.all([api('pay', { action: 'start', token: token(), ward: w }), rzpScript().catch(() => null)]);
+  const reset = () => { btn.disabled = false; if (from) from.textContent = label; else wardButton(); };
+  if (r.paid) { WARD_PAID = Array.isArray(WARD_PAID) ? [...WARD_PAID, String(w)] : WARD_PAID; reset(); wardOpened(w); return from ? null : btn.click(); }
+  if (r.order && window.Razorpay) {
+    new window.Razorpay({
+      key: r.key, order_id: r.order, amount: r.amount, currency: 'INR', name: 'Voter Search', description: r.description,
+      prefill: { name: r.name, contact: r.contact, email: 'void@razorpay.com' },
+      readonly: { name: true, contact: !!r.contact, email: true }, hidden: { contact: !!r.contact, email: true },
+      theme: { color: '#b4235a' },
+      handler: (resp) => { reset(); payReturn(r.id, resp); },
+      modal: { ondismiss: reset, confirm_close: true },
+    }).open();
+    return;
+  }
+  reset();
+  $('count').textContent = r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
+    : L('⚠ अभी ऑनलाइन भुगतान नहीं हो पा रहा — थोड़ी देर बाद फिर कोशिश करें।', '⚠ Online payment is not working right now — please try again a little later.');
+  $('count').classList.add('bad');
 }
 $('wardPrint').addEventListener('click', async () => {
   const w = $('qWard').value, btn = $('wardPrint');
-  if (!w) return;
+  if (!w || btn.disabled) return;
+  if (!wardPaid(w)) return wardPay(w);
   btn.disabled = true; btn.textContent = L('पर्चियाँ आ रही हैं…', 'Loading the slips…');
   const r = await api('search', { token: token(), ward: w, all: true });
   counted(r);
   btn.disabled = false; wardButton();
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
+  if (r.error === 'pay_ward') { WARD_PAID = Array.isArray(WARD_PAID) ? WARD_PAID.filter((x) => String(x) !== String(w)) : []; wardButton(); return wardPay(w); }
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   printSlips(r.results, L(`पर्चियाँ ${VILLAGE.name} वार्ड ${w} (${r.total})`, `Slips ${vn(VILLAGE)} ward ${w} (${r.total})`));
 });
@@ -1837,7 +1896,7 @@ const CPN_MSG = {
   cpn_used_up: () => L('⚠ यह कूपन पूरा इस्तेमाल हो चुका है', '⚠ This coupon has been used up'),
   cpn_used: () => L('⚠ आप यह कूपन पहले इस्तेमाल कर चुके हैं', '⚠ You have already used this coupon'),
   cpn_first: () => L('⚠ यह कूपन सिर्फ़ पहली खरीद पर है', '⚠ This coupon is only for a first purchase'),
-  cpn_pending: () => L('⚠ इस कूपन से एक UPI भुगतान अभी चल रहा है — पहले उसे पूरा करें या थोड़ी देर बाद फिर कोशिश करें', '⚠ A UPI payment with this coupon is still open — finish it first, or try again a little later'),
+  cpn_pending: () => L('⚠ इस कूपन से एक ऑनलाइन भुगतान अभी चल रहा है — पहले उसे पूरा करें या थोड़ी देर बाद फिर कोशिश करें', '⚠ An online payment with this coupon is still open — finish it first, or try again a little later'),
   cpn_min: (r) => L(`⚠ यह कूपन ${r.minN} या ज़्यादा सर्च के पैक पर है`, `⚠ This coupon is for packs of ${r.minN} or more searches`),
   cpn_max: (r) => L(`⚠ यह कूपन ${r.maxN} तक सर्च के पैक पर है`, `⚠ This coupon is for packs of up to ${r.maxN} searches`),
 };
@@ -1852,55 +1911,46 @@ function buyMoreButton() {
   b.classList.toggle('low', searchesLeft > 0 && searchesLeft <= 3);
   b.classList.toggle('none', searchesLeft === 0);
 }
-// search packs: [searches, ₹]. The same list is in admin.html, which shows the price when the admin approves.
+// search packs: [searches, ₹], as PACKS in api/_lib.js
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
-// WhatsApp to this login's admin (else the app's number) asking for a pack, with this login's name, number and village
-// and the request's link <site>/<id>: the request is made on the server only when the button is tapped (api/signup.js
-// 'request'; asking for the same pack again sends the same one) and the link opens the admin page at it, so it shows
-// nothing about the person itself. A tab is opened at once (a tap may open one; after waiting for the server it may
-// not), then sent to WhatsApp; the window then closes.
-function buyWhatsApp(cls, [n, rs], coupon = '', bonus = 0) {
-  const label = L(`💬 ${n}${bonus ? ` + ${bonus}` : ''} सर्च (₹${rs}) WhatsApp पर मंगाएं`, `💬 Ask for ${n}${bonus ? ` + ${bonus}` : ''} searches (₹${rs}) on WhatsApp`);
-  const a = el('button', cls, label); a.type = 'button';
+// searches are only bought online: when that is not set up on the server, or the gateway refuses, the window says so
+const payOff = () => el('div', 'k', L('⚠ अभी ऑनलाइन भुगतान नहीं हो पा रहा — थोड़ी देर बाद फिर कोशिश करें।',
+  '⚠ Online payment is not working right now — please try again a little later.'));
+// pay for a pack right here online: the server makes a Razorpay order (api/pay.js 'start') and Razorpay's checkout window
+// opens on this page with the price, name and mobile number filled in and locked, so the person only picks how to pay
+// (UPI, card, net banking, wallet…). When it is paid, payReturn asks the server, which checks with Razorpay and adds the
+// searches; closing the window without paying just enables the button again.
+let rzpLoad = null;   // Razorpay's checkout script, loaded the first time it is needed
+const rzpScript = () => (rzpLoad ||= new Promise((ok, no) => {
+  const sc = document.createElement('script');
+  sc.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  sc.onload = () => ok(); sc.onerror = () => { rzpLoad = null; no(new Error('checkout')); };
+  document.head.append(sc);
+}));
+function buyUpi([n, rs], coupon = '', bonus = 0) {
+  const label = L(`💳 ₹${rs} अभी ऑनलाइन भुगतान करें`, `💳 Pay ₹${rs} now online`);
+  const a = el('button', 'btn upibtn', label); a.type = 'button';
+  const reset = () => { a.disabled = false; a.textContent = label; };
   a.addEventListener('click', async () => {
     if (a.disabled) return;
-    const tab = window.open('', '_blank');
-    a.disabled = true; a.textContent = L('⏳ …', '⏳ …');
-    const r = await api('signup', { action: 'request', token: token(), n, coupon });
-    a.disabled = false; a.textContent = label;
-    if (!r.id) {
-      if (tab) tab.close();
-      a.textContent = CPN_MSG[r.error] ? CPN_MSG[r.error](r) : r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
-        : L('⚠ अनुरोध नहीं बना — दोबारा दबाएं', '⚠ Could not make the request — tap again');
+    a.disabled = true; a.textContent = L('⏳ भुगतान खुल रहा है…', '⏳ Opening the payment…');
+    const [r] = await Promise.all([api('pay', { action: 'start', token: token(), n, coupon }), rzpScript().catch(() => null)]);
+    if (r.order && window.Razorpay) {
+      const rzp = new window.Razorpay({
+        key: r.key, order_id: r.order, amount: r.amount, currency: 'INR', name: 'Voter Search', description: r.description,
+        prefill: { name: r.name, contact: r.contact, email: 'void@razorpay.com' },   // void@: Razorpay's "no email"
+        readonly: { name: true, contact: !!r.contact, email: true }, hidden: { contact: !!r.contact, email: true },
+        theme: { color: '#b4235a' },
+        handler: (resp) => { reset(); payReturn(r.id, resp); },
+        modal: { ondismiss: reset, confirm_close: true },
+      });
+      rzp.open();
       return;
     }
-    const phone = MY_PHONE ? `+${MY_PHONE.slice(0, 2)} ${MY_PHONE.slice(2)}` : '';
-    const link = `${location.origin}/${r.id}`;
-    if (r.phone != null) ADMIN_PHONE = r.phone;   // whom the server sent the request to ('' = the superadmin: our number)
-    const url = `https://wa.me/${ADMIN_PHONE || WHATSAPP}?text=` + encodeURIComponent(L(
-      `नमस्ते, मुझे Voter Search में ${n} सर्च चाहिए (₹${rs}${coupon ? `, कूपन ${coupon}` : ''})।\nनाम: ${MY_NAME}\nमोबाइल: ${phone}\nगाँव: ${VILLAGE ? VILLAGE.name : ''}\n\n${link}`,
-      `Hello, I would like ${n} searches in Voter Search (₹${rs}${coupon ? `, coupon ${coupon}` : ''}).\nName: ${MY_NAME}\nMobile: ${phone}\nVillage: ${VILLAGE ? vn(VILLAGE) : ''}\n\n${link}`));
-    buyClose();
-    if (tab) { tab.opener = null; tab.location.href = url; } else location.href = url;
-  });
-  return a;
-}
-// pay for a pack right here by UPI: the server makes the JaduPe transaction (api/pay.js 'start') and this page goes to
-// JaduPe's payment page, which comes back to /<village>?pay=<request id> (payReturn)
-function buyUpi([n, rs], coupon = '', bonus = 0) {
-  const label = L(`💳 ₹${rs} UPI से अभी भुगतान करें`, `💳 Pay ₹${rs} now by UPI`);
-  const a = el('button', 'btn upibtn', label); a.type = 'button';
-  a.addEventListener('click', async () => {
-    if (a.disabled) return;
-    a.disabled = true; a.textContent = L('⏳ भुगतान पेज खुल रहा है…', '⏳ Opening the payment page…');
-    const r = await api('pay', { action: 'start', token: token(), n, coupon });
-    if (r.link) { location.href = r.link; return; }
-    a.disabled = false;
+    reset();
     if (CPN_MSG[r.error]) { a.textContent = CPN_MSG[r.error](r); return; }
     if (r.error === 'too_many') { a.textContent = L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow'); return; }
-    // UPI not working right now (e.g. JaduPe refused): ask the admin on WhatsApp instead
-    a.replaceWith(el('div', 'k', L('⚠ अभी UPI से भुगतान नहीं हो पा रहा — एडमिन को भुगतान करके WhatsApp पर भेजें:',
-      '⚠ UPI payment is not working right now — pay the admin and send this on WhatsApp:')), buyWhatsApp('btn wabtn', [n, rs], coupon, bonus));
+    a.replaceWith(payOff());   // online payment not working right now (e.g. the gateway refused)
   });
   return a;
 }
@@ -1917,7 +1967,7 @@ function buyOpen(code) {
   $('buyClose').classList.remove('hidden');
   $('buyTitle').textContent = L('🛒 और सर्च', '🛒 More searches');
   const box = el('div', 'paybox'), packs = el('div', 'packs');
-  // with UPI here, only that; else (no JaduPe token on the server) WhatsApp to the admin
+  // paid online only (no payment gateway set up on the server: the window says so)
   // a coupon (कूपन) applied below: each pack's price and bonus with it (couponPrice in api/_lib.js)
   let cpn = null;
   const withCpn = ([n, rs]) => {
@@ -1930,7 +1980,7 @@ function buyOpen(code) {
   };
   const payBtn = (pk) => {
     const p = withCpn(pk), code = p.on ? cpn.code : '';
-    return ONLINE ? buyUpi([pk[0], p.rs], code, p.bonus) : buyWhatsApp('btn wabtn', [pk[0], p.rs], code, p.bonus);
+    return ONLINE ? buyUpi([pk[0], p.rs], code, p.bonus) : payOff();
   };
   let pick = PACKS[0], pay = payBtn(pick);
   const drawPacks = () => {
@@ -2017,10 +2067,9 @@ function buyOpen(code) {
   const none = searchesLeft === 0 && !BOUGHT;
   box.append(el('b', null, !none ? L('और सर्च चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी सर्च इस्तेमाल हो गईं', 'All your searches are used')
     : L('आज की सभी सर्च इस्तेमाल हो गईं', 'All of today\'s searches are used')),
-    el('div', 'k', ONLINE ? L('कितनी सर्च चाहिए, चुनें और UPI से भुगतान करें — सर्च अपने आप जुड़ जाएंगी।',
-      'Choose how many searches and pay by UPI — they are added by themselves.')
-      : L('कितनी सर्च चाहिए, चुनें। एडमिन को भुगतान करें और WhatsApp पर भेजें — भुगतान देखकर वे सर्च जोड़ देंगे। फिर यह पेज दोबारा खोलें।',
-        'Choose how many searches. Pay the admin and send this on WhatsApp — they add the searches once they see the payment. Then open this page again.')),
+    el('div', 'k', ONLINE ? L('कितनी सर्च चाहिए, चुनें और ऑनलाइन भुगतान करें (UPI, कार्ड, नेट बैंकिंग, वॉलेट) — सर्च अपने आप जुड़ जाएंगी।',
+      'Choose how many searches and pay online (UPI, card, net banking, wallet) — they are added by themselves.')
+      : L('ऑनलाइन भुगतान अभी चालू नहीं है — थोड़ी देर बाद फिर कोशिश करें।', 'Online payment is not available right now — please try again later.')),
     packs, cpnList, cpnRow, cpnMsg, pay);
   $('buyBody').replaceChildren(box);
   $('buyNote').textContent = L('खरीदी सर्च कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की सर्च पूरी होने के बाद इस्तेमाल होती हैं') + '। एक सर्च = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
@@ -2048,15 +2097,26 @@ function cpnCard(c, go, label = L('अभी लें ›', 'Get it ›')) {
   b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   return b;
 }
+// the invite banner: 🎁 दोस्त लाओ, फ़्री सर्च पाओ — tapping it sends the invite link (the 🎁 button's)
+function refBanner() {
+  const b = el('div', 'cpnbanner refbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0;
+  b.append(el('span', null, L('🎁 दोस्त लाओ, फ़्री सर्च पाओ! हर दोस्त के जुड़ने और ख़रीदने पर आप दोनों को मुफ़्त सर्च',
+    "🎁 Bring friends, get free searches! Free searches for both of you when a friend joins and buys")),
+    el('b', null, L('WhatsApp पर भेजें ›', 'Send on WhatsApp ›')));
+  const go = () => $('invite').click();
+  b.addEventListener('click', go);
+  b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  return b;
+}
 async function cpnBanners() {
   const box = $('cpnBanners');
   box.replaceChildren(); box.classList.add('hidden');
   if (!CAN_BUY || DEMO || cpnBannersShut) return;
   const r = await api('signup', { action: 'coupons', token: token() });
   const list = (r.coupons || []).filter((c) => c.banner);
-  if (!list.length || cpnBannersShut) return;
-  for (const c of list) {
-    const b = cpnCard(c, () => buyOpen(c.code));
+  const cards = [...list.map((c) => cpnCard(c, () => buyOpen(c.code))), ...(MY_REF ? [refBanner()] : [])];
+  if (!cards.length || cpnBannersShut) return;
+  for (const b of cards) {
     const x = el('button', 'cpnbannerx', '✕'); x.type = 'button'; x.setAttribute('aria-label', L('बंद करें', 'Close'));
     x.addEventListener('click', (e) => { e.stopPropagation(); cpnBannersShut = true; box.classList.add('hidden'); });
     b.append(x);
@@ -2069,10 +2129,10 @@ async function cpnBanners() {
 $('invite').addEventListener('click', () => {
   if (!MY_REF) return;
   const give = MY_REF.give, gets = MY_REF.joiner;
-  if (!confirm(L(`अपना लिंक WhatsApp पर भेजें। जो दोस्त इस लिंक से जुड़ेगा${gets ? ` उसे ${gets} सर्च ज़्यादा मिलेंगी, और` : ','} जब वह पहली बार सर्च खरीदेगा तब आपको ${give} सर्च मुफ़्त मिलेंगी।`,
-    `Send your link on WhatsApp. A friend who joins through it ${gets ? `gets ${gets} extra searches, and ` : ''}when they first buy searches you get ${give} free.`))) return;
+  if (!confirm(L(`🎁 दोस्त लाओ, फ़्री सर्च पाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} उसकी पहली ख़रीद पर आपको ${give} सर्च बिल्कुल मुफ़्त! 🚀\nजितने ज़्यादा दोस्त, उतनी ज़्यादा फ़्री सर्च।`,
+    `🎁 Bring friends, get free searches!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} you get ${give} searches free on their first buy! 🚀\nThe more friends, the more free searches.`))) return;
   const link = `${location.origin}/${SLUG}?ref=${MY_REF.code}`;
-  const text = L(`Voter Search — ${VILLAGE ? VILLAGE.name : ''} की मतदाता सूची में नाम, पर्ची और परिवार खोजें।${gets ? ` मेरे लिंक से जुड़ने पर ${gets} सर्च ज़्यादा मिलेंगी:` : ' मेरे लिंक से जुड़ें:'}\n${link}`,
+  const text = L(`🗳️ ${VILLAGE ? VILLAGE.name : ''} की पूरी मतदाता सूची अब फ़ोन पर! नाम लिखते ही पर्ची, परिवार और बूथ — सेकंडों में।${gets ? `\n🎁 मेरे लिंक से जुड़ें और पाएं ${gets} सर्च बोनस:` : '\n👉 मेरे लिंक से जुड़ें:'}\n${link}`,
     `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
   location.href = 'https://wa.me/?text=' + encodeURIComponent(text);
 });
@@ -2353,26 +2413,44 @@ async function openVillage(v) {
   const paid = new URLSearchParams(location.search).get('pay');
   if (paid) payReturn(paid); else outOfSearches();
 }
-// back from JaduPe's payment page (?pay=<request id>): ask the server how the payment stands (api/pay.js 'check'), which
-// asks JaduPe; still pending → a button to ask again
-async function payReturn(id) {
+// after paying in Razorpay's window (resp: what it handed back), or opening /<village>?pay=<purchase id>: ask the server how
+// the payment stands (api/pay.js 'check'), which asks Razorpay; paid → what was added and what the person has now
+async function payReturn(id, resp = null, tries = 0) {
   history.replaceState(null, '', location.pathname);
   const box = el('div', 'paybox');
   $('buyTitle').textContent = L('💳 भुगतान', '💳 Payment');
   $('buyNote').textContent = '';
+  $('buyClose').classList.remove('hidden');
   $('buyBody').replaceChildren(box);
   $('buyPop').classList.remove('hidden');
   box.append(el('div', 'k', L('भुगतान जाँच रहे हैं…', 'Checking the payment…')));
-  const r = await api('pay', { action: 'check', token: token(), id });
+  const r = await api('pay', { action: 'check', token: token(), id, ...(resp || {}) });
+  // just paid but not shown as paid yet (Razorpay may take a moment): ask again a few times by itself
+  if (r.status === 'open' && resp && tries < 4) { await new Promise((ok) => setTimeout(ok, 2500)); return payReturn(id, resp, tries + 1); }
   if (r.left != null) searchesLeft = r.left;
   if (r.bought != null) BOUGHT = r.bought;
-  buyMoreButton();
+  buyMoreButton();   // the search count on the page, at once
   const ok = el('button', 'btn', L('ठीक है', 'OK')); ok.type = 'button'; ok.addEventListener('click', buyClose);
+  if (r.kind === 'ward' && r.status === 'done') {   // a ward's slips: paid → download them from here
+    if (r.village === SLUG && Array.isArray(WARD_PAID)) WARD_PAID = [...WARD_PAID, String(r.ward)];
+    if (r.village === SLUG) wardOpened(r.ward);
+    const get = el('button', 'btn', L(`⬇ वार्ड ${r.ward} की पर्चियाँ डाउनलोड / प्रिंट करें`, `⬇ Download / print ward ${r.ward}'s slips`)); get.type = 'button';
+    get.addEventListener('click', () => { buyClose(); $('qWard').value = String(r.ward); wardButton(); $('wardPrint').click(); });
+    box.replaceChildren(el('div', 'amt', '🎉'), el('b', null, L(`भुगतान हो गया — वार्ड ${r.ward} की सभी पर्चियाँ आपकी हैं!`, `Payment done — all of ward ${r.ward}'s slips are yours!`)),
+      el('div', 'k', L('अब पूरे वार्ड की पर्चियाँ दिखेंगी — और जब चाहें दोबारा डाउनलोड कर सकते हैं।', 'Every slip of the ward now shows — and you can download them again any time.')), get, ok);
+    wardButton();
+    return;
+  }
   if (r.status === 'done') {
-    box.replaceChildren(el('div', 'amt', '✓'), el('b', null, L(`भुगतान मिल गया — ${r.n} सर्च जुड़ गईं`, `Payment received — ${r.n} searches added`)), ok);
+    const now = r.left != null ? r.left : r.bought;
+    box.replaceChildren(el('div', 'amt', '🎉'),
+      el('b', null, L(`भुगतान हो गया — आपको ${r.got} सर्च मिलीं!`, `Payment done — you got ${r.got} searches!`)),
+      ...(r.bonus ? [el('div', 'k', L(`${r.n} खरीदी + ${r.bonus} मुफ़्त`, `${r.n} bought + ${r.bonus} free`))] : []),
+      ...(now != null ? [el('div', 'k', L(`अब आपके पास कुल ${now} सर्च हैं।`, `You now have ${now} searches in all.`))] : []), ok);
+    setTimeout(() => { if (box.isConnected && !$('buyPop').classList.contains('hidden')) buyClose(); }, 4000);   // closes by itself after 4 s
   } else if (r.status === 'open') {
     const again = el('button', 'btn', L('फिर जाँचें', 'Check again')); again.type = 'button';
-    again.addEventListener('click', () => payReturn(id));
+    again.addEventListener('click', () => payReturn(id, resp));
     box.replaceChildren(el('b', null, L('भुगतान अभी पूरा नहीं दिखा', 'The payment is not complete yet')),
       el('div', 'k', L('पैसे कट गए हों तो थोड़ी देर में सर्च अपने आप जुड़ जाएंगी — यह पेज दोबारा खोलें।',
         'If the money has gone from your account, the searches are added by themselves shortly — open this page again.')), again);

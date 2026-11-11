@@ -79,7 +79,7 @@ const MAIN_DB = KV_URL || !USER_DB ? restDb(KV_URL, KV_TOKEN) : USER_DB;   // on
 // People's data (keys without KEY_PREFIX): logins, password index, the sign-up set, bought searches used, pack requests,
 // online payments, payments per admin and their handovers, OTP codes, the "moved" marker, and the indexes of logins by
 // mobile number and of the admins (buildIndexes below)
-const USER_KEYS = /^(user:|pw:|users$|free$|paid:|req:|reqs$|reqopen:|reqlock:|jtxn:|pay:|settle:|otp:|usermoved$|phone:|admins$|idxbuilt$)/;
+const USER_KEYS = /^(user:|pw:|users$|free$|paid:|req:|reqs$|reqopen:|reqlock:|jtxn:|rzp:|pay:|settle:|otp:|usermoved$|phone:|admins$|idxbuilt$)/;
 const dbOf = (key) => (USER_DB && USER_KEYS.test(key) ? USER_DB : MAIN_DB);
 
 // Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
@@ -439,10 +439,9 @@ const appPerms = (u) => (u.role === 'admin' && u.perms === undefined ? PERMS.sli
 // What a village admin may do on the admin page, set by the superadmin (field "aperms"; admins made before these
 // existed: all of them):
 //   add: make new users · own: see and look after the users they made · all: see and look after every user of their
-//   villages · credits: add searches to those users · approve: approve or reject their search requests (and the ones sent
-//   to this admin)
-const ADMIN_PERMS = ['add', 'own', 'all', 'credits', 'approve'];
-const PROMOTED_PERMS = ['add', 'own', 'credits', 'approve'];   // a user made admin (api/_routes/admin.js "promote")
+//   villages. (Admins no longer add searches or take payments: 'credits' and 'approve' stored on older admins are ignored.)
+const ADMIN_PERMS = ['add', 'own', 'all'];
+const PROMOTED_PERMS = ['add', 'own'];   // a user made admin (api/_routes/admin.js "promote")
 const adminPermsOf = (u) => (u.role !== 'admin' ? [] : u.aperms === undefined ? ADMIN_PERMS.slice()
   : String(u.aperms).split(',').filter((p) => ADMIN_PERMS.includes(p)));
 // today's date in India, for the per-person daily search count
@@ -456,7 +455,7 @@ const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); ret
 const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
 const adminLimited = (u) => u.role === 'admin';
 // Prepaid searches (api/signup.js): a user who signed up by themselves (field "self") may start "credits" searches in all
-// (free ones from signing up plus paid ones an admin added, api/_routes/admin.js "credits_add") instead of a daily limit; they
+// (free ones from signing up, invites and coupons, plus ones bought online, api/pay.js) instead of a daily limit; they
 // never expire and are counted for good under "paid:<id>". Users made by an admin have a daily limit instead, and may
 // buy searches too (canBuy): theirs are used once the day's limit is used up, and counted the same way.
 const credits = (u) => Number(u && u.credits) || 0;
@@ -576,11 +575,10 @@ async function adminFor(u) {
 const adminPhone = async (u) => (await adminFor(u)).phone;
 // search packs a person can ask for: [searches, ₹] (the same list is in index.html and admin.html)
 const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
-// A request for a pack (api/signup.js 'request'), key req:<id>, id = 8 digits: the WhatsApp message to the admin carries
-// only <site>/<id>, which opens the admin page; the admin logs in and sees who asked (api/_routes/admin.js 'req_get'). Fields:
-// user, village, n, rs, created, status 'open' | 'done' | 'rejected', and once approved or rejected doneAt, doneBy,
-// doneByName (approved: also doneN, doneRs).
-// reqopen:<user>:<n> → that person's open request for that pack, so asking again sends the same link.
+// A purchase of a pack, key req:<id>, id = 8 digits: made when a person pays online (api/pay.js 'start'). Fields:
+// user, village, n, rs, created, status 'open' | 'done' | 'rejected', gw, txn, link, and once paid or closed doneAt,
+// doneBy, doneByName (paid: also doneN, doneRs). Older ones (before searches could only be bought online) were WhatsApp
+// requests to an admin, without gw; the superadmin can still close those (api/_routes/admin.js 'req_reject').
 // what a number of searches costs: the pack's price, else ₹1 a search
 const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
 // Coupons (कूपन), made by the superadmin on the admin page (api/_routes/admin.js "coupon_set"): hash coupon:<CODE> with kind
@@ -641,9 +639,9 @@ async function couponHold(c, uid, rid) {
     const held = await redis('GET', k);
     if (!held || held === rid) continue;
     let r = await getReq(held);
-    if (r && r.gw && r.status === 'open') r = await settleOnline(r.id);
+    if (r && r.gw === 'razorpay' && r.status === 'open') r = await settleOnline(r.id);
     if (!r || r.status !== 'open' || r.user !== uid || !r.coupon) continue;
-    if (r.gw) return 'cpn_pending';
+    if (r.gw === 'razorpay') return 'cpn_pending';
     await redis('HSET', `req:${r.id}`, 'coupon', '', 'rs', packPrice(r.n), 'bonus', 0);
   }
   for (const k of keys) await redis('SET', k, rid, 'EX', 90 * 86400);
@@ -672,10 +670,9 @@ async function newReqId() {   // 8 digits no request has yet
   do id = String(crypto.randomInt(10000000, 100000000)); while (await getReq(id));
   return id;
 }
-// Payments: each approved request (and each hand-added "सर्च जोड़ें" on the admin page, which gets an approved request of
-// its own with hand: '1') records doneRs = the ₹ collected and doneBy / doneByName = the admin who collected it;
-// pay:rs, pay:n, pay:count (hashes, admin id → total ₹, searches, payments) and pay:name (admin id → name) add them up
-// for the superadmin.
+// Payments: each paid purchase records doneRs = the ₹ paid and doneBy 'admin' / doneByName = GATEWAY's name; pay:rs,
+// pay:n, pay:count (hashes, 'admin' → total ₹, searches, payments) add them up. (Before 2026-11 admins also collected
+// payments themselves, with a हिसाब per admin; those totals stay in pay:* and settle:*, no longer shown.)
 const isReqId = (id) => /^\d{8}$/.test(String(id || ''));
 async function getReq(id) {
   if (!isReqId(id)) return null;
@@ -687,8 +684,8 @@ async function getReq(id) {
 }
 const paidKey = (id) => `paid:${id}`;
 async function creditsLeft(u) { return Math.max(0, credits(u) - (Number(await redis('GET', paidKey(u.id))) || 0)); }
-// n bought searches for person u, collected by `by` ({id, name}: an admin, or GATEWAY): the searches, and the payment
-// recorded in request r (none: a hand-added one, which gets its own request, already approved) and in the pay:* totals
+// n bought searches for person u, paid through `by` (GATEWAY): the searches, and the payment recorded in request r and
+// in the pay:* totals
 // A request approved for the pack it asked for keeps its own price; made with a coupon, it also gets the bonus searches
 // once the coupon is counted as used (useCoupon: no bonus when its limits are used up meanwhile). Approved for another
 // number of searches, the coupon is dropped and the price is the pack's.
@@ -712,6 +709,22 @@ async function addPaid(u, n, r, by) {
   await redis('HINCRBY', 'pay:count', by.id, 1);
   if (by.id !== 'admin') await redis('HSET', 'pay:name', by.id, by.name);
 }
+// A whole ward's slips (वार्ड की सभी पर्चियाँ, api/_routes/search.js "all") cost ₹WARD_RS, once per ward: a purchase
+// (api/pay.js 'start' with a ward; req:<id> with kind 'ward', ward, wv = its village, n 0) that, once paid, puts the ward
+// in the set wardpaid:<user id>:<village>, so that login may print / save it again any time. The superadmin and village
+// admins don't pay (wardFree).
+const WARD_RS = 100;
+const wardKey = (uid, slug) => `wardpaid:${uid}:${slug}`;
+const wardFree = (u) => !!u && (u.role === 'super' || u.role === 'admin');
+const wardsPaid = async (u, slug) => (wardFree(u) || !u ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
+async function wardDone(u, r, by) {
+  const rs = Number(r.rs) || WARD_RS;
+  await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
+  await redis('HSET', `req:${r.id}`, 'status', 'done', 'doneAt', new Date().toISOString(), 'doneN', 0, 'doneRs', rs, 'doneBy', by.id, 'doneByName', by.name);
+  await redis('HINCRBY', 'pay:rs', by.id, rs);
+  await redis('HINCRBY', 'pay:count', by.id, 1);
+  if (by.id !== 'admin') await redis('HSET', 'pay:name', by.id, by.name);
+}
 // a login's first purchase: its inviter (refBy) gets the rule's searches, once
 async function refReward(id) {
   const refBy = await redis('HGET', `user:${id}`, 'refBy');
@@ -723,37 +736,84 @@ async function refReward(id) {
   await redis('HINCRBY', `user:${inv.id}`, 'refBought', 1);
   await redis('HSET', `user:${id}`, 'refGave', rule.inviter);
 }
-// Online UPI payment through JaduPe (jadupe.com, api/pay.js), when JADUPE_TOKEN (the API token from JaduPe's "APIs and
-// Documentation" page) is set. The money goes to the superadmin's JaduPe merchant account, so it counts as collected
-// by the superadmin. A request paid this way has gw: 'jadupe', txn = JaduPe's transaction id (jtxn:<txn> → request id)
-// and link = the payment page. Its status is only ever taken from JaduPe's check-payment-status API, never from what a
-// phone or the webhook says.
-const GATEWAY = { id: 'admin', name: 'UPI ऑनलाइन (JaduPe)' };
-const payOnline = () => !!process.env.JADUPE_TOKEN;
-async function jadupe(path, payload) {
-  const r = await fetch((process.env.JADUPE_URL || 'https://jadupe.com/api/') + path, {
-    method: payload ? 'POST' : 'GET',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.JADUPE_TOKEN}` },
-    body: payload ? JSON.stringify(payload) : undefined,
+// Online payment (api/pay.js) through Razorpay (razorpay.com): a Razorpay order for each purchase, for its exact price,
+// paid in Razorpay's checkout window on our own page (index.html buyUpi) with the person's name and mobile number filled
+// in and locked, so they type nothing but choose how to pay (UPI, card, net banking, wallet…). Set in Vercel:
+//   RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET   from Razorpay's dashboard → Account & Settings → API Keys (rzp_live_… for
+//                                           real payments; rzp_test_… keys make test payments only)
+// Without them there is no online payment.
+// A purchase paid this way has gw: 'razorpay', txn = the order's id (rzp:<txn> → purchase id).
+// The money goes to the superadmin's Razorpay account, so it counts as collected by the superadmin. A purchase's status
+// is only ever taken from Razorpay's own API, never from what a phone or a webhook says (the checkout's signature is
+// checked too, razorpaySigned, but the order is still asked about).
+const GATEWAY = { id: 'admin', name: 'ऑनलाइन (Razorpay)' };   // who approves an online purchase (the superadmin)
+const payOnline = () => !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+const isOrderId = (id) => /^order_[0-9A-Za-z]{6,40}$/.test(String(id || ''));
+async function razorpay(method, path, body) {   // path after /v1/, e.g. 'orders'
+  const auth = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64');
+  const r = await fetch(`${(process.env.RAZORPAY_URL || 'https://api.razorpay.com').replace(/\/+$/, '')}/v1/${path}`, {
+    method, headers: { Accept: 'application/json', Authorization: `Basic ${auth}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
   });
   const text = await r.text();
-  try { return JSON.parse(text); } catch (e) { return { success: false, message: text.slice(0, 200) }; }
+  let j; try { j = JSON.parse(text); } catch (e) { j = { error: { description: text.slice(0, 200) } }; }
+  return { ...j, ok: r.ok, http: r.status };   // j.status: the order's or payment's own status
 }
-// asks JaduPe how an online request's payment stands: completed (paid at least the pack's price, give or take ₹1) →
-// the searches are added, once; timeout / error → the request is closed as rejected. → the request as it now is
+// makes an order for purchase id → {txn} or {error}
+async function razorpayCreate({ id, rs, n, ward }) {
+  const j = await razorpay('POST', 'orders', { amount: Math.round(Number(rs) * 100), currency: 'INR', receipt: String(id),
+    notes: { purchase: String(id), ...(ward ? { ward: String(ward) } : { searches: String(n) }) } });
+  if (!j.ok || !isOrderId(j.id)) return { error: (j.error && j.error.description) || `http ${j.http}`, raw: j };
+  return { txn: j.id };
+}
+// the checkout's answer: Razorpay signs "<order id>|<payment id>" with our key secret
+function razorpaySigned(order, payment, sig) {
+  if (!isOrderId(order) || !/^pay_[0-9A-Za-z]{6,40}$/.test(String(payment || '')) || !/^[0-9a-f]{64}$/.test(String(sig || ''))) return false;
+  const want = require('crypto').createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(`${order}|${payment}`).digest('hex');
+  return sameText(want, sig);
+}
+// A webhook really from Razorpay: X-Razorpay-Signature is the HMAC-SHA256 of the body with the webhook secret
+// (RZP_WB_SECRET, set in Razorpay → Webhooks). Vercel hands over the body already parsed, so besides the raw text (when
+// there is one) it is also tried as JSON written back out, with and without the \/ and \uXXXX escaping Razorpay uses.
+// No secret set → true (the order is checked with Razorpay itself anyway, settleOnline).
+function razorpayHook(req, b) {
+  const secret = process.env.RZP_WB_SECRET;
+  if (!secret) return true;
+  const sig = String((req.headers && req.headers['x-razorpay-signature']) || '');
+  if (!/^[0-9a-f]{64}$/.test(sig)) return false;
+  const j = JSON.stringify(b), slash = j.replace(/\//g, '\\/');
+  const uni = (t) => t.replace(/[\u007f-\uffff]/g, (ch) => '\\u' + ch.charCodeAt(0).toString(16).padStart(4, '0'));
+  const raw = req.rawBody != null ? String(req.rawBody) : typeof req.body === 'string' ? req.body : null;
+  return [raw, j, slash, uni(j), uni(slash)].some((t) => t != null && sameText(crypto.createHmac('sha256', secret).update(t).digest('hex'), sig));
+}
+// the order's state → 'paid' | 'open', with the amount paid in ₹. A payment only authorized (an account set to capture
+// by hand) is captured here, so the money is taken and the order counts as paid.
+async function razorpayStatus(r) {
+  if (!isOrderId(r.txn)) return { st: 'open' };
+  const o = await razorpay('GET', `orders/${r.txn}`);
+  if (!o.ok) return { st: 'open' };
+  if (o.status === 'paid') return { st: 'paid', amount: Number(o.amount_paid) / 100 };
+  if (o.status !== 'attempted') return { st: 'open' };
+  const ps = await razorpay('GET', `orders/${r.txn}/payments`);
+  for (const p of (ps.ok && ps.items) || []) {
+    if (p.status === 'captured') return { st: 'paid', amount: Number(p.amount) / 100 };
+    if (p.status === 'authorized' && Number(p.amount) === Number(o.amount)) {
+      const c = await razorpay('POST', `payments/${p.id}/capture`, { amount: p.amount, currency: p.currency || 'INR' });
+      if (c.ok && c.status === 'captured') return { st: 'paid', amount: Number(c.amount) / 100 };
+    }
+  }
+  return { st: 'open' };
+}
+// asks Razorpay how the purchase's payment stands: paid (at least the pack's price, give or take ₹1) → the searches are
+// added, once (an order that is never paid stays open; the superadmin may close it). → the purchase as it now is
+// Requests made with the gateways used before (gw 'jadupe', 'instamojo') are left as they are, for the admin to settle.
 async function settleOnline(rid) {
   const r = await getReq(rid);
-  if (!r || r.gw !== 'jadupe' || !r.txn || r.status !== 'open') return r;
-  const s = await jadupe('check-payment-status', { txn_id: String(r.txn) });
-  const t = s && s.success && s.data && s.data.transaction;
-  if (!t) return r;
-  const st = String(t.status || '').toLowerCase();
-  if (st === 'completed' && Number(t.amount) >= Number(r.rs) - 1) {
+  if (!r || r.gw !== 'razorpay' || r.status !== 'open' || !r.txn || !payOnline()) return r;
+  const s = await razorpayStatus(r);
+  if (s.st === 'paid' && s.amount >= Number(r.rs) - 1) {
     const u = await getUser(r.user);
-    if (u && await redis('SET', `reqlock:${r.id}`, GATEWAY.id, 'NX')) await addPaid(u, Number(r.n), r, GATEWAY);
-  } else if ((st === 'timeout' || st === 'error') && await redis('SET', `reqlock:${r.id}`, GATEWAY.id, 'NX')) {
-    await redis('HSET', `req:${r.id}`, 'status', 'rejected', 'doneAt', new Date().toISOString(), 'doneBy', GATEWAY.id,
-      'doneByName', `${GATEWAY.name}: ${st === 'timeout' ? 'समय खत्म' : 'भुगतान नहीं हुआ'}`);
+    if (u && await redis('SET', `reqlock:${r.id}`, GATEWAY.id, 'NX')) await (r.kind === 'ward' ? wardDone(u, r, GATEWAY) : addPaid(u, Number(r.n), r, GATEWAY));
   }
   return getReq(rid);
 }
@@ -825,7 +885,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, jadupe, settleOnline, normPhone,
+module.exports = { WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+  FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

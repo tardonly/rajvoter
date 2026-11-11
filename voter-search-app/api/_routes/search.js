@@ -1,8 +1,12 @@
 // POST {village, token, name, rel, ward, mark, offset, after} → {total, more, results: [...up to 10 voters, each with its
 //   status mark and who set it, and on polling day its survey mark sm], wards, perms, survey (markModeOf in _lib.js)}
 // POST {village, token, family: "<ward>:<box>"} → {total, results: everyone at that voter's house number in that ward}
-// POST {village, token, ward, all: true} → {total, results: [every voter of that ward]}   (people allowed 'wardPdf')
-// A ward with no name lists the whole ward in box order (only for people allowed 'ward'); it pages with after = the last
+// POST {village, token, ward, all: true} → {total, results: [every voter of that ward]}   once that ward is paid for
+//   (₹WARD_RS, api/pay.js; the superadmin and village admins don't pay), else 402 {error: 'pay_ward', rs}. Other
+//   answers carry wp: the wards this login has paid for here, or true when it doesn't pay.
+// A ward with no name lists the whole ward in box order: anyone (not the demo) sees its first FREE_WARD slips, 10 at a
+// time; the rest once that ward is paid for (₹WARD_RS, the same purchase as its slips' download; admins don't pay), the
+// answer saying locked: true where the free ones end. It pages with after = the last
 // box shown, so marking slips while going through a filtered list doesn't skip anyone. A name search pages through its
 // best 250 matches. mark filters by status mark: 'none' (no mark yet) | 'done' | 'coming' | 'absent'.
 // Voters struck off the roll (del 'E' | 'S' | 'R') are found and shown, tagged, but never in a mark filter or ward slips.
@@ -21,9 +25,10 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
+const { DEMO, village, whoIs, WARD_RS, wardKey, wardFree, wardsPaid, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
 const { load, search, family, publicFields } = require('../_search.js');
 
+const FREE_WARD = 20;   // slips of a ward anyone may list before paying for it
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
 const SEARCH_STEPS = 25, SEARCH_MINUTES = 10;
 
@@ -99,8 +104,11 @@ module.exports = route(async (req, res, b) => {
   if (user.status !== 'ok') return send(res, 403, { error: user.status });   // retired, opened on another phone, other village
 
   const named = !!(String(b.name || '').trim() || String(b.rel || '').trim());
-  if (!named && !b.family && b.ward && !b.all && !user.perms.includes('ward')) return send(res, 403, { error: 'no_ward_list' });
-  if (b.all && !user.perms.includes('wardPdf')) return send(res, 403, { error: 'no_pdf' });
+  if (!named && !b.family && b.ward && !b.all && user.demo) return send(res, 403, { error: 'no_ward_list' });
+  if (b.all && !user.demo && !wardFree(user) && Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
+    return send(res, 402, { error: 'pay_ward', rs: WARD_RS });
+  }
+  if (b.all && user.demo) return send(res, 403, { error: 'no_pdf' });
   const use = await countSearch(req, user, b, named);
   if (use.error) return send(res, 429, use);
   const left = { searchId: use.searchId, left: use.left, bought: use.bought };
@@ -124,7 +132,7 @@ module.exports = route(async (req, res, b) => {
     hits = hits.filter((r) => !r.del && ((marks[markKey(r)] || {}).m || 'none') === filter);
   }
   const total = hits.length;
-  let page, more;
+  let page, more, locked = false;
   if (named) {
     const limit = Math.min(total, MAX_NAMED);
     const offset = Math.min(Math.max(0, parseInt(b.offset, 10) || 0), limit);
@@ -133,8 +141,12 @@ module.exports = route(async (req, res, b) => {
   } else {
     const after = parseInt(b.after, 10) || 0;
     const rest = after ? hits.filter((r) => r.box > after) : hits;
-    page = rest.slice(0, PAGE);
-    more = rest.length > PAGE;
+    const open = wardFree(user) || Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) === 1;
+    const room = open ? PAGE : Math.max(0, Math.min(PAGE, FREE_WARD - (hits.length - rest.length)));   // free ones not shown yet
+    page = rest.slice(0, room);
+    more = rest.length > page.length && (open || hits.length - rest.length + page.length < FREE_WARD);
+    locked = !open && rest.length > page.length && !more;
   }
-  send(res, 200, { total, more, results: await withMarks(v.slug, page, user.cand, user.survey), wards: load(v.data).wards, perms: user.perms, survey: user.survey, ...left });
+  send(res, 200, { total, more, ...(locked ? { locked: true, rs: WARD_RS } : {}), results: await withMarks(v.slug, page, user.cand, user.survey), wards: load(v.data).wards, perms: user.perms, survey: user.survey,
+    wp: wardFree(user) || (await wardsPaid(user, v.slug)), ...left });
 });

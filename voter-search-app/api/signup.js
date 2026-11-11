@@ -3,8 +3,7 @@
 // type its password (forgotten → a one-time code to the number and a new password, 'otp' + 'reset', when OTP_SEND_URL
 // is set; else ask the admin); a new number chooses its own password and gets its own login at once ('signup') with
 // free searches by the superadmin's rule (freeRule in _lib.js: by how many signed up in that village before), none for a
-// number that already signed up elsewhere. For more searches the person pays their village admin (WhatsApp button in the app goes to that admin's number) and
-// an admin adds them on the admin page (api/_routes/admin.js "credits_add").
+// number that already signed up elsewhere. For more searches the person pays online in the app (api/pay.js).
 //   POST {action: 'info'}  → {villages}   for the start page's village choice
 //   POST {action: 'lookup', village (optional on the start page), phone [, ref]} → {exists, free, rule, otp, refBy}   ref: the
 //     invite link's code (refInviter in _lib.js); refBy: the inviter's name, free then includes the referral bonus;   otp: a forgotten
@@ -21,13 +20,6 @@
 //   POST {action: 'move', token, village, to} → {village, list, movesLeft}   a signed-up login picked the wrong village:
 //     it moves itself to village "to" (its searches and password go along, it stays logged in), up to MOVES times; after
 //     that its admin moves it (api/_routes/admin.js "move")
-//   POST {action: 'request', token, village, n} → {id, phone}   any user login (signed up or made by an admin) asks for a pack of n searches (PACKS in
-//     _lib.js): the request is kept (req:<id>, see getReq) with to = the admin it goes to (adminFor in _lib.js), and its
-//     id goes in the WhatsApp message to phone ('' = the app's own number) as <site>/<id>; the person's open request for
-//     the same pack is reused. 20 new requests a day per login. With coupon: its price and bonus (couponFor in _lib.js),
-//     → also {rs, bonus}; a coupon that can't be used → {error: 'cpn_…'}.
-//     A person has one open request per coupon (couponHold in _lib.js): asking with it again moves it to the new request,
-//     or → 'cpn_pending' while an online payment with it is still open.
 //   POST {action: 'coupon', token, village, code} → {coupon: {code, kind, value, minN}} or {error: 'cpn_…'}
 //   POST {action: 'coupons', token, village} → {coupons: [{code, kind, value, minN, maxN, until, first}]}   the coupons the
 //     superadmin lists in the buy window (show) that this login can use now, best first
@@ -181,39 +173,6 @@ module.exports = route(async (req, res, b) => {
     const r = await couponFor(b.code, me);
     if (r.error) { if (r.error === 'cpn_none') await failed(req, 'coupon'); return send(res, 400, r); }
     return send(res, 200, { coupon: couponView(r.c) });
-  }
-  if (b.action === 'request') {
-    const me = await whoIs(b.token, b.village);
-    if (!me || me.status !== 'ok') return send(res, 401, { error: 'login' });
-    if (!canBuy(me)) return send(res, 400, { error: 'not_prepaid' });
-    const pk = PACKS.find(([n]) => n === Number(b.n));
-    if (!pk) return send(res, 400, { error: 'bad_credits' });
-    let cpn = null, c = null;
-    if (b.coupon) {
-      const r = await couponFor(b.coupon, me, pk[0]);
-      if (r.error) return send(res, 400, r);
-      c = r.c;
-      cpn = { coupon: c.code, ...couponPrice(c, pk[0]) };
-    }
-    const fields = cpn ? ['rs', cpn.rs, 'coupon', cpn.coupon, 'bonus', cpn.bonus] : ['rs', pk[1], 'coupon', '', 'bonus', 0];
-    const openKey = `reqopen:${me.id}:${pk[0]}`, old = await getReq(await redis('GET', openKey));
-    const to = await adminFor(me);
-    if (old && old.status === 'open' && old.user === me.id) {
-      // e.g. their admin or village has changed since, or a coupon was added or taken off
-      if (c) { const held = await couponHold(c, me.id, old.id); if (held) return send(res, 409, { error: held }); }
-      await redis('HSET', `req:${old.id}`, 'to', to.id, 'village', buyVillage(me, b.village), ...fields);
-      return send(res, 200, { id: old.id, phone: to.phone, rs: fields[1], bonus: fields[5] });
-    }
-    const k = `reqs:${me.id}:${today()}`;
-    if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
-    await redis('EXPIRE', k, 86400);
-    const id = await newReqId();
-    if (c) { const held = await couponHold(c, me.id, id); if (held) return send(res, 409, { error: held }); }
-    await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, b.village), 'n', pk[0], 'created', new Date().toISOString(), 'status', 'open',
-      'to', to.id, ...fields);
-    await redis('SET', openKey, id);
-    await redis('SADD', 'reqs', id);   // every request, for the admin page's list (api/_routes/admin.js "list")
-    return send(res, 200, { id, phone: to.phone, rs: fields[1], bonus: fields[5] });
   }
   send(res, 400, { error: 'action' });
 });

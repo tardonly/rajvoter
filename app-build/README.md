@@ -29,8 +29,8 @@ only receive the cards that match a search. Every search checks that the user's 
   page with it shows "यह पासवर्ड … का है" with a link to the right village. Besides searching by name, a user can do
   only what their admin ticks under their name on the admin page (the server checks this on every request):
   - **निशान लगा सकते हैं** — set marks on slips
-  - **पूरा वार्ड देख सकते हैं** — list a whole ward with no name typed
-  - **वार्ड की सभी पर्चियाँ** — print / save a whole ward's slips
+  - (listing a whole ward and its slips' download are no longer permissions: anyone sees a ward's first 20 slips
+    free and buys the rest for ₹100 — see below)
   - **पर्ची प्रिंट** — the प्रिंट / PDF button on a slip
   - **वार्ड अनुसार प्रगति देख सकते हैं** — a green **वोटर रिपोर्ट** button at the top of the app (next to where admins
     see **एडमिन**) opens the per-ward table (**↻ रिफ्रेश** reloads it, **✕** closes it): कुल, वोट दिया, आ रहे, वोटर नहीं, बाकी, with a coloured bar per ward. A
@@ -172,9 +172,11 @@ deployment (e.g. to S3) first.
 3. **Add two environment variables** (Project → Settings → Environment Variables):
    - `DATA_KEY` = the text in `app-build/DATA_KEY.txt`
    - `ADMIN_PASSWORD` = the superadmin password (long, not shared with anyone)
-   - optional, for UPI payment in the app: `JADUPE_TOKEN` = the API token from jadupe.com → APIs and Documentation (the
-     part after `Bearer `). Without it the app offers only WhatsApp to the admin. On JaduPe set the webhook URL to
-     `https://raj-voter.vercel.app/api/pay`.
+   - optional, for online payment in the app: `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` from Razorpay's dashboard →
+     Account & Settings → API Keys. Without them the buy window says online payment is not working. Optionally, in
+     Razorpay → Webhooks add `https://www.rajelection.com/api/pay` with at least `order.paid`, `payment.captured` and
+     `payment.authorized` (other events are answered and ignored), and put the webhook's secret in `RZP_WB_SECRET`:
+     webhooks without that signature are refused.
 4. **Redeploy** (Deployments → ⋯ → Redeploy) so the variables take effect.
 
 ## Signing up with a mobile number, and getting more searches
@@ -211,57 +213,35 @@ The login page asks only for the **mobile number** first:
 - Logins made by an admin can buy searches too: they keep their daily limit, and the bought searches are used only
   once the day's are used up (counted for good under `paid:<id>`, like a sign-up's). The app shows **🛒 और सर्च
   खरीदें** to them as well, opens the window when the day's searches and bought ones are both used up, and the count
-  line says e.g. "आज की सर्च पूरी · खरीदी 297 सर्च बाकी". On the admin page they get both the limit box and **सर्च जोड़ें**,
+  line says e.g. "आज की सर्च पूरी · खरीदी 297 सर्च बाकी". On the admin page they get the limit box,
   a "₹ खरीदी · N सर्च बाकी" badge, and the bought searches used beside today's.
 
-More searches: the **🛒 और सर्च खरीदें** window offers packs (`PACKS` in `index.html`, `admin.html` and `api/_lib.js`;
-the ₹1-a-search price is shown struck through beside the pack price, with the saving): 100 searches
-₹100, 200 ₹200, 500 ₹400, 800 ₹650, 1000 ₹800. The person picks one, pays the admin, and the **💬 WhatsApp** button
-opens a chat with that person's admin: whoever made the login (the superadmin, or a village admin who is still active,
-has a number and looks after the village), else — for a self sign-up — the village's admin with the fewest villages,
-using the mobile number on the admin's login (so give every village admin a number); with no such admin, the
-superadmin, i.e. the app's number (`WHATSAPP` in `index.html`). The request is kept as sent to that admin (`to`), and
-only that admin sees it under 🔔 (the superadmin sees all, with "भेजा: <name>"); the window closes once WhatsApp opens. The message has the person's name,
-mobile number, village, the pack and a link `/<request id>` (8 digits): the request is made only when that button is
-tapped (picking a pack makes none) and kept on the server
-(`req:<id>`, `api/signup.js` "request"; asking for the same pack again sends the same request) and the link itself
-shows nothing about the person. Opening it shows the admin login (only an admin password gets in; a person's own
-password is refused), then the **✅ सर्च मंज़ूरी** popup: the person with **📞 कॉल करें** and WhatsApp buttons to follow
-up, their searches so far, the pack asked for and what the payment should be. The admin picks or changes the number to
-match the payment and taps **✓ भुगतान मिल गया — N सर्च जोड़ें**; a WhatsApp button then tells the person. A request
-can be approved once: opening its link later shows "यह अनुरोध मंज़ूर हो चुका है" with how many, by whom and when, and
-nothing to do. **✕ अस्वीकार करें** (tap twice) closes a request without searches, e.g. when no payment came; its link then
-shows "अस्वीकार किया जा चुका है" and a WhatsApp button can tell the person. An admin of another village gets "not in your list" (the server checks too). Older messages with
-`/admin#add=<mobile>&n=<searches>&v=<village>` still open the same popup.
-The **🔔** button at the top of the admin page shows how many requests are waiting (red number, refreshed every
-minute) and lists the admin's requests: waiting ones first, then those approved (with the ₹ collected and which admin collected
-it) or rejected in the last 30 days; tapping one opens the approval popup; **↻** in the popup fetches them again. A village admin sees only requests made
-from their own villages by people of those villages; the superadmin sees all. Every approval records the payment
-(the pack's price, else ₹1 a search); searches added by hand with **सर्च जोड़ें** are recorded too, as "हाथ से जोड़ी".
-The superadmin also sees **💰 कुल वसूली**: the total collected, and per admin the ₹, number of payments and searches
-(all time, `pay:*` keys); a village admin sees **💰 आपकी वसूली**, only what they collected themself.
-**हिसाब (ledger):** a tap on an admin's row (a village admin: on "📒 हिसाब देखें") lists every payment that admin
-collected and every handover to the superadmin, newest first, with वसूली / जमा किया / बाकी. When an admin hands over
-the money, the superadmin records it there (₹ and a note such as cash / UPI; a wrong entry can be removed), and the
-बाकी (due) goes down; "एडमिन से आना बाकी" on the superadmin's box is the total still due from all admins
-(`settle:<admin id>` and `pay:settled` keys). Searches can also be added by hand in
-the people list: **सर्च जोड़ें** with the pack sizes or any number. Those logins are tagged "₹ भुगतान किया" and no
-longer count for the free sign-up tiers.
+More searches: the **🛒 और सर्च खरीदें** window offers packs (`PACKS` in `index.html` and `api/_lib.js`; the
+₹1-a-search price is shown struck through beside the pack price, with the saving): 100 searches ₹100, 200 ₹200,
+500 ₹400, 800 ₹650, 1000 ₹800. Searches are **only bought online** through Razorpay. Admins neither collect money nor
+add searches by hand (both removed in 2026-11), so there is no WhatsApp request to an admin, no approval and no हिसाब
+(ledger) any more. Searches come only from the free sign-up searches, invites, coupons and online payments. Admins still
+set daily limits and "extra today" for the logins they made.
 Signed-up logins are tagged "बनाया: खुद, मोबाइल नंबर से" and show their searches instead of a daily limit; admin-made
 logins show their daily limit and, once they have bought some, their bought searches as well.
 
-**Paying online by UPI (JaduPe):** with `JADUPE_TOKEN` set, the buy window has only **💳 ₹X UPI से अभी भुगतान करें**
-instead of the WhatsApp button (`api/pay.js`); if JaduPe refuses (e.g. "Please complete KYC and wait for admin
-approval"), the window says so and shows the WhatsApp button after all. It makes a request (gw `jadupe`, sent to the superadmin) and a JaduPe transaction
-for the pack's price, and opens JaduPe's payment page, which comes back to `/<village>?pay=<request id>`; the app then
-shows whether the payment came and the searches were added. The searches are added by themselves when JaduPe says the
-transaction is **completed** for at least the pack's price (within ₹1): checked when the person comes back, when
-JaduPe calls the webhook (`/api/pay`), or when the superadmin opens the request. The payment status is always asked
-from JaduPe with our token, never taken from the webhook's own data, so a made-up webhook adds nothing. A **timeout** /
-**error** closes the request as rejected. The money goes to the superadmin's JaduPe account, so it counts as collected by the superadmin
-("UPI ऑनलाइन (JaduPe)" in the ledger) and no admin owes it. Open online requests show only to the superadmin, marked
-"💳 UPI ऑनलाइन". JaduPe needs a mobile number: a login without one is sent as `JADUPE_MOBILE` (default 9999999999);
-the email sent is `JADUPE_EMAIL` (default noreply@raj-voter.vercel.app).
+**Paying online (Razorpay):** with the Razorpay keys set, the buy window has **💳 ₹X अभी ऑनलाइन भुगतान करें**
+(`api/pay.js`). Without the keys, or if Razorpay refuses, it says online payment is not working right now. A tap makes a
+purchase (`req:<id>`, gw `razorpay`) and a Razorpay **order** for that purchase's exact price (coupons included), and
+opens Razorpay's checkout on the page itself. The amount, the person's name and mobile number are filled in and locked
+(mobile and email hidden), so the person only picks how to pay: UPI, card, net banking, wallet, EMI or pay later.
+
+The searches are added by themselves when Razorpay says the order is **paid** for at least the price (within ₹1); a
+payment that is only authorized is captured first. This is checked right after the checkout (its signature checked
+too), when Razorpay calls the webhook (`/api/pay`), or when the superadmin opens the purchase. The status is always
+asked from Razorpay with our keys, never taken from the webhook's own data. Each purchase is credited once. Then a popup
+says **"🎉 भुगतान हो गया — आपको X सर्च मिलीं!"** (bought + a coupon's free ones, and the new total; it closes by itself after 4 seconds), and the search
+count on the page changes at once.
+
+The superadmin's **🔔** lists the online purchases: open ones first, then those paid or closed in the last 30 days,
+with the ₹ received. An open one can be checked with Razorpay again, or closed with **✕ बंद करें** (tap twice) when a
+payment never came. Village admins don't see purchases. Requests left open from before (WhatsApp requests to admins,
+JaduPe, Instamojo) show there too, for the superadmin to close.
 
 ## Coupons (कूपन)
 
@@ -280,9 +260,9 @@ It can carry these conditions (blank or 0 = no condition):
 - **first purchase only**;
 - **on / off**.
 
-A buyer types the code in the buy window and taps **लागू करें**. The packs then show the new prices, and the WhatsApp request or UPI payment goes out at that price. The admin's request screen shows the coupon and the price to collect.
+A buyer types the code in the buy window and taps **लागू करें**. The packs then show the new prices, and the Razorpay order is made for that price.
 
-A coupon is counted as used only when the purchase is approved or paid. If the admin approves a different number of searches than were asked for, the coupon is dropped. A price never goes below ₹1. Deleting a coupon does not change requests already made with it.
+A coupon is counted as used only when the purchase is paid. A price never goes below ₹1. Deleting a coupon does not change requests already made with it.
 
 ## Referrals (दोस्तों को बुलाएं)
 Every user login has a **🎁 दोस्तों को बुलाएं** button in the app (next to the search count). It sends their link
@@ -334,7 +314,12 @@ Log in with the superadmin password or a village admin's password (or log into a
 - **प्रिंट / PDF** on a slip: prints that one slip in the top-left corner of an A4 page. To download instead, choose
   **Save as PDF** in the phone's print screen (iPhone: Print → share → Save to Files).
 - **वार्ड N की सभी पर्चियाँ** (after choosing a ward): every voter of that ward in box order, two slips per row (about
-  10 per A4 page), to print or save as one PDF.
+  10 per A4 page), to print or save as one PDF. Choosing only a ward lists its voters in box order, 10 at a time;
+  everyone (not the demo) sees the **first 20 free**, then a 🔒 card offers the rest. **A ward costs ₹100**, which opens
+  both its full list and this download, paid online through Razorpay like a
+  search pack (the button reads "⬇ वार्ड N की सभी पर्चियाँ · ₹100"). Once paid, that login can download that ward
+  again any time free; the superadmin and village admins never pay. The purchase shows in the admin page's payment list
+  as "वार्ड N की सभी पर्चियाँ". The demo can't download a whole ward.
 - **Marks**: under each slip, **वोट दिया** (green), **आ रहे हैं** (yellow, on the way) or **वोटर नहीं है** (red, not a
   voter here). Tapping the lit button again removes it. Every user of the village sees the coloured bar with who set it
   and when (e.g. "आ रहे हैं · Ramesh, 4 नव॰, 10:30 am"); phones showing the slip pick up new marks within a minute (and at

@@ -1,6 +1,6 @@
 // POST {village, token} → {active, name, admin, role, villages, perms, cand (the user's candidate's name, or ''), reason, demo,
 //   left (demo searches remaining, or bought searches remaining with prepaid: true), bought (a login with a daily limit:
-//   its bought searches remaining), canBuy, online (canBuy and UPI payment through JaduPe is set up), adminPhone (canBuy: whom to ask for more searches on WhatsApp, '' → the
+//   its bought searches remaining), canBuy, online (canBuy and UPI payment through Razorpay is set up), adminPhone (canBuy: whom to ask for more searches on WhatsApp, '' → the
 //   app's number), movesLeft (a signed-up login: how many more times it may change its own village, api/signup.js "move"),
 //   survey (which marks this login uses, markModeOf in _lib.js)}.
 //   The app calls this when it opens.
