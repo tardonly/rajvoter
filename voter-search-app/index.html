@@ -275,14 +275,12 @@
   .elecbar .left { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: #1d4ed8; color: #fff; font-weight: 700; white-space: nowrap; }
   .elecbar div { width: 100%; }
   #lock .elecbar { margin: 4px 0 12px; }
-  .demobar { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa;
+  .demobar { margin: 0 auto 8px; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa;
     color: #9a3412; font-size: 13.5px; line-height: 1.5; }
   .demobar b { color: #7c2d12; }
   .demobar a { color: var(--accent); font-weight: 600; }
-  .demobar form { display: flex; gap: 6px; margin-top: 6px; }
-  .demobar input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 15px; border: 1px solid #fdba74; border-radius: 8px; }
-  .demobar form button { padding: 8px 12px; border: 0; border-radius: 8px; background: #16a34a; color: #fff; font-weight: 600; font-size: 14px; white-space: nowrap; }
-  .demobar .ask { font-weight: 600; margin-top: 6px; }
+  .demobar a.demologin { display: block; max-width: 460px; box-sizing: border-box; margin-top: 8px; padding: 10px 12px; border-radius: 10px;
+    background: var(--accent); color: #fff; text-align: center; font-size: 16px; text-decoration: none; }
   #count.bad { color: var(--bad); }
   main { padding: 10px 10px 24px; max-width: 640px; margin: 0 auto; }
   .hint { color: var(--muted); font-size: 14px; line-height: 1.6; padding: 8px 6px; }
@@ -697,9 +695,6 @@ const SLUG = PART1 === 'demo' && PART2 ? `demo-${PART2}` : PART1.replace(/\.html
 let HOME = !SLUG;
 const DEMO_PICK = 'demo', DEMO = SLUG === DEMO_PICK || SLUG.startsWith('demo-');
 const pageOf = (slug) => (slug.startsWith('demo-') ? `/demo/${slug.slice(5)}` : `/${slug}`);   // a village's address
-const WHATSAPP = '917888924374';
-const waLink = (gaon) => `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(L(`नमस्ते, मुझे गाँव ${gaon} के लिए Voter Search ऐप चाहिए।`,
-  `Hello, I would like the Voter Search app for the village ${gaon}.`))}`;
 let VILLAGE = null;
 const $ = (id) => document.getElementById(id);
 // Language: Hindi (default) or English, switched with the हिंदी / English button and remembered on this phone.
@@ -803,8 +798,8 @@ const MSG = {
   too_many: L('बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें', 'Too many wrong passwords — try again in 15 minutes'),
   slow_down: L('बहुत तेज़ सर्च — एक मिनट रुककर कोशिश करें', 'Searching too fast — wait a minute and try again'),
   limit: L('आज की सर्च सीमा पूरी हो गई — कल फिर सर्च करें या एडमिन से बात करें', 'Today\'s search limit is used up — search again tomorrow or talk to your admin'),
-  demo_limit: L('डेमो की सर्च पूरी हो गईं — अपने गाँव के लिए यह ऐप लेने को ऊपर अपने गाँव का नाम लिखकर WhatsApp करें',
-    'The demo searches are used up — to get this app for your village, type its name above and send it on WhatsApp'),
+  demo_limit: L('डेमो की सर्च पूरी हो गईं — आगे सर्च करने के लिए ऊपर "लॉगिन / साइन-अप" दबाएं',
+    'The demo searches are used up — tap "Log in / sign up" above to keep searching'),
   offline: L('इंटरनेट नहीं है — इंटरनेट चालू करें', 'No internet — please switch on the internet'),
   server: L('सर्वर में दिक्कत — थोड़ी देर बाद कोशिश करें', 'Server problem — try again in a little while'),
   no_village: L('यह गाँव नहीं मिला — पता (लिंक) जाँचें', 'Village not found — check the address (link)'),
@@ -2052,26 +2047,17 @@ async function demoLogin() {
   if (SLUG === DEMO_PICK) return myVillages(r.list);   // /demo: the villages to try
   showApp(r.name, false, r.villages, r.perms);
 }
-// the orange bar: searches left, and a box for the visitor's own village name that opens WhatsApp with it filled in
+// the orange bar: searches left, a login button to this village's own page (log in or sign up there and carry on), the video and share
 function demoBar() {
   const bar = $('demoBar');
   if (!bar.firstChild) {
-    const form = el('form'), gaon = el('input'), send = el('button', null, L('WhatsApp करें', 'Send on WhatsApp'));
-    gaon.id = 'demoGaon'; gaon.placeholder = L('अपने गाँव का नाम लिखें', 'Your village\'s name'); gaon.autocomplete = 'off';
-    send.type = 'submit';
-    form.append(gaon, send);
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = gaon.value.trim();
-      if (!name) { gaon.focus(); gaon.placeholder = L('पहले अपने गाँव का नाम लिखें', 'First type your village\'s name'); return; }
-      window.open(waLink(name), '_blank', 'noopener');
-    });
+    const login = el('a', 'demologin', L('🔑 लॉगिन / साइन-अप करके आगे सर्च करें', '🔑 Log in / sign up to keep searching'));
+    login.href = '/' + SLUG.slice('demo-'.length);
     const acts = el('div', 'homeacts'), how = el('button', null, L('▶ 30 सेकंड में देखें ऐप का कमाल', '▶ See the app in action — 30 seconds')), share = el('button', 'share', L('↗ शेयर करें', '↗ Share'));
     how.type = share.type = 'button';
     how.addEventListener('click', howOpen); share.addEventListener('click', shareOpen);
     acts.append(how, share);
-    bar.append(el('div'), el('div', 'ask', L('अपने गाँव के लिए यह ऐप चाहिए? गाँव का नाम लिखकर WhatsApp करें:',
-      'Want this app for your village? Type its name and send it on WhatsApp:')), form, acts);
+    bar.append(el('div'), login, acts);
   }
   bar.firstChild.replaceChildren(el('b', null, L('डेमो', 'Demo')), L(` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में सर्च करके देखें`,
     ` · try a search in the real voter list of the first ${VILLAGE.wards.length} wards of ${vn(VILLAGE)}`),
