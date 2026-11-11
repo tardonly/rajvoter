@@ -1602,32 +1602,9 @@ async function printSlips(rows, title) {
 let POSTER = { top: '', big: '' }, posterFor = null, posterAsk = null;
 const posterOk = () => !DEMO && (can('print') || can('wardPdf'));
 function posterImg(src, cls) { const i = el('img', cls); i.src = src; i.alt = ''; return i; }
-// a made-up poster, drawn faded where this login has none yet, so people see what kind of picture goes there
-function posterSample(slot) {
-  const big = slot === 'big', W = 1200, H = big ? 420 : 260;
-  const t = (a, b) => L(a, b).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const face = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fef3c7" stroke="#f5d48a" stroke-width="8"/>
-    <circle cx="${cx}" cy="${cy - r * .22}" r="${r * .36}" fill="#b45309" opacity=".55"/>
-    <path d="M${cx - r * .7} ${cy + r * .78} Q${cx} ${cy + r * .05} ${cx + r * .7} ${cy + r * .78} Z" fill="#b45309" opacity=".55"/>`;
-  const sym = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="22" fill="#fffbeb" stroke="#f5d48a" stroke-width="6"/>
-    <path d="M${x + w * .2} ${y + h * .48} Q${x + w / 2} ${y + h * .08} ${x + w * .8} ${y + h * .48} Z" fill="#64748b"/>
-    <path d="M${x + w / 2} ${y + h * .46} V${y + h * .66} q0 ${h * .08} ${-w * .08} ${h * .06}" stroke="#64748b" stroke-width="7" fill="none"/>
-    <text x="${x + w / 2}" y="${y + h * .88}" font-size="${h * .13}" text-anchor="middle" fill="#475569" font-weight="700">${t('चुनाव चिन्ह', 'Symbol')}</text>`;
-  const body = big
-    ? `${face(200, 225, 160)}${sym(940, 50, 220, 320)}
-       <text x="600" y="80" font-size="36" text-anchor="middle" fill="#92400e">${t('आपका एक वोट, गाँव का विकास', 'Your one vote, your village\'s progress')}</text>
-       <text x="600" y="190" font-size="92" text-anchor="middle" fill="#fff8e1" font-weight="800" stroke="#a16207" stroke-width="2">${t('उम्मीदवार का नाम', 'Candidate name')}</text>
-       <text x="600" y="260" font-size="40" text-anchor="middle" fill="#fff">${t('सरपंच प्रत्याशी · ग्राम पंचायत', 'Sarpanch candidate · Gram Panchayat')}</text>
-       <rect x="400" y="300" width="400" height="60" rx="30" fill="#fffbeb"/>
-       <text x="600" y="342" font-size="34" text-anchor="middle" fill="#92400e" font-weight="700">${t('भारी मतों से विजयी बनाएँ', 'Vote for a big win')}</text>`
-    : `${face(140, 130, 105)}${sym(990, 25, 180, 210)}
-       <text x="590" y="130" font-size="84" text-anchor="middle" fill="#fff8e1" font-weight="800" stroke="#a16207" stroke-width="2">${t('उम्मीदवार का नाम', 'Candidate name')}</text>
-       <text x="590" y="195" font-size="38" text-anchor="middle" fill="#fff">${t('सरपंच प्रत्याशी · ग्राम पंचायत', 'Sarpanch candidate · Gram Panchayat')}</text>`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="Noto Sans Devanagari, Mukta, sans-serif">
-    <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4d7c5a"/><stop offset=".5" stop-color="#6b9a6f"/><stop offset="1" stop-color="#4d7c5a"/></linearGradient></defs>
-    <rect width="${W}" height="${H}" fill="url(#g)"/><rect y="${H - 14}" width="${W}" height="14" fill="#f5d48a"/>${body}</svg>`;
-  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-}
+// an example poster (poster-sample-*.jpg, a made-up candidate), shown faded where this login has none yet, so people
+// see what kind of picture goes there
+const posterSample = (slot) => (slot === 'big' ? '/poster-sample-pdf.jpg' : '/poster-sample-slip.jpg');
 // the poster, or the faded sample, as a picture
 function posterPic(slot, cls) {
   const i = posterImg(POSTER[slot] || posterSample(slot), cls);

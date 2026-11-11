@@ -97,7 +97,7 @@ if (process.env.DEV_USER_REDIS) {
   }).listen(PORT + 1, '127.0.0.1');
 }
 
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.json': 'application/json', '.mp4': 'video/mp4' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.json': 'application/json', '.mp4': 'video/mp4' };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
