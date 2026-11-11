@@ -283,7 +283,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     <!-- after USER_REDIS_URL is set: the superadmin moves the logins, requests and payments made before out of Upstash, once -->
     <div class="card hidden" id="dbCopy">
       <b>लोगों का डेटाबेस (USER_REDIS_URL) जुड़ गया है</b>
-      <div class="sub">पहले बने व्यक्ति, एडमिन, उनके पासवर्ड, अनुरोध और भुगतान अभी Upstash में हैं — तब तक वे लॉगिन नहीं कर पाएंगे। एक बार नीचे दबाएं: ये सब नए डेटाबेस में चले जाएंगे और Upstash से हट जाएंगे। पर्चियों के निशान और उम्मीदवार Upstash में ही रहेंगे।</div>
+      <div class="sub">पहले बने यूज़र, एडमिन, उनके पासवर्ड, अनुरोध और भुगतान अभी Upstash में हैं — तब तक वे लॉगिन नहीं कर पाएंगे। एक बार नीचे दबाएं: ये सब नए डेटाबेस में चले जाएंगे और Upstash से हट जाएंगे। पर्चियों के निशान और उम्मीदवार Upstash में ही रहेंगे।</div>
       <button class="btn" id="dbCopyBtn" type="button">लोगों का डेटा नए डेटाबेस में ले जाएं</button>
       <div class="sub" id="dbCopyMsg"></div>
     </div>
@@ -297,7 +297,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     </div>
 
     <nav class="tabs" id="tabs" role="tablist">
-      <button type="button" data-tab="people">व्यक्ति</button>
+      <button type="button" data-tab="people">यूज़र</button>
       <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
       <button type="button" data-tab="cands">उम्मीदवार</button>
       <button type="button" data-tab="prog">प्रगति</button>
@@ -403,7 +403,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
           <label class="fr num"><span>कुल कितनी बार</span><input id="cpnMax" type="number" min="0" inputmode="numeric" placeholder="0"></label>
           <label class="fr num"><span>आखिरी दिन</span><input id="cpnUntil" type="date"></label>
         </div>
-        <label class="fr"><input type="checkbox" id="cpnOnce" checked> <span>एक व्यक्ति सिर्फ़ एक बार</span></label>
+        <label class="fr"><input type="checkbox" id="cpnOnce" checked> <span>एक यूज़र सिर्फ़ एक बार</span></label>
         <label class="fr"><input type="checkbox" id="cpnFirst"> <span>सिर्फ़ पहली खरीद पर</span></label>
         <label class="fr"><input type="checkbox" id="cpnOn" checked> <span>चालू</span></label>
         <label class="fr"><input type="checkbox" id="cpnShow" checked> <span>खरीद विंडो में सबको दिखाएं (नहीं तो सिर्फ़ जिसे कोड पता हो)</span></label>
@@ -461,7 +461,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     </div>
 
     <div class="card pane" data-tab="people">
-      <div class="bar2"><h2>व्यक्ति</h2><button class="btn" id="openAdd" type="button">+ नया व्यक्ति</button></div>
+      <div class="bar2"><h2>यूज़र</h2><button class="btn" id="openAdd" type="button">+ नया यूज़र</button></div>
       <div class="filter">
         <button type="button" data-f="on" class="on">चालू</button>
         <button type="button" data-f="off">बंद</button>
@@ -540,11 +540,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
 <!-- popup: add a person -->
 <div class="modal hidden" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
   <div class="card">
-    <div class="bar2"><h2 id="addTitle">नया व्यक्ति जोड़ें</h2><button class="x" id="closeAdd" type="button" aria-label="बंद करें">✕</button></div>
+    <div class="bar2"><h2 id="addTitle">नया यूज़र जोड़ें</h2><button class="x" id="closeAdd" type="button" aria-label="बंद करें">✕</button></div>
     <form id="addForm" class="stack" autocomplete="off">
       <select id="newSamiti" class="hidden" aria-label="पंचायत समिति"></select>
       <select id="newVillage" required><option value="">गाँव चुनें</option></select>
-      <input id="newName" type="text" placeholder="व्यक्ति का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
+      <input id="newName" type="text" placeholder="यूज़र का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
       <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
       <div id="newAreas" class="checks hidden"></div>
       <select id="newCand" class="hidden" aria-label="उम्मीदवार"></select>
@@ -578,12 +578,12 @@ const STATIC_EN = {
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
   'एडमिन पासवर्ड': 'Admin password', 'मोबाइल नंबर (अपना बनाया पासवर्ड हो तो)': 'Mobile number (if you chose your own password)', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
   'पार्टियाँ': 'Parties', 'चुनाव चिन्ह चुनें': 'Choose symbol', 'पार्टी का नाम': 'Party name', 'पार्टी जोड़ें': 'Add party',
-  'व्यक्ति': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'वोटर लिस्ट': 'Voter list', 'निशान हटाएं': 'Clear marks',
+  'यूज़र': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'वोटर लिस्ट': 'Voter list', 'निशान हटाएं': 'Clear marks',
   'बंद करें': 'Close', 'कॉपी करें': 'Copy', 'WhatsApp पर भेजें': 'Send on WhatsApp',
   'यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।': 'This password is shown only now. If it is forgotten, make another with "New password".',
   'नया एडमिन जोड़ें': 'Add a new admin', 'एडमिन सिर्फ़ अपने गाँवों में लोग जोड़ और बंद कर सकता है।': 'An admin can add and switch off people only in their own villages.',
   'एडमिन का नाम': 'Admin\'s name', 'WhatsApp मोबाइल नंबर (जैसे 98765 43210)': 'WhatsApp mobile number (e.g. 98765 43210)',
-  'एडमिन बनाएं': 'Create admin', 'सभी एडमिन': 'All admins', '+ नया व्यक्ति': '+ New person', 'चालू': 'Active', 'बंद': 'Off', 'सभी': 'All',
+  'एडमिन बनाएं': 'Create admin', 'सभी एडमिन': 'All admins', '+ नया यूज़र': '+ New person', 'चालू': 'Active', 'बंद': 'Off', 'सभी': 'All',
   'गाँव': 'Village', 'सभी गाँव': 'All villages',
   'हर उम्मीदवार के कार्यकर्ता (3–4 पासवर्ड) एक समूह हैं: वे सिर्फ़ अपने उम्मीदवार के निशान लगाते और देखते हैं,\n        दूसरे उम्मीदवार के लोग ये निशान नहीं देख सकते। बिना उम्मीदवार वाले लोग गाँव के आम निशान देखते हैं।':
     'Each candidate\'s workers (3–4 passwords) are a group: they set and see only their own candidate\'s marks, and other candidates\' people cannot see them. People without a candidate see the village\'s common marks.',
@@ -591,8 +591,8 @@ const STATIC_EN = {
   'ताज़ा करें': 'Refresh', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards', 'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter',
   'बाकी': 'Remaining', 'और दिखाएं': 'Show more', 'पर्चियों के निशान हटाएं': 'Clear the marks on the slips',
   'बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।': 'A button clears all marks of that colour in that village, on everyone\'s phone.',
-  'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया व्यक्ति जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village', 'पंचायत समिति': 'Panchayat samiti',
-  'व्यक्ति का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'पासवर्ड बनाएं': 'Make password',
+  'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया यूज़र जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village', 'पंचायत समिति': 'Panchayat samiti',
+  'यूज़र का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'पासवर्ड बनाएं': 'Make password',
 };
 (function translatePage() {
   for (const b of document.querySelectorAll('[data-lang]')) {
@@ -634,7 +634,7 @@ const MSG = EN ? {
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
   no_perm: 'You are not allowed to do this — ask the super admin', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
-  no_user: 'None of your people has this mobile number — add the person first (व्यक्ति tab)', no_online: 'Online payment is not set up', gateway: 'Razorpay problem',
+  no_user: 'None of your people has this mobile number — add the person first (यूज़र tab)', no_online: 'Online payment is not set up', gateway: 'Razorpay problem',
   wallet_min: 'Withdraw at least the minimum', wallet_low: 'Not that much in the wallet', bad_upi: 'Type a correct UPI ID (name@bank)', wd_open: 'A withdrawal is already on its way', wallet_amount: 'Type the amount in ₹',
   bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
   no_party: 'Party not found', bad_icon: 'That symbol picture could not be used — choose another', no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
@@ -643,11 +643,11 @@ const MSG = EN ? {
   not_admin: 'यह एडमिन पासवर्ड नहीं है', retired: 'यह पासवर्ड बंद कर दिया गया है',
   logged_out: 'आपको लॉग आउट कर दिया गया है — दोबारा लॉगिन करें',
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
-  offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह व्यक्ति नहीं मिला',
+  offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह यूज़र नहीं मिला',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
   no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
-  no_user: 'आपके व्यक्तियों में यह मोबाइल नंबर नहीं है — पहले व्यक्ति tab में जोड़ें', no_online: 'ऑनलाइन भुगतान चालू नहीं है', gateway: 'Razorpay में दिक्कत',
+  no_user: 'आपके यूज़र्स में यह मोबाइल नंबर नहीं है — पहले यूज़र tab में जोड़ें', no_online: 'ऑनलाइन भुगतान चालू नहीं है', gateway: 'Razorpay में दिक्कत',
   wallet_min: 'कम से कम न्यूनतम राशि निकालें', wallet_low: 'वॉलेट में इतने ₹ नहीं हैं', bad_upi: 'सही UPI ID लिखें (name@bank)', wd_open: 'एक निकासी पहले से चल रही है', wallet_amount: 'राशि ₹ में लिखें',
   bad_credits: 'कितनी सर्च जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में सर्च नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_party: 'यह पार्टी नहीं मिली', bad_icon: 'यह चिन्ह की फ़ोटो नहीं चल सकी — दूसरी चुनें', no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
@@ -823,7 +823,7 @@ function showWardPay(on) {
   $('wpTitle').textContent = L('वार्ड की पर्चियाँ डाउनलोड', 'Ward slips download');
   $('wpNow').textContent = on ? L('₹50 प्रति वार्ड', '₹50 a ward') : L('सबके लिए मुफ़्त', 'free for everyone');
   $('wpOnText').textContent = L('पैसे लें (₹50 प्रति वार्ड) — बंद करें तो सबके लिए मुफ़्त', 'Charge (₹50 a ward) — off = free for everyone');
-  $('wpHow').textContent = L('किसी एक व्यक्ति के लिए अलग: व्यक्ति tab में उसके कार्ड पर "वार्ड पर्चियाँ" चुनें। सिर्फ़ सुपर-एडमिन कभी पैसे नहीं देते।', 'For one person: choose "Ward slips" on their card in the People tab. Only the superadmin never pays.');
+  $('wpHow').textContent = L('किसी एक यूज़र के लिए अलग: यूज़र tab में उसके कार्ड पर "वार्ड पर्चियाँ" चुनें। सिर्फ़ सुपर-एडमिन कभी पैसे नहीं देते।', 'For one person: choose "Ward slips" on their card in the People tab. Only the superadmin never pays.');
   $('wpOn').checked = WARD_PAY;
   if (me && users.length) render();   // the person cards say what "as for everyone" is now
 }
@@ -1043,7 +1043,7 @@ $('walSearchGo').addEventListener('click', () => walletDo({ action: 'wallet_sear
 let COUPONS = [], cpnEdit = null;
 const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट${c.maxOff ? ` (₹${c.maxOff} तक)` : ''}` : c.kind === 'rs' ? `₹${c.value} छूट`
   : c.kind === 'bonuspct' ? `${c.value}% ज़्यादा सर्च मुफ़्त${c.maxOff ? ` (${c.maxOff} सर्च तक)` : ''}` : `${c.value} सर्च मुफ़्त`);
-const cpnRules = (c) => [c.show ? 'खरीद विंडो में दिखता है (जो इसे अभी लगा सकें उन्हें)' : 'छुपा (सिर्फ़ कोड से)', c.minN && c.maxN ? `${c.minN}–${c.maxN} सर्च के पैक पर` : c.minN ? `${c.minN}+ सर्च के पैक पर` : c.maxN ? `${c.maxN} तक सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
+const cpnRules = (c) => [c.show ? 'खरीद विंडो में दिखता है (जो इसे अभी लगा सकें उन्हें)' : 'छुपा (सिर्फ़ कोड से)', c.minN && c.maxN ? `${c.minN}–${c.maxN} सर्च के पैक पर` : c.minN ? `${c.minN}+ सर्च के पैक पर` : c.maxN ? `${c.maxN} तक सर्च के पैक पर` : '', c.once ? 'एक यूज़र एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
   c.until ? `${c.until} तक` : '', `${c.used}${c.maxUses ? `/${c.maxUses}` : ''} बार इस्तेमाल`].filter(Boolean).join(' · ');
 function showCoupons(list) {
   $('cpnCard').classList.toggle('hidden', !list);
@@ -1410,7 +1410,7 @@ function setMode(survey) {
   $('modeTitle').textContent = L('पर्ची के निशान', 'Marks on the slips');
   $('modeNow').textContent = survey ? L('अभी: सर्वे', 'now: survey') : L('अभी: मतदान दिवस', 'now: polling day');
   $('modeHelp').textContent = L('सर्वे (चुनाव से पहले): अपना वोट / सोच रहे हैं / विपक्ष। मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है। दोनों के निशान अलग रखे जाते हैं — बदलने पर कोई निशान नहीं मिटता, और मतदान दिवस पर हर पर्ची पर उसका सर्वे का निशान भी दिखता है। ' +
-    (forAll ? 'यहाँ बदलने पर सबके फ़ोन बदल जाते हैं; उसके बाद हर व्यक्ति ऐप में अपने लिए फिर बदल सकता है।' : 'यह सिर्फ़ आपके लिए है — ऐप में भी बदल सकते हैं।'),
+    (forAll ? 'यहाँ बदलने पर सबके फ़ोन बदल जाते हैं; उसके बाद हर यूज़र ऐप में अपने लिए फिर बदल सकता है।' : 'यह सिर्फ़ आपके लिए है — ऐप में भी बदल सकते हैं।'),
     'Survey (before the election): our vote / undecided / opposition. Polling day: voted / coming / not a voter. The two are kept apart — switching erases no mark, and on polling day each slip also shows its survey mark. ' +
     (forAll ? 'Switching here switches every phone; after that each person can switch back for themself in the app.' : 'This is only for you — you can switch in the app too.'));
   document.querySelectorAll('#modeCard button[data-mode]').forEach((b) => {
@@ -1553,7 +1553,7 @@ function permBoxes(u, msg = 'listMsg', saved) {
 
 // superadmin: what a village admin may do here (ADMIN_PERMS in api/_lib.js)
 const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they made', all: 'Sees every user of their villages' }
-  : { add: 'नए व्यक्ति बना सकते हैं', own: 'अपने बनाए व्यक्ति देख सकते हैं', all: 'अपने गाँवों के सभी व्यक्ति देख सकते हैं' };
+  : { add: 'नए यूज़र बना सकते हैं', own: 'अपने बनाए यूज़र देख सकते हैं', all: 'अपने गाँवों के सभी यूज़र देख सकते हैं' };
 function adminPermBoxes(u, msg = 'listMsg') {
   const box = el('div', 'perms'), keys = Object.keys(APERM_NAME);
   for (const p of keys) {
@@ -1614,7 +1614,7 @@ function showPassword(u, pw) {
   // superadmin can change an admin's right here too
   const isUser = u.role === 'user' && u.perms, isAdm = u.role === 'admin' && u.perms && me.role === 'super';
   $('newPwPerms').classList.toggle('hidden', !isUser && !isAdm);
-  $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', L('यह व्यक्ति क्या कर सकता है:', 'What this person may do:')), permBoxes(u, 'newPwMsg', refresh),
+  $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', L('यह यूज़र क्या कर सकता है:', 'What this person may do:')), permBoxes(u, 'newPwMsg', refresh),
     ...(u.prepaid ? [] : [limitBox(u, 'newPwMsg', refresh)])]   // bought searches have no daily limit
     : isAdm ? [el('div', 'ph', L('यह एडमिन क्या कर सकता है — ऐप में:', 'What this admin may do — in the app:')), permBoxes(u, 'newPwMsg', refresh),
       el('div', 'ph', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u, 'newPwMsg'), limitBox(u, 'newPwMsg', refresh)] : []));
@@ -1770,7 +1770,7 @@ function render() {
   const fv = $('fVillage').value;
   const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv));
   const list = $('list'); list.innerHTML = '';
-  if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? L('कोई बंद पासवर्ड नहीं', 'No switched-off passwords') : L('अभी कोई व्यक्ति नहीं — "+ नया व्यक्ति" से जोड़ें', 'Nobody yet — add someone with "+ New person"')));
+  if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? L('कोई बंद पासवर्ड नहीं', 'No switched-off passwords') : L('अभी कोई यूज़र नहीं — "+ नया यूज़र" से जोड़ें', 'Nobody yet — add someone with "+ New person"')));
   paged(list, shown, person, `people:${filter}:${fv}`);
   renderCands();
   const al = $('adminList'); al.innerHTML = '';
@@ -1808,7 +1808,7 @@ function renderCands() {
     }
     // add someone already made (a user of this village not in this group)
     const add = el('div', 'row'), pick = el('select'), go = el('button', 'btn ghost', L('जोड़ें', 'Add'));
-    pick.add(new Option(L('व्यक्ति चुनें…', 'Choose a person…'), ''));
+    pick.add(new Option(L('यूज़र चुनें…', 'Choose a person…'), ''));
     for (const u of users.filter((x) => x.village === c.village && !x.retired && x.cand !== c.id)) {
       const other = u.cand && candOf(u.cand);
       pick.add(new Option(other ? L(`${u.name} (अभी ${other.name} के साथ)`, `${u.name} (now with ${other.name})`) : u.name, u.id));
@@ -1975,7 +1975,7 @@ function candBox(u) {
 // the admins' own note on a person: only on this page, saved when the box loses focus (no list redraw, so typing is not lost)
 function noteBox(u) {
   const box = el('div', 'anote'), ta = document.createElement('textarea'), msg = el('div', 'notemsg', '');
-  ta.placeholder = L('नोट लिखें (सिर्फ़ एडमिन पेज पर दिखेगा)', 'Write a note (shown only on the admin page)');
+  ta.placeholder = u.role === 'admin' ? L('इस एडमिन के बारे में लिखें', 'Write about this admin') : L('इस यूज़र के बारे में लिखें', 'Write about this user');
   ta.maxLength = 1000; ta.value = u.note || ''; ta.rows = 2;
   ta.addEventListener('change', async () => {
     msg.textContent = L('सेव हो रहा है…', 'Saving…');
@@ -2073,7 +2073,7 @@ function person(u) {
       `Invited ${invited.length} · ${u.refBought || invBought} bought searches · reward${u.refCash ? ` ₹${u.refCash} cashback` : ''}${u.refBonus ? ` (incl. ₹${u.refBonus} bonus)` : ''}${u.refEarned ? ` ${u.refEarned} searches` : ''}`),
     (u.wallet || u.walletOut) && L(`💰 वॉलेट ₹${u.wallet}${u.walletOut ? ` · ₹${u.walletOut} UPI में निकाले` : ''}`, `💰 Wallet ₹${u.wallet}${u.walletOut ? ` · ₹${u.walletOut} taken out by UPI` : ''}`),
   ].filter(Boolean).join(' · ')) : null;
-  row.append(nm, ph, info, sess, ...(meter ? [meter] : []), noteBox(u), use, ...(refLine ? [refLine] : []));
+  row.append(nm, ph, info, sess, ...(meter ? [meter] : []), ...(u.id === me.id ? [] : [noteBox(u)]), use, ...(refLine ? [refLine] : []));
   if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
       limitBox(u, 'listMsg', refresh), wardPayBox(u));   // a daily limit; ward slips paid or free
@@ -2084,7 +2084,7 @@ function person(u) {
   const actions = el('div', 'actions');
   if (!isAdmin && !u.retired && me.role === 'super') {   // a user becomes a village admin of their village, same login
     const up = el('button', 'btn ghost', L('एडमिन बनाएं', 'Make admin'));
-    up.addEventListener('click', () => act({ action: 'promote', id: u.id }, L(`${u.name} को ${vName(u.village)} का एडमिन बनाएं? वही नंबर और पासवर्ड रहेगा; वे नए व्यक्ति बना सकेंगे और अपने व्यक्ति देख सकेंगे। बाद में "एडमिन" टैब में बदल सकते हैं।`,
+    up.addEventListener('click', () => act({ action: 'promote', id: u.id }, L(`${u.name} को ${vName(u.village)} का एडमिन बनाएं? वही नंबर और पासवर्ड रहेगा; वे नए यूज़र बना सकेंगे और अपने यूज़र देख सकेंगे। बाद में "एडमिन" टैब में बदल सकते हैं।`,
       `Make ${u.name} an admin of ${vName(u.village)}? Same number and password; they can make new users and see their own users. Change this later in the Admins tab.`)));
     actions.append(up);
   }
