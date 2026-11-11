@@ -543,6 +543,22 @@ async function refInviter(code, phone) {
   return u && canBuy(u) && u.role === 'user' && u.retired !== '1' && u.phone !== phone ? u : null;
 }
 
+// the referrer a buyer names at checkout (api/pay.js 'start' with ref): their code (login id, as in the invite link) or
+// their mobile number → an active user login that may invite, never the buyer themself (same login or number); else null
+async function refBuyer(code, me) {
+  code = String(code || '').trim().toLowerCase();
+  let u = null;
+  if (/^[0-9a-f]{10}$/.test(code)) u = await getUser(code);   // a 10-digit mobile number looks like a code too
+  if (!u) {
+    const ph = normPhone(code);
+    if (ph) {
+      const l = (await phoneLogins(ph)).find((x) => x.role === 'user' && x.retired !== '1');
+      u = l ? await getUser(l.id) : null;
+    }
+  }
+  return u && canBuy(u) && u.role === 'user' && u.retired !== '1' && u.id !== me.id && (!me.phone || u.phone !== me.phone) ? u : null;
+}
+
 // every login with this mobile number (normPhone form): [{id, role, village, villages, retired, self}]
 async function phoneLogins(phone) {
   if (!phone) return [];
@@ -701,7 +717,7 @@ async function addPaid(u, n, r, by) {
   const first = await redis('HSETNX', `user:${u.id}`, 'bought', '1');   // 1: this is the login's first purchase
   const cpn = asked && r.coupon && (await useCoupon(r.coupon, u.id, Number(first) === 1)) ? r.coupon : '';
   const bonus = cpn ? Number(r.bonus) || 0 : 0;
-  await refReward(u.id, rs);
+  await refReward(u.id, rs, r && r.ref);
   await redis('HINCRBY', `user:${u.id}`, 'credits', n + bonus);
   await redis('SREM', 'free', u.id);
   const id = r ? r.id : await newReqId();
@@ -726,7 +742,7 @@ const wardsPaid = async (u, slug) => (wardFree(u) || !u ? [] : ((await redis('SM
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
   await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
-  await refReward(u.id, rs);
+  await refReward(u.id, rs, r.ref);
   await redis('HSET', `req:${r.id}`, 'status', 'done', 'doneAt', new Date().toISOString(), 'doneN', 0, 'doneRs', rs, 'doneBy', by.id, 'doneByName', by.name);
   await redis('HINCRBY', 'pay:rs', by.id, rs);
   await redis('HINCRBY', 'pay:count', by.id, 1);
@@ -735,11 +751,17 @@ async function wardDone(u, r, by) {
 // login id paid ₹rs: its inviter (refBy) gets the rule's pct% of it as cashback, and on its first purchase it counts
 // toward the inviter's refBought, every bonusAt-th of which brings the bonus too (HINCRBY: two friends buying at once
 // can't both be the 5th)
-async function refReward(id, rs) {
-  const refBy = await redis('HGET', `user:${id}`, 'refBy');
-  if (!refBy) return;
-  const first = Number(await redis('HSETNX', `user:${id}`, 'refPaid', '1')) === 1;
-  const rule = await refRule(), inv = await getUser(refBy);
+// via: the referrer the buyer named at checkout (req field ref, refBuyer): a buyer with no inviter yet becomes theirs
+// (refBy, so later purchases reward them too), and this purchase's cashback goes to them either way; a buyer counts once
+// toward each such referrer's refBought (set refbuyers:<referrer>)
+async function refReward(id, rs, via) {
+  if (via) await redis('HSETNX', `user:${id}`, 'refBy', via);
+  const refBy = await redis('HGET', `user:${id}`, 'refBy'), to = via || refBy;
+  if (!to) return;
+  if (to === refBy && via) { const inv0 = await getUser(via); if (inv0) await redis('HSETNX', `user:${id}`, 'refByName', inv0.name || ''); }
+  const first = to === refBy ? Number(await redis('HSETNX', `user:${id}`, 'refPaid', '1')) === 1
+    : Number(await redis('SADD', `refbuyers:${to}`, id)) === 1;
+  const rule = await refRule(), inv = await getUser(to);
   if (!inv || inv.retired === '1') return;
   const count = first ? Number(await redis('HINCRBY', `user:${inv.id}`, 'refBought', 1)) : 0;
   if (!rule.on) return;
@@ -1007,7 +1029,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

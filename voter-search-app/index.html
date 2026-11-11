@@ -77,6 +77,8 @@
   .pack small { font-size: 11.5px; color: #15803d; font-weight: 600; }
   .cpnrow { display: flex; gap: 6px; margin: 8px 0 2px; }
   .cpnrow input { flex: 1; min-width: 0; text-transform: uppercase; font-size: 15px; padding: 8px 10px; border: 1.5px dashed #a855f7; border-radius: 8px; }
+  .refrow input { text-transform: none; border-color: #0d9488; }
+  .refrow .cpnbtn { background: #0d9488; }
   .cpnbtn { border: 0; border-radius: 8px; padding: 8px 14px; background: #7c3aed; color: #fff; font-weight: 600; font-size: 14px; }
   .cpnbtn:disabled { opacity: .6; }
   .cpnlist { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
@@ -1954,6 +1956,7 @@ const rzpScript = () => (rzpLoad ||= new Promise((ok, no) => {
   sc.onload = () => ok(); sc.onerror = () => { rzpLoad = null; no(new Error('checkout')); };
   document.head.append(sc);
 }));
+let BUY_REF = '';   // who asked this person to buy: their referral code or mobile number, checked (api/pay.js 'ref_check')
 function buyUpi([n, rs], coupon = '', bonus = 0) {
   const label = L(`💳 ₹${rs} अभी ऑनलाइन भुगतान करें`, `💳 Pay ₹${rs} now online`);
   const a = el('button', 'btn upibtn', label); a.type = 'button';
@@ -1961,7 +1964,7 @@ function buyUpi([n, rs], coupon = '', bonus = 0) {
   a.addEventListener('click', async () => {
     if (a.disabled) return;
     a.disabled = true; a.textContent = L('⏳ भुगतान खुल रहा है…', '⏳ Opening the payment…');
-    const [r] = await Promise.all([api('pay', { action: 'start', token: token(), n, coupon }), rzpScript().catch(() => null)]);
+    const [r] = await Promise.all([api('pay', { action: 'start', token: token(), n, coupon, ...(BUY_REF ? { ref: BUY_REF } : {}) }), rzpScript().catch(() => null)]);
     if (r.order && window.Razorpay) {
       const rzp = new window.Razorpay({
         key: r.key, order_id: r.order, amount: r.amount, currency: 'INR', name: 'Voter Search', description: r.description,
@@ -1976,6 +1979,7 @@ function buyUpi([n, rs], coupon = '', bonus = 0) {
     }
     reset();
     if (CPN_MSG[r.error]) { a.textContent = CPN_MSG[r.error](r); return; }
+    if (r.error === 'ref_bad') { a.textContent = L('⚠ रेफ़रल कोड सही नहीं — हटाकर फिर दबाएं', '⚠ Referral code not valid — remove it and tap again'); return; }
     if (r.error === 'too_many') { a.textContent = L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow'); return; }
     a.replaceWith(payOff());   // online payment not working right now (e.g. the gateway refused)
   });
@@ -2091,13 +2095,32 @@ function buyOpen(code) {
     drawPacks();
   });
   cpnRow.append(cpnIn, cpnBtn);
+  // रेफ़रल: whoever asked this person to buy (their code or mobile number) gets the referral cashback on this purchase
+  BUY_REF = '';
+  const refRow = el('div', 'cpnrow refrow'), refIn = el('input'), refBtn = el('button', 'cpnbtn', L('लागू करें', 'Apply')), refMsg = el('div', 'k cpnmsg');
+  refIn.placeholder = L('🤝 रेफ़रल कोड / रेफ़र करने वाले का मोबाइल (हो तो)', '🤝 Referral code / referrer\'s mobile (if any)');
+  refIn.maxLength = 15; refIn.autocomplete = 'off'; refBtn.type = 'button';
+  const refAt = new URLSearchParams(location.search).get('ref');
+  if (refAt) refIn.value = refAt;
+  refBtn.addEventListener('click', async () => {
+    if (BUY_REF) { BUY_REF = ''; refIn.value = ''; refIn.disabled = false; refBtn.textContent = L('लागू करें', 'Apply'); refMsg.textContent = ''; return; }
+    const v = refIn.value.trim();
+    if (!v) { refIn.focus(); return; }
+    refBtn.disabled = true; refMsg.textContent = '';
+    const r = await api('pay', { action: 'ref_check', token: token(), ref: v });
+    refBtn.disabled = false;
+    if (r.error) { refMsg.className = 'k cpnmsg bad'; refMsg.textContent = r.error === 'ref_bad' ? L('⚠ यह रेफ़रल कोड / नंबर किसी का नहीं मिला (अपना नहीं डाल सकते)', '⚠ No one found with this referral code / number (not your own)') : r.error === 'too_many' ? MSG.too_many : L('⚠ जाँच नहीं पाए — दोबारा दबाएं', '⚠ Could not check — tap again'); return; }
+    BUY_REF = v; refIn.disabled = true; refBtn.textContent = L('हटाएं', 'Remove');
+    refMsg.className = 'k cpnmsg good'; refMsg.textContent = L(`✓ रेफ़र करने वाले: ${r.name || v}`, `✓ Referred by: ${r.name || v}`);
+  });
+  refRow.append(refIn, refBtn);
   const none = searchesLeft === 0 && !BOUGHT;
   box.append(el('b', null, !none ? L('और सर्च चाहिए?', 'Need more searches?') : PREPAID ? L('आपकी सभी सर्च इस्तेमाल हो गईं', 'All your searches are used')
     : L('आज की सभी सर्च इस्तेमाल हो गईं', 'All of today\'s searches are used')),
     el('div', 'k', ONLINE ? L('कितनी सर्च चाहिए, चुनें और ऑनलाइन भुगतान करें (UPI, कार्ड, नेट बैंकिंग, वॉलेट) — सर्च अपने आप जुड़ जाएंगी।',
       'Choose how many searches and pay online (UPI, card, net banking, wallet) — they are added by themselves.')
       : L('ऑनलाइन भुगतान अभी चालू नहीं है — थोड़ी देर बाद फिर कोशिश करें।', 'Online payment is not available right now — please try again later.')),
-    packs, cpnList, cpnRow, cpnMsg, pay);
+    packs, cpnList, cpnRow, cpnMsg, refRow, refMsg, pay);
   $('buyBody').replaceChildren(box);
   $('buyNote').textContent = L('खरीदी सर्च कभी खत्म नहीं होतीं' + (PREPAID ? '' : ' — रोज़ की सर्च पूरी होने के बाद इस्तेमाल होती हैं') + '। एक सर्च = नाम लिखने से बॉक्स खाली करने तक; परिवार और अगले पेज मुफ़्त।',
     'Bought searches never expire' + (PREPAID ? '' : ' — they are used once the day\'s searches are used') + '. One search = typing a name until the box is cleared; family and more pages are free.');
@@ -2246,6 +2269,9 @@ async function walletOpen(note = '') {
   if (MY_REF) {
     if (refBonusOn()) box.append(el('div', 'balsub', L(`🎉 ${MY_REF.count || 0} दोस्तों ने ख़रीदा · ₹${MY_REF.bonus} बोनस के लिए बस ${refToBonus()} दोस्त और!`,
       `🎉 ${MY_REF.count || 0} friends have bought · just ${refToBonus()} more for the ₹${MY_REF.bonus} bonus!`)));
+    const myCode = String(MY_PHONE || '').replace(/\D/g, '').slice(-10) || MY_REF.code;
+    box.append(el('div', 'balsub', L(`🤝 आपका रेफ़रल कोड: ${myCode} — कोई भी सर्च ख़रीदते समय यह डाले, तो ${MY_REF.pct}% आपके वॉलेट में`,
+      `🤝 Your referral code: ${myCode} — when anyone enters it while buying searches, ${MY_REF.pct}% comes to your wallet`)));
     const inv = el('button', 'btn more', L(`🎁 दोस्तों को बुलाएं — हर ख़रीद पर ${MY_REF.pct}% कैशबैक`, `🎁 Invite friends — ${MY_REF.pct}% cashback on every purchase`)); inv.type = 'button';
     inv.addEventListener('click', () => { $('walletPop').classList.add('hidden'); $('invite').click(); });
     box.append(inv);

@@ -5,6 +5,9 @@
 //   POST {action: 'start', token, village, n, coupon?} → {id, key, order, amount, name, contact, description}   makes a
 //     purchase (req:<id>, gw 'razorpay') for pack n and a Razorpay order for its price; the page opens the checkout with
 //     these. 20 new purchases a day per login.
+//   ref (optional, in either 'start'): who asked this person to buy — their referral code or mobile number (refBuyer in
+//     _lib.js); they get the referral cashback on it once it is paid (refReward). error 'ref_bad' when it names nobody.
+//   POST {action: 'ref_check', token, village, ref} → {name} | {error: 'ref_bad'}   the buy window's check before paying
 //   POST {action: 'check', token, village, id [, razorpay_order_id, razorpay_payment_id, razorpay_signature]}
 //     → {status: 'open' | 'done' | 'rejected', n, got, bonus, left | bought}   after the checkout (with what it handed
 //     back) or on coming back to the page: the server asks Razorpay (settleOnline in _lib.js). got: searches added
@@ -24,7 +27,7 @@
 //   POST {action: 'wallet_searches', token, village, rs} → {wallet, got, left | bought}   ₹rs of it → rs searches
 //   POST {action: 'wallet_upi', token, village, rs, upi} → {wallet, wd}   ₹rs of it to that UPI ID (from ₹WALLET_MIN,
 //     one open withdrawal at a time, 3 a day); errors: wallet_min, wallet_low, bad_upi, wd_open, too_many, no_wallet
-const { refFor, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+const { refFor, refBuyer, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, b) => {
   if (!b.action && typeof b.event === 'string') {   // Razorpay's webhook
@@ -41,10 +44,16 @@ module.exports = route(async (req, res, b) => {
     if (rid) await settleOnline(rid);
     return send(res, 200, { ok: true });
   }
-  if (!['start', 'check', 'wallet', 'wallet_searches', 'wallet_upi'].includes(b.action)) return send(res, 400, { error: 'action' });
+  if (!['start', 'check', 'ref_check', 'wallet', 'wallet_searches', 'wallet_upi'].includes(b.action)) return send(res, 400, { error: 'action' });
   const me = await whoIs(b.token, b.village);
   if (!me || me.status !== 'ok') return send(res, 401, { error: 'login' });
   if (b.action.startsWith('wallet')) return wallet(res, b, me);
+  let via = null;   // the referrer named at checkout
+  if (b.ref && (b.action === 'start' || b.action === 'ref_check')) {
+    via = await refBuyer(b.ref, me);
+    if (!via) return send(res, 400, { error: 'ref_bad' });
+  }
+  if (b.action === 'ref_check') return send(res, 200, via ? { name: via.name || '' } : { error: 'ref_bad' });
 
   if (b.action === 'check') {
     const r = await getReq(b.id);
@@ -59,7 +68,7 @@ module.exports = route(async (req, res, b) => {
 
   if (!payOnline()) return send(res, 400, { error: 'no_online' });
   if (!canBuy(me)) return send(res, 400, { error: 'not_prepaid' });
-  if (b.ward != null && b.ward !== '') return wardStart(req, res, b, me);
+  if (b.ward != null && b.ward !== '') return wardStart(req, res, b, me, via);
   const pk = PACKS.find(([n]) => n === Number(b.n));
   if (!pk) return send(res, 400, { error: 'bad_credits' });
   let cpn = null, c = null;   // a coupon: its lower price and bonus searches (couponFor in _lib.js)
@@ -80,7 +89,7 @@ module.exports = route(async (req, res, b) => {
     console.error('razorpay order', m.error, m.raw);
     return send(res, 502, { error: 'gateway', detail: m.error });
   }
-  await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, b.village), 'n', pk[0], 'rs', rs, ...(cpn ? ['coupon', cpn.coupon, 'bonus', cpn.bonus] : []), 'created', new Date().toISOString(),
+  await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, b.village), 'n', pk[0], 'rs', rs, ...(cpn ? ['coupon', cpn.coupon, 'bonus', cpn.bonus] : []), ...(via ? ['ref', via.id] : []), 'created', new Date().toISOString(),
     'status', 'open', 'to', GATEWAY.id, 'gw', 'razorpay', 'txn', m.txn);
   await redis('SET', `rzp:${m.txn}`, id);
   await redis('SADD', 'reqs', id);   // in the admin page's list too (the superadmin's)
@@ -91,7 +100,7 @@ module.exports = route(async (req, res, b) => {
 
 // the ward list comes from _villages.json: this function doesn't ship the voter data (only api/data.js does, vercel.json)
 // a whole ward's slips: ₹WARD_RS for ward b.ward of village b.village (once; then search.js "all" gives it any time)
-async function wardStart(req, res, b, me) {
+async function wardStart(req, res, b, me, via) {
   const v = village(b.village), w = parseInt(b.ward, 10);
   if (!v || !(w > 0) || !(v.wards || []).map(Number).includes(w)) return send(res, 400, { error: 'no_ward' });
   if (wardFree(me) || Number(await redis('SISMEMBER', wardKey(me.id, v.slug), String(w))) === 1) return send(res, 200, { paid: true });
@@ -104,7 +113,7 @@ async function wardStart(req, res, b, me) {
     console.error('razorpay order', m.error, m.raw);
     return send(res, 502, { error: 'gateway', detail: m.error });
   }
-  await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, v.slug), 'kind', 'ward', 'ward', w, 'wv', v.slug, 'n', 0, 'rs', WARD_RS,
+  await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, v.slug), 'kind', 'ward', 'ward', w, 'wv', v.slug, 'n', 0, 'rs', WARD_RS, ...(via ? ['ref', via.id] : []),
     'created', new Date().toISOString(), 'status', 'open', 'to', GATEWAY.id, 'gw', 'razorpay', 'txn', m.txn);
   await redis('SET', `rzp:${m.txn}`, id);
   await redis('SADD', 'reqs', id);
