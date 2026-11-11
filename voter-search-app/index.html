@@ -461,7 +461,11 @@
   #posterPrev .pbig { margin-bottom: 8px; }
   .slip .ptop, .pbig { display: block; width: 100%; max-width: 100%; height: auto; }
   .posterpop .card { min-width: 0; overflow-x: hidden; }
-  .slip .ptop { border-bottom: 1px solid #222; }
+  /* a poster may not go into the polling booth: a dashed line to cut the banner off, so the voter takes in the slip alone */
+  .slip .pcut { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid #222;
+    font-size: 12.5px; font-weight: 700; color: #222; background: #fff; white-space: nowrap; }
+  .slip .pcut::before, .slip .pcut::after { content: ""; flex: 1; min-width: 12px; border-top: 2px dashed #222; }
+  .slip .pcut b { font-size: 18px; line-height: 1; }
   .pbig { border-radius: 6px; }
 
   /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page */
@@ -479,6 +483,7 @@
     #printArea .slip .time { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     #printArea .pbig { width: 190mm; max-height: 135mm; object-fit: contain; margin: 0 0 3mm; border-radius: 0; break-after: avoid; }
     #printArea .slip .ptop { max-height: 40mm; object-fit: contain; }
+    #printArea .slip .pcut { font-size: 8.5pt; padding: 1.5mm 2mm; }
     #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
     #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
@@ -1292,7 +1297,7 @@ function slip(r, forPrint, inFamily) {
 
   const k = el('div', 'kendra'); k.append(L('मतदान केन्द्र : ', 'Polling station: '), el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
   d.append(head, idl, l1, l2, k, el('div', 'time', pollTime()));
-  if (forPrint) { if (POSTER.top) d.prepend(posterImg(POSTER.top, 'ptop')); return d; }
+  if (forPrint) { if (POSTER.top) d.prepend(posterImg(POSTER.top, 'ptop'), posterCut()); return d; }
   if (r.del) {
     d.classList.add('gone');
     d.prepend(el('div', 'gonebar', `✕ ${L('सूची से हटाया गया', 'Struck off the list')}${r.del === 'X' ? '' : ` (${r.del}${DELETED[r.del] ? ` – ${DELETED[r.del]}` : ''})`}`));
@@ -1605,6 +1610,11 @@ function posterImg(src, cls) { const i = el('img', cls); i.src = src; i.alt = ''
 // an example poster (poster-sample-*.jpg, a made-up candidate), shown faded where this login has none yet, so people
 // see what kind of picture goes there
 const posterSample = (slot) => (slot === 'big' ? '/poster-sample-pdf.jpg' : '/poster-sample-slip.jpg');
+// the line between a slip's banner and the slip: the banner is cut off before the voter goes into the booth
+function posterCut() {
+  const c = el('div', 'pcut'); c.append(el('b', null, '✂'), L('यहाँ से काटें · पोस्टर बूथ में ले जाना मना है', 'Cut here · no posters inside the booth'));
+  return c;
+}
 // the poster, or the faded sample, as a picture
 function posterPic(slot, cls) {
   const i = posterImg(POSTER[slot] || posterSample(slot), cls);
@@ -1695,7 +1705,7 @@ function posterDraw() {
   const w = (VILLAGE.wards || [])[0] || 1;
   const one = slip({ ward: w, box: 1, epic: 'RJ/00/000/000001', hname: 'किशन सिंह', name: 'Kishan Singh', rel: 'पिता', hrel: 'भंवर सिंह',
     relname: 'Bhanwar Singh', house: '1', age: 45, sex: 'पुरुष', kendra: '1 - राजकीय उच्च माध्यमिक विद्यालय' }, true);
-  if (!POSTER.top) one.prepend(posterPic('top', 'ptop'));
+  if (!POSTER.top) one.prepend(posterPic('top', 'ptop'), posterCut());
   prev.append(one);
   body.append(prev);
 }
