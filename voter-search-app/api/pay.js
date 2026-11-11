@@ -17,7 +17,6 @@
 //   Signed with RZP_WB_SECRET (razorpayHook in _lib.js); other events are answered and ignored. Webhooks only name the
 //   order: it is still checked with Razorpay itself, so even a forged one can't add searches.
 const { WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
-const { load } = require('./_search.js');
 
 module.exports = route(async (req, res, b) => {
   if (!b.action && typeof b.event === 'string') {   // Razorpay's webhook
@@ -75,10 +74,11 @@ module.exports = route(async (req, res, b) => {
     contact: /^[6-9]\d{9}$/.test(mobile) ? `+91${mobile}` : '', description: `${pk[0]}${cpn && cpn.bonus ? ` + ${cpn.bonus}` : ''} searches` });
 });
 
+// the ward list comes from _villages.json: this function doesn't ship the voter data (only api/data.js does, vercel.json)
 // a whole ward's slips: ₹WARD_RS for ward b.ward of village b.village (once; then search.js "all" gives it any time)
 async function wardStart(req, res, b, me) {
   const v = village(b.village), w = parseInt(b.ward, 10);
-  if (!v || !(w > 0) || !(load(v.data).wards || []).map(Number).includes(w)) return send(res, 400, { error: 'no_ward' });
+  if (!v || !(w > 0) || !(v.wards || []).map(Number).includes(w)) return send(res, 400, { error: 'no_ward' });
   if (wardFree(me) || Number(await redis('SISMEMBER', wardKey(me.id, v.slug), String(w))) === 1) return send(res, 200, { paid: true });
   const k = `reqs:${me.id}:${today()}`;
   if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
