@@ -127,7 +127,7 @@ const view = (u) => ({
 const reqView = ({ id, user, village: v, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw, coupon, bonus, doneCoupon }) =>
   ({ id, user, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
     doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1', online: !!gw,
-    coupon: coupon || '', bonus: Number(bonus) || 0, doneCoupon: doneCoupon || '' });   // online: paid by UPI on JaduPe
+    coupon: coupon || '', bonus: Number(bonus) || 0, doneCoupon: doneCoupon || '' });   // online: paid by UPI through a gateway (gw)
 const REQ_DONE_DAYS = 30;
 const STATS_ALL = 30;   // "stats" gives every mark group's progress up to this many groups   // approved requests stay in the list this long
 
@@ -243,7 +243,11 @@ module.exports = route(async (req, res, b) => {
       redis('SMEMBERS', 'users').then((x) => x || []),
       candsOf(me.villages),
       isSuper && canMoveUserData() ? redis('GET', 'usermoved') : null]);
-    const all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
+    let all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
+    if (!isSuper) {   // a village admin never sees another admin, not even that admin's person login (same mobile number)
+      const adminPhones = new Set(all.filter((u) => u.role === 'admin' && u.phone).map((u) => u.phone));
+      all = all.filter((u) => !(u.phone && adminPhones.has(u.phone)));
+    }
     const shown = all.filter((u) => (mine(u) && (!b.village || u.village === b.village)) || (isSuper && u.role === 'admin'));
     const day = today();
     const buyers = shown.filter((u) => isPrepaid(u) || credits(u) > 0);
@@ -278,9 +282,12 @@ module.exports = route(async (req, res, b) => {
     const payIds = Object.keys(rsO).filter((id) => isSuper || id === me.id);
     // only the people these requests and payments name are read, not every login
     const who = new Map((await getUsers([...new Set([...rows.flatMap((r) => [r.user, r.to]), ...payIds].filter((id) => id && id !== 'admin'))])).map((u) => [u.id, u]));
+    // a village admin does not see another admin's person login (same mobile number; see "list")
+    const adminPhones = isSuper ? new Set() : new Set((await getUsers((await redis('SMEMBERS', 'admins')) || [])).filter((u) => u.role === 'admin' && u.phone).map((u) => u.phone));
     const reqs = may('approve') ? rows.map((r) => {
       const u = who.get(r.user);   // a person of my villages, asking from one of my villages; a village admin's: the superadmin's
       if (!u || (u.role === 'admin' ? !isSuper : u.role !== 'user' || !mayUse(u.village))) return null;
+      if (u.phone && adminPhones.has(u.phone)) return null;
       if (!(mine(u) || r.to === me.id)) return null;   // requests of my users, or sent to me
       if (!isSuper && r.to && r.to !== me.id && r.doneBy !== me.id) return null;   // sent to someone else
       if (!isSuper && r.gw && r.status === 'open') return null;   // being paid online: added by itself once paid
@@ -456,6 +463,8 @@ module.exports = route(async (req, res, b) => {
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
   const user = b.id ? await getUser(String(b.id)) : null;
   if (!user || !(isSuper || mine(user))) return send(res, 404, { error: 'not_found' });
+  // nor manage an admin through that admin's person login (same mobile number; see "list")
+  if (!isSuper && user.phone && (await phoneLogins(user.phone)).some((x) => x.role === 'admin')) return send(res, 404, { error: 'not_found' });
 
   if (b.action === 'promote') {   // superadmin: a user becomes a village admin of their village, with the same login
     if (!isSuper) return send(res, 403, { error: 'super_only' });
