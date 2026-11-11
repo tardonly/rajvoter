@@ -2571,12 +2571,12 @@ async function lockPhone() {
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   await signVillages();
   const invited = r.refBy ? L(`${r.refBy} ने आपको रेफ़र किया है। `, `${r.refBy} invited you. `) : '';
-  lockStepTo('sign', invited + (r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद 50 पैसे प्रति सर्च।`,
-    `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that 50 paise per search.`)
-    : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद 50 पैसे प्रति सर्च।`,
-    `New number — type your name: your login is made at once with ${r.free} free searches. After that 50 paise per search.`)
-    : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (50 पैसे प्रति सर्च)।',
-      'New number — type your name: your login is made at once; then buy searches (50 paise per search).')));
+  lockStepTo('sign', invited + (r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद 50 पैसे में एक पर्ची।`,
+    `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that 50 paise a slip.`)
+    : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद 50 पैसे में एक पर्ची।`,
+    `New number — type your name: your login is made at once with ${r.free} free searches. After that 50 paise a slip.`)
+    : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (50 पैसे में एक पर्ची)।',
+      'New number — type your name: your login is made at once; then buy searches (50 paise a slip).')));
 }
 // the superadmin's free-search rule for sign-ups (freeRule in api/_lib.js) in words: "the first 10 people of each village
 // get 10 free searches", or with halving "… get 10, the next 10 get 5, then 2, then 1"
@@ -2748,8 +2748,8 @@ async function lockSignup() {
   if (MOVES_LEFT) where.append(' ', wrong);
   box.append(user, pass, el('div', 'amt', '✓'), el('b', null, L('आपका खाता बन गया — पासवर्ड:', 'Your login is ready — password:')), el('div', 'buypw', r.password), copy, ...(save ? [save] : []), where,
     el('div', 'k', L('यह पासवर्ड लिख लें: दूसरे फ़ोन पर मोबाइल नंबर और इसी पासवर्ड से खुलेगा।', 'Write this password down: on another phone, your mobile number and this password open it.')),
-    el('div', 'k', r.left ? L(`${r.left} सर्च मुफ़्त — उसके बाद 50 पैसे प्रति सर्च।`, `${r.left} free searches — after that 50 paise per search.`)
-      : L('सर्च खरीदकर शुरू करें (50 पैसे प्रति सर्च)।', 'Buy searches to start (50 paise per search).')), open);
+    el('div', 'k', r.left ? L(`${r.left} सर्च मुफ़्त — उसके बाद 50 पैसे में एक पर्ची।`, `${r.left} free searches — after that 50 paise a slip.`)
+      : L('सर्च खरीदकर शुरू करें (50 पैसे में एक पर्ची)।', 'Buy searches to start (50 paise a slip).')), open);
   $('buyTitle').textContent = L('आपका खाता', 'Your login');
   $('buyPop').dataset.go = slug;
   $('buyClose').classList.add('hidden');
