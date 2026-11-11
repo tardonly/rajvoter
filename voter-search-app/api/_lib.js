@@ -240,19 +240,25 @@ async function pipeline(cmds) {
 // Moving people's data to USER_REDIS_URL: copies Upstash's USER_KEYS into it, then removes them from Upstash, one SCAN
 // step per call (cursor '0' to start; → {next, keys}, next '0' = done). What is already in the new database wins: a value
 // is only filled in where it is missing (strings SET NX, hash fields HSETNX, set members SADD), so it is safe to run again.
-// With MONGODB_URI set it copies everything instead (every key with KEY_PREFIX) from Upstash into MongoDB and leaves
-// Upstash as it was, as a backup; the same "only where missing" rule makes it safe to run again.
-const canMoveUserData = () => (MONGO_DB ? !!(KV_URL && KV_TOKEN) : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
+// With MONGODB_URI set it copies everything instead (every key with KEY_PREFIX) into MongoDB, first from USER_REDIS_URL
+// (people's data, and the newest copy of it), then from Upstash (cursor "1:<n>" while on the second one), and leaves
+// both as they were, as a backup; the same "only where missing" rule makes it safe to run again.
+const COPY_SOURCES = () => [USER_DB, KV_URL && KV_TOKEN && MAIN_DB !== USER_DB ? restDb(KV_URL, KV_TOKEN) : null].filter(Boolean);
+const canMoveUserData = () => (MONGO_DB ? COPY_SOURCES().length > 0 : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
 async function copyToMongo(cursor) {
-  const src = restDb(KV_URL, KV_TOKEN);
-  const [next, keys] = await src.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
-  if (!keys.length) return { next: String(next), keys: 0 };
+  const srcs = COPY_SOURCES();
+  const m = String(cursor || '0').match(/^(?:(\d+):)?(.*)$/);
+  const at = Number(m[1] || 0), src = srcs[at];
+  if (!src) return { next: '0', keys: 0 };
+  const [scanned, keys] = await src.call(['SCAN', m[2] || '0', 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
+  const next = String(scanned) !== '0' ? (at ? `${at}:${scanned}` : String(scanned)) : at + 1 < srcs.length ? `${at + 1}:0` : '0';
+  if (!keys.length) return { next, keys: 0 };
   const types = await src.pipe(keys.map((k) => ['TYPE', k]));
   const [vals, ttls] = await Promise.all([
     src.pipe(keys.map((k, i) => [{ string: 'GET', hash: 'HGETALL', set: 'SMEMBERS' }[types[i]] || 'TYPE', k])),
     src.pipe(keys.map((k) => ['PTTL', k]))]);
   await MONGO_DB.importKeys(keys.map((key, i) => ({ key, type: types[i], value: vals[i], ttl: Number(ttls[i]) })));
-  return { next: String(next), keys: keys.length };
+  return { next, keys: keys.length };
 }
 async function moveUserData(cursor) {
   if (MONGO_DB) return copyToMongo(cursor);
