@@ -279,8 +279,14 @@
     color: #9a3412; font-size: 13.5px; line-height: 1.5; }
   .demobar b { color: #7c2d12; }
   .demobar a { color: var(--accent); font-weight: 600; }
-  .demobar a.demologin { display: block; max-width: 460px; box-sizing: border-box; margin-top: 8px; padding: 10px 12px; border-radius: 10px;
-    background: var(--accent); color: #fff; text-align: center; font-size: 16px; text-decoration: none; }
+  .demobar a.demologin { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 9px 12px;
+    border-radius: 10px; background: var(--accent); color: #fff; text-align: center; font-size: 16px; text-decoration: none; }
+  /* laptops: login, video and share on one line */
+  @media (min-width: 900px) {
+    .demobar .homeacts { grid-template-columns: repeat(3, max-content); max-width: none; }
+    .demobar a.demologin { grid-column: auto; }
+    .demobar .homeacts button, .demobar a.demologin { padding: 8px 18px; }
+  }
   #count.bad { color: var(--bad); }
   main { padding: 10px 10px 24px; max-width: 640px; margin: 0 auto; }
   .hint { color: var(--muted); font-size: 14px; line-height: 1.6; padding: 8px 6px; }
@@ -2056,8 +2062,8 @@ function demoBar() {
     const acts = el('div', 'homeacts'), how = el('button', null, L('▶ 30 सेकंड में देखें ऐप का कमाल', '▶ See the app in action — 30 seconds')), share = el('button', 'share', L('↗ शेयर करें', '↗ Share'));
     how.type = share.type = 'button';
     how.addEventListener('click', howOpen); share.addEventListener('click', shareOpen);
-    acts.append(how, share);
-    bar.append(el('div'), login, acts);
+    acts.append(login, how, share);
+    bar.append(el('div'), acts);
   }
   bar.firstChild.replaceChildren(el('b', null, L('डेमो', 'Demo')), L(` · ${VILLAGE.name} के पहले ${VILLAGE.wards.length} वार्ड की असली मतदाता सूची में सर्च करके देखें`,
     ` · try a search in the real voter list of the first ${VILLAGE.wards.length} wards of ${vn(VILLAGE)}`),
