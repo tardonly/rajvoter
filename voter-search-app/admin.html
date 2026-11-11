@@ -347,6 +347,13 @@
         <div class="row"><button class="btn" id="cpnSave" type="button">कूपन बनाएं</button><button class="btn ghost hidden" id="cpnCancel" type="button">रद्द</button></div>
         <div class="sub" id="cpnMsg" style="margin:0"></div>
       </div>
+      <!-- coupon redemptions: paid purchases that used a coupon (api/_routes/admin.js "coupon_uses") -->
+      <div class="phead" style="margin-top:18px"><b>📊 कूपन रिडीम डैशबोर्ड</b> · <span id="cuNow"></span> <button class="btn ghost" id="cuReload" type="button" style="width:auto;padding:4px 10px;margin:0">↻</button></div>
+      <div class="row" id="cuTiles" style="margin-top:10px;flex-wrap:wrap"></div>
+      <div class="stack" id="cuSum" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:12px;align-items:center"><b>किसने इस्तेमाल किया</b>
+        <select id="cuPick" style="width:auto"><option value="">सभी कूपन</option></select></div>
+      <div class="stack" id="cuRows" style="margin-top:8px"></div>
     </div>
 
     <!-- superadmin: free searches for people who sign up themselves (api/_routes/admin.js "free_rule") -->
@@ -631,6 +638,7 @@ function loadSettings() {   // superadmin: free searches, referrals and coupons 
     if (r.error) { for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = errText(r); return; }
     settingsIn = true;
     showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
+    loadCouponUses();
   })();
   return settingsBusy.finally(() => { settingsBusy = null; });
 }
@@ -811,6 +819,44 @@ function showCoupons(list) {
     row.append(txt, ed, del);
     return row;
   }));
+}
+// coupon redemptions (api/_routes/admin.js "coupon_uses"): totals, one line per coupon, then who used them
+let CU = null;
+async function loadCouponUses() {
+  $('cuNow').textContent = '⏳';
+  const r = await api({ action: 'coupon_uses' });
+  if (r.error) { $('cuNow').textContent = errText(r); return; }
+  CU = r; showCouponUses();
+}
+$('cuReload').addEventListener('click', loadCouponUses);
+$('cuPick').addEventListener('change', showCouponUses);
+function showCouponUses() {
+  if (!CU) return;
+  const S = CU.summary, sum = (k) => S.reduce((t, s) => t + s[k], 0), inr = (x) => `₹${x.toLocaleString('en-IN')}`;
+  const people = new Set(CU.rows.map((r) => r.user)).size;
+  $('cuNow').textContent = CU.total ? `${CU.total} बार रिडीम` : 'अभी तक कोई नहीं';
+  const tile = (big, small) => { const t = el('div', 'sub'); t.style.cssText = 'margin:0;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;flex:1;min-width:120px'; t.append(el('b', null, big), el('div', null, small)); t.firstChild.style.fontSize = '20px'; return t; };
+  $('cuTiles').replaceChildren(tile(String(CU.total), 'बार रिडीम'), tile(String(people), 'लोग'), tile(inr(sum('rs')), 'कमाई (कूपन वाली खरीद)'),
+    tile(inr(sum('off')), 'छूट दी'), tile(sum('bonus').toLocaleString('en-IN'), 'सर्च मुफ़्त दीं'), tile(String(sum('open')), 'भुगतान अधूरा'));
+  const known = new Map(COUPONS.map((c) => [c.code, c]));
+  $('cuSum').replaceChildren(...(S.length ? S.map((s) => {
+    const c = known.get(s.code), row = el('div', 'person');
+    row.append(el('b', null, `${s.code}${c ? ` — ${cpnWhat(c)}` : ' (हटाया गया)'}`),
+      el('div', 'info', [`${s.uses}${c && c.maxUses ? `/${c.maxUses}` : ''} बार`, `${s.people} लोग`, `कमाई ${inr(s.rs)}`, s.off && `छूट ${inr(s.off)}`,
+        s.bonus && `${s.bonus} सर्च मुफ़्त`, s.open && `${s.open} भुगतान अधूरा`, s.last && `आखिरी: ${fmt(s.last)}`].filter(Boolean).join(' · ')));
+    return row;
+  }) : [el('div', 'sub', 'अभी तक किसी ने कूपन से खरीद नहीं की')]));
+  const pick = $('cuPick'), was = pick.value;
+  pick.replaceChildren(el('option', null, 'सभी कूपन'), ...S.map((s) => el('option', null, s.code)));
+  pick.options[0].value = ''; pick.value = S.some((s) => s.code === was) ? was : '';
+  const rows = CU.rows.filter((r) => !pick.value || r.code === pick.value);
+  $('cuRows').replaceChildren(...(rows.length ? rows.slice(0, 200).map((r) => {
+    const row = el('div', 'person');
+    row.append(el('b', null, `${r.name || r.user}${r.phone ? ` · ${r.phone}` : ''}`),
+      el('div', 'info', [r.code, `${r.n} सर्च पैक`, `${inr(r.rs)} दिए`, r.off && `${inr(r.off)} बचाए`, r.bonus && `+${r.bonus} सर्च मुफ़्त`,
+        (villages[r.village] || {}).name || r.village, fmt(r.at)].filter(Boolean).join(' · ')));
+    return row;
+  }) : [el('div', 'sub', 'कोई नहीं')]), ...(rows.length > 200 ? [el('div', 'sub', `और ${rows.length - 200}…`)] : []));
 }
 function cpnForm(c) {
   cpnEdit = c ? c.code : null;

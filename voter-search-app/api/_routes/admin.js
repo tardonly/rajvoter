@@ -52,6 +52,10 @@
 //   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, maxOff, minN, maxN, maxUses, until, once, first, on, show, note, banner, bannerText, isNew
 //                                         → {coupon}   superadmin: a coupon (getCoupon in _lib.js); "list" gives coupons
 //   action "coupon_del", code → {ok}      superadmin
+//   action "coupon_uses"      → {summary: [{code, uses, people, rs, off, bonus, open, last}], rows: [{id, code, name, phone,
+//                                         village, n, rs, off, bonus, at}] (latest 500), total}   superadmin: coupon
+//                                         redemptions (paid purchases with doneCoupon); off = ₹ saved vs the pack's price,
+//                                         bonus = free searches added, open = checkouts started with it but not paid
 //   action "wd_paid", id [, utr] / "wd_back", id → {wd}   superadmin: a wallet's UPI withdrawal (wdStart in _lib.js) sent
 //     by hand (with its UPI reference) / not sent, the ₹ back in the person's wallet; "settings" lists them (wds)
 //   action "ref_rule", on, pct, joiner, bonusAt, bonus → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
@@ -271,6 +275,29 @@ module.exports = route(async (req, res, b) => {
     if (!wdOpen(w)) return send(res, 409, { error: 'wd_done' });
     const now = b.action === 'wd_paid' ? await wdPaid(w, b.utr, me.id) : await wdBack(w, 'admin');
     return send(res, 200, { wd: wdView(now) });
+  }
+  if (b.action === 'coupon_uses') {   // superadmin: every paid purchase that used a coupon (doneCoupon, addPaid in _lib.js)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const reqIds = (await redis('SMEMBERS', 'reqs')) || [];
+    const reqRows = reqIds.length ? await pipeline(reqIds.map((id) => ['HGETALL', `req:${id}`])) : [];
+    const h = (arr) => { const o = {}; for (let k = 0; k < (arr || []).length; k += 2) o[arr[k]] = arr[k + 1]; return o; };
+    const all = reqIds.map((id, i) => ({ id, ...h(reqRows[i]) }));
+    const used = all.filter((r) => r.user && r.status === 'done' && r.doneCoupon);
+    const open = all.filter((r) => r.user && r.status === 'open' && r.coupon);   // checkout started with a coupon, not paid (yet)
+    const who = new Map((await getUsers([...new Set(used.map((r) => r.user))])).map((u) => [u.id, u]));
+    const rows = used.map((r) => {
+      const u = who.get(r.user) || {}, n = Number(r.n) || 0, rs = Number(r.doneRs) || 0;
+      return { id: r.id, code: r.doneCoupon, user: r.user, name: u.name || '', phone: u.phone || '', village: r.village || '', n, rs,
+        off: Math.max(0, packPrice(n) - rs), bonus: Math.max(0, (Number(r.doneN) || 0) - n), at: r.doneAt || r.created || '' };
+    }).sort((a, c) => (a.at < c.at ? 1 : -1));
+    const by = {};
+    for (const r of rows) {
+      const s = by[r.code] || (by[r.code] = { code: r.code, uses: 0, people: new Set(), rs: 0, off: 0, bonus: 0, open: 0, last: '' });
+      s.uses++; s.people.add(r.user); s.rs += r.rs; s.off += r.off; s.bonus += r.bonus; if (r.at > s.last) s.last = r.at;
+    }
+    for (const r of open) (by[r.coupon] || (by[r.coupon] = { code: r.coupon, uses: 0, people: new Set(), rs: 0, off: 0, bonus: 0, open: 0, last: '' })).open++;
+    const summary = Object.values(by).map((s) => ({ ...s, people: s.people.size })).sort((a, c) => c.uses - a.uses || (a.code < c.code ? -1 : 1));
+    return send(res, 200, { summary, rows: rows.slice(0, 500), total: rows.length });
   }
   if (b.action === 'reqs') {   // online purchases (the 🔔), superadmin only; after "list", so the page shows first
     if (!isSuper) return send(res, 200, { reqs: [] });
