@@ -319,7 +319,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .slip .kendra { border-top: 1px solid #222; margin: 6px 6px 0; padding: 4px 4px 3px; font-size: 13px; text-align: center; }
   .slip .time { background: var(--pink); color: #fff; text-align: center; font-size: 13px; padding: 3px 4px; }
   #more { margin: 4px auto 0; display: block; width: auto; padding: 10px 22px; font-size: 16px; }
-  /* a ward's free slips are over: unlock the rest for ₹100 */
+  /* a ward's free slips are over: unlock the rest for ₹50 */
   .wardlock { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; margin: 14px 0 4px; padding: 18px 16px;
     border-radius: 14px; background: linear-gradient(135deg, #fdf2f8, #ede9fe); border: 1.5px dashed #b4235a; }
   .wardlock .big { font-size: 30px; line-height: 1; }
@@ -1255,7 +1255,7 @@ async function search(more = false, force = false) {
   $('more').classList.toggle('hidden', !r.more);
   if (r.locked) $('results').appendChild(wardLock(q.ward, total - shown, r.rs || WARD_RS));
 }
-// the free slips of a ward are over (FREE_WARD in api/_routes/search.js): the rest, and the download, for ₹100
+// the free slips of a ward are over (FREE_WARD in api/_routes/search.js): the rest, and the download, for ₹50
 function wardLock(w, rest, rs) {
   const d = el('div', 'wardlock');
   d.append(el('div', 'big', '🔒'), el('b', null, L(`वार्ड ${w} की ${rest} पर्चियाँ और हैं`, `${rest} more slips in ward ${w}`)),
@@ -1927,7 +1927,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') listClose(
 
 // A whole ward's slips cost WARD_RS once per ward (api/pay.js wardStart): the button says the price until this login has
 // paid for that ward (WARD_PAID: the wards paid for in this village, from every search answer; true = admins, who don't pay)
-const WARD_RS = 100;
+const WARD_RS = 50;
 let WARD_PAID = [];
 const wardPaid = (w) => WARD_PAID === true || (Array.isArray(WARD_PAID) && WARD_PAID.map(String).includes(String(w)));
 function wardButton() {

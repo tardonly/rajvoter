@@ -737,7 +737,7 @@ async function addPaid(u, n, r, by) {
 // (api/pay.js 'start' with a ward; req:<id> with kind 'ward', ward, wv = its village, n 0) that, once paid, puts the ward
 // in the set wardpaid:<user id>:<village>, so that login may print / save it again any time. The superadmin and village
 // admins don't pay (wardFree).
-const WARD_RS = 100;
+const WARD_RS = 50;
 const wardKey = (uid, slug) => `wardpaid:${uid}:${slug}`;
 // Whether people pay for wards, set by the superadmin on the admin page (api/_routes/admin.js "ward_pay"): key
 // "wardpay" '1' = they pay, '0' = every ward free; not set yet → env WARD_PAY=1 to pay, else free. Per person, the
