@@ -492,6 +492,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
         <div class="msg" id="partyMsg"></div>
       </div>
       <form id="candForm" class="stack" autocomplete="off">
+        <select id="candSamiti" aria-label="पंचायत समिति"></select>
         <select id="candVillage" aria-label="गाँव"></select>
         <input id="candName" type="text" placeholder="उम्मीदवार का नाम" maxlength="60" required>
         <button class="btn" id="candBtn" type="submit">उम्मीदवार बनाएं</button>
@@ -1276,12 +1277,11 @@ function setup() {
   const pick = mine.length === 1 ? mine[0] : '';
   for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id), `${pick || mine[0] || ''}|`);
   newSamitiOptions(mine, pick);
-  for (const id of ['fVillage', 'candVillage']) {
-    const sel = $(id);
-    sel.length = id === 'candVillage' ? 0 : 1;
-    for (const s of mine) sel.add(new Option(vName(s), s));
-    sel.value = pick || (id === 'candVillage' ? mine[0] || '' : '');
-  }
+  const fv = $('fVillage');
+  fv.length = 1;
+  for (const s of mine) fv.add(new Option(vName(s), s));
+  fv.value = pick;
+  samitiOptions($('candSamiti'), mine, pick); candVillageOptions(pick);
   $('candVillage').classList.toggle('hidden', mine.length < 2);
   // back to search: the village list when this admin has several villages, else straight to the one village
   $('backLink').classList.toggle('hidden', !mine.length);
@@ -1686,8 +1686,12 @@ $('newVillage').addEventListener('change', newAreaOptions);
 // that samiti's villages, by name. Villages without a samiti are grouped as "अन्य गाँव".
 const addVillages = () => (me ? me.villages.filter((s) => villages[s]) : []);   // this admin's villages
 function newSamitiOptions(mine, pick) {
+  samitiOptions($('newSamiti'), mine, pick);
+  newVillageOptions(pick);
+}
+// a पंचायत समिति select over these villages: "पंचायत समिति चुनें" first when there are several (hidden when there is one)
+function samitiOptions(sel, mine, pick) {
   const keys = [...new Set(mine.map((s) => samitiOf(villages[s])))].sort((a, b) => (!a) - (!b) || samitiName(a).localeCompare(samitiName(b)));
-  const sel = $('newSamiti');
   sel.length = 0;
   if (keys.length > 1) sel.add(new Option(L('पंचायत समिति चुनें', 'Choose panchayat samiti'), ''));
   for (const k of keys) {
@@ -1696,8 +1700,18 @@ function newSamitiOptions(mine, pick) {
   }
   sel.value = pick ? samitiOf(villages[pick]) : keys.length === 1 ? keys[0] : '';
   sel.classList.toggle('hidden', keys.length < 2);
-  newVillageOptions(pick);
 }
+// a new candidate: the पंचायत समिति first, then a village in it (both must be chosen)
+function candVillageOptions(pick) {
+  const ps = $('candSamiti'), sel = $('candVillage'), many = ps.length > 1, k = ps.value;
+  const list = many && !k && !ps.selectedIndex ? [] : addVillages().filter((s) => samitiOf(villages[s]) === k).sort((a, b) => vName(a).localeCompare(vName(b)));
+  sel.length = 0;
+  sel.add(new Option(!list.length ? L('पहले पंचायत समिति चुनें', 'Choose the panchayat samiti first') : L('गाँव चुनें', 'Choose village'), ''));
+  for (const s of list) sel.add(new Option(vName(s), s));
+  sel.disabled = !list.length;
+  sel.value = list.includes(pick) ? pick : list.length === 1 ? list[0] : '';
+}
+$('candSamiti').addEventListener('change', () => candVillageOptions(''));
 function newVillageOptions(pick) {
   const sel = $('newVillage'), many = $('newSamiti').length > 1, k = $('newSamiti').value;
   const list = many && !$('newSamiti').selectedIndex ? []
@@ -1899,6 +1913,8 @@ $('partyForm').addEventListener('submit', async (e) => {
 $('candForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('candName').value.trim(), village = $('candVillage').value;
+  if (!$('candSamiti').classList.contains('hidden') && !$('candSamiti').value) { $('candMsg').textContent = L('पंचायत समिति चुनें', 'Choose the panchayat samiti'); $('candSamiti').focus(); return; }
+  if (!village) { $('candMsg').textContent = MSG.no_village; $('candVillage').focus(); return; }
   if (!name) return;
   $('candBtn').disabled = true; $('candMsg').textContent = '';
   const r = await api({ action: 'cand_add', village, name });
