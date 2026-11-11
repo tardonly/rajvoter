@@ -66,6 +66,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .newpw { padding: 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; }
   .newpw .pw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; font-weight: 700; letter-spacing: 1px; margin: 6px 0 10px; user-select: all; word-break: break-all; }
   .newpw .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .qbox { width: 100%; margin-bottom: 10px; padding: 10px 13px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; }
   .filter { display: flex; gap: 6px; margin-bottom: 10px; }
   .filter button { padding: 5px 12px; font-size: 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
   .filter button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -457,6 +458,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       </form>
       <div class="msg" id="addAdminMsg"></div>
       <h2 style="margin-top:16px">सभी एडमिन</h2>
+      <input id="qAdmins" class="qbox" type="search" placeholder="🔍 नाम, मोबाइल या गाँव से खोजें" autocomplete="off">
       <div id="adminList"></div>
     </div>
 
@@ -468,6 +470,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
         <button type="button" data-f="all">सभी</button>
         <select id="fVillage" aria-label="गाँव"><option value="">सभी गाँव</option></select>
       </div>
+      <input id="qUsers" class="qbox" type="search" placeholder="🔍 नाम, मोबाइल या गाँव से खोजें" autocomplete="off">
       <div id="list"></div>
       <div class="msg" id="listMsg"></div>
     </div>
@@ -584,7 +587,7 @@ const STATIC_EN = {
   'नया एडमिन जोड़ें': 'Add a new admin', 'एडमिन सिर्फ़ अपने गाँवों में लोग जोड़ और बंद कर सकता है।': 'An admin can add and switch off people only in their own villages.',
   'एडमिन का नाम': 'Admin\'s name', 'WhatsApp मोबाइल नंबर (जैसे 98765 43210)': 'WhatsApp mobile number (e.g. 98765 43210)',
   'एडमिन बनाएं': 'Create admin', 'सभी एडमिन': 'All admins', '+ नया यूज़र': '+ New person', 'चालू': 'Active', 'बंद': 'Off', 'सभी': 'All',
-  'गाँव': 'Village', 'सभी गाँव': 'All villages',
+  'गाँव': 'Village', 'सभी गाँव': 'All villages', '🔍 नाम, मोबाइल या गाँव से खोजें': '🔍 Search by name, mobile or village',
   'हर उम्मीदवार के कार्यकर्ता (3–4 पासवर्ड) एक समूह हैं: वे सिर्फ़ अपने उम्मीदवार के निशान लगाते और देखते हैं,\n        दूसरे उम्मीदवार के लोग ये निशान नहीं देख सकते। बिना उम्मीदवार वाले लोग गाँव के आम निशान देखते हैं।':
     'Each candidate\'s workers (3–4 passwords) are a group: they set and see only their own candidate\'s marks, and other candidates\' people cannot see them. People without a candidate see the village\'s common marks.',
   'उम्मीदवार का नाम': 'Candidate\'s name', 'उम्मीदवार बनाएं': 'Create candidate',
@@ -1753,6 +1756,7 @@ document.querySelectorAll('.filter button[data-f]').forEach((b) => b.addEventLis
   render();
 }));
 $('fVillage').addEventListener('change', render);
+for (const id of ['qUsers', 'qAdmins']) $(id).addEventListener('input', render);
 
 // ---------- lists ----------
 // long lists, PAGE rows at a time with "और दिखाएं" (the count shown is kept across refreshes); key names the list
@@ -1767,18 +1771,29 @@ function paged(box, items, make, key) {
   };
   add(0, Math.max(PAGE, pageShown[key] || 0));
 }
+// the search boxes over the users and the admins: name, mobile number (any part of its digits) or village
+function matches(u, q) {
+  q = q.trim().toLowerCase();
+  if (!q) return true;
+  const digits = q.replace(/\D/g, '');
+  if (digits.length >= 3 && String(u.phone || '').includes(digits)) return true;
+  const vils = [u.village, ...(u.villages || []), ...(u.more || [])].filter(Boolean);
+  return [u.name, ...vils.map((s) => vFull(s)), ...vils.map(enName)].some((t) => String(t || '').toLowerCase().includes(q));
+}
 function render() {
   if (!me) return;
-  const fv = $('fVillage').value;
-  const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv));
+  const fv = $('fVillage').value, q = $('qUsers').value, qa = $('qAdmins').value;
+  const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv) && matches(u, q));
   const list = $('list'); list.innerHTML = '';
-  if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? L('कोई बंद पासवर्ड नहीं', 'No switched-off passwords') : L('अभी कोई यूज़र नहीं — "+ नया यूज़र" से जोड़ें', 'Nobody yet — add someone with "+ New person"')));
-  paged(list, shown, person, `people:${filter}:${fv}`);
+  if (!shown.length && q.trim()) list.append(el('div', 'empty', L('इस खोज से कोई यूज़र नहीं मिला', 'No user matches this search')));
+  else if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? L('कोई बंद पासवर्ड नहीं', 'No switched-off passwords') : L('अभी कोई यूज़र नहीं — "+ नया यूज़र" से जोड़ें', 'Nobody yet — add someone with "+ New person"')));
+  paged(list, shown, person, `people:${filter}:${fv}:${q}`);
   renderCands();
   const al = $('adminList'); al.innerHTML = '';
   if (me.role === 'super') {
-    if (!admins.length) al.append(el('div', 'empty', L('अभी कोई एडमिन नहीं', 'No admins yet')));
-    paged(al, admins, person, 'admins');
+    const ad = admins.filter((u) => matches(u, qa));
+    if (!ad.length) al.append(el('div', 'empty', admins.length ? L('इस खोज से कोई एडमिन नहीं मिला', 'No admin matches this search') : L('अभी कोई एडमिन नहीं', 'No admins yet')));
+    paged(al, ad, person, `admins:${qa}`);
   }
 }
 
