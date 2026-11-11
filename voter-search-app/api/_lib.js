@@ -15,8 +15,9 @@
 //                   GET by default; OTP_SEND_METHOD=POST with OTP_SEND_BODY (the same placeholders, e.g. JSON) posts
 //                   instead. A reply that isn't 2xx, or says "Status": "Error" / false, counts as not sent.
 //   MONGODB_URI     MongoDB (added by Vercel's MongoDB Atlas integration; MONGODB_DB optional, else the database in
-//                   the address, else "rajelection"). When set, everything is kept there instead of Redis (mongoDb below),
-//                   and the superadmin copies what Upstash holds into it once (admin page, moveUserData below).
+//                   the address, else "rajelection"). When set, it takes Upstash's place (mongoDb below): everything
+//                   Upstash kept goes there, while people's data stays in USER_REDIS_URL when that is set, untouched.
+//                   The superadmin copies what Upstash holds into it once (admin page, moveUserData below).
 //   KEY_PREFIX      optional, default "rv:": put in front of every database key, so this app can share one
 //                   database with another app (e.g. the older single-village Adsar app) without mixing data
 const crypto = require('crypto');
@@ -216,12 +217,12 @@ function mongoDb(url) {
 const USER_DB = !USER_URL ? null : /^rediss?:\/\//i.test(USER_URL) ? tcpDb(USER_URL)
   : restDb(USER_URL.replace(/\/+$/, ''), process.env.USER_REDIS_TOKEN);
 const MAIN_DB = KV_URL || !USER_DB ? restDb(KV_URL, KV_TOKEN) : USER_DB;   // only USER_REDIS_URL set: everything there
-const MONGO_DB = MONGO_URL ? mongoDb(MONGO_URL) : null;   // set: everything is kept in MongoDB
+const MONGO_DB = MONGO_URL ? mongoDb(MONGO_URL) : null;   // set: MongoDB takes Upstash's place
 // People's data (keys without KEY_PREFIX): logins, password index, the sign-up set, bought searches used, pack requests,
 // online payments, payments per admin and their handovers, OTP codes, the "moved" marker, and the indexes of logins by
 // mobile number and of the admins (buildIndexes below)
 const USER_KEYS = /^(user:|pw:|users$|free$|paid:|req:|reqs$|reqopen:|reqlock:|jtxn:|rzp:|pay:|settle:|otp:|usermoved$|phone:|admins$|idxbuilt$)/;
-const dbOf = (key) => MONGO_DB || (USER_DB && USER_KEYS.test(key) ? USER_DB : MAIN_DB);
+const dbOf = (key) => (USER_DB && USER_KEYS.test(key) ? USER_DB : MONGO_DB || MAIN_DB);
 
 // Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
 const prefixed = ([name, key, ...args]) => [name, KEY_PREFIX + key, ...args];
@@ -240,29 +241,26 @@ async function pipeline(cmds) {
 // Moving people's data to USER_REDIS_URL: copies Upstash's USER_KEYS into it, then removes them from Upstash, one SCAN
 // step per call (cursor '0' to start; → {next, keys}, next '0' = done). What is already in the new database wins: a value
 // is only filled in where it is missing (strings SET NX, hash fields HSETNX, set members SADD), so it is safe to run again.
-// With MONGODB_URI set it copies everything instead (every key with KEY_PREFIX) into MongoDB, first from USER_REDIS_URL
-// (the outside Redis with people's data, and the newest copy of it), then from Upstash (cursor "1:<n>" while on the
-// second one), and leaves both as they were, as a backup; the same "only where missing" rule makes it safe to run again.
-// Upstash is read over its own protocol (REDIS_URL, which Vercel's Upstash integration adds) when that is set, else REST.
+// With MONGODB_URI set it copies Upstash into MongoDB instead and leaves Upstash as it was, as a backup; the same
+// "only where missing" rule makes it safe to run again. USER_REDIS_URL is never read or written by it, and people's keys
+// (USER_KEYS) are skipped when it is set, as they live there (or with COPY_SKIP_USER_KEYS, for app-build/copy-to-mongo.cjs). Upstash is read over its own protocol (REDIS_URL, which
+// Vercel's Upstash integration adds) when that is set, else over REST.
 const UPSTASH_TCP = /^rediss?:\/\//i.test(process.env.REDIS_URL || '') && process.env.REDIS_URL !== USER_URL ? process.env.REDIS_URL : '';
 let upstashSrc = null;
 const upstashForCopy = () => upstashSrc || (upstashSrc = UPSTASH_TCP ? tcpDb(UPSTASH_TCP) : KV_URL && KV_TOKEN && MAIN_DB !== USER_DB ? restDb(KV_URL, KV_TOKEN) : null);
-const COPY_SOURCES = () => [USER_DB, upstashForCopy()].filter(Boolean);
-const canMoveUserData = () => (MONGO_DB ? COPY_SOURCES().length > 0 : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
+const COPY_DONE = MONGO_DB ? 'mongocopied' : 'usermoved';   // when the copy finished; 'mongocopied' is not a USER_KEYS key
+const canMoveUserData = () => (MONGO_DB ? !!upstashForCopy() : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
 async function copyToMongo(cursor) {
-  const srcs = COPY_SOURCES();
-  const m = String(cursor || '0').match(/^(?:(\d+):)?(.*)$/);
-  const at = Number(m[1] || 0), src = srcs[at];
-  if (!src) return { next: '0', keys: 0 };
-  const [scanned, keys] = await src.call(['SCAN', m[2] || '0', 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
-  const next = String(scanned) !== '0' ? (at ? `${at}:${scanned}` : String(scanned)) : at + 1 < srcs.length ? `${at + 1}:0` : '0';
-  if (!keys.length) return { next, keys: 0 };
+  const src = upstashForCopy();
+  const [next, found] = await src.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
+  const keys = USER_DB || process.env.COPY_SKIP_USER_KEYS ? found.filter((k) => !USER_KEYS.test(k.slice(KEY_PREFIX.length))) : found;
+  if (!keys.length) return { next: String(next), keys: 0 };
   const types = await src.pipe(keys.map((k) => ['TYPE', k]));
   const [vals, ttls] = await Promise.all([
     src.pipe(keys.map((k, i) => [{ string: 'GET', hash: 'HGETALL', set: 'SMEMBERS' }[types[i]] || 'TYPE', k])),
     src.pipe(keys.map((k) => ['PTTL', k]))]);
   await MONGO_DB.importKeys(keys.map((key, i) => ({ key, type: types[i], value: vals[i], ttl: Number(ttls[i]) })));
-  return { next, keys: keys.length };
+  return { next: String(next), keys: keys.length };
 }
 async function moveUserData(cursor) {
   if (MONGO_DB) return copyToMongo(cursor);
@@ -1259,5 +1257,5 @@ async function candReach(id, slugs) {
 
 module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
-  OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

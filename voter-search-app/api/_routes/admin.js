@@ -103,7 +103,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { wardPayOn, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { wardPayOn, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // parties (पार्टी): hash "parties", id → JSON {name, icon, created}; icon a small PNG/JPEG data URL made by the admin page
@@ -299,7 +299,7 @@ module.exports = route(async (req, res, b) => {
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     if (!canMoveUserData()) return send(res, 400, { error: 'no_db_copy' });
     const r = await moveUserData(b.cursor);
-    if (r.next === '0') await redis('SET', 'usermoved', now);
+    if (r.next === '0') await redis('SET', COPY_DONE, now);
     return send(res, 200, { ...r, done: r.next === '0' });
   }
 
@@ -329,7 +329,7 @@ module.exports = route(async (req, res, b) => {
     const [ids, cands, moved, parties] = await Promise.all([
       redis('SMEMBERS', 'users').then((x) => x || []),
       candsOf(me.villages),
-      isSuper && canMoveUserData() ? redis('GET', 'usermoved') : null,
+      isSuper && canMoveUserData() ? redis('GET', COPY_DONE) : null,
       allParties()]);
     let all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
     if (!isSuper) {   // a village admin never sees another admin, not even that admin's person login (same mobile number)
