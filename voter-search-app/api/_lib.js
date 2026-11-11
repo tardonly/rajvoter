@@ -735,8 +735,8 @@ async function addPaid(u, n, r, by) {
 }
 // A whole ward's slips (वार्ड की सभी पर्चियाँ, api/_routes/search.js "all") cost ₹WARD_RS, once per ward: a purchase
 // (api/pay.js 'start' with a ward; req:<id> with kind 'ward', ward, wv = its village, n 0) that, once paid, puts the ward
-// in the set wardpaid:<user id>:<village>, so that login may print / save it again any time. The superadmin and village
-// admins don't pay (wardFree).
+// in the set wardpaid:<user id>:<village>, so that login may print / save it again any time. Only the superadmin never
+// pays; village admins pay like everyone else (wardFree).
 const WARD_RS = 50;
 const wardKey = (uid, slug) => `wardpaid:${uid}:${slug}`;
 // Whether people pay for wards, set by the superadmin on the admin page (api/_routes/admin.js "ward_pay"): key
@@ -749,7 +749,7 @@ async function wardPayOn() {
 }
 async function wardFree(u) {
   if (!u) return false;
-  if (u.role === 'super' || u.role === 'admin') return true;
+  if (u.role === 'super') return true;
   if (u.wardpay === 'free') return true;
   if (u.wardpay === 'pay') return false;
   return !(await wardPayOn());

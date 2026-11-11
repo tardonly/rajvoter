@@ -823,7 +823,7 @@ function showWardPay(on) {
   $('wpTitle').textContent = L('वार्ड की पर्चियाँ डाउनलोड', 'Ward slips download');
   $('wpNow').textContent = on ? L('₹50 प्रति वार्ड', '₹50 a ward') : L('सबके लिए मुफ़्त', 'free for everyone');
   $('wpOnText').textContent = L('पैसे लें (₹50 प्रति वार्ड) — बंद करें तो सबके लिए मुफ़्त', 'Charge (₹50 a ward) — off = free for everyone');
-  $('wpHow').textContent = L('किसी एक व्यक्ति के लिए अलग: व्यक्ति tab में उसके कार्ड पर "वार्ड पर्चियाँ" चुनें। एडमिन कभी पैसे नहीं देते।', 'For one person: choose "Ward slips" on their card in the People tab. Admins never pay.');
+  $('wpHow').textContent = L('किसी एक व्यक्ति के लिए अलग: व्यक्ति tab में उसके कार्ड पर "वार्ड पर्चियाँ" चुनें। सिर्फ़ सुपर-एडमिन कभी पैसे नहीं देते।', 'For one person: choose "Ward slips" on their card in the People tab. Only the superadmin never pays.');
   $('wpOn').checked = WARD_PAY;
   if (me && users.length) render();   // the person cards say what "as for everyone" is now
 }
@@ -2076,7 +2076,7 @@ function person(u) {
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), noteBox(u), use, ...(refLine ? [refLine] : []));
   if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
-      limitBox(u, 'listMsg', refresh));   // a daily limit
+      limitBox(u, 'listMsg', refresh), wardPayBox(u));   // a daily limit; ward slips paid or free
   }
   if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]), ...(me.role === 'super' ? [wardPayBox(u)] : []),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(me.role === 'super' ? [moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));

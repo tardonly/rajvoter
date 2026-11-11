@@ -623,7 +623,7 @@ module.exports = route(async (req, res, b) => {
 
   if (b.action === 'ward_pay_user') {   // superadmin: this person pays for ward slips or not, whatever the switch for everyone says
     if (!isSuper) return send(res, 403, { error: 'super_only' });
-    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });   // admins never pay
+    if (user.role !== 'user' && user.role !== 'admin') return send(res, 400, { error: 'not_user' });   // only the superadmin never pays
     const mode = ['free', 'pay'].includes(b.mode) ? b.mode : '';
     await redis('HSET', `user:${user.id}`, 'wardpay', mode);
     return send(res, 200, { user: view(await getUser(user.id)) });
