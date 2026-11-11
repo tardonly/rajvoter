@@ -59,13 +59,13 @@ function restDb(url, token) {
   };
 }
 // … or any Redis over its own protocol (ioredis), one connection kept per running function
-function tcpDb(url) {
+function tcpDb(url, name = 'USER_REDIS_URL') {
   let c = null;
   const conn = () => {
     if (!c) {
       const Redis = require('ioredis');
       c = new Redis(url, { maxRetriesPerRequest: 2, enableReadyCheck: false, connectTimeout: 8000 });
-      c.on('error', (e) => console.error('USER_REDIS_URL:', e.message));
+      c.on('error', (e) => console.error(name + ':', e.message));
     }
     return c;
   };
@@ -247,7 +247,7 @@ async function pipeline(cmds) {
 // Vercel's Upstash integration adds) when that is set, else over REST.
 const UPSTASH_TCP = /^rediss?:\/\//i.test(process.env.REDIS_URL || '') && process.env.REDIS_URL !== USER_URL ? process.env.REDIS_URL : '';
 let upstashSrc = null;
-const upstashForCopy = () => upstashSrc || (upstashSrc = UPSTASH_TCP ? tcpDb(UPSTASH_TCP) : KV_URL && KV_TOKEN && MAIN_DB !== USER_DB ? restDb(KV_URL, KV_TOKEN) : null);
+const upstashForCopy = () => upstashSrc || (upstashSrc = UPSTASH_TCP ? tcpDb(UPSTASH_TCP, 'REDIS_URL (Upstash)') : KV_URL && KV_TOKEN && MAIN_DB !== USER_DB ? restDb(KV_URL, KV_TOKEN) : null);
 const COPY_DONE = MONGO_DB ? 'mongocopied' : 'usermoved';   // when the copy finished; 'mongocopied' is not a USER_KEYS key
 const canMoveUserData = () => (MONGO_DB ? !!upstashForCopy() : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
 async function copyToMongo(cursor) {
