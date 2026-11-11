@@ -15,7 +15,9 @@
 //     start page an admin login first, else the newest) gets the password it chose; errors 'otp_wrong' | 'otp_expired' |
 //     'otp_tries', 'pw_short', 'pw_taken'. The page then logs in with it (api/unlock.js)
 //   POST {action: 'password', token, village, password} → {ok}   a logged-in person chooses a new password (पासवर्ड बदलें)
-//   POST {action: 'signup', village, phone, name, password [, ref]} → {password, token, name, phone, villages, list, perms,
+//   POST {action: 'signup', village, phone, name, password [, ref]} →   ref: the invite link's code, or the referral code or
+//     referrer's mobile number typed at sign-up; one that matches no one is refused (error ref_bad)
+//     → {password, token, name, phone, villages, list, perms,
 //     prepaid, left, adminPhone, ref}   ref (answer): this login's own invite code and reward (refFor in _lib.js)   password: the one the person chose (setOwnPassword in _lib.js)
 //   POST {action: 'move', token, village, to} → {village, list, movesLeft}   a signed-up login picked the wrong village:
 //     it moves itself to village "to" (its searches and password go along, it stays logged in), up to MOVES times; after
@@ -95,10 +97,11 @@ module.exports = route(async (req, res, b) => {
     if (badOwnPassword(b.password)) return send(res, 400, { error: 'pw_short' });
     if ((await phoneLogins(phone)).some((u) => u.retired !== '1' && u.villages.includes(v.slug))) return send(res, 409, { error: 'exists' });
     if (await redis('GET', `pw:${ownPwHash(phone, b.password)}`)) return send(res, 409, { error: 'pw_taken' });   // this number's other login
+    const inv = await refInviter(b.ref, phone);   // a friend's invite link, or the referral code / mobile typed in
+    if (String(b.ref || '').trim() && !inv) return send(res, 400, { error: 'ref_bad' });
     const k = `signups:${clientIp(req)}:${today()}`, n = await redis('INCR', k);
     await redis('EXPIRE', k, 86400);
     if (n > SIGNUPS_PER_DAY) return send(res, 429, { error: 'too_many' });
-    const inv = await refInviter(b.ref, phone);   // came through a friend's invite link
     const free = await freeSearches(phone, v.slug, null, inv, true);
     const { id } = await newLogin(['role', 'user', 'village', v.slug, 'credits', free, 'self', '1', ...(inv ? ['refBy', inv.id, 'refByName', inv.name] : [])],
       name, phone, 'self', '');

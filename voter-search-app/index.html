@@ -536,6 +536,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
         <select id="signVillage" aria-label="गाँव"></select>
         <input id="signName" type="text" maxlength="60" placeholder="आपका नाम">
         <input id="signPw" type="password" autocomplete="new-password" maxlength="40" placeholder="अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <input id="signRef" type="text" maxlength="20" placeholder="🤝 रेफ़रल कोड / रेफ़र करने वाले का मोबाइल (हो तो)" autocapitalize="none" autocorrect="off" spellcheck="false">
         <label><input id="showSignPw" type="checkbox"> पासवर्ड दिखाएं</label>
       </div>
       <button class="btn" id="unlockBtn" type="submit">आगे</button>
@@ -720,7 +721,7 @@ const LOCALE = L('hi-IN', 'en-IN');
 const STATIC_EN = {
   'पासवर्ड भूल गए? OTP से नया बनाएं': 'Forgot your password? Make a new one with an OTP', 'OTP डालें': 'Enter the OTP',
   'OTP फिर भेजें': 'Send the OTP again', 'नया पासवर्ड (कम से कम 6 अक्षर)': 'New password (at least 6 characters)',
-  'अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)': 'Choose a password (at least 6 characters)', 'पासवर्ड बदलें': 'Change password',
+  'अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)': 'Choose a password (at least 6 characters)', '🤝 रेफ़रल कोड / रेफ़र करने वाले का मोबाइल (हो तो)': '🤝 Referral code / referrer\'s mobile (if any)', 'पासवर्ड बदलें': 'Change password',
   '📲 ऐप इंस्टॉल करें': '📲 Install the app', 'ऐप इंस्टॉल करें': 'Install the app', 'निशान:': 'Marks:', 'सर्वे': 'Survey', 'मतदान दिवस': 'Polling day', 'हटाएं': 'Put away', 'निशान': 'Marks',
   'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
@@ -2153,6 +2154,7 @@ const SIGN_ERR = {
   no_samiti: L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti'), no_village: L('अपना गाँव चुनें', 'Choose your village'), name: L('अपना नाम लिखें', 'Type your name'),
   phone: L('10 अंकों का मोबाइल नंबर डालें', 'Enter a 10-digit mobile number'),
   pw_short: L('पासवर्ड कम से कम 6 अक्षर का रखें', 'Make the password at least 6 characters'),
+  ref_bad: L('यह रेफ़रल कोड / नंबर किसी का नहीं मिला — ठीक करें या खाली छोड़ें', 'No one found with this referral code / number — fix it or leave it empty'),
   pw_taken: L('इस नंबर के दूसरे खाते का यही पासवर्ड है — कोई और पासवर्ड चुनें', 'This number\'s other login has this password — choose another'),
   no_login: L('इस नंबर का कोई खाता नहीं मिला', 'No login found for this number'),
   no_otp: L('OTP से पासवर्ड अभी नहीं बदल सकते — अपने एडमिन से पूछें', 'The password cannot be reset by OTP yet — ask your admin'),
@@ -2560,6 +2562,7 @@ async function lockPhone() {
   OTP_ON = !!r.otp;
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   await signVillages();
+  if (!$('signRef').value) $('signRef').value = store.get('ref') || '';   // a friend's invite link fills it in
   const invited = r.refBy ? L(`${r.refBy} ने आपको रेफ़र किया है। `, `${r.refBy} invited you. `) : '';
   lockStepTo('sign', invited + (r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद 50 पैसे में एक पर्ची।`,
     `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that 50 paise a slip.`)
@@ -2698,9 +2701,10 @@ async function lockSignup() {
   const password = $('signPw').value.trim();
   if (password.length < 6) { $('signPw').focus(); return showLock(SIGN_ERR.pw_short); }
   $('unlockBtn').disabled = true; showLock(L('खाता बन रहा है…', 'Making your login…'), true);
-  const r = await api('signup', { action: 'signup', village: slug, name, phone: $('phone').value, password, ref: store.get('ref') || '' });
+  const r = await api('signup', { action: 'signup', village: slug, name, phone: $('phone').value, password, ref: $('signRef').value.trim() });
   $('unlockBtn').disabled = false;
   if (!r.error) store.del('ref');
+  if (r.error === 'ref_bad') $('signRef').focus();
   if (r.error === 'exists') { showLock(''); return lockStepTo('pw', PW_NOTE()); }
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
   showLock('');

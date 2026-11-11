@@ -536,10 +536,16 @@ async function refFor(u) {
   const rule = await refRule();
   return rule.on ? { code: u.id, pct: rule.pct, joiner: rule.joiner, bonusAt: rule.bonusAt, bonus: rule.bonus, count: Number(u.refBought) || 0 } : null;
 }
-// the inviter behind a ?ref= code, for a new number: an active user login with another number, or null
+// the inviter for a new number: the ?ref= code of an invite link, or the code or mobile number typed at sign-up →
+// an active user login with another number, or null
 async function refInviter(code, phone) {
-  if (!/^[0-9a-f]{10}$/.test(String(code || ''))) return null;
-  const u = await getUser(code);
+  code = String(code || '').trim().toLowerCase();
+  let u = /^[0-9a-f]{10}$/.test(code) ? await getUser(code) : null;   // a 10-digit mobile number looks like a code too
+  if (!u) {
+    const ph = normPhone(code);
+    const l = ph ? (await phoneLogins(ph)).find((x) => x.role === 'user' && x.retired !== '1') : null;
+    u = l ? await getUser(l.id) : null;
+  }
   return u && canBuy(u) && u.role === 'user' && u.retired !== '1' && u.phone !== phone ? u : null;
 }
 
