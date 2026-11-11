@@ -5,7 +5,7 @@
 // Each action goes to GA4 directly (when GA_ID is set) and to the dataLayer as event "app_action", so a Tag Manager
 // trigger on that event can use them too.
 (function () {
-  var GA_ID = '';   // the GA4 web stream's measurement ID: G-XXXXXXXXXX (analytics.google.com → Admin → Data streams)
+  var GA_ID = 'G-G9EK9GTQ4J';   // the GA4 web stream's measurement ID: G-XXXXXXXXXX (analytics.google.com → Admin → Data streams)
   window.dataLayer = window.dataLayer || [];
   window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
   if (GA_ID) {
