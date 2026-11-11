@@ -131,6 +131,18 @@
   .limit .note { color: var(--muted); font-size: 12.5px; }
   .limit select { width: auto; padding: 5px 8px; font-size: 14px; border-radius: 8px; }
   .badge.cand { background: #fae8ff; color: #86198f; }
+  /* parties: a symbol and a name, on candidates and in the superadmin's list */
+  .party { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+  .party img, .party .noicon { width: 28px; height: 28px; border-radius: 6px; object-fit: contain; background: #f3f4f6; flex: none; }
+  .candrow .party { margin: 6px 0 0; }
+  #partyBox { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+  #partyBox h3 { margin: 0 0 8px; font-size: 16px; }
+  #partyList { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  #partyList .pchip { display: inline-flex; align-items: center; gap: 4px; background: #f9fafb; border: 1px solid var(--line); border-radius: 10px; padding: 4px 4px 4px 6px; }
+  #partyList .pchip button { border: 0; background: none; color: var(--bad); font-size: 15px; padding: 0 6px; cursor: pointer; }
+  #partyForm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  #partyForm input[type=text] { flex: 1; min-width: 160px; }
+  #partyIconPrev { width: 36px; height: 36px; border-radius: 6px; object-fit: contain; background: #f3f4f6; }
   .candrow { padding: 12px 0; border-top: 1px solid var(--line); }
   .candrow:first-child { border-top: 0; }
   .candrow .name { font-weight: 600; font-size: 16px; }
@@ -455,6 +467,18 @@
       <h2>उम्मीदवार</h2>
       <p class="sub">हर उम्मीदवार के कार्यकर्ता (3–4 पासवर्ड) एक समूह हैं: वे सिर्फ़ अपने उम्मीदवार के निशान लगाते और देखते हैं,
         दूसरे उम्मीदवार के लोग ये निशान नहीं देख सकते। बिना उम्मीदवार वाले लोग गाँव के आम निशान देखते हैं।</p>
+      <div id="partyBox" class="hidden">
+        <h3>पार्टियाँ</h3>
+        <div id="partyList"></div>
+        <form id="partyForm" autocomplete="off">
+          <img id="partyIconPrev" class="hidden" alt="">
+          <label class="btn ghost" for="partyIcon">चुनाव चिन्ह चुनें</label>
+          <input id="partyIcon" type="file" accept="image/*" hidden>
+          <input id="partyName" type="text" placeholder="पार्टी का नाम" maxlength="60" required>
+          <button class="btn" id="partyBtn" type="submit">पार्टी जोड़ें</button>
+        </form>
+        <div class="msg" id="partyMsg"></div>
+      </div>
       <form id="candForm" class="stack" autocomplete="off">
         <select id="candVillage" aria-label="गाँव"></select>
         <input id="candName" type="text" placeholder="उम्मीदवार का नाम" maxlength="60" required>
@@ -544,6 +568,7 @@ const STATIC_EN = {
   'सेव करें': 'Save',
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
   'एडमिन पासवर्ड': 'Admin password', 'मोबाइल नंबर (अपना बनाया पासवर्ड हो तो)': 'Mobile number (if you chose your own password)', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
+  'पार्टियाँ': 'Parties', 'चुनाव चिन्ह चुनें': 'Choose symbol', 'पार्टी का नाम': 'Party name', 'पार्टी जोड़ें': 'Add party',
   'व्यक्ति': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'वोटर लिस्ट': 'Voter list', 'निशान हटाएं': 'Clear marks',
   'बंद करें': 'Close', 'कॉपी करें': 'Copy', 'WhatsApp पर भेजें': 'Send on WhatsApp',
   'यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।': 'This password is shown only now. If it is forgotten, make another with "New password".',
@@ -590,7 +615,7 @@ const store = {
 let MARKED = {}, MARKED_IN = false, STATS = null, fullStats = false;   // fullStats: a marks tab was opened, so progress per ward too
 const MARK_TABS = ['prog', 'voters', 'clear'], SETTING_TABS = ['ref', 'cpn', 'free'];
 let settingsBusy = null, settingsIn = false;   // from "stats" (api/_routes/admin.js), loaded after the page shows: slips marked per person; null = not yet
-let token = store.get(), me = null, users = [], admins = [], reqs = [], filter = 'on', villages = {}, progress = [], cands = [], AREA_SIZE = {};
+let token = store.get(), me = null, users = [], admins = [], reqs = [], filter = 'on', villages = {}, progress = [], cands = [], parties = [], AREA_SIZE = {};
 const MSG = EN ? {
   wrong: 'Wrong password', too_many: 'Too many wrong passwords — try again in 15 minutes',
   not_admin: 'This is not an admin password', retired: 'This password has been switched off',
@@ -603,7 +628,7 @@ const MSG = EN ? {
   no_user: 'None of your people has this mobile number — add the person first (व्यक्ति tab)', no_online: 'Online payment is not set up', gateway: 'Razorpay problem',
   wallet_min: 'Withdraw at least the minimum', wallet_low: 'Not that much in the wallet', bad_upi: 'Type a correct UPI ID (name@bank)', wd_open: 'A withdrawal is already on its way', wallet_amount: 'Type the amount in ₹',
   bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
-  no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
+  no_party: 'Party not found', bad_icon: 'That symbol picture could not be used — choose another', no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
 } : {
   wrong: 'पासवर्ड गलत है', too_many: 'बहुत बार गलत पासवर्ड — 15 मिनट बाद कोशिश करें',
   not_admin: 'यह एडमिन पासवर्ड नहीं है', retired: 'यह पासवर्ड बंद कर दिया गया है',
@@ -616,7 +641,7 @@ const MSG = EN ? {
   no_user: 'आपके व्यक्तियों में यह मोबाइल नंबर नहीं है — पहले व्यक्ति tab में जोड़ें', no_online: 'ऑनलाइन भुगतान चालू नहीं है', gateway: 'Razorpay में दिक्कत',
   wallet_min: 'कम से कम न्यूनतम राशि निकालें', wallet_low: 'वॉलेट में इतने ₹ नहीं हैं', bad_upi: 'सही UPI ID लिखें (name@bank)', wd_open: 'एक निकासी पहले से चल रही है', wallet_amount: 'राशि ₹ में लिखें',
   bad_credits: 'कितनी सर्च जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में सर्च नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
-  no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
+  no_party: 'यह पार्टी नहीं मिली', bad_icon: 'यह चिन्ह की फ़ोटो नहीं चल सकी — दूसरी चुनें', no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
 };
 // 919876543210 → "+91 98765 43210"
 const showPhone = (p) => (/^91\d{10}$/.test(p) ? `+91 ${p.slice(2, 7)} ${p.slice(7)}` : p ? `+${p}` : '');
@@ -669,7 +694,7 @@ async function openPanel() {
   const r = await api({ action: 'list' });
   if (['wrong', 'retired', 'logged_out', 'other_device'].includes(r.error)) { store.del(); return goHome(MSG[r.error]); }
   if (r.error) return showLogin(errText(r));
-  me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || [];
+  me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; parties = r.parties || [];
   for (const v of r.villageList || []) villages[v.slug] = v;
   AREA_SIZE = r.areaSize || {};
   setup(); showMarks(r);
@@ -1298,7 +1323,7 @@ const samitisIn = (box) => [...box.querySelectorAll('input[data-samiti]:checked'
 async function refresh(stats = false) {   // stats: progress and marks too (loadStats), when they may have changed
   const [r] = await Promise.all([api({ action: 'list' }), loadReqs()]);
   if (r.error) { $('listMsg').textContent = errText(r); return; }
-  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; render();
+  $('listMsg').textContent = ''; me = r.me; users = r.users; admins = r.admins || []; cands = r.cands || []; parties = r.parties || []; render();
   if (typeof r.survey === 'boolean') setMode(r.survey);
   if (stats) loadStats();
 }
@@ -1753,6 +1778,13 @@ function renderCands() {
     const nm = el('div', 'name', c.name);
     if (many) nm.append(el('span', 'badge vil', vName(c.village)));
     nm.append(el('span', 'badge cand', L(`${members.length} कार्यकर्ता`, `${members.length} worker${members.length === 1 ? '' : 's'}`)));
+    const pRow = el('div', 'row'), pSel = el('select');
+    pSel.setAttribute('aria-label', L('पार्टी', 'Party'));
+    pSel.add(new Option(L('पार्टी: कोई नहीं', 'Party: none'), ''));
+    for (const p of parties) pSel.add(new Option(p.name, p.id));
+    pSel.value = partyOf(c.party) ? c.party : '';
+    pSel.addEventListener('change', () => act({ action: 'cand_party', cand: c.id, party: pSel.value }));
+    pRow.append(pSel);
     const list = el('div', 'members');
     if (!members.length) list.append(el('div', 'info', L('अभी कोई कार्यकर्ता नहीं — नीचे से जोड़ें', 'No workers yet — add them below')));
     for (const u of members) {
@@ -1777,10 +1809,64 @@ function renderCands() {
         `Delete candidate ${c.name}? All marks of their group are erased and their workers will see the village's common marks.`)));
     add.append(pick, go);
     const actions = el('div', 'actions'); actions.append(del);
-    row.append(nm, list, add, actions);
+    const pv = partyOf(c.party);
+    row.append(nm, ...(pv ? [partyTag(pv)] : []), pRow, list, add, actions);
     box.append(row);
   }
+  renderParties();
 }
+const partyOf = (id) => (id && parties.find((p) => p.id === id)) || null;
+function partyTag(p) {   // the party's symbol and name
+  const t = el('div', 'party');
+  if (p.icon) { const i = el('img'); i.src = p.icon; i.alt = ''; t.append(i); } else t.append(el('span', 'noicon'));
+  t.append(el('span', null, p.name));
+  return t;
+}
+// superadmin: the parties candidates can be given, each with its symbol
+function renderParties() {
+  $('partyBox').classList.toggle('hidden', me.role !== 'super');
+  if (me.role !== 'super') return;
+  const box = $('partyList'); box.replaceChildren();
+  if (!parties.length) box.append(el('div', 'info', L('अभी कोई पार्टी नहीं', 'No parties yet')));
+  for (const p of parties) {
+    const chip = el('span', 'pchip'), x = el('button', null, '✕');
+    x.type = 'button'; x.title = L('पार्टी हटाएं', 'Delete party');
+    const n = cands.filter((c) => c.party === p.id).length;
+    x.addEventListener('click', () => act({ action: 'party_del', party: p.id }, L(`पार्टी ${p.name} हटाएं?${n ? ` ${n} उम्मीदवार की पार्टी हट जाएगी।` : ''}`,
+      `Delete party ${p.name}?${n ? ` ${n} candidate${n === 1 ? '' : 's'} will have no party.` : ''}`)));
+    chip.append(partyTag(p), x); box.append(chip);
+  }
+}
+let partyIcon = '';
+// the symbol, shrunk on this device to at most 96×96 (PNG keeps a clear background; a big photo goes JPEG)
+$('partyIcon').addEventListener('change', async () => {
+  const f = $('partyIcon').files[0]; $('partyIcon').value = '';
+  if (!f) return;
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = URL.createObjectURL(f); });
+    const k = Math.min(1, 96 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(img.src);
+    let data = c.toDataURL('image/png');
+    if (data.length > 55000) data = c.toDataURL('image/jpeg', 0.85);
+    partyIcon = data;
+    $('partyIconPrev').src = data; $('partyIconPrev').classList.remove('hidden');
+    $('partyMsg').textContent = '';
+  } catch { $('partyMsg').textContent = L('यह फ़ोटो नहीं खुली — दूसरी चुनें', 'Could not open that picture — choose another'); }
+});
+$('partyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('partyName').value.trim();
+  if (!name) return;
+  $('partyBtn').disabled = true; $('partyMsg').textContent = '';
+  const r = await api({ action: 'party_set', name, icon: partyIcon });
+  $('partyBtn').disabled = false;
+  if (r.error) { $('partyMsg').textContent = errText(r); return; }
+  $('partyName').value = ''; partyIcon = ''; $('partyIconPrev').classList.add('hidden');
+  refresh(true);
+});
 $('candForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('candName').value.trim(), village = $('candVillage').value;

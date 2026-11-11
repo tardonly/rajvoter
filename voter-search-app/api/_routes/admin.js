@@ -43,6 +43,13 @@
 //                                         only they see (see markHash in _lib.js)
 //   action "cand_delete", cand       → {ok}     removes the candidate and its marks; its users go back to the village's marks
 //   action "cand_set", id, cand      → {user}   puts a user of the candidate's village in that group ('' = no candidate)
+//   action "party_set" [, party], name, icon → {party}   superadmin: adds a party (no party) or changes one: name and its
+//                                         symbol, a small picture the admin page shrinks to a PNG/JPEG data URL ('' = none);
+//                                         all of them in hash "parties" (id → JSON {name, icon, created})
+//   action "party_del", party        → {ok}     superadmin: removes a party; candidates that had it show none
+//   action "cand_party", cand, party → {cand}   which party a candidate stands for ('' = none); the superadmin or the
+//                                               candidate's village admin. "list" gives parties [{id, name, icon}] and each
+//                                               cand's party
 //   action "move", id, village       → {user}   moves a user to another village (both must be the admin's): their
 //                                               candidate is cleared and their phone is logged out
 //   (reqs: every online purchase (api/pay.js), open ones first, plus those paid or closed in the last 30 days, each with
@@ -96,6 +103,19 @@ const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
 const { wardPayOn, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
+
+// parties (पार्टी): hash "parties", id → JSON {name, icon, created}; icon a small PNG/JPEG data URL made by the admin page
+const PARTY_ICON = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/, PARTY_ICON_MAX = 60 * 1024;
+async function getParty(id) {
+  if (!/^[0-9a-f]{8}$/.test(String(id || ''))) return null;
+  const raw = await redis('HGET', 'parties', id);
+  try { return raw ? { id, ...JSON.parse(raw) } : null; } catch { return null; }
+}
+async function allParties() {   // oldest first
+  const flat = (await redis('HGETALL', 'parties')) || [], out = [];
+  for (let i = 0; i < flat.length; i += 2) { try { out.push({ id: flat[i], ...JSON.parse(flat[i + 1]) }); } catch { /* skip a broken entry */ } }
+  return out.sort((x, y) => (x.created < y.created ? -1 : 1)).map(({ id, name, icon }) => ({ id, name, icon: icon || '' }));
+}
 
 // admin permissions from the request → only known ones
 const adminPermsIn = (list) => ADMIN_PERMS.filter((p) => Array.isArray(list) && list.includes(p));
@@ -304,10 +324,11 @@ module.exports = route(async (req, res, b) => {
   };
   if (b.action === 'stats') return send(res, 200, await stats(Math.min(10000, Math.max(0, parseInt(b.all, 10) || 0)), b.only === 'marked'));
   if (b.action === 'list') {   // quick: what the person list needs (requests: "reqs"; tab settings: "settings")
-    const [ids, cands, moved] = await Promise.all([
+    const [ids, cands, moved, parties] = await Promise.all([
       redis('SMEMBERS', 'users').then((x) => x || []),
       candsOf(me.villages),
-      isSuper && canMoveUserData() ? redis('GET', 'usermoved') : null]);
+      isSuper && canMoveUserData() ? redis('GET', 'usermoved') : null,
+      allParties()]);
     let all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
     if (!isSuper) {   // a village admin never sees another admin, not even that admin's person login (same mobile number)
       const adminPhones = new Set(all.filter((u) => u.role === 'admin' && u.phone).map((u) => u.phone));
@@ -324,7 +345,8 @@ module.exports = route(async (req, res, b) => {
     const admins = isSuper ? shown.filter((u) => u.role === 'admin').map(withUse) : undefined;
     const dbCopy = isSuper && canMoveUserData() ? (moved ? 'done' : 'todo') : undefined;
     return send(res, 200, { dbCopy, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins,
-      villageList: villageList(me.villages), areaSize: areaSizes(me.villages), cands: cands.map(({ id, name, village: v, created }) => ({ id, name, village: v, created })) });
+      villageList: villageList(me.villages), areaSize: areaSizes(me.villages), parties,
+      cands: cands.map(({ id, name, village: v, created, party }) => ({ id, name, village: v, created, party: party || '' })) });
       // villageList: names of my villages (the list is not public)
   }
   if (b.action === 'settings') {   // superadmin, when a settings tab opens: free searches, referrals, coupons
@@ -435,6 +457,33 @@ module.exports = route(async (req, res, b) => {
     await redis('HSET', `cand:${id}`, 'name', name, 'village', b.village, 'created', now);
     await redis('SADD', 'cands', id);
     return send(res, 200, { cand: await getCand(id) });
+  }
+
+  if (b.action === 'party_set') {   // superadmin: a party (पार्टी) and its symbol, to put on candidates
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const name = String(b.name || '').trim().slice(0, 60), icon = String(b.icon || '');
+    if (!name) return send(res, 400, { error: 'name' });
+    if (icon && (icon.length > PARTY_ICON_MAX || !PARTY_ICON.test(icon))) return send(res, 400, { error: 'bad_icon' });
+    const old = b.party ? await getParty(b.party) : null;
+    if (b.party && !old) return send(res, 404, { error: 'no_party' });
+    const id = old ? old.id : crypto.randomBytes(4).toString('hex');
+    const party = { name, icon, created: old ? old.created : now };
+    await redis('HSET', 'parties', id, JSON.stringify(party));
+    return send(res, 200, { party: { id, ...party } });
+  }
+  if (b.action === 'party_del') {
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    if (!(await getParty(b.party))) return send(res, 404, { error: 'no_party' });
+    await redis('HDEL', 'parties', b.party);
+    return send(res, 200, { ok: true });
+  }
+  if (b.action === 'cand_party') {   // the party a candidate stands for ('' = none)
+    const c = await getCand(b.cand);
+    if (!c || !mayUse(c.village)) return send(res, 404, { error: 'no_cand' });
+    const party = String(b.party || '');
+    if (party && !(await getParty(party))) return send(res, 404, { error: 'no_party' });
+    await redis('HSET', `cand:${c.id}`, 'party', party);
+    return send(res, 200, { cand: await getCand(c.id) });
   }
 
   if (b.action === 'cand_delete') {
