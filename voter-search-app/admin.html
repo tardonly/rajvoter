@@ -1975,7 +1975,7 @@ function candBox(u) {
 // the admins' own note on a person: only on this page, saved when the box loses focus (no list redraw, so typing is not lost)
 function noteBox(u) {
   const box = el('div', 'anote'), ta = document.createElement('textarea'), msg = el('div', 'notemsg', '');
-  ta.placeholder = u.role === 'admin' ? L('इस एडमिन के बारे में लिखें', 'Write about this admin') : L('इस यूज़र के बारे में लिखें, ये सिर्फ़ आपको दिखेगा', 'Write about this user, only you will see this');
+  ta.placeholder = u.role === 'admin' ? L('इस एडमिन के बारे में लिखें, ये सिर्फ़ आपको दिखेगा', 'Write about this admin, only you will see this') : L('इस यूज़र के बारे में लिखें, ये सिर्फ़ आपको दिखेगा', 'Write about this user, only you will see this');
   ta.maxLength = 1000; ta.value = u.note || ''; ta.rows = 2;
   ta.addEventListener('change', async () => {
     msg.textContent = L('सेव हो रहा है…', 'Saving…');
