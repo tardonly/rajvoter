@@ -513,8 +513,9 @@ async function takeFree(slug, rule, want) {
 }
 // Referrals (रेफ़रल): a user's invite link is <site>/<village>?ref=<their id> (the app's 🎁 दोस्तों को बुलाएं button). A new
 // number that signs up through it gets `joiner` extra searches (not a number that signed up before), and the login
-// keeps refBy / refByName. When that person first buys searches (addPaid), the inviter gets `inviter` searches, once
-// (field refPaid on the new login; the inviter counts refBought and refEarned). The superadmin sets it on the admin page
+// keeps refBy / refByName. When that person first buys searches (addPaid), the inviter gets ₹`inviter` cashback in their
+// wallet (walletAdd below), once (field refPaid on the new login; the inviter counts refBought and refCash; refEarned is
+// the searches older rewards gave). The superadmin sets it on the admin page
 // (key "refrule", api/_routes/admin.js "ref_rule"), REF until then.
 const REF = { on: true, inviter: 20, joiner: 5 };
 const REF_MAX = 1000;
@@ -731,10 +732,117 @@ async function refReward(id) {
   if (!refBy || !(await redis('HSETNX', `user:${id}`, 'refPaid', '1'))) return;
   const rule = await refRule(), inv = await getUser(refBy);
   if (!rule.on || !rule.inviter || !inv || inv.retired === '1') return;
-  await redis('HINCRBY', `user:${inv.id}`, 'credits', rule.inviter);
-  await redis('HINCRBY', `user:${inv.id}`, 'refEarned', rule.inviter);
+  await walletAdd(inv.id, rule.inviter);
+  await redis('HINCRBY', `user:${inv.id}`, 'refCash', rule.inviter);
   await redis('HINCRBY', `user:${inv.id}`, 'refBought', 1);
-  await redis('HSET', `user:${id}`, 'refGave', rule.inviter);
+  await redis('HSET', `user:${id}`, 'refGave', rule.inviter, 'refGaveRs', '1');
+}
+// Wallet (वॉलेट): ₹ cashback, so far only from referrals (refReward). Kept as field "wallet" on user:<id> (walletIn: all
+// ever added). The person may (api/pay.js 'wallet…'):
+//   - turn it into searches at any time, ₹1 = 1 search (as the packs' price, PACKS), added to their credits;
+//   - take it out to their UPI ID, from ₹WALLET_MIN up, one withdrawal open at a time: wd:<id> {user, rs, upi, status
+//     'pending' | 'processing' | 'paid' | 'failed', created, doneAt, payout, utr, why}, in the sets 'wds' and wds:<user id>.
+// With RazorpayX (Razorpay Payouts) set up, the money goes at once by UPI through its API. Set in Vercel, besides the
+// Razorpay keys (payOnline): RAZORPAYX_ACCOUNT = the RazorpayX account number to pay from (RazorpayX dashboard → My
+// Account; it needs funds in it, and payouts activated for API use). Without it, a withdrawal waits ('pending') for the
+// superadmin to send the ₹ by hand and mark it on the admin page (api/_routes/admin.js 'wd_paid' / 'wd_back'). A
+// failed or refused withdrawal puts the ₹ back in the wallet, once.
+const WALLET_MIN = 50;
+const UPI_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{1,255}@[a-zA-Z][a-zA-Z0-9]{1,63}$/;
+const walletOf = (u) => Math.max(0, Math.floor(Number(u && u.wallet) || 0));
+const hasWallet = (u) => !!u && canBuy(u) && u.role === 'user';
+const payoutsOn = () => payOnline() && /^\d{6,24}$/.test(String(process.env.RAZORPAYX_ACCOUNT || ''));
+async function walletAdd(id, rs) {
+  await redis('HINCRBY', `user:${id}`, 'wallet', rs);
+  await redis('HINCRBY', `user:${id}`, 'walletIn', rs);
+}
+// takes rs ₹ out of the wallet; false (and nothing taken) when there isn't that much
+async function walletTake(id, rs) {
+  const left = Number(await redis('HINCRBY', `user:${id}`, 'wallet', -rs));
+  if (left >= 0) return true;
+  await redis('HINCRBY', `user:${id}`, 'wallet', rs);
+  return false;
+}
+// wallet → searches: rs ₹ become rs searches
+async function walletToSearches(u, rs) {
+  if (!(await walletTake(u.id, rs))) return false;
+  await redis('HINCRBY', `user:${u.id}`, 'credits', rs);
+  await redis('HINCRBY', `user:${u.id}`, 'walletSearches', rs);
+  return true;
+}
+async function getWd(id) {
+  if (!/^w[0-9a-f]{12}$/.test(String(id || ''))) return null;
+  const arr = await redis('HGETALL', `wd:${id}`);
+  if (!arr || !arr.length) return null;
+  const r = { id };
+  for (let i = 0; i < arr.length; i += 2) r[arr[i]] = arr[i + 1];
+  return r;
+}
+const wdView = (w) => ({ id: w.id, rs: Number(w.rs) || 0, upi: w.upi || '', status: w.status, created: w.created, doneAt: w.doneAt || null,
+  utr: w.utr || '', why: w.why || '', auto: !!w.auto });
+const wdOpen = (w) => w.status === 'pending' || w.status === 'processing';
+// a withdrawal that didn't go through: the ₹ back in the wallet, once
+async function wdBack(w, why) {
+  if (!(await redis('HSETNX', `wd:${w.id}`, 'settled', '1'))) return getWd(w.id);   // the same lock as wdPaid: one or the other
+  await redis('HINCRBY', `user:${w.user}`, 'wallet', Number(w.rs) || 0);
+  await redis('HSET', `wd:${w.id}`, 'status', 'failed', 'doneAt', new Date().toISOString(), 'why', String(why || '').slice(0, 200));
+  return getWd(w.id);
+}
+async function wdPaid(w, utr, by) {
+  if (!wdOpen(w) || !(await redis('HSETNX', `wd:${w.id}`, 'settled', '1'))) return getWd(w.id);
+  await redis('HSET', `wd:${w.id}`, 'status', 'paid', 'doneAt', new Date().toISOString(), 'utr', String(utr || '').slice(0, 40), 'doneBy', by || '');
+  await redis('HINCRBY', `user:${w.user}`, 'walletOut', Number(w.rs) || 0);
+  return getWd(w.id);
+}
+// asks Razorpay Payouts to send it (again, with the same idempotency key, when an earlier try got no answer)
+async function wdSend(w, u) {
+  const mobile = String((u && u.phone) || '').replace(/\D/g, '').slice(-10);
+  let j;
+  try {
+    j = await razorpay('POST', 'payouts', {
+      account_number: String(process.env.RAZORPAYX_ACCOUNT), amount: Math.round(Number(w.rs) * 100), currency: 'INR', mode: 'UPI', purpose: 'cashback',
+      fund_account: { account_type: 'vpa', vpa: { address: w.upi },
+        contact: { name: String((u && u.name) || 'User').slice(0, 50), type: 'customer', reference_id: String(w.user), ...(/^[6-9]\d{9}$/.test(mobile) ? { contact: mobile } : {}) } },
+      queue_if_low_balance: true, reference_id: w.id, narration: 'Voter Search cashback', notes: { withdrawal: w.id, user: String(w.user) },
+    }, { 'X-Payout-Idempotency': `wd-${w.id}` });
+  } catch (e) { console.error('razorpay payout', e); return getWd(w.id); }   // no answer: stays 'processing', tried again later
+  if (!j.ok || !j.id) {
+    console.error('razorpay payout', j.http, j.error);
+    if (j.http >= 400 && j.http < 500) return wdBack(w, (j.error && j.error.description) || `http ${j.http}`);
+    return getWd(w.id);
+  }
+  await redis('HSET', `wd:${w.id}`, 'payout', j.id);
+  return wdPayoutState({ ...w, payout: j.id }, j);
+}
+const PAYOUT_FAILED = ['failed', 'rejected', 'reversed', 'cancelled'];
+function wdPayoutState(w, p) {
+  if (p.status === 'processed') return wdPaid(w, p.utr, 'razorpayx');
+  if (PAYOUT_FAILED.includes(p.status)) return wdBack(w, (p.status_details && p.status_details.description) || (p.failure_reason) || p.status);
+  return getWd(w.id);
+}
+// a person's withdrawal: rs ₹ to upi → {wd} or {error}
+async function wdStart(u, rs, upi) {
+  if (!(await walletTake(u.id, rs))) return { error: 'wallet_low' };
+  const id = 'w' + crypto.randomBytes(6).toString('hex'), auto = payoutsOn();
+  await redis('HSET', `wd:${id}`, 'user', u.id, 'rs', rs, 'upi', upi, 'status', auto ? 'processing' : 'pending', 'created', new Date().toISOString(), ...(auto ? ['auto', '1'] : []));
+  await redis('SADD', 'wds', id);
+  await redis('SADD', `wds:${u.id}`, id);
+  await redis('HSET', `user:${u.id}`, 'upi', upi);
+  const w = await getWd(id);
+  return { wd: auto ? await wdSend(w, u) : w };
+}
+// an automatic withdrawal still going: how it stands with Razorpay now
+async function wdSettle(w) {
+  if (!w || w.status !== 'processing' || !w.auto || !payOnline()) return w;
+  if (!w.payout) return wdSend(w, await getUser(w.user));
+  const p = await razorpay('GET', `payouts/${encodeURIComponent(w.payout)}`).catch(() => null);
+  return p && p.ok ? wdPayoutState(w, p) : w;
+}
+// a login's withdrawals, newest first (the open automatic ones asked about first)
+async function wdsOf(uid, n = 10) {
+  const ids = (await redis('SMEMBERS', `wds:${uid}`)) || [];
+  const all = (await Promise.all(ids.map(getWd))).filter(Boolean).sort((a, b) => (a.created < b.created ? 1 : -1)).slice(0, n);
+  return Promise.all(all.map(wdSettle));
 }
 // Online payment (api/pay.js) through Razorpay (razorpay.com): a Razorpay order for each purchase, for its exact price,
 // paid in Razorpay's checkout window on our own page (index.html buyUpi) with the person's name and mobile number filled
@@ -749,10 +857,10 @@ async function refReward(id) {
 const GATEWAY = { id: 'admin', name: 'ऑनलाइन (Razorpay)' };   // who approves an online purchase (the superadmin)
 const payOnline = () => !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
 const isOrderId = (id) => /^order_[0-9A-Za-z]{6,40}$/.test(String(id || ''));
-async function razorpay(method, path, body) {   // path after /v1/, e.g. 'orders'
+async function razorpay(method, path, body, extra) {   // path after /v1/, e.g. 'orders'; extra: more headers
   const auth = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64');
   const r = await fetch(`${(process.env.RAZORPAY_URL || 'https://api.razorpay.com').replace(/\/+$/, '')}/v1/${path}`, {
-    method, headers: { Accept: 'application/json', Authorization: `Basic ${auth}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    method, headers: { Accept: 'application/json', Authorization: `Basic ${auth}`, ...(body ? { 'Content-Type': 'application/json' } : {}), ...(extra || {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await r.text();
@@ -885,7 +993,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

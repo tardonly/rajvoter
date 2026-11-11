@@ -16,20 +16,35 @@
 //     https://<site>/api/pay with those events. It credits a person whose page closed before the check.
 //   Signed with RZP_WB_SECRET (razorpayHook in _lib.js); other events are answered and ignored. Webhooks only name the
 //   order: it is still checked with Razorpay itself, so even a forged one can't add searches.
-const { WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+//   RazorpayX's webhook (payout.processed / payout.failed / payout.reversed / payout.rejected, same URL) settles a UPI
+//   withdrawal from the wallet the same way: only after asking Razorpay about the payout (wdSettle).
+// The wallet (₹ cashback from invites; walletOf / wdStart in _lib.js), for a person's login:
+//   POST {action: 'wallet', token, village} → {wallet, min, auto, upi, wds}   auto: UPI withdrawals go at once (RazorpayX);
+//     upi: the UPI ID used last; wds: the latest withdrawals (wdView in _lib.js)
+//   POST {action: 'wallet_searches', token, village, rs} → {wallet, got, left | bought}   ₹rs of it → rs searches
+//   POST {action: 'wallet_upi', token, village, rs, upi} → {wallet, wd}   ₹rs of it to that UPI ID (from ₹WALLET_MIN,
+//     one open withdrawal at a time, 3 a day); errors: wallet_min, wallet_low, bad_upi, wd_open, too_many, no_wallet
+const { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, b) => {
   if (!b.action && typeof b.event === 'string') {   // Razorpay's webhook
     if (!razorpayHook(req, b)) { console.warn('razorpay webhook: bad signature', b.event); return send(res, 400, { error: 'bad_signature' }); }
+    if (/^payout\./.test(b.event)) {   // RazorpayX: a wallet withdrawal (its reference_id is the withdrawal's id)
+      const p = (b.payload && b.payload.payout && b.payload.payout.entity) || {};
+      const w = await getWd(p.reference_id);
+      if (w && w.payout === p.id) await wdSettle(w);
+      return send(res, 200, { ok: true });
+    }
     if (!['order.paid', 'payment.captured', 'payment.authorized'].includes(b.event)) return send(res, 200, { ok: true });   // refunds, failures, links…: nothing to do
     const pl = b.payload || {}, order = (pl.order && pl.order.entity && pl.order.entity.id) || (pl.payment && pl.payment.entity && pl.payment.entity.order_id);
     const rid = isOrderId(order) ? await redis('GET', `rzp:${order}`) : null;
     if (rid) await settleOnline(rid);
     return send(res, 200, { ok: true });
   }
-  if (b.action !== 'start' && b.action !== 'check') return send(res, 400, { error: 'action' });
+  if (!['start', 'check', 'wallet', 'wallet_searches', 'wallet_upi'].includes(b.action)) return send(res, 400, { error: 'action' });
   const me = await whoIs(b.token, b.village);
   if (!me || me.status !== 'ok') return send(res, 401, { error: 'login' });
+  if (b.action.startsWith('wallet')) return wallet(res, b, me);
 
   if (b.action === 'check') {
     const r = await getReq(b.id);
@@ -96,4 +111,30 @@ async function wardStart(req, res, b, me) {
   const mobile = String(me.phone || '').replace(/\D/g, '').slice(-10);
   send(res, 200, { id, key: process.env.RAZORPAY_KEY_ID, order: m.txn, amount: WARD_RS * 100, name: me.name || '',
     contact: /^[6-9]\d{9}$/.test(mobile) ? `+91${mobile}` : '', description: `Ward ${w} slips` });
+}
+
+// the wallet's actions (see the top of this file)
+async function wallet(res, b, me) {
+  if (!hasWallet(me)) return send(res, 403, { error: 'no_wallet' });
+  const rs = Math.floor(Number(b.rs));
+  if (b.action === 'wallet_searches') {
+    if (!(rs >= 1)) return send(res, 400, { error: 'wallet_amount' });
+    if (!(await walletToSearches(me, rs))) return send(res, 400, { error: 'wallet_low' });
+    const u = await getUser(me.id), left = await creditsLeft(u);
+    return send(res, 200, { wallet: walletOf(u), got: rs, ...(isPrepaid(u) ? { left } : { bought: left }) });
+  }
+  if (b.action === 'wallet_upi') {
+    const upi = String(b.upi || '').trim().toLowerCase();
+    if (!(rs >= WALLET_MIN)) return send(res, 400, { error: 'wallet_min', min: WALLET_MIN });
+    if (!UPI_RE.test(upi)) return send(res, 400, { error: 'bad_upi' });
+    if ((await wdsOf(me.id, 20)).some(wdOpen)) return send(res, 409, { error: 'wd_open' });
+    const k = `wdday:${me.id}:${today()}`;
+    if (await redis('INCR', k) > 3) return send(res, 429, { error: 'too_many' });
+    await redis('EXPIRE', k, 86400);
+    const r = await wdStart(me, rs, upi);
+    if (r.error) return send(res, 400, r);
+    return send(res, 200, { wallet: walletOf(await getUser(me.id)), wd: wdView(r.wd) });
+  }
+  const wds = await wdsOf(me.id), u = await getUser(me.id);   // after wdsOf: a failed withdrawal is back in the wallet
+  send(res, 200, { wallet: walletOf(u), min: WALLET_MIN, auto: payoutsOn(), upi: u.upi || '', wds: wds.map(wdView) });
 }

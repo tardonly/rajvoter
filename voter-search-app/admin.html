@@ -277,7 +277,7 @@
       <button type="button" data-tab="prog">प्रगति</button>
       <button type="button" data-tab="voters">मतदाता सूची</button>
       <button type="button" data-tab="clear">निशान हटाएं</button>
-      <button type="button" data-tab="ref" class="hidden" id="tabRef">रेफ़रल (दोस्तों को बुलाएं)</button>
+      <button type="button" data-tab="ref" class="hidden" id="tabRef">रेफ़रल · वॉलेट</button>
       <button type="button" data-tab="cpn" class="hidden" id="tabCpn">कूपन</button>
       <button type="button" data-tab="free" class="hidden" id="tabFree">साइन-अप पर मुफ़्त सर्च</button>
     </nav>
@@ -307,6 +307,10 @@
         <button class="btn" id="refSave" type="button"></button>
         <div class="sub" id="refMsg" style="margin:0"></div>
       </div>
+      <!-- wallet withdrawals to UPI (api/_routes/admin.js "wd_paid" / "wd_back"; wdStart in api/_lib.js) -->
+      <div class="phead" style="margin-top:18px"><b id="wdTitle"></b> · <span id="wdNow"></span></div>
+      <div class="sub" id="wdHow" style="margin:4px 0 0"></div>
+      <div class="stack" id="wdList" style="margin-top:10px"></div>
     </div>
 
     <!-- superadmin: coupons for buying searches, with their conditions (api/_routes/admin.js "coupon_set" / "coupon_del") -->
@@ -622,7 +626,7 @@ function loadSettings() {   // superadmin: free searches, referrals and coupons 
     const r = await api({ action: 'settings' });
     if (r.error) { for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = errText(r); return; }
     settingsIn = true;
-    showFreeRule(r.freeRule); showRefRule(r.refRule); showCoupons(r.coupons);
+    showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
   })();
   return settingsBusy.finally(() => { settingsBusy = null; });
 }
@@ -714,9 +718,9 @@ function showRefRule(rule) {
   $('tabRef').classList.toggle('hidden', !rule);
   if (!rule) return;
   $('refTitle').textContent = L('रेफ़रल (दोस्तों को बुलाएं)', 'Referrals (invite friends)');
-  $('refNow').textContent = rule.on ? L(`चालू · बुलाने वाले को ${rule.inviter}, दोस्त को ${rule.joiner}`, `on · inviter ${rule.inviter}, friend ${rule.joiner}`) : L('बंद', 'off');
+  $('refNow').textContent = rule.on ? L(`चालू · बुलाने वाले को ₹${rule.inviter} कैशबैक, दोस्त को ${rule.joiner} सर्च`, `on · inviter ₹${rule.inviter} cashback, friend ${rule.joiner} searches`) : L('बंद', 'off');
   $('refOnText').textContent = L('चालू — ऐप में 🎁 दोस्तों को बुलाएं बटन दिखेगा', 'On — the app shows the 🎁 Invite friends button');
-  $('refInvText').textContent = L('बुलाने वाले को सर्च (दोस्त की पहली खरीद पर)', 'Searches for the inviter (on the friend\'s first purchase)');
+  $('refInvText').textContent = L('बुलाने वाले को ₹ कैशबैक, वॉलेट में (दोस्त की पहली खरीद पर)', 'Cashback ₹ for the inviter, into their wallet (on the friend\'s first purchase)');
   $('refJoinText').textContent = L('दोस्त को सर्च (जुड़ने पर, मुफ़्त सर्च के अलावा)', 'Searches for the friend (on joining, besides the free ones)');
   $('refSave').textContent = L('सेव करें', 'Save');
   $('refOn').checked = rule.on; $('refInviter').value = rule.inviter; $('refJoiner').value = rule.joiner;
@@ -729,6 +733,40 @@ $('refSave').addEventListener('click', async () => {
   showRefRule(r.refRule);
   $('refMsg').textContent = L('✓ सेव हो गया', '✓ Saved');
 });
+// wallet withdrawals to UPI (wdView in api/_lib.js): open ones first, each with ✓ sent (by hand, with its UPI reference) and
+// ↩ not sent (the ₹ back in the person's wallet). Automatic ones (RazorpayX) settle by themselves.
+const WD_ST = { pending: ['⏳ भेजना है', '⏳ To send'], processing: ['🔄 Razorpay भेज रहा है', '🔄 Razorpay sending'], paid: ['✓ भेजा गया', '✓ Sent'], failed: ['✕ नहीं भेजा · ₹ वॉलेट में वापस', '✕ Not sent · ₹ back in wallet'] };
+function showWds(list) {
+  const box = $('wdList'); box.replaceChildren();
+  if (!list) return;
+  const open = list.filter((w) => w.status === 'pending');
+  $('wdTitle').textContent = L('💸 वॉलेट से UPI निकासी', '💸 Wallet withdrawals to UPI');
+  $('wdNow').textContent = open.length ? L(`${open.length} भेजनी हैं · ₹${open.reduce((t, w) => t + w.rs, 0)}`, `${open.length} to send · ₹${open.reduce((t, w) => t + w.rs, 0)}`) : L('कोई बाकी नहीं', 'none waiting');
+  $('wdHow').textContent = L('RazorpayX (RAZORPAYX_ACCOUNT) न हो तो: UPI ID पर पैसे भेजें, फिर ✓ दबाएं।', 'Without RazorpayX (RAZORPAYX_ACCOUNT): send the money to the UPI ID, then press ✓.');
+  if (!list.length) { box.append(el('div', 'sub', L('अभी कोई निकासी नहीं', 'No withdrawals yet'))); return; }
+  for (const w of list) {
+    const row = el('div', 'person');
+    const st = WD_ST[w.status] || [w.status, w.status];
+    row.append(el('b', null, `₹${w.rs} → ${w.upi}`),
+      el('div', 'info', [`${w.name}${w.phone ? ` · ${w.phone}` : ''}`, new Date(w.created).toLocaleString('en-IN'), L(st[0], st[1]),
+        w.utr && `UTR ${w.utr}`, w.status === 'failed' && w.why && w.why !== 'admin' ? w.why : ''].filter(Boolean).join(' · ')));
+    if (w.status === 'pending') {
+      const acts = el('div', 'row'), msg = el('div', 'sub');
+      const paid = el('button', 'btn', L('✓ भेज दिया', '✓ Sent')), back = el('button', 'btn ghost', L('↩ नहीं भेजा, वॉलेट में लौटाएं', '↩ Not sent, back to wallet'));
+      paid.type = back.type = 'button';
+      const act = async (action, utr) => {
+        paid.disabled = back.disabled = true;
+        const r = await api({ action, id: w.id, ...(utr ? { utr } : {}) });
+        if (r.error) { msg.textContent = errText(r); paid.disabled = back.disabled = false; return; }
+        Object.assign(w, r.wd); showWds(list);
+      };
+      paid.addEventListener('click', () => { const utr = prompt(L(`₹${w.rs} ${w.upi} पर भेज दिए? UPI रेफ़रेंस / UTR नंबर (हो तो):`, `Sent ₹${w.rs} to ${w.upi}? UPI reference / UTR (if any):`), ''); if (utr !== null) act('wd_paid', utr.trim()); });
+      back.addEventListener('click', () => { if (confirm(L(`₹${w.rs} ${w.name} के वॉलेट में लौटाएं?`, `Put ₹${w.rs} back in ${w.name}'s wallet?`))) act('wd_back'); });
+      acts.append(paid, back); row.append(acts, msg);
+    }
+    box.append(row);
+  }
+}
 // coupons (getCoupon in api/_lib.js): the list, each with ✎ (into the form) and 🗑; the form makes or changes one
 let COUPONS = [], cpnEdit = null;
 const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट${c.maxOff ? ` (₹${c.maxOff} तक)` : ''}` : c.kind === 'rs' ? `₹${c.value} छूट`
@@ -1657,10 +1695,11 @@ function person(u) {
   const meter = u.limit == null ? null : useMeter(u);
   // referrals: who invited this person, and the people they invited (refRule in api/_lib.js)
   const invited = users.filter((x) => x.refBy === u.id), invBought = invited.filter((x) => x.refPaid).length;
-  const refLine = u.refByName || invited.length || u.refEarned ? el('div', 'info', [
+  const refLine = u.refByName || invited.length || u.refEarned || u.refCash || u.wallet ? el('div', 'info', [
     u.refByName && L(`🎁 ${u.refByName} के लिंक से जुड़े`, `🎁 Joined through ${u.refByName}'s link`),
-    (invited.length || u.refEarned) && L(`इनके बुलाए: ${invited.length} लोग · ${u.refBought || invBought} ने सर्च खरीदीं · इनाम ${u.refEarned} सर्च`,
-      `Invited ${invited.length} · ${u.refBought || invBought} bought searches · reward ${u.refEarned} searches`),
+    (invited.length || u.refEarned || u.refCash) && L(`इनके बुलाए: ${invited.length} लोग · ${u.refBought || invBought} ने सर्च खरीदीं · इनाम${u.refCash ? ` ₹${u.refCash} कैशबैक` : ''}${u.refEarned ? ` ${u.refEarned} सर्च` : ''}`,
+      `Invited ${invited.length} · ${u.refBought || invBought} bought searches · reward${u.refCash ? ` ₹${u.refCash} cashback` : ''}${u.refEarned ? ` ${u.refEarned} searches` : ''}`),
+    (u.wallet || u.walletOut) && L(`💰 वॉलेट ₹${u.wallet}${u.walletOut ? ` · ₹${u.walletOut} UPI में निकाले` : ''}`, `💰 Wallet ₹${u.wallet}${u.walletOut ? ` · ₹${u.walletOut} taken out by UPI` : ''}`),
   ].filter(Boolean).join(' · ')) : null;
   row.append(nm, ph, info, sess, ...(meter ? [meter] : []), noteBox(u), use, ...(refLine ? [refLine] : []));
   if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches

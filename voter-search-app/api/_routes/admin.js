@@ -52,6 +52,8 @@
 //   action "coupon_set", code, kind ('pct' | 'rs' | 'bonus' | 'bonuspct'), value, maxOff, minN, maxN, maxUses, until, once, first, on, show, note, banner, bannerText, isNew
 //                                         → {coupon}   superadmin: a coupon (getCoupon in _lib.js); "list" gives coupons
 //   action "coupon_del", code → {ok}      superadmin
+//   action "wd_paid", id [, utr] / "wd_back", id → {wd}   superadmin: a wallet's UPI withdrawal (wdStart in _lib.js) sent
+//     by hand (with its UPI reference) / not sent, the ₹ back in the person's wallet; "settings" lists them (wds)
 //   action "ref_rule", on, inviter, joiner → {refRule}   superadmin: referral searches (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   the superadmin: which set of marks everyone uses from now on
@@ -75,7 +77,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // admin permissions from the request → only known ones
@@ -106,6 +108,7 @@ const view = (u) => ({
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
   // referrals: who invited this login, and what this login's invites earned (refRule in _lib.js)
   refBy: u.refBy || '', refByName: u.refByName || '', refPaid: u.refPaid === '1', refBought: Number(u.refBought) || 0, refEarned: Number(u.refEarned) || 0,
+  refCash: Number(u.refCash) || 0, wallet: walletOf(u), walletOut: Number(u.walletOut) || 0,   // ₹: referral cashback earned, in the wallet now, taken out by UPI
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
   logins: Number(u.logins || 0), kicks: Number(u.kicks || 0),
@@ -252,9 +255,22 @@ module.exports = route(async (req, res, b) => {
   }
   if (b.action === 'settings') {   // superadmin, when a settings tab opens: free searches, referrals, coupons
     if (!isSuper) return send(res, 403, { error: 'super_only' });
-    const [free, ref, codes] = await Promise.all([freeRule(), refRule(), redis('SMEMBERS', 'coupons')]);
+    const [free, ref, codes, wdIds] = await Promise.all([freeRule(), refRule(), redis('SMEMBERS', 'coupons'), redis('SMEMBERS', 'wds')]);
     const coupons = (await Promise.all((codes || []).map(getCoupon))).filter(Boolean).sort((a, c) => (a.code < c.code ? -1 : 1));
-    return send(res, 200, { freeRule: free, refRule: ref, coupons });
+    // wallet withdrawals: the open ones, then the latest 100 done
+    const all = (await Promise.all((wdIds || []).map(getWd))).filter(Boolean).sort((a, c) => (wdOpen(a) !== wdOpen(c) ? (wdOpen(a) ? -1 : 1) : a.created < c.created ? 1 : -1)).slice(0, 100);
+    const ws = await Promise.all(all.map(wdSettle));
+    const who = new Map((await getUsers([...new Set(ws.map((w) => w.user))])).map((u) => [u.id, u]));
+    const wds = ws.map((w) => ({ ...wdView(w), user: w.user, name: (who.get(w.user) || {}).name || '', phone: (who.get(w.user) || {}).phone || '' }));
+    return send(res, 200, { freeRule: free, refRule: ref, coupons, wds });
+  }
+  if (b.action === 'wd_paid' || b.action === 'wd_back') {   // superadmin: a UPI withdrawal sent by hand, or not sent
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const w = await getWd(b.id);
+    if (!w) return send(res, 404, { error: 'not_found' });
+    if (!wdOpen(w)) return send(res, 409, { error: 'wd_done' });
+    const now = b.action === 'wd_paid' ? await wdPaid(w, b.utr, me.id) : await wdBack(w, 'admin');
+    return send(res, 200, { wd: wdView(now) });
   }
   if (b.action === 'reqs') {   // online purchases (the 🔔), superadmin only; after "list", so the page shows first
     if (!isSuper) return send(res, 200, { reqs: [] });

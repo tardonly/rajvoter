@@ -120,6 +120,21 @@
     background: #e0f2fe; color: #075985; }
   #leftBadge.low { background: #fef3c7; color: #92400e; }
   #leftBadge.none { background: #fee2e2; color: #991b1b; }
+  #walletBtn { border: 1px solid #86efac; border-radius: 8px; padding: 5px 10px; margin: 6px 0 0 6px; font-size: 13px; background: #f0fdf4; color: #15803d; font-weight: 700; cursor: pointer; }
+  .wallet .bal { text-align: center; font-size: 36px; font-weight: 800; color: #15803d; line-height: 1.1; margin-top: 4px; }
+  .wallet .balsub { text-align: center; font-size: 13px; color: var(--muted); }
+  .wallet .opt { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  .wallet .opt b { font-size: 15px; }
+  .wallet .opt .k { font-size: 12.5px; color: var(--muted); margin: 2px 0 8px; }
+  .wallet .opt .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .wallet .opt input { flex: 1 1 140px; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; }
+  .wallet .opt input.amt { flex: 0 1 90px; }
+  .wallet .opt .btn { margin: 0; flex: 0 0 auto; }
+  .wallet .msg { font-size: 13px; margin-top: 6px; color: #b91c1c; }
+  .wallet .msg.ok { color: #15803d; }
+  .wallet .wds { margin-top: 12px; font-size: 13px; }
+  .wallet .wds div { border-top: 1px solid var(--line); padding: 6px 0; }
+  .wallet .more { width: 100%; margin-top: 12px; }
   #invite { border: 1px solid #c4b5fd; border-radius: 8px; padding: 5px 10px; margin: 6px 0 0 6px; font-size: 13px; background: #f5f3ff; color: #5b21b6; font-weight: 600; }
   #buyMore { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: #16a34a; color: #fff; font-weight: 600; }
   .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
@@ -518,6 +533,14 @@
   </div>
 </div>
 
+<div id="walletPop" class="progpop hidden" role="dialog" aria-label="वॉलेट">
+  <div class="card">
+    <div class="head"><h2 id="walletTitle">💰 मेरा वॉलेट</h2>
+      <span><button id="walletClose" type="button" aria-label="बंद करें">✕</button></span></div>
+    <div id="walletBody"></div>
+  </div>
+</div>
+
 <div id="installPop" class="progpop hidden" role="dialog" aria-label="ऐप इंस्टॉल करें">
   <div class="card">
     <div class="head"><h2>📲 ऐप इंस्टॉल करें</h2>
@@ -593,7 +616,7 @@
       <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
     <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button>
-      <b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button></span></div>
+      <b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button></span></div>
   </header>
   <main>
     <div id="results"></div>
@@ -1070,7 +1093,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   store.set(tokKey, r.token, keep);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
-  MY_REF = r.ref || null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  MY_REF = r.ref || null; WALLET = r.wallet != null ? r.wallet : null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   MOVES_LEFT = r.movesLeft || 0;
   showApp(r.name, r.admin, r.villages, r.perms, r.cand, r.role);
   outOfSearches();
@@ -1086,6 +1109,7 @@ let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: a signed-
 // CAN_BUY: any user login may buy searches; BOUGHT: a login with a daily limit, its bought searches left (used after the day's)
 // ONLINE: packs can also be paid here online through Razorpay: UPI, card, net banking, wallet (api/pay.js)
 let CAN_BUY = false, BOUGHT = null, ONLINE = false;
+let WALLET = null;   // ₹ cashback in this login's wallet (walletOf in api/_lib.js), null: no wallet
 let MY_REF = null;   // this login's invite code and reward ({code, give, joiner}; refFor in api/_lib.js), null: no invites
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
@@ -1906,6 +1930,8 @@ function buyMoreButton() {
   const show = PREPAID && !DEMO && searchesLeft != null, b = $('leftBadge');
   $('buyMore').classList.toggle('hidden', !CAN_BUY || DEMO);
   $('invite').classList.toggle('hidden', !MY_REF || DEMO);
+  $('walletBtn').classList.toggle('hidden', WALLET == null || DEMO);
+  if (WALLET != null) $('walletBtn').textContent = WALLET ? L(`💰 वॉलेट ₹${WALLET} · कैश करें ›`, `💰 Wallet ₹${WALLET} · Cash out ›`) : L('💰 वॉलेट ₹0', '💰 Wallet ₹0');
   b.classList.toggle('hidden', !show);
   if (!show) return;
   b.textContent = L(`🔍 ${searchesLeft} सर्च बाकी`, `🔍 ${searchesLeft} searches left`);
@@ -2098,11 +2124,12 @@ function cpnCard(c, go, label = L('अभी लें ›', 'Get it ›')) {
   b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   return b;
 }
-// the invite banner: 🎁 दोस्त लाओ, फ़्री सर्च पाओ — tapping it sends the invite link (the 🎁 button's)
+// the invite banner: 🎁 दोस्त लाओ, ₹ कैशबैक पाओ — tapping it sends the invite link (the 🎁 button's)
 function refBanner() {
   const b = el('div', 'cpnbanner refbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0;
-  b.append(el('span', null, L('🎁 दोस्त लाओ, फ़्री सर्च पाओ! हर दोस्त के जुड़ने और ख़रीदने पर आप दोनों को मुफ़्त सर्च',
-    "🎁 Bring friends, get free searches! Free searches for both of you when a friend joins and buys")),
+  const give = MY_REF ? MY_REF.give : 0;
+  b.append(el('span', null, L(`🎁 दोस्त लाओ, ₹${give} कैशबैक पाओ! हर दोस्त की पहली ख़रीद पर ₹${give} सीधे आपके वॉलेट में — UPI में निकालें या सर्च लें`,
+    `🎁 Bring friends, get ₹${give} cashback! ₹${give} into your wallet on every friend's first purchase — take it to UPI or as searches`)),
     el('b', null, L('WhatsApp पर भेजें ›', 'Send on WhatsApp ›')));
   const go = () => $('invite').click();
   b.addEventListener('click', go);
@@ -2126,17 +2153,99 @@ async function cpnBanners() {
   box.scrollLeft = 0;
   box.classList.remove('hidden');
 }
-// 🎁 दोस्तों को बुलाएं: this login's invite link on WhatsApp; the inviter gets searches when the friend first buys some
+// 🎁 दोस्तों को बुलाएं: this login's invite link on WhatsApp; the inviter gets ₹ cashback in their wallet when the friend first buys
 $('invite').addEventListener('click', () => {
   if (!MY_REF) return;
   const give = MY_REF.give, gets = MY_REF.joiner;
-  if (!confirm(L(`🎁 दोस्त लाओ, फ़्री सर्च पाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} उसकी पहली ख़रीद पर आपको ${give} सर्च बिल्कुल मुफ़्त! 🚀\nजितने ज़्यादा दोस्त, उतनी ज़्यादा फ़्री सर्च।`,
-    `🎁 Bring friends, get free searches!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} you get ${give} searches free on their first buy! 🚀\nThe more friends, the more free searches.`))) return;
+  if (!confirm(L(`🎁 दोस्त लाओ, ₹${give} कैशबैक पाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} उसकी पहली ख़रीद पर ₹${give} आपके वॉलेट में! 💰\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतना ज़्यादा कैशबैक।`,
+    `🎁 Bring friends, get ₹${give} cashback!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} ₹${give} goes into your wallet on their first buy! 💰\nTake the wallet money to UPI or turn it into searches. The more friends, the more cashback.`))) return;
   const link = `${location.origin}/${SLUG}?ref=${MY_REF.code}`;
   const text = L(`🗳️ ${VILLAGE ? VILLAGE.name : ''} की पूरी मतदाता सूची अब फ़ोन पर! नाम लिखते ही पर्ची, परिवार और बूथ — सेकंडों में।${gets ? `\n🎁 मेरे लिंक से जुड़ें और पाएं ${gets} सर्च बोनस:` : '\n👉 मेरे लिंक से जुड़ें:'}\n${link}`,
     `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
   location.href = 'https://wa.me/?text=' + encodeURIComponent(text);
 });
+// 💰 वॉलेट (api/pay.js 'wallet…'): the ₹ cashback from invites; turn it into searches (₹1 = 1 search) or take it out to a
+// UPI ID (from the server's min; one at a time). The latest withdrawals and how they stand are listed under it.
+const WALLET_ERR = {
+  wallet_low: () => L('⚠ वॉलेट में इतने पैसे नहीं हैं', '⚠ Not that much in the wallet'),
+  wallet_min: (r) => L(`⚠ कम से कम ₹${r.min} निकाल सकते हैं`, `⚠ The least you can take out is ₹${r.min}`),
+  wallet_amount: () => L('⚠ सही रकम डालें', '⚠ Enter a valid amount'),
+  bad_upi: () => L('⚠ सही UPI ID डालें, जैसे 9876543210@ybl', '⚠ Enter a valid UPI ID, like 9876543210@ybl'),
+  wd_open: () => L('⚠ आपकी एक निकासी अभी चल रही है — उसके पूरा होने के बाद फिर कोशिश करें', '⚠ One withdrawal is still going — try again once it is done'),
+  too_many: () => L('⚠ आज की निकासी पूरी — कल फिर कोशिश करें', '⚠ Enough withdrawals for today — try again tomorrow'),
+};
+const walletErr = (r) => (WALLET_ERR[r.error] ? WALLET_ERR[r.error](r) : MSG[r.error] || MSG.server);
+const WD_ST = { pending: ['⏳ 24 घंटे में आपके UPI में आएगा', '⏳ Reaches your UPI within 24 hours'], processing: ['🔄 भेजा जा रहा है', '🔄 On its way'],
+  paid: ['✅ भेज दिया गया', '✅ Sent'], failed: ['✕ नहीं जा सका · ₹ वॉलेट में वापस', '✕ Could not be sent · ₹ back in the wallet'] };
+async function walletOpen(note = '') {
+  const box = el('div', 'wallet');
+  $('walletBody').replaceChildren(box);
+  $('walletPop').classList.remove('hidden');
+  box.append(el('div', 'balsub', L('लोड हो रहा है…', 'Loading…')));
+  const r = await api('pay', { action: 'wallet', token: token() });
+  if (r.error) { box.replaceChildren(el('div', 'msg', walletErr(r))); return; }
+  WALLET = r.wallet; buyMoreButton();
+  box.replaceChildren(el('div', 'bal', `₹${WALLET}`), el('div', 'balsub', L('दोस्तों को बुलाने का कैशबैक', 'Cashback from inviting friends')));
+  if (note) { const m = el('div', 'msg ok', note); m.style.textAlign = 'center'; box.append(m); }
+  // ₹ → searches
+  const o1 = el('div', 'opt'), n1 = el('input', 'amt'), go1 = el('button', 'btn', L('सर्च लें', 'Get searches')), m1 = el('div', 'msg');
+  n1.type = 'number'; n1.min = '1'; n1.max = String(WALLET); n1.value = String(WALLET); n1.setAttribute('inputmode', 'numeric'); n1.setAttribute('aria-label', '₹'); go1.type = 'button';
+  go1.disabled = WALLET < 1;
+  o1.append(el('b', null, L('🔍 सर्च में बदलें', '🔍 Turn into searches')), el('div', 'k', L('₹1 = 1 सर्च, तुरंत', '₹1 = 1 search, at once')), el('div', 'row'), m1);
+  o1.querySelector('.row').append(n1, go1);
+  go1.addEventListener('click', async () => {
+    const rs = Math.floor(Number(n1.value));
+    if (!(rs >= 1 && rs <= WALLET)) { m1.textContent = WALLET_ERR.wallet_amount(); return; }
+    go1.disabled = true; m1.textContent = '';
+    const x = await api('pay', { action: 'wallet_searches', token: token(), rs });
+    if (x.error) { go1.disabled = false; m1.textContent = walletErr(x); return; }
+    if (x.left != null) searchesLeft = x.left;
+    if (x.bought != null) BOUGHT = x.bought;
+    WALLET = x.wallet; buyMoreButton();
+    walletOpen(L(`✅ ${x.got} सर्च जुड़ गईं!`, `✅ ${x.got} searches added!`));
+  });
+  // ₹ → UPI
+  const open = (r.wds || []).find((w) => w.status === 'pending' || w.status === 'processing');
+  const o2 = el('div', 'opt'), upi = el('input'), n2 = el('input', 'amt'), go2 = el('button', 'btn', L('कैश निकालें', 'Cash out')), m2 = el('div', 'msg');
+  upi.type = 'text'; upi.placeholder = L('UPI ID, जैसे 9876543210@ybl', 'UPI ID, e.g. 9876543210@ybl'); upi.value = r.upi || ''; upi.autocomplete = 'off'; upi.autocapitalize = 'none'; upi.spellcheck = false;
+  n2.type = 'number'; n2.min = String(r.min); n2.max = String(WALLET); n2.value = String(WALLET); n2.setAttribute('aria-label', '₹'); go2.type = 'button';
+  o2.append(el('b', null, L('💸 UPI में कैश लें', '💸 Cash to UPI')),
+    el('div', 'k', r.auto ? L(`सीधे आपके UPI (PhonePe, Google Pay, Paytm…) में, कुछ मिनट में · कम से कम ₹${r.min}`, `Straight to your UPI (PhonePe, Google Pay, Paytm…) in a few minutes · at least ₹${r.min}`)
+      : L(`आपके UPI (PhonePe, Google Pay, Paytm…) में 24 घंटे के अंदर · कम से कम ₹${r.min}`, `To your UPI (PhonePe, Google Pay, Paytm…) within 24 hours · at least ₹${r.min}`)));
+  if (open) o2.append(el('div', 'msg ok', L(`₹${open.rs} → ${open.upi}: `, `₹${open.rs} → ${open.upi}: `) + L(...WD_ST[open.status])));
+  else if (WALLET < r.min) o2.append(el('div', 'k', L(`अभी ₹${r.min - WALLET} और चाहिए — दोस्तों को बुलाएं!`, `₹${r.min - WALLET} more needed — invite friends!`)));
+  else {
+    o2.append(el('div', 'row'), m2);
+    o2.querySelector('.row').append(upi, n2, go2);
+    go2.addEventListener('click', async () => {
+      const rs = Math.floor(Number(n2.value)), id = upi.value.trim();
+      if (!(rs >= r.min && rs <= WALLET)) { m2.textContent = rs > WALLET ? WALLET_ERR.wallet_low() : WALLET_ERR.wallet_min(r); return; }
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,255}@[a-zA-Z][a-zA-Z0-9]{1,63}$/.test(id)) { m2.textContent = WALLET_ERR.bad_upi(); return; }
+      if (!confirm(L(`₹${rs} इस UPI ID पर भेजें?\n\n${id}\n\nUPI ID ध्यान से जाँच लें।`, `Send ₹${rs} to this UPI ID?\n\n${id}\n\nCheck the UPI ID carefully.`))) return;
+      go2.disabled = true; m2.textContent = '';
+      const x = await api('pay', { action: 'wallet_upi', token: token(), rs, upi: id });
+      if (x.error) { go2.disabled = false; m2.textContent = walletErr(x); return; }
+      WALLET = x.wallet; buyMoreButton();
+      walletOpen(x.wd.status === 'failed' ? L(`✕ भेजा नहीं जा सका${x.wd.why ? ` (${x.wd.why})` : ''} — ₹${x.wd.rs} वॉलेट में वापस`, `✕ Could not send${x.wd.why ? ` (${x.wd.why})` : ''} — ₹${x.wd.rs} back in the wallet`)
+        : L(`✅ ₹${x.wd.rs} की निकासी शुरू — ${L(...WD_ST[x.wd.status])}`, `✅ ₹${x.wd.rs} withdrawal started — ${L(...WD_ST[x.wd.status])}`));
+    });
+  }
+  box.append(o1, o2);
+  if ((r.wds || []).length) {
+    const list = el('div', 'wds');
+    list.append(el('b', null, L('पिछली निकासी', 'Past withdrawals')));
+    for (const w of r.wds) list.append(el('div', null, `₹${w.rs} → ${w.upi} · ${new Date(w.created).toLocaleDateString('en-IN')} · ${L(...WD_ST[w.status] || [w.status, w.status])}${w.utr ? ` · UTR ${w.utr}` : ''}`));
+    box.append(list);
+  }
+  if (MY_REF) {
+    const inv = el('button', 'btn more', L(`🎁 दोस्तों को बुलाएं — हर दोस्त पर ₹${MY_REF.give}`, `🎁 Invite friends — ₹${MY_REF.give} for each`)); inv.type = 'button';
+    inv.addEventListener('click', () => { $('walletPop').classList.add('hidden'); $('invite').click(); });
+    box.append(inv);
+  }
+}
+$('walletBtn').addEventListener('click', () => walletOpen());
+$('walletClose').addEventListener('click', () => $('walletPop').classList.add('hidden'));
+$('walletPop').addEventListener('click', (e) => { if (e.target === $('walletPop')) $('walletPop').classList.add('hidden'); });
 $('buyClose').addEventListener('click', buyClose);
 // after signing up the window shows the new password: only its Continue button closes it (and logs in)
 const signedUp = () => !!$('buyPop').dataset.go;
@@ -2408,7 +2517,7 @@ async function openVillage(v) {
   if (!r.active && tokKey !== `tok:${SLUG}` && tokKey !== 'tok:admin') { tokKey = `tok:${SLUG}`; return showLock(''); }
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
-  MY_REF = r.ref || null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
+  MY_REF = r.ref || null; WALLET = r.wallet != null ? r.wallet : null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   MOVES_LEFT = r.movesLeft || 0;
   showApp(r.name, r.admin, r.villages, r.perms, r.cand, r.role);
   const paid = new URLSearchParams(location.search).get('pay');
