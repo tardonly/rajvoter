@@ -596,13 +596,14 @@ async function adminFor(u) {
 }
 const adminPhone = async (u) => (await adminFor(u)).phone;
 // search packs a person can ask for: [searches, ₹] (the same list is in index.html and admin.html)
-const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
+const PACKS = [[100, 50], [200, 100], [500, 200], [800, 325], [1000, 400]];
 // A purchase of a pack, key req:<id>, id = 8 digits: made when a person pays online (api/pay.js 'start'). Fields:
 // user, village, n, rs, created, status 'open' | 'done' | 'rejected', gw, txn, link, and once paid or closed doneAt,
 // doneBy, doneByName (paid: also doneN, doneRs). Older ones (before searches could only be bought online) were WhatsApp
 // requests to an admin, without gw; the superadmin can still close those (api/_routes/admin.js 'req_reject').
-// what a number of searches costs: the pack's price, else ₹1 a search
-const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Number(n) || 0; };
+// what a number of searches costs: the pack's price, else 50 paise a search (SEARCH_PER_RS searches for ₹1)
+const SEARCH_PER_RS = 2;
+const packPrice = (n) => { const pk = PACKS.find(([k]) => k === Number(n)); return pk ? pk[1] : Math.ceil((Number(n) || 0) / SEARCH_PER_RS); };
 // Coupons (कूपन), made by the superadmin on the admin page (api/_routes/admin.js "coupon_set"): hash coupon:<CODE> with kind
 // 'pct' (value % off the pack's price) | 'rs' (₹value off) | 'bonus' (value extra searches) | 'bonuspct' (value % of the
 // pack's searches extra), maxOff (the most it gives for 'pct': ₹ off, for 'bonuspct': extra searches; 0 = no limit), and
@@ -806,7 +807,7 @@ async function agentReward(r, u, rs) {
 }
 // Wallet (वॉलेट): ₹ cashback, from referrals (refReward) and, for village admins, from their QR sales (agentReward). Kept as field "wallet" on user:<id> (walletIn: all
 // ever added). The person may (api/pay.js 'wallet…'):
-//   - turn it into searches at any time, ₹1 = 1 search (as the packs' price, PACKS), added to their credits;
+//   - turn it into searches at any time, ₹1 = 2 searches (as the packs' price, PACKS), added to their credits;
 //   - take it out to their UPI ID, from ₹WALLET_MIN up, one withdrawal open at a time: wd:<id> {user, rs, upi, status
 //     'pending' | 'processing' | 'paid' | 'failed', created, doneAt, payout, utr, why}, in the sets 'wds' and wds:<user id>.
 // With RazorpayX (Razorpay Payouts) set up, the money goes at once by UPI through its API. Set in Vercel, besides the
@@ -833,9 +834,10 @@ async function walletTake(id, rs) {
 // wallet → searches: rs ₹ become rs searches
 async function walletToSearches(u, rs) {
   if (!(await walletTake(u.id, rs))) return false;
-  await redis('HINCRBY', `user:${u.id}`, 'credits', rs);
-  await redis('HINCRBY', `user:${u.id}`, 'walletSearches', rs);
-  return true;
+  const n = rs * SEARCH_PER_RS;
+  await redis('HINCRBY', `user:${u.id}`, 'credits', n);
+  await redis('HINCRBY', `user:${u.id}`, 'walletSearches', n);
+  return n;
 }
 async function getWd(id) {
   if (!/^w[0-9a-f]{12}$/.test(String(id || ''))) return null;
@@ -1084,7 +1086,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

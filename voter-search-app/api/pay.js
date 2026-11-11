@@ -130,9 +130,10 @@ async function wallet(res, b, me) {
   const rs = Math.floor(Number(b.rs));
   if (b.action === 'wallet_searches') {
     if (!(rs >= 1)) return send(res, 400, { error: 'wallet_amount' });
-    if (!(await walletToSearches(me, rs))) return send(res, 400, { error: 'wallet_low' });
+    const got = await walletToSearches(me, rs);
+    if (!got) return send(res, 400, { error: 'wallet_low' });
     const u = await getUser(me.id), left = await creditsLeft(u);
-    return send(res, 200, { wallet: walletOf(u), got: rs, ...(isPrepaid(u) ? { left } : { bought: left }) });
+    return send(res, 200, { wallet: walletOf(u), got, ...(isPrepaid(u) ? { left } : { bought: left }) });
   }
   if (b.action === 'wallet_upi') {
     const upi = String(b.upi || '').trim().toLowerCase();

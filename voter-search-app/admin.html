@@ -1019,7 +1019,7 @@ const payApi = (payload) => post('pay', { token, ...payload });
 async function loadWallet() {
   $('walTitle').textContent = L('👛 आपका वॉलेट', '👛 Your wallet');
   $('walRsText').textContent = L('₹', '₹'); $('walUpiText').textContent = L('आपकी UPI ID', 'Your UPI ID');
-  $('walUpiGo').textContent = L('UPI पर निकालें', 'Withdraw to UPI'); $('walSearchGo').textContent = L('सर्च में बदलें (₹1 = 1 सर्च)', 'Turn into searches (₹1 = 1)');
+  $('walUpiGo').textContent = L('UPI पर निकालें', 'Withdraw to UPI'); $('walSearchGo').textContent = L('सर्च में बदलें (₹1 = 2 सर्च)', 'Turn into searches (₹1 = 2)');
   const r = await payApi({ action: 'wallet' });
   $('walBox').classList.toggle('hidden', !!r.error);
   if (r.error) { $('walNow').textContent = me.role === 'super' ? L('सुपर एडमिन का वॉलेट नहीं होता', 'The super admin has no wallet') : errText(r); return; }

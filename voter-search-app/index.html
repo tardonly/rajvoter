@@ -2188,7 +2188,7 @@ function buyMoreButton() {
   b.classList.toggle('none', searchesLeft === 0);
 }
 // search packs: [searches, ₹], as PACKS in api/_lib.js
-const PACKS = [[100, 100], [200, 200], [500, 400], [800, 650], [1000, 800]];
+const PACKS = [[100, 50], [200, 100], [500, 200], [800, 325], [1000, 400]];
 // searches are only bought online: when that is not set up on the server, or the gateway refuses, the window says so
 const payOff = () => el('div', 'k', L('⚠ अभी ऑनलाइन भुगतान नहीं हो पा रहा — थोड़ी देर बाद फिर कोशिश करें।',
   '⚠ Online payment is not working right now — please try again a little later.'));
@@ -2265,7 +2265,7 @@ function buyOpen(code) {
     packs.replaceChildren();
     for (const pk of PACKS) {
       const b = el('button', `pack${pk === pick ? ' on' : ''}`); b.type = 'button';
-      const p = withCpn(pk), full = pk[0];   // ₹1 a search, struck through, then the price; the saving below
+      const p = withCpn(pk), full = Math.ceil(pk[0] / 2);   // 50 paise a search, struck through, then the price; the saving below
       const price = el('span');
       if (p.rs < full) price.append(el('s', null, `₹${full}`), ' ');
       price.append(`₹${p.rs}`);
@@ -2439,7 +2439,7 @@ $('invite').addEventListener('click', () => {
     `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
   location.href = 'https://wa.me/?text=' + encodeURIComponent(text);
 });
-// 💰 वॉलेट (api/pay.js 'wallet…'): the ₹ cashback from invites; turn it into searches (₹1 = 1 search) or take it out to a
+// 💰 वॉलेट (api/pay.js 'wallet…'): the ₹ cashback from invites; turn it into searches (₹1 = 2 searches) or take it out to a
 // UPI ID (from the server's min; one at a time). The latest withdrawals and how they stand are listed under it.
 const WALLET_ERR = {
   wallet_low: () => L('⚠ वॉलेट में इतने पैसे नहीं हैं', '⚠ Not that much in the wallet'),
@@ -2467,7 +2467,7 @@ async function walletOpen(note = '') {
   const o1 = el('div', 'opt'), n1 = el('input', 'amt'), go1 = el('button', 'btn', L('सर्च लें', 'Get searches')), m1 = el('div', 'msg');
   n1.type = 'number'; n1.min = '1'; n1.max = String(WALLET); n1.value = String(WALLET); n1.setAttribute('inputmode', 'numeric'); n1.setAttribute('aria-label', '₹'); go1.type = 'button';
   go1.disabled = WALLET < 1;
-  o1.append(el('b', null, L('🔍 सर्च में बदलें', '🔍 Turn into searches')), el('div', 'k', L('₹1 = 1 सर्च, तुरंत', '₹1 = 1 search, at once')), el('div', 'row'), m1);
+  o1.append(el('b', null, L('🔍 सर्च में बदलें', '🔍 Turn into searches')), el('div', 'k', L('₹1 = 2 सर्च, तुरंत', '₹1 = 2 searches, at once')), el('div', 'row'), m1);
   o1.querySelector('.row').append(n1, go1);
   go1.addEventListener('click', async () => {
     const rs = Math.floor(Number(n1.value));
@@ -2571,12 +2571,12 @@ async function lockPhone() {
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   await signVillages();
   const invited = r.refBy ? L(`${r.refBy} ने आपको रेफ़र किया है। `, `${r.refBy} invited you. `) : '';
-  lockStepTo('sign', invited + (r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद ₹1 प्रति सर्च।`,
-    `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that ₹1 per search.`)
-    : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति सर्च।`,
-    `New number — type your name: your login is made at once with ${r.free} free searches. After that ₹1 per search.`)
-    : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (₹1 प्रति सर्च)।',
-      'New number — type your name: your login is made at once; then buy searches (₹1 per search).')));
+  lockStepTo('sign', invited + (r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद 50 पैसे प्रति सर्च।`,
+    `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that 50 paise per search.`)
+    : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद 50 पैसे प्रति सर्च।`,
+    `New number — type your name: your login is made at once with ${r.free} free searches. After that 50 paise per search.`)
+    : L('नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा, फिर सर्च खरीदें (50 पैसे प्रति सर्च)।',
+      'New number — type your name: your login is made at once; then buy searches (50 paise per search).')));
 }
 // the superadmin's free-search rule for sign-ups (freeRule in api/_lib.js) in words: "the first 10 people of each village
 // get 10 free searches", or with halving "… get 10, the next 10 get 5, then 2, then 1"
@@ -2748,8 +2748,8 @@ async function lockSignup() {
   if (MOVES_LEFT) where.append(' ', wrong);
   box.append(user, pass, el('div', 'amt', '✓'), el('b', null, L('आपका खाता बन गया — पासवर्ड:', 'Your login is ready — password:')), el('div', 'buypw', r.password), copy, ...(save ? [save] : []), where,
     el('div', 'k', L('यह पासवर्ड लिख लें: दूसरे फ़ोन पर मोबाइल नंबर और इसी पासवर्ड से खुलेगा।', 'Write this password down: on another phone, your mobile number and this password open it.')),
-    el('div', 'k', r.left ? L(`${r.left} सर्च मुफ़्त — उसके बाद ₹1 प्रति सर्च।`, `${r.left} free searches — after that ₹1 per search.`)
-      : L('सर्च खरीदकर शुरू करें (₹1 प्रति सर्च)।', 'Buy searches to start (₹1 per search).')), open);
+    el('div', 'k', r.left ? L(`${r.left} सर्च मुफ़्त — उसके बाद 50 पैसे प्रति सर्च।`, `${r.left} free searches — after that 50 paise per search.`)
+      : L('सर्च खरीदकर शुरू करें (50 पैसे प्रति सर्च)।', 'Buy searches to start (50 paise per search).')), open);
   $('buyTitle').textContent = L('आपका खाता', 'Your login');
   $('buyPop').dataset.go = slug;
   $('buyClose').classList.add('hidden');
