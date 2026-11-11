@@ -203,7 +203,7 @@
   // the main video: upright on phones, wide on laptops (a short pause on the first second as the cover)
   const wide = matchMedia('(min-width: 900px)').matches;
   const mv = $('mainVideo');
-  mv.src = `/promo-${wide ? 'laptop' : 'phone'}.mp4#t=1`;
+  mv.src = `/promo-${wide ? 'laptop' : 'phone'}-vo.mp4#t=1`;
 
   // one video at a time
   const vids = document.querySelectorAll('video');

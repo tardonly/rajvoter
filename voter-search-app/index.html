@@ -492,7 +492,7 @@
       <button id="shMore" type="button">दूसरे ऐप में शेयर करें<small>Facebook, Telegram, SMS…</small></button>
       <button id="shCopy" type="button">लिंक कॉपी करें<small id="shLink"></small></button>
       <button id="shPromo" type="button">वीडियो पेज का लिंक कॉपी करें<small id="shPromoLink"></small></button>
-      <div class="sharesave"><a href="/promo-phone.mp4" download="matdata-khoj-phone.mp4">⬇ वीडियो (फ़ोन)</a><a href="/promo-laptop.mp4" download="matdata-khoj-laptop.mp4">⬇ वीडियो (लैपटॉप)</a></div>
+      <div class="sharesave"><a href="/promo-phone-vo.mp4" download="matdata-khoj-phone.mp4">⬇ वीडियो (फ़ोन)</a><a href="/promo-laptop-vo.mp4" download="matdata-khoj-laptop.mp4">⬇ वीडियो (लैपटॉप)</a></div>
     </div>
     <div class="note" id="shareNote"></div>
   </div>
@@ -853,7 +853,7 @@ function showApp(name, admin, villages, perms, cand, role) {
 const ON_PHONE = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
 function howPlay(cut) {
   const v = $('howVideo');
-  v.src = `/promo-${cut}.mp4`;
+  v.src = `/promo-${cut}-vo.mp4`;
   for (const b of document.querySelectorAll('.howcut button')) b.classList.toggle('on', b.dataset.cut === cut);
   v.play().catch(() => {});
 }
@@ -895,7 +895,7 @@ const SHARE_LINE = L('Voter Search — अपने गाँव की मत�
   'Voter Search — your village\'s voter list on phone and laptop. Type a name for the slip, vote marks and a ward report.');
 const PROMO_PAGE = `${SITE}promo`;   // the videos page: the promo, the shorts, sign-up and demo
 const SHARE_TEXT = `${SHARE_LINE}\n${SITE}\n${L('वीडियो देखें', 'Watch the videos')}: ${PROMO_PAGE}`;
-const PROMO = '/promo-phone.mp4';   // upright, as WhatsApp status shows it
+const PROMO = '/promo-phone-vo.mp4';   // upright, as WhatsApp status shows it
 let promoFile = null;
 function promoLoad() {   // fetched as the share box opens, so a tap can share it at once (phones allow sharing only right after a tap)
   promoFile ||= fetch(PROMO).then((r) => (r.ok ? r.blob() : Promise.reject(new Error('no video'))))
