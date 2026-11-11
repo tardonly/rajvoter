@@ -6,6 +6,7 @@
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-5Z2LNDRF');</script>
 <!-- End Google Tag Manager -->
+<script src="/ga.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
@@ -840,10 +841,22 @@ async function api(path, payload) {
   let r;
   try {
     r = await fetch(`/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ village: SLUG, ...payload }) });
-  } catch (e) { return { error: 'offline' }; }
-  try { r = await r.json(); } catch (e) { return { error: 'server' }; }
+    try { r = await r.json(); } catch (e) { r = { error: 'server' }; }
+  } catch (e) { r = { error: 'offline' }; }
+  apiTrack(path, payload || {}, r);
   if (typeof r.survey === 'boolean') setMode(r.survey);   // the superadmin's choice: survey or polling-day marks
   return r;
+}
+// every request as an analytics event (ga.js): what was done, in which village, and how it went — nothing personal
+function apiTrack(path, p, r) {
+  if (path === 'marks' || !window.track) return;   // marks: the slips' own refresh, not something the user did
+  const name = path === 'search' ? (p.family ? 'family' : p.all ? 'ward_slips' : p.offset ? 'search_more' : 'search')
+    : p.action ? `${path}_${p.action}` : path;
+  const params = { village: SLUG || 'home', result: r.error || 'ok', demo: DEMO ? 'yes' : 'no' };
+  if (p.mark !== undefined) params.mark = p.mark || 'clear';
+  if (p.n) params.pack = p.n;
+  if (p.ward) params.ward = p.ward;
+  track(name, params);
 }
 
 // The marks on a slip: before the election a survey (अपना वोट / सोच रहे हैं / विपक्ष), on polling day वोट दिया / आ रहे हैं /
