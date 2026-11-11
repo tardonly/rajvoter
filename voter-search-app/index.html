@@ -390,7 +390,8 @@
     /* coupon banners: as wide as the search row under them (the header's content), growing and shrinking with the window */
     #cpnBanners { padding-left: max(12px, calc((100% - 1240px) / 2)); padding-right: max(12px, calc((100% - 1240px) / 2));
       scroll-padding: 0 max(12px, calc((100% - 1240px) / 2)); }
-    #cpnBanners .cpnbanner, #cpnBanners .cpnbanner:only-child { flex: 0 0 100%; max-width: none; min-height: 76px; }
+    #cpnBanners .cpnbanner { flex: 0 0 calc((100% - 10px) / 2); max-width: none; min-height: 76px; }   /* two at a time; more scroll sideways */
+    #cpnBanners .cpnbanner:only-child { flex-basis: 100%; }
     .fields { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); grid-auto-flow: column; grid-auto-columns: auto; }
     .row2 { display: contents; }
     #qReset { order: 1; }   /* after the mark filter, at the end of the line */
