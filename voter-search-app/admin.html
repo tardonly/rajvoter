@@ -492,6 +492,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
         <div class="msg" id="partyMsg"></div>
       </div>
       <form id="candForm" class="stack" autocomplete="off">
+        <select id="candDistrict" aria-label="ज़िला"></select>
         <select id="candSamiti" aria-label="पंचायत समिति"></select>
         <select id="candVillage" aria-label="गाँव"></select>
         <input id="candName" type="text" placeholder="उम्मीदवार का नाम" maxlength="60" required>
@@ -546,6 +547,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   <div class="card">
     <div class="bar2"><h2 id="addTitle">नया यूज़र जोड़ें</h2><button class="x" id="closeAdd" type="button" aria-label="बंद करें">✕</button></div>
     <form id="addForm" class="stack" autocomplete="off">
+      <select id="newDistrict" class="hidden" aria-label="ज़िला"></select>
       <select id="newSamiti" class="hidden" aria-label="पंचायत समिति"></select>
       <select id="newVillage" required><option value="">गाँव चुनें</option></select>
       <input id="newName" type="text" placeholder="यूज़र का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
@@ -595,7 +597,7 @@ const STATIC_EN = {
   'ताज़ा करें': 'Refresh', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards', 'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter',
   'बाकी': 'Remaining', 'और दिखाएं': 'Show more', 'पर्चियों के निशान हटाएं': 'Clear the marks on the slips',
   'बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।': 'A button clears all marks of that colour in that village, on everyone\'s phone.',
-  'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया यूज़र जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village', 'पंचायत समिति': 'Panchayat samiti',
+  'हटाएं': 'clear', 'सभी निशान हटाएं': 'Clear all marks', 'नया यूज़र जोड़ें': 'Add a new person', 'गाँव चुनें': 'Choose village', 'पंचायत समिति': 'Panchayat samiti', 'ज़िला': 'District',
   'यूज़र का नाम (जैसे रमेश, बूथ 54)': 'Person\'s name (e.g. Ramesh, booth 54)', 'पासवर्ड बनाएं': 'Make password',
 };
 (function translatePage() {
@@ -1281,7 +1283,7 @@ function setup() {
   fv.length = 1;
   for (const s of mine) fv.add(new Option(vName(s), s));
   fv.value = pick;
-  samitiOptions($('candSamiti'), mine, pick); candVillageOptions(pick);
+  districtOptions($('candDistrict'), $('candSamiti'), mine, pick); candVillageOptions(pick);
   $('candVillage').classList.toggle('hidden', mine.length < 2);
   // back to search: the village list when this admin has several villages, else straight to the one village
   $('backLink').classList.toggle('hidden', !mine.length);
@@ -1314,14 +1316,29 @@ document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('cli
 // so a village added to it later is the admin's too); its villages are then ticked and can't be unticked one by one.
 const samitiOf = (v) => (v.panchayatSamiti ? `${v.district || ''}|${v.panchayatSamiti}` : '');
 const samitiName = (k) => { const [d, sam] = k.split('|'); return `${sam}${d ? ` (${d})` : ''}`; };
+const samOnly = (k) => k.split('|')[1] || k;   // the samiti's own name, when its district is already chosen
+const distOf = (s) => (villages[s] && villages[s].district) || '';
+// over a long list of village groups (one per पंचायत समिति, each with data-d = its district): choose the ज़िला first.
+// Until then only the groups with something ticked show; ticked villages in other districts stay ticked.
+function distPick(groups, first = '') {
+  const sel = el('select', 'distpick');
+  sel.setAttribute('aria-label', L('ज़िला', 'District'));
+  sel.add(new Option(L('ज़िला चुनें', 'Choose district'), ''));
+  for (const d of [...new Set(groups.map((g) => g.dataset.d))].sort((a, b) => a.localeCompare(b))) sel.add(new Option(d || L('अन्य', 'Other'), d));
+  sel.value = first;
+  const show = () => groups.forEach((g) => g.classList.toggle('hidden', sel.value ? g.dataset.d !== sel.value : !g.querySelector('input:checked')));
+  sel.addEventListener('change', show); show();
+  return sel;
+}
 function villageChecks(checked, samitis = []) {
-  const box = document.createDocumentFragment(), groups = new Map();
+  const box = document.createDocumentFragment(), groups = new Map(), gs = [];
   for (const s of Object.keys(villages)) { const k = samitiOf(villages[s]); (groups.get(k) || groups.set(k, []).get(k)).push(s); }
   for (const [k, slugs] of [...groups].sort((a, b) => (!a[0]) - (!b[0]) || a[0].localeCompare(b[0]))) {
     const g = el('div', 'vgroup'), list = el('div', 'checks');
+    g.dataset.d = distOf(slugs[0]); gs.push(g);
     const whole = el('input'); whole.type = 'checkbox'; whole.dataset.samiti = k; whole.checked = !!k && samitis.includes(k);
     if (k) {
-      const head = el('label', 'sam'); head.append(whole, L(`पूरी पंचायत समिति ${samitiName(k)} · ${slugs.length} गाँव`, `Whole panchayat samiti ${samitiName(k)} · ${slugs.length} villages`));
+      const head = el('label', 'sam'); head.append(whole, L(`${samOnly(k)} — पूरी, सभी ${slugs.length} गाँव`, `${samOnly(k)} — whole, all ${slugs.length} villages`));
       g.append(head);
     } else g.append(el('div', 'sam', L('अन्य गाँव', 'Other villages')));
     for (const s of slugs) {
@@ -1332,6 +1349,7 @@ function villageChecks(checked, samitis = []) {
     whole.addEventListener('change', () => list.querySelectorAll('input').forEach((c) => { c.checked = whole.checked; c.disabled = whole.checked; }));
     g.append(list); box.append(g);
   }
+  box.prepend(distPick(gs));
   return box;
 }
 const checkedIn = (box) => [...box.querySelectorAll('input[value]:checked:not(:disabled)')].map((c) => c.value);   // villages one by one
@@ -1686,25 +1704,41 @@ $('newVillage').addEventListener('change', newAreaOptions);
 // that samiti's villages, by name. Villages without a samiti are grouped as "अन्य गाँव".
 const addVillages = () => (me ? me.villages.filter((s) => villages[s]) : []);   // this admin's villages
 function newSamitiOptions(mine, pick) {
-  samitiOptions($('newSamiti'), mine, pick);
+  districtOptions($('newDistrict'), $('newSamiti'), mine, pick);
   newVillageOptions(pick);
 }
-// a पंचायत समिति select over these villages: "पंचायत समिति चुनें" first when there are several (hidden when there is one)
-function samitiOptions(sel, mine, pick) {
-  const keys = [...new Set(mine.map((s) => samitiOf(villages[s])))].sort((a, b) => (!a) - (!b) || samitiName(a).localeCompare(samitiName(b)));
-  sel.length = 0;
-  if (keys.length > 1) sel.add(new Option(L('पंचायत समिति चुनें', 'Choose panchayat samiti'), ''));
+// a ज़िला select over these villages ("ज़िला चुनें" first when there are several, hidden when there is one), then
+// samitiOptions for the chosen district
+function districtOptions(dSel, sSel, mine, pick) {
+  const ds = [...new Set(mine.map(distOf))].sort((a, b) => a.localeCompare(b));
+  dSel.length = 0;
+  if (ds.length > 1) dSel.add(new Option(L('ज़िला चुनें', 'Choose district'), ''));
+  for (const d of ds) dSel.add(new Option(`${d || L('अन्य', 'Other')} · ${mine.filter((s) => distOf(s) === d).length} ${L('गाँव', 'villages')}`, d));
+  dSel.value = pick ? distOf(pick) : ds.length === 1 ? ds[0] : '';
+  dSel.classList.toggle('hidden', ds.length < 2);
+  samitiOptions(dSel, sSel, mine, pick);
+}
+// the पंचायत समितियाँ of the chosen district: "पंचायत समिति चुनें" first when there are several (hidden when this admin has one)
+function samitiOptions(dSel, sSel, mine, pick) {
+  const chosen = dSel.length < 2 || dSel.selectedIndex > 0;
+  const inD = chosen ? mine.filter((s) => distOf(s) === dSel.value) : [];
+  const keys = [...new Set(inD.map((s) => samitiOf(villages[s])))].sort((a, b) => (!a) - (!b) || samOnly(a).localeCompare(samOnly(b)));
+  sSel.length = 0;
+  if (!chosen) sSel.add(new Option(L('पहले ज़िला चुनें', 'Choose the district first'), ''));
+  else if (keys.length > 1) sSel.add(new Option(L('पंचायत समिति चुनें', 'Choose panchayat samiti'), ''));
   for (const k of keys) {
-    const n = mine.filter((s) => samitiOf(villages[s]) === k).length;
-    sel.add(new Option(k ? `${L('पंचायत समिति', 'Panchayat samiti')} ${samitiName(k)} · ${n} ${L('गाँव', 'villages')}` : L(`अन्य गाँव · ${n}`, `Other villages · ${n}`), k));
+    const n = inD.filter((s) => samitiOf(villages[s]) === k).length;
+    sSel.add(new Option(k ? `${samOnly(k)} · ${n} ${L('गाँव', 'villages')}` : L(`अन्य गाँव · ${n}`, `Other villages · ${n}`), k));
   }
-  sel.value = pick ? samitiOf(villages[pick]) : keys.length === 1 ? keys[0] : '';
-  sel.classList.toggle('hidden', keys.length < 2);
+  sSel.disabled = !chosen;
+  const pk = pick ? samitiOf(villages[pick]) : '';
+  sSel.value = keys.includes(pk) ? pk : keys.length === 1 ? keys[0] : '';
+  sSel.classList.toggle('hidden', new Set(mine.map((s) => samitiOf(villages[s]))).size < 2);
 }
 // a new candidate: the पंचायत समिति first, then a village in it (both must be chosen)
 function candVillageOptions(pick) {
-  const ps = $('candSamiti'), sel = $('candVillage'), many = ps.length > 1, k = ps.value;
-  const list = many && !k && !ps.selectedIndex ? [] : addVillages().filter((s) => samitiOf(villages[s]) === k).sort((a, b) => vName(a).localeCompare(vName(b)));
+  const sel = $('candVillage'), k = $('candSamiti').value;
+  const list = k ? addVillages().filter((s) => samitiOf(villages[s]) === k).sort((a, b) => vName(a).localeCompare(vName(b))) : [];
   sel.length = 0;
   sel.add(new Option(!list.length ? L('पहले पंचायत समिति चुनें', 'Choose the panchayat samiti first') : L('गाँव चुनें', 'Choose village'), ''));
   for (const s of list) sel.add(new Option(vName(s), s));
@@ -1712,12 +1746,13 @@ function candVillageOptions(pick) {
   sel.value = list.includes(pick) ? pick : list.length === 1 ? list[0] : '';
 }
 $('candSamiti').addEventListener('change', () => candVillageOptions(''));
+$('candDistrict').addEventListener('change', () => { samitiOptions($('candDistrict'), $('candSamiti'), addVillages(), ''); candVillageOptions(''); });
+$('newDistrict').addEventListener('change', () => { samitiOptions($('newDistrict'), $('newSamiti'), addVillages(), ''); newVillageOptions(''); });
 function newVillageOptions(pick) {
-  const sel = $('newVillage'), many = $('newSamiti').length > 1, k = $('newSamiti').value;
-  const list = many && !$('newSamiti').selectedIndex ? []
-    : addVillages().filter((s) => samitiOf(villages[s]) === k).sort((a, b) => vName(a).localeCompare(vName(b)));
+  const sel = $('newVillage'), k = $('newSamiti').value;
+  const list = k ? addVillages().filter((s) => samitiOf(villages[s]) === k).sort((a, b) => vName(a).localeCompare(vName(b))) : [];
   sel.length = 0;
-  sel.add(new Option(many && !$('newSamiti').selectedIndex ? L('पहले पंचायत समिति चुनें', 'Choose the panchayat samiti first') : L('गाँव चुनें', 'Choose village'), ''));
+  sel.add(new Option(!k ? L('पहले पंचायत समिति चुनें', 'Choose the panchayat samiti first') : L('गाँव चुनें', 'Choose village'), ''));
   for (const s of list) sel.add(new Option(vName(s), s));
   sel.disabled = !list.length;
   sel.value = list.includes(pick) ? pick : list.length === 1 ? list[0] : '';
@@ -1727,7 +1762,7 @@ $('newSamiti').addEventListener('change', () => newVillageOptions(''));
 function openAdd() {
   $('addMsg').textContent = '';
   const showing = $('fVillage').value;   // the village the list is showing
-  if (showing && villages[showing]) { $('newSamiti').value = samitiOf(villages[showing]); newVillageOptions(showing); }
+  if (showing && villages[showing]) { districtOptions($('newDistrict'), $('newSamiti'), addVillages(), showing); newVillageOptions(showing); }
   newCandOptions(); newAreaOptions();
   $('addModal').classList.remove('hidden');
   $('newName').focus();
@@ -1913,6 +1948,7 @@ $('partyForm').addEventListener('submit', async (e) => {
 $('candForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('candName').value.trim(), village = $('candVillage').value;
+  if (!$('candDistrict').classList.contains('hidden') && !$('candDistrict').value) { $('candMsg').textContent = L('ज़िला चुनें', 'Choose the district'); $('candDistrict').focus(); return; }
   if (!$('candSamiti').classList.contains('hidden') && !$('candSamiti').value) { $('candMsg').textContent = L('पंचायत समिति चुनें', 'Choose the panchayat samiti'); $('candSamiti').focus(); return; }
   if (!village) { $('candMsg').textContent = MSG.no_village; $('candVillage').focus(); return; }
   if (!name) return;
@@ -1966,16 +2002,19 @@ function moreBox(u, row) {
     for (const s of Object.keys(villages).filter((x) => x !== u.village)) { const k = samitiOf(villages[s]); (groups.get(k) || groups.set(k, []).get(k)).push(s); }
     const near = samitiOf(villages[u.village] || {});
     const vgroups = [...groups].sort((a, b) => (b[0] === near) - (a[0] === near) || (!a[0]) - (!b[0]) || a[0].localeCompare(b[0]));
+    const gs = [];
     pick.append(wards);
     for (const [k, slugs] of vgroups) {
       const g = el('div', 'vgroup'), list = el('div', 'checks');
-      g.append(el('div', 'sam', k ? `${L('पंचायत समिति', 'Panchayat samiti')} ${samitiName(k)}` : L('अन्य गाँव', 'Other villages')));
+      g.dataset.d = distOf(slugs[0]); gs.push(g);
+      g.append(el('div', 'sam', k ? samOnly(k) : L('अन्य गाँव', 'Other villages')));
       for (const s of slugs.sort((a, b) => vName(a).localeCompare(vName(b)))) {
         const l = el('label'), c = el('input'); c.type = 'checkbox'; c.value = s; c.checked = (u.more || []).includes(s);
         l.append(c, vName(s)); list.append(l);
       }
       g.append(list); pick.append(g);
     }
+    wards.after(distPick(gs, distOf(u.village)));
     const sync = () => {
       const inAreas = new Set(areasIn(wl).flatMap(areaSlugs));
       pick.querySelectorAll('input[value]').forEach((c) => { if (inAreas.has(c.value)) c.checked = true; c.disabled = inAreas.has(c.value); });

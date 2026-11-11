@@ -532,6 +532,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
         <div class="lockalt"><button id="otpResend" type="button">OTP फिर भेजें</button></div>
       </div>
       <div id="signStep" class="hidden">
+        <select id="signDistrict" aria-label="ज़िला"></select>
         <select id="signSamiti" aria-label="पंचायत समिति"></select>
         <select id="signVillage" aria-label="गाँव"></select>
         <input id="signName" type="text" maxlength="60" placeholder="आपका नाम">
@@ -2151,7 +2152,7 @@ const SIGN_ERR = {
   otp_tries: L('बहुत बार गलत OTP — "OTP फिर भेजें" दबाएं', 'Too many wrong OTPs — tap "Send OTP again"'),
   wait: L('OTP अभी भेजा है — 30 सेकंड रुककर फिर भेजें', 'An OTP was just sent — wait 30 seconds to send another'),
   otp_send: L('OTP नहीं भेज पाए — थोड़ी देर बाद फिर कोशिश करें', 'Could not send the OTP — try again in a while'),
-  no_samiti: L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti'), no_village: L('अपना गाँव चुनें', 'Choose your village'), name: L('अपना नाम लिखें', 'Type your name'),
+  no_district: L('अपना ज़िला चुनें', 'Choose your district'), no_samiti: L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti'), no_village: L('अपना गाँव चुनें', 'Choose your village'), name: L('अपना नाम लिखें', 'Type your name'),
   phone: L('10 अंकों का मोबाइल नंबर डालें', 'Enter a 10-digit mobile number'),
   pw_short: L('पासवर्ड कम से कम 6 अक्षर का रखें', 'Make the password at least 6 characters'),
   ref_bad: L('यह रेफ़रल कोड / नंबर किसी का नहीं मिला — ठीक करें या खाली छोड़ें', 'No one found with this referral code / number — fix it or leave it empty'),
@@ -2548,7 +2549,7 @@ function lockStepTo(step, note = '', noPhone = false) {
   $('unlockBtn').textContent = step === 'pw' ? L('खोलें', 'Open') : step === 'sign' ? L('खाता बनाएं', 'Create my login')
     : step === 'reset' ? L('नया पासवर्ड सेव करें', 'Save the new password') : L('आगे', 'Next');
   $('phoneNote').textContent = note;
-  const focus = step === 'pw' ? $('pw') : step === 'sign' ? (HOME ? $('signSamiti') : $('signName')) : step === 'reset' ? $('resetOtp') : $('phone');
+  const focus = step === 'pw' ? $('pw') : step === 'sign' ? (HOME ? $('signDistrict') : $('signName')) : step === 'reset' ? $('resetOtp') : $('phone');
   if (!$('lock').classList.contains('hidden')) focus.focus();
 }
 async function lockPhone() {
@@ -2593,45 +2594,54 @@ async function allVillages() {
   if (!signList) { const info = await api('signup', { action: 'info' }); if (info.villages) signList = info.villages; }
   return signList || [];
 }
-// two selects: the पंचायत समिति (with its district), then the villages of that samiti
-function villagePicker(ps, sel, list) {
-  const samitis = new Map();
-  for (const v of list) if (!samitis.has(samitiOf(v))) samitis.set(samitiOf(v), v);
-  ps.replaceChildren(new Option(L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti'), ''));
-  for (const [k, v] of [...samitis].sort((a, b) => String(a[1].panchayatSamiti || '').localeCompare(String(b[1].panchayatSamiti || ''), LOCALE))) {
-    ps.add(new Option(`${v.panchayatSamiti || L('अन्य', 'Other')}${v.district ? ` (${L('जिला', 'District')} ${v.district})` : ''}`, k));
-  }
-  const picked = () => {
+// three selects: the ज़िला, then the पंचायत समितियाँ of that district, then the villages of that samiti
+function villagePicker(ds, ps, sel, list) {
+  const dist = (v) => v.district || '-';
+  ds.replaceChildren(new Option(L('अपना ज़िला चुनें', 'Choose your district'), ''));
+  for (const d of [...new Set(list.map(dist))].sort((a, b) => a.localeCompare(b, LOCALE))) ds.add(new Option(d === '-' ? L('अन्य', 'Other') : d, d));
+  const distPicked = () => {
+    const d = ds.value, samitis = new Map();
+    for (const v of d ? list.filter((v) => dist(v) === d) : []) if (!samitis.has(samitiOf(v))) samitis.set(samitiOf(v), v);
+    ps.replaceChildren(new Option(d ? L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti') : L('पहले ज़िला चुनें', 'First choose the district'), ''));
+    ps.disabled = !d;
+    for (const [k, v] of [...samitis].sort((a, b) => String(a[1].panchayatSamiti || '').localeCompare(String(b[1].panchayatSamiti || ''), LOCALE))) {
+      ps.add(new Option(v.panchayatSamiti || L('अन्य', 'Other'), k));
+    }
+    if (d) ps.focus();
+    picked(true);
+  };
+  const picked = (quiet) => {
     const k = ps.value;
     sel.replaceChildren(new Option(k ? L('अपना गाँव (ग्राम पंचायत) चुनें', 'Choose your village (gram panchayat)') : L('पहले पंचायत समिति चुनें', 'First choose the panchayat samiti'), ''));
     sel.disabled = !k;
     for (const v of list.filter((v) => samitiOf(v) === k).sort((a, b) => vn(a).localeCompare(vn(b), LOCALE))) sel.add(new Option(vn(v), v.slug));
-    if (k) sel.focus();
+    if (k && !quiet) sel.focus();
   };
-  ps.onchange = picked;
-  picked();
+  ds.onchange = distPicked;
+  ps.onchange = () => picked();
+  distPicked();
 }
 async function signVillages() {   // the start page asks which village; a village page is that village
   const ps = $('signSamiti');
-  ps.classList.toggle('hidden', !HOME);
-  $('signVillage').classList.toggle('hidden', !HOME);
+  for (const id of ['signDistrict', 'signSamiti', 'signVillage']) $(id).classList.toggle('hidden', !HOME);
   if (!HOME || ps.options.length) return;
-  villagePicker(ps, $('signVillage'), await allVillages());
+  villagePicker($('signDistrict'), ps, $('signVillage'), await allVillages());
 }
 
 // A signed-up login that picked the wrong village moves itself to another one (api/signup.js 'move'): its password and
 // searches go along and it stays logged in. from = its village now, tok = its token.
 async function moveOpen(from, tok) {
-  const box = el('div', 'paybox'), ps = el('select', 'movesel'), sel = el('select', 'movesel'), go = el('button', 'btn', L('इस गाँव में बदलें', 'Move to this village'));
+  const box = el('div', 'paybox'), ds = el('select', 'movesel'), ps = el('select', 'movesel'), sel = el('select', 'movesel'), go = el('button', 'btn', L('इस गाँव में बदलें', 'Move to this village'));
   const msg = el('div', 'k'), back = el('button', 'buyback', L('← रहने दें', '← Never mind'));
   go.type = back.type = 'button';
-  ps.setAttribute('aria-label', L('पंचायत समिति', 'Panchayat samiti')); sel.setAttribute('aria-label', L('गाँव', 'Village'));
+  ds.setAttribute('aria-label', L('ज़िला', 'District')); ps.setAttribute('aria-label', L('पंचायत समिति', 'Panchayat samiti')); sel.setAttribute('aria-label', L('गाँव', 'Village'));
   const now = (signList || []).find((v) => v.slug === from);
-  box.append(el('b', null, L(`अभी आपका गाँव: ${now ? vn(now) : from}`, `Your village now: ${now ? vn(now) : from}`)), ps, sel, go, msg,
+  box.append(el('b', null, L(`अभी आपका गाँव: ${now ? vn(now) : from}`, `Your village now: ${now ? vn(now) : from}`)), ds, ps, sel, go, msg,
     el('div', 'k', L(`आपका पासवर्ड और सर्च साथ जाएंगी। गाँव ${MOVES_LEFT} बार और बदल सकते हैं, उसके बाद अपने एडमिन से कहें।`,
       `Your password and searches go along. You can change the village ${MOVES_LEFT} more time${MOVES_LEFT === 1 ? '' : 's'}; after that ask your admin.`)), back);
   back.addEventListener('click', () => (moveBack ? moveBack() : buyClose()));
   go.addEventListener('click', async () => {
+    if (!ds.value) { msg.textContent = SIGN_ERR.no_district; return; }
     if (!ps.value) { msg.textContent = SIGN_ERR.no_samiti; return; }
     if (!sel.value) { msg.textContent = SIGN_ERR.no_village; return; }
     go.disabled = true; msg.textContent = L('बदल रहे हैं…', 'Moving…');
@@ -2647,7 +2657,7 @@ async function moveOpen(from, tok) {
   $('buyNote').textContent = '';
   $('buyBody').replaceChildren(box);
   $('buyPop').classList.remove('hidden');
-  villagePicker(ps, sel, (await allVillages()).filter((v) => v.slug !== from));
+  villagePicker(ds, ps, sel, (await allVillages()).filter((v) => v.slug !== from));
 }
 let moveBack = null;   // after signing up: ← रहने दें goes back to the new password
 // 🔑 पासवर्ड बदलें: the person chooses a new password (api/signup.js 'password'); this phone stays logged in
@@ -2695,6 +2705,7 @@ $('switchBtn').addEventListener('click', (e) => {
 });
 async function lockSignup() {
   const slug = HOME ? $('signVillage').value : SLUG, name = $('signName').value.trim();
+  if (HOME && !$('signDistrict').value) return showLock(SIGN_ERR.no_district);
   if (HOME && !$('signSamiti').value) return showLock(SIGN_ERR.no_samiti);
   if (!slug) return showLock(SIGN_ERR.no_village);
   if (!name) return showLock(SIGN_ERR.name);
