@@ -58,7 +58,16 @@
 //                                         bonus = free searches added, open = checkouts started with it but not paid
 //   action "wd_paid", id [, utr] / "wd_back", id → {wd}   superadmin: a wallet's UPI withdrawal (wdStart in _lib.js) sent
 //     by hand (with its UPI reference) / not sent, the ₹ back in the person's wallet; "settings" lists them (wds)
-//   action "ref_rule", on, pct, joiner, bonusAt, bonus → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
+//   action "agent"               → {on, apct, packs, sales, agentSales, agentRs, agentCash}   a village admin (or the
+//                                         superadmin, without reward) selling searches by UPI QR (agentReward in _lib.js):
+//                                         whether online payment is set up, the admin's % and their latest 30 sales (set agentreqs:<admin id>)
+//   action "agent_find", phone    → {person: {id, name, village}}   the active user login of that mobile number, only
+//                                         among the people this admin looks after (as in "list"); else 'no_user'
+//   action "agent_start", phone, n → {sale}   a purchase of pack n for that person, with a Razorpay UPI QR (razorpayQr)
+//                                         to show them; 50 a day per admin. sale: {id, n, rs, status, name, phone, village,
+//                                         created, closeBy, image (the QR picture), cash (the admin's ₹, once paid)}
+//   action "agent_check", rid      → {sale}   asks Razorpay how it stands (settleOnline): paid → searches added, ₹ to the admin
+//   action "ref_rule", on, pct, joiner, bonusAt, bonus, apct → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   the superadmin: which set of marks everyone uses from now on
 //                                         (each person may switch back for themself); a village admin: their own choice
@@ -81,7 +90,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // admin permissions from the request → only known ones
@@ -119,8 +128,8 @@ const view = (u) => ({
 });
 
 // a pack request as the admin page sees it
-const reqView = ({ id, user, village: v, kind, ward, wv, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw, coupon, bonus, doneCoupon }) =>
-  ({ id, user, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
+const reqView = ({ id, user, village: v, kind, ward, wv, n, rs, created, status, doneAt, doneN, doneRs, doneBy, doneByName, hand, gw, coupon, bonus, doneCoupon, agent, agentName, agentCash }) =>
+  ({ id, user, agent: agent || '', agentName: agentName || '', agentCash: Number(agentCash) || 0, village: v, n: Number(n), rs: Number(rs), created, status, doneAt: doneAt || null, doneN: Number(doneN) || 0,
     doneRs: Number(doneRs) || 0, doneBy: doneBy || '', doneByName: doneByName || '', hand: hand === '1', online: !!gw,
     coupon: coupon || '', bonus: Number(bonus) || 0, doneCoupon: doneCoupon || '',
     ...(kind === 'ward' ? { kind, ward: Number(ward), wv: wv || v } : {}) });   // kind 'ward': a whole ward's slips (api/pay.js wardStart)   // online: paid by UPI through a gateway (gw)
@@ -153,12 +162,63 @@ module.exports = route(async (req, res, b) => {
     return { more, areas, all: userVillages(home, more.join(','), areas.join(',')) };
   };
 
+  // selling searches by UPI QR for someone else (agentReward in _lib.js; see the top of this file)
+  const saleView = async (r) => {
+    const u = await getUser(r.user) || {};
+    return { id: r.id, n: Number(r.n), rs: Number(r.rs), status: r.status, name: u.name || '', phone: u.phone || '', village: r.village || '',
+      created: r.created, closeBy: r.closeBy || '', image: r.status === 'open' ? r.qrimg || '' : '', cash: Number(r.agentCash) || 0, got: Number(r.doneN) || 0 };
+  };
+  const seller = me.role === 'admin' || isSuper;
+  const personOf = async (raw) => {
+    const ph = normPhone(raw);
+    if (!ph) return null;
+    // only a person this admin looks after (mine: the ones they made, or all of their villages' with 'all')
+    const us = await getUsers((await phoneLogins(ph)).filter((x) => x.role === 'user' && x.retired !== '1').map((x) => x.id));
+    return us.find((u) => canBuy(u) && u.retired !== '1' && mine(u)) || null;
+  };
+  if (b.action === 'agent') {
+    if (!seller) return send(res, 403, { error: 'no_perm' });
+    const ids = (await redis('SMEMBERS', `agentreqs:${me.id}`)) || [];
+    const latest = (await Promise.all(ids.map(getReq))).filter(Boolean).sort((x, y) => (x.created < y.created ? 1 : -1)).slice(0, 30);
+    const sales = await Promise.all(latest.map(saleView));
+    const u = isSuper ? {} : await getUser(me.id);
+    return send(res, 200, { on: payOnline(), apct: isSuper ? 0 : (await refRule()).apct, packs: PACKS, qrMin: QR_MIN, sales,
+      agentSales: Number(u.agentSales) || 0, agentRs: Number(u.agentRs) || 0, agentCash: Number(u.agentCash) || 0 });
+  }
+  if (b.action === 'agent_find' || b.action === 'agent_start') {
+    if (!seller) return send(res, 403, { error: 'no_perm' });
+    const p = await personOf(b.phone);
+    if (!p) return send(res, 404, { error: 'no_user' });
+    if (b.action === 'agent_find') return send(res, 200, { person: { id: p.id, name: p.name || '', village: p.village || '' } });
+    if (!payOnline()) return send(res, 400, { error: 'no_online' });
+    const pk = PACKS.find(([k]) => k === Number(b.n));
+    if (!pk) return send(res, 400, { error: 'bad_credits' });
+    const k = `agentday:${me.id}:${today()}`;
+    if (await redis('INCR', k) > 50) return send(res, 429, { error: 'too_many' });
+    await redis('EXPIRE', k, 86400);
+    const id = await newReqId();
+    const q = await razorpayQr({ id, rs: pk[1], n: pk[0], who: p.name || '' });
+    if (q.error) { console.error('razorpay qr', q.error, q.raw); return send(res, 502, { error: 'gateway', detail: q.error }); }
+    await redis('HSET', `req:${id}`, 'user', p.id, 'village', p.village || '', 'n', pk[0], 'rs', pk[1], 'created', now, 'status', 'open',
+      'to', 'admin', 'gw', 'razorpay', 'txn', q.txn, 'qrimg', q.image, 'closeBy', q.closeBy, 'agent', me.id, 'agentName', me.name || '');
+    await redis('SET', `rzp:${q.txn}`, id);
+    await redis('SADD', 'reqs', id);
+    await redis('SADD', `agentreqs:${me.id}`, id);
+    return send(res, 200, { sale: await saleView(await getReq(id)) });
+  }
+  if (b.action === 'agent_check') {
+    const r = await getReq(b.rid);
+    if (!r || r.agent !== me.id) return send(res, 404, { error: 'not_found' });
+    return send(res, 200, { sale: await saleView(await settleOnline(r.id)) });
+  }
+
   if (b.action === 'ref_rule') {   // superadmin: referrals (refRule in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const n = (v, max) => { const x = Math.floor(Number(v)); return v !== '' && v != null && x >= 0 && x <= max ? x : -1; };
+    const apct = b.apct === undefined ? (await refRule()).apct : n(b.apct, REF_PCT_MAX);
     const pct = n(b.pct, REF_PCT_MAX), joiner = n(b.joiner, REF_MAX), bonusAt = n(b.bonusAt, REF_AT_MAX), bonus = n(b.bonus, REF_MAX);
-    if (pct < 0 || joiner < 0 || bonusAt < 0 || bonus < 0) return send(res, 400, { error: 'ref_rule' });
-    await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'pct', pct, 'joiner', joiner, 'bonusAt', bonusAt, 'bonus', bonus, 'at', now, 'by', me.id);
+    if (pct < 0 || joiner < 0 || bonusAt < 0 || bonus < 0 || apct < 0) return send(res, 400, { error: 'ref_rule' });
+    await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'pct', pct, 'apct', apct, 'joiner', joiner, 'bonusAt', bonusAt, 'bonus', bonus, 'at', now, 'by', me.id);
     return send(res, 200, { refRule: await refRule() });
   }
   if (b.action === 'coupon_set') {   // superadmin: make or change a coupon (getCoupon in _lib.js)

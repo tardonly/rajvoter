@@ -192,6 +192,12 @@
   .newpw .limit { font-size: 15px; margin-top: 12px; }
   /* voters by mark */
   .pick select { flex: 1; min-width: 0; }
+  .packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+  .packs button { padding: 8px 4px; border-radius: 10px; border: 1.5px solid #2563eb; background: #fff; color: #1e3a8a; font-size: 13px; font-weight: 600; }
+  .packs button b { display: block; font-size: 17px; } .packs button.on { background: #2563eb; color: #fff; }
+  .qrbox { margin-top: 14px; padding: 14px; border: 2px solid #2563eb; border-radius: 14px; text-align: center; max-width: 420px; }
+  .qrbox img { width: 100%; max-width: 320px; display: block; margin: 10px auto 0; }
+  .qrbox.paid { border-color: #16a34a; background: #f0fdf4; }
   .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 4px; }
   .chips button { padding: 8px 2px; border-radius: 10px; border: 1.5px solid; background: #fff; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
   .chips button b { display: block; font-size: 18px; }
@@ -277,6 +283,7 @@
       <button type="button" data-tab="prog">प्रगति</button>
       <button type="button" data-tab="voters">मतदाता सूची</button>
       <button type="button" data-tab="clear">निशान हटाएं</button>
+      <button type="button" data-tab="sell" class="hidden" id="tabSell">💳 QR से भुगतान</button>
       <button type="button" data-tab="ref" class="hidden" id="tabRef">रेफ़रल · वॉलेट</button>
       <button type="button" data-tab="cpn" class="hidden" id="tabCpn">कूपन</button>
       <button type="button" data-tab="free" class="hidden" id="tabFree">साइन-अप पर मुफ़्त सर्च</button>
@@ -304,6 +311,7 @@
           <label class="fr num"><span id="refInvText"></span><input id="refPct" type="number" min="0" max="50" inputmode="numeric"></label>
           <label class="fr num"><span id="refJoinText"></span><input id="refJoiner" type="number" min="0" max="1000" inputmode="numeric"></label>
         </div>
+        <label class="fr num"><span id="refAgentText"></span><input id="refApct" type="number" min="0" max="50" inputmode="numeric"></label>
         <div class="row">
           <label class="fr num"><span id="refAtText"></span><input id="refAt" type="number" min="0" max="100" inputmode="numeric"></label>
           <label class="fr num"><span id="refBonusText"></span><input id="refBonus" type="number" min="0" max="1000" inputmode="numeric"></label>
@@ -315,6 +323,44 @@
       <div class="phead" style="margin-top:18px"><b id="wdTitle"></b> · <span id="wdNow"></span></div>
       <div class="sub" id="wdHow" style="margin:4px 0 0"></div>
       <div class="stack" id="wdList" style="margin-top:10px"></div>
+    </div>
+
+    <!-- village admins (and the superadmin): a Razorpay UPI QR for another person's pack; the admin earns % in their wallet
+         (api/_routes/admin.js "agent…", agentReward in api/_lib.js); their wallet (api/pay.js "wallet…") -->
+    <div class="card pane" data-tab="sell" id="sellCard">
+      <div class="phead"><b id="sellTitle"></b> · <span id="sellNow"></span></div>
+      <div class="sub" id="sellHow" style="margin:4px 0 0"></div>
+      <div class="stack" style="margin-top:12px" id="sellForm">
+        <div class="row">
+          <label class="fr" style="flex:1"><span id="sellPhoneText"></span><input id="sellPhone" type="tel" inputmode="numeric" maxlength="14" autocomplete="off"></label>
+          <button class="btn ghost" id="sellFind" type="button" style="align-self:flex-end"></button>
+        </div>
+        <div class="sub" id="sellWho" style="margin:0"></div>
+        <div class="packs hidden" id="sellPacks"></div>
+        <button class="btn hidden" id="sellGo" type="button"></button>
+        <div class="msg" id="sellMsg" style="min-height:0"></div>
+      </div>
+      <div class="qrbox hidden" id="sellQr">
+        <div id="sellQrHead"></div>
+        <img id="sellQrImg" alt="UPI QR">
+        <div class="sub" id="sellQrState" style="margin:6px 0"></div>
+        <button class="btn ghost" id="sellQrNew" type="button"></button>
+      </div>
+      <div class="phead" style="margin-top:18px"><b id="walTitle"></b> · <span id="walNow"></span></div>
+      <div class="stack" style="margin-top:8px" id="walBox">
+        <div class="row">
+          <label class="fr num"><span id="walRsText"></span><input id="walRs" type="number" min="1" inputmode="numeric"></label>
+          <label class="fr" style="flex:1"><span id="walUpiText"></span><input id="walUpi" type="text" autocomplete="off" autocapitalize="off" placeholder="name@upi"></label>
+        </div>
+        <div class="row">
+          <button class="btn" id="walUpiGo" type="button"></button>
+          <button class="btn ghost" id="walSearchGo" type="button"></button>
+        </div>
+        <div class="msg" id="walMsg" style="min-height:0"></div>
+        <div class="stack" id="walWds"></div>
+      </div>
+      <div class="phead" style="margin-top:18px"><b id="salesTitle"></b></div>
+      <div class="stack" id="salesList" style="margin-top:8px"></div>
     </div>
 
     <!-- superadmin: coupons for buying searches, with their conditions (api/_routes/admin.js "coupon_set" / "coupon_del") -->
@@ -550,6 +596,8 @@ const MSG = EN ? {
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
   no_perm: 'You are not allowed to do this — ask the super admin', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
+  no_user: 'None of your people has this mobile number — add the person first (व्यक्ति tab)', no_online: 'Online payment is not set up', gateway: 'Razorpay problem',
+  wallet_min: 'Withdraw at least the minimum', wallet_low: 'Not that much in the wallet', bad_upi: 'Type a correct UPI ID (name@bank)', wd_open: 'A withdrawal is already on its way', wallet_amount: 'Type the amount in ₹',
   bad_credits: 'Type how many searches to add (1 to 10000)', bad_amount: 'Type the amount in ₹', not_prepaid: 'This login cannot buy searches', already_done: 'This request is already handled',
   no_cand: 'Candidate not found', not_user: 'Admins are not added to a candidate\'s group',
 } : {
@@ -561,6 +609,8 @@ const MSG = EN ? {
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
   no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
+  no_user: 'आपके व्यक्तियों में यह मोबाइल नंबर नहीं है — पहले व्यक्ति tab में जोड़ें', no_online: 'ऑनलाइन भुगतान चालू नहीं है', gateway: 'Razorpay में दिक्कत',
+  wallet_min: 'कम से कम न्यूनतम राशि निकालें', wallet_low: 'वॉलेट में इतने ₹ नहीं हैं', bad_upi: 'सही UPI ID लिखें (name@bank)', wd_open: 'एक निकासी पहले से चल रही है', wallet_amount: 'राशि ₹ में लिखें',
   bad_credits: 'कितनी सर्च जोड़नी हैं, 1 से 10000 के बीच लिखें', bad_amount: 'राशि ₹ में लिखें', not_prepaid: 'इस खाते में सर्च नहीं जोड़ी जा सकतीं', already_done: 'यह अनुरोध पहले ही निपटाया जा चुका है',
   no_cand: 'यह उम्मीदवार नहीं मिला', not_user: 'एडमिन किसी उम्मीदवार के समूह में नहीं जोड़े जाते',
 };
@@ -621,6 +671,7 @@ async function openPanel() {
   setup(); showMarks(r);
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
   for (const id of ['tabRef', 'tabCpn', 'tabFree']) $(id).classList.toggle('hidden', me.role !== 'super');   // filled when opened
+  $('tabSell').classList.toggle('hidden', me.role !== 'super' && me.role !== 'admin');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight
   loadReqs();
   loadStats();   // how many slips each person marked (and progress, if a marks tab is open)
@@ -738,13 +789,15 @@ function showRefRule(rule) {
   $('refInvText').textContent = L('बुलाने वाले को % कैशबैक, वॉलेट में (दोस्त की हर ख़रीद पर)', 'Cashback % for the inviter, into their wallet (on every purchase of the friend)');
   $('refAtText').textContent = L('हर इतने दोस्तों पर बोनस (जो ख़रीदें; 0 = बंद)', 'Bonus every this many friends (who buy; 0 = off)');
   $('refBonusText').textContent = L('बोनस ₹ (वॉलेट में)', 'Bonus ₹ (into the wallet)');
+  $('refAgentText').textContent = L('एडमिन को % (उनके QR से हुई हर बिक्री पर, वॉलेट में)', 'Admin % (on every sale by their QR, into their wallet)');
+  $('refApct').value = rule.apct;
   $('refJoinText').textContent = L('दोस्त को सर्च (जुड़ने पर, मुफ़्त सर्च के अलावा)', 'Searches for the friend (on joining, besides the free ones)');
   $('refSave').textContent = L('सेव करें', 'Save');
   $('refOn').checked = rule.on; $('refPct').value = rule.pct; $('refJoiner').value = rule.joiner; $('refAt').value = rule.bonusAt; $('refBonus').value = rule.bonus;
 }
 $('refSave').addEventListener('click', async () => {
   $('refSave').disabled = true; $('refMsg').textContent = '';
-  const r = await api({ action: 'ref_rule', on: $('refOn').checked, pct: $('refPct').value, joiner: $('refJoiner').value, bonusAt: $('refAt').value, bonus: $('refBonus').value });
+  const r = await api({ action: 'ref_rule', on: $('refOn').checked, pct: $('refPct').value, joiner: $('refJoiner').value, bonusAt: $('refAt').value, bonus: $('refBonus').value, apct: $('refApct').value });
   $('refSave').disabled = false;
   if (r.error) { $('refMsg').textContent = L('संख्या ठीक डालें: % 0–50, दोस्त 0–100, ₹/सर्च 0–1000', 'Check the numbers: % 0–50, friends 0–100, ₹/searches 0–1000'); return; }
   showRefRule(r.refRule);
@@ -784,6 +837,131 @@ function showWds(list) {
     box.append(row);
   }
 }
+// 💳 QR से भुगतान: a village admin makes a Razorpay UPI QR for another person's pack; once paid, the person gets the
+// searches and the admin the % in their wallet (api/_routes/admin.js "agent…"). The QR is checked every few seconds.
+let SELL = null, sellWho = null, sellN = 0, sellCur = null, sellTimer = null;
+const SALE_ST = { open: ['⏳ भुगतान का इंतज़ार', '⏳ Waiting for payment'], done: ['✓ भुगतान मिला', '✓ Paid'], rejected: ['✕ बंद', '✕ Closed'] };
+async function loadSell() {
+  $('sellTitle').textContent = L('💳 QR से भुगतान (किसी और के लिए)', '💳 Payment QR (for someone else)');
+  $('sellPhoneText').textContent = L('ग्राहक का मोबाइल नंबर', "Customer's mobile number");
+  $('sellFind').textContent = L('खोजें', 'Find');
+  $('sellGo').textContent = L('QR बनाएं', 'Make QR');
+  $('sellQrNew').textContent = L('नया QR', 'New QR');
+  $('salesTitle').textContent = L('आपकी हाल की बिक्री', 'Your recent sales');
+  $('sellNow').textContent = L('⏳ लोड हो रहा है…', '⏳ Loading…');
+  const r = await api({ action: 'agent' });
+  if (r.error) { $('sellNow').textContent = errText(r); return; }
+  SELL = r;
+  $('sellNow').textContent = me.role === 'super' ? L('आप सुपर एडमिन हैं — कमीशन नहीं', 'You are the super admin — no commission')
+    : L(`आपकी ${r.agentSales} बिक्री · ₹${r.agentRs} · आपकी कमाई ₹${r.agentCash}`, `${r.agentSales} sales · ₹${r.agentRs} · you earned ₹${r.agentCash}`);
+  $('sellHow').textContent = !r.on ? MSG.no_online : me.role === 'super' ? L('ग्राहक का नंबर डालें, पैक चुनें, QR दिखाएं — ग्राहक किसी भी UPI ऐप से स्कैन करके भुगतान करे, सर्च उसके खाते में जुड़ जाएंगी।', "Type the customer's number, pick a pack, show the QR — they scan it in any UPI app and pay; the searches go to their login.")
+    : L(`ग्राहक का नंबर डालें, पैक चुनें, QR दिखाएं — ग्राहक किसी भी UPI ऐप से स्कैन करके भुगतान करे। सर्च उसके खाते में और ${r.apct}% आपके वॉलेट में।`, `Type the customer's number, pick a pack, show the QR — they scan it in any UPI app and pay. The searches go to them, ${r.apct}% to your wallet.`);
+  $('sellForm').classList.toggle('hidden', !r.on);
+  const box = $('sellPacks'); box.replaceChildren();
+  for (const [n, rs] of r.packs) {
+    const b = el('button'); b.type = 'button'; b.append(el('b', null, `₹${rs}`), document.createTextNode(L(`${n} सर्च`, `${n} searches`)));
+    b.classList.toggle('on', n === sellN);
+    b.addEventListener('click', () => { sellN = n; box.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); $('sellGo').disabled = false; });
+    box.append(b);
+  }
+  showSales();
+  loadWallet();
+}
+function showSales() {
+  const box = $('salesList'); box.replaceChildren();
+  if (!SELL.sales.length) { box.append(el('div', 'sub', L('अभी कोई बिक्री नहीं', 'No sales yet'))); return; }
+  for (const x of SELL.sales) {
+    const row = el('div', 'person'), st = SALE_ST[x.status] || [x.status, x.status];
+    row.append(el('b', null, `${x.name || '—'} · ₹${x.rs} · ${L(`${x.n} सर्च`, `${x.n} searches`)}`),
+      el('div', 'info', [showPhone(x.phone), vName(x.village), fmt(x.created), L(st[0], st[1]), x.cash ? L(`आपको ₹${x.cash}`, `you got ₹${x.cash}`) : ''].filter(Boolean).join(' · ')));
+    if (x.status === 'open') {
+      const b = el('button', 'btn ghost', x.image && x.closeBy > new Date().toISOString() ? L('QR दिखाएं', 'Show QR') : L('↻ जाँचें', '↻ Check')); b.type = 'button';
+      b.addEventListener('click', () => (x.image && x.closeBy > new Date().toISOString() ? showQr(x) : checkSale(x.id)));
+      row.append(b);
+    }
+    box.append(row);
+  }
+}
+function sellReset() {
+  clearTimeout(sellTimer); sellCur = null;
+  $('sellQr').classList.add('hidden'); $('sellQr').classList.remove('paid'); $('sellForm').classList.toggle('hidden', !(SELL && SELL.on));
+}
+$('sellPhone').addEventListener('input', () => { sellWho = null; $('sellWho').textContent = ''; $('sellPacks').classList.add('hidden'); $('sellGo').classList.add('hidden'); $('sellMsg').textContent = ''; });
+$('sellPhone').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('sellFind').click(); });
+$('sellFind').addEventListener('click', async () => {
+  $('sellMsg').textContent = ''; $('sellFind').disabled = true;
+  const r = await api({ action: 'agent_find', phone: $('sellPhone').value });
+  $('sellFind').disabled = false;
+  if (r.error) { $('sellWho').textContent = ''; $('sellMsg').textContent = r.error === 'not_found' ? MSG.no_user : errText(r); return; }
+  sellWho = r.person;
+  $('sellWho').textContent = `✓ ${r.person.name || '—'}${r.person.village ? ` · ${vName(r.person.village)}` : ''}`;
+  $('sellPacks').classList.remove('hidden'); $('sellGo').classList.remove('hidden'); $('sellGo').disabled = !sellN;
+});
+$('sellGo').addEventListener('click', async () => {
+  if (!sellWho || !sellN) return;
+  $('sellGo').disabled = true; $('sellMsg').textContent = '';
+  const r = await api({ action: 'agent_start', phone: $('sellPhone').value, n: sellN });
+  $('sellGo').disabled = false;
+  if (r.error) { $('sellMsg').textContent = errText(r); return; }
+  SELL.sales.unshift(r.sale); showSales(); showQr(r.sale);
+});
+$('sellQrNew').addEventListener('click', () => { sellReset(); $('sellPhone').value = ''; $('sellPhone').dispatchEvent(new Event('input')); $('sellPhone').focus(); });
+function showQr(x) {
+  clearTimeout(sellTimer); sellCur = x;
+  $('sellForm').classList.add('hidden'); $('sellQr').classList.remove('hidden', 'paid');
+  $('sellQrHead').replaceChildren(el('b', null, `₹${x.rs}`), document.createTextNode(` · ${L(`${x.n} सर्च`, `${x.n} searches`)} · ${x.name || ''}`));
+  $('sellQrImg').src = x.image; $('sellQrImg').classList.remove('hidden');
+  $('sellQrState').textContent = L('ग्राहक इसे किसी भी UPI ऐप (PhonePe, GPay, Paytm…) से स्कैन करके भुगतान करे', 'The customer scans this in any UPI app (PhonePe, GPay, Paytm…) and pays');
+  $('sellQr').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  sellTimer = setTimeout(() => checkSale(x.id, true), 4000);
+}
+async function checkSale(id, auto) {
+  const r = await api({ action: 'agent_check', rid: id });
+  if (r.error) { if (!auto) alert(errText(r)); else if (sellCur && sellCur.id === id) sellTimer = setTimeout(() => checkSale(id, true), 6000); return; }
+  const x = r.sale, i = SELL.sales.findIndex((s) => s.id === id);
+  if (i >= 0) SELL.sales[i] = x;
+  showSales();
+  if (!sellCur || sellCur.id !== id) { if (!auto && x.status === 'open') alert(L('अभी भुगतान नहीं आया', 'Not paid yet')); return; }
+  if (x.status === 'done') {
+    $('sellQr').classList.add('paid'); $('sellQrImg').classList.add('hidden');
+    $('sellQrState').textContent = L(`✓ भुगतान मिला — ${x.name} के खाते में ${x.got} सर्च जुड़ गईं${x.cash ? `, आपके वॉलेट में ₹${x.cash}` : ''}`,
+      `✓ Paid — ${x.got} searches added for ${x.name}${x.cash ? `, ₹${x.cash} in your wallet` : ''}`);
+    loadSell();
+    return;
+  }
+  if (x.status !== 'open' || !(x.closeBy > new Date().toISOString())) {
+    $('sellQrImg').classList.add('hidden');
+    $('sellQrState').textContent = L('QR का समय ख़त्म — नया QR बनाएं', 'The QR has expired — make a new one');
+    return;
+  }
+  if (!document.hidden) sellTimer = setTimeout(() => checkSale(id, true), 4000);
+  else sellTimer = setTimeout(() => checkSale(id, true), 15000);
+}
+// the admin's own wallet (api/pay.js 'wallet…'): to UPI, or into searches
+const payApi = (payload) => post('pay', { token, ...payload });
+async function loadWallet() {
+  $('walTitle').textContent = L('👛 आपका वॉलेट', '👛 Your wallet');
+  $('walRsText').textContent = L('₹', '₹'); $('walUpiText').textContent = L('आपकी UPI ID', 'Your UPI ID');
+  $('walUpiGo').textContent = L('UPI पर निकालें', 'Withdraw to UPI'); $('walSearchGo').textContent = L('सर्च में बदलें (₹1 = 1 सर्च)', 'Turn into searches (₹1 = 1)');
+  const r = await payApi({ action: 'wallet' });
+  $('walBox').classList.toggle('hidden', !!r.error);
+  if (r.error) { $('walNow').textContent = me.role === 'super' ? L('सुपर एडमिन का वॉलेट नहीं होता', 'The super admin has no wallet') : errText(r); return; }
+  $('walNow').textContent = L(`₹${r.wallet} · कम से कम ₹${r.min} निकाल सकते हैं`, `₹${r.wallet} · withdraw from ₹${r.min}`);
+  if (!$('walUpi').value) $('walUpi').value = r.upi || '';
+  const box = $('walWds'); box.replaceChildren();
+  for (const w of r.wds || []) { const st = WD_ST[w.status] || [w.status, w.status]; box.append(el('div', 'sub', `₹${w.rs} → ${w.upi} · ${fmt(w.created)} · ${L(st[0], st[1])}${w.utr ? ` · UTR ${w.utr}` : ''}`)); }
+}
+async function walletDo(payload) {
+  $('walUpiGo').disabled = $('walSearchGo').disabled = true; $('walMsg').textContent = '';
+  const r = await payApi(payload);
+  $('walUpiGo').disabled = $('walSearchGo').disabled = false;
+  if (r.error) { $('walMsg').textContent = r.error === 'wallet_min' ? L(`कम से कम ₹${r.min}`, `At least ₹${r.min}`) : errText(r); return; }
+  $('walMsg').textContent = payload.action === 'wallet_upi' ? L('✓ निकासी शुरू हो गई', '✓ Withdrawal started') : L(`✓ ${r.got} सर्च जुड़ गईं`, `✓ ${r.got} searches added`);
+  $('walRs').value = ''; loadWallet();
+}
+$('walUpiGo').addEventListener('click', () => walletDo({ action: 'wallet_upi', rs: $('walRs').value, upi: $('walUpi').value }));
+$('walSearchGo').addEventListener('click', () => walletDo({ action: 'wallet_searches', rs: $('walRs').value }));
+
 // coupons (getCoupon in api/_lib.js): the list, each with ✎ (into the form) and 🗑; the form makes or changes one
 let COUPONS = [], cpnEdit = null;
 const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट${c.maxOff ? ` (₹${c.maxOff} तक)` : ''}` : c.kind === 'rs' ? `₹${c.value} छूट`
@@ -1046,6 +1224,7 @@ function showTab(name) {
   if (!me) return;   // the person list is still on its way (openPanel)
   if (MARK_TABS.includes(btn) && !fullStats) { fullStats = true; loadStats(); }   // progress per ward: only when wanted
   if (SETTING_TABS.includes(btn) && me.role === 'super') loadSettings();
+  if (btn === 'sell') loadSell();
   if (btn === 'voters' && !vs.loaded && STATS) loadVoters();   // else once "stats" is in (loadStats)
 }
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));

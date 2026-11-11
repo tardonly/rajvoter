@@ -518,7 +518,7 @@ async function takeFree(slug, rule, want) {
 // (refReward; field refPaid on the new login marks its first purchase; the inviter counts refBought, refCash, refBonus;
 // refEarned is the searches older rewards gave). The superadmin sets it on the admin page (key "refrule",
 // api/_routes/admin.js "ref_rule"), REF until then.
-const REF = { on: true, pct: 5, joiner: 5, bonusAt: 5, bonus: 100 };
+const REF = { on: true, pct: 5, joiner: 5, bonusAt: 5, bonus: 100, apct: 10 };   // apct: a village admin's % on a sale by QR (agentReward)
 const REF_PCT_MAX = 50, REF_AT_MAX = 100;
 const REF_MAX = 1000;
 async function refRule() {
@@ -527,7 +527,7 @@ async function refRule() {
   const num = (v, d) => { const n = Math.floor(Number(v)); return n >= 0 && n <= REF_MAX && v !== undefined && v !== '' ? n : d; };
   const pct = num(o.pct, REF.pct), at = num(o.bonusAt, REF.bonusAt);
   return { on: o.on === undefined ? REF.on : o.on === '1', pct: Math.min(pct, REF_PCT_MAX), joiner: num(o.joiner, REF.joiner),
-    bonusAt: Math.min(at, REF_AT_MAX), bonus: num(o.bonus, REF.bonus) };
+    bonusAt: Math.min(at, REF_AT_MAX), bonus: num(o.bonus, REF.bonus), apct: Math.min(num(o.apct, REF.apct), REF_PCT_MAX) };
 }
 // what the app needs for the invite button: this login's code, what the inviter gets and how many of their friends have
 // bought (count, toward the next bonus); null for those who can't invite
@@ -718,6 +718,7 @@ async function addPaid(u, n, r, by) {
   const cpn = asked && r.coupon && (await useCoupon(r.coupon, u.id, Number(first) === 1)) ? r.coupon : '';
   const bonus = cpn ? Number(r.bonus) || 0 : 0;
   await refReward(u.id, rs, r && r.ref);
+  if (r && r.agent) await agentReward(r, u, rs);
   await redis('HINCRBY', `user:${u.id}`, 'credits', n + bonus);
   await redis('SREM', 'free', u.id);
   const id = r ? r.id : await newReqId();
@@ -773,7 +774,23 @@ async function refReward(id, rs, via) {
   if (extra) await redis('HINCRBY', `user:${inv.id}`, 'refBonus', extra);
   if (cash) await redis('HINCRBY', `user:${id}`, 'refGave', cash);
 }
-// Wallet (वॉलेट): ₹ cashback, so far only from referrals (refReward). Kept as field "wallet" on user:<id> (walletIn: all
+// Sales by a village admin (api/_routes/admin.js "agent_start"): the admin makes a Razorpay UPI QR (razorpayQr) for a
+// pack for another person's login; that person scans and pays, gets the searches, and the admin (req field agent) gets
+// the referral rule's apct% of the price in their wallet, once the payment is in (addPaid). Not for the superadmin's own
+// sales, nor a sale to the admin's own number. Counted on the admin as agentSales / agentRs / agentCash, and on the
+// purchase as agentCash.
+async function agentReward(r, u, rs) {
+  const ag = await getUser(r.agent);
+  if (!ag || ag.role !== 'admin' || ag.retired === '1' || (ag.phone && ag.phone === u.phone)) return;
+  await redis('HINCRBY', `user:${ag.id}`, 'agentSales', 1);
+  await redis('HINCRBY', `user:${ag.id}`, 'agentRs', rs);
+  const rule = await refRule(), cash = rule.apct && rs > 0 ? Math.max(1, Math.round((rs * rule.apct) / 100)) : 0;
+  if (!cash) return;
+  await walletAdd(ag.id, cash);
+  await redis('HINCRBY', `user:${ag.id}`, 'agentCash', cash);
+  await redis('HSET', `req:${r.id}`, 'agentCash', cash);
+}
+// Wallet (वॉलेट): ₹ cashback, from referrals (refReward) and, for village admins, from their QR sales (agentReward). Kept as field "wallet" on user:<id> (walletIn: all
 // ever added). The person may (api/pay.js 'wallet…'):
 //   - turn it into searches at any time, ₹1 = 1 search (as the packs' price, PACKS), added to their credits;
 //   - take it out to their UPI ID, from ₹WALLET_MIN up, one withdrawal open at a time: wd:<id> {user, rs, upi, status
@@ -786,7 +803,7 @@ async function refReward(id, rs, via) {
 const WALLET_MIN = 50;
 const UPI_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{1,255}@[a-zA-Z][a-zA-Z0-9]{1,63}$/;
 const walletOf = (u) => Math.max(0, Math.floor(Number(u && u.wallet) || 0));
-const hasWallet = (u) => !!u && canBuy(u) && u.role === 'user';
+const hasWallet = (u) => !!u && canBuy(u);   // users (invites) and village admins (agentReward)
 const payoutsOn = () => payOnline() && /^\d{6,24}$/.test(String(process.env.RAZORPAYX_ACCOUNT || ''));
 async function walletAdd(id, rs) {
   await redis('HINCRBY', `user:${id}`, 'wallet', rs);
@@ -893,6 +910,8 @@ async function wdsOf(uid, n = 10) {
 const GATEWAY = { id: 'admin', name: 'ऑनलाइन (Razorpay)' };   // who approves an online purchase (the superadmin)
 const payOnline = () => !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
 const isOrderId = (id) => /^order_[0-9A-Za-z]{6,40}$/.test(String(id || ''));
+const isQrId = (id) => /^qr_[0-9A-Za-z]{6,40}$/.test(String(id || ''));
+const isTxnId = (id) => isOrderId(id) || isQrId(id);   // a purchase's txn: a checkout order, or a UPI QR (razorpayQr)
 async function razorpay(method, path, body, extra) {   // path after /v1/, e.g. 'orders'; extra: more headers
   const auth = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64');
   const r = await fetch(`${(process.env.RAZORPAY_URL || 'https://api.razorpay.com').replace(/\/+$/, '')}/v1/${path}`, {
@@ -909,6 +928,17 @@ async function razorpayCreate({ id, rs, n, ward }) {
     notes: { purchase: String(id), ...(ward ? { ward: String(ward) } : { searches: String(n) }) } });
   if (!j.ok || !isOrderId(j.id)) return { error: (j.error && j.error.description) || `http ${j.http}`, raw: j };
   return { txn: j.id };
+}
+// A UPI QR code (Razorpay → Payments → QR Codes; the account needs it turned on) for purchase id: single use, for the
+// exact price, closing by itself after QR_MIN minutes. → {txn: its id (qr_…), image: Razorpay's picture of it, closeBy} or {error}
+const QR_MIN = 30;
+async function razorpayQr({ id, rs, n, who }) {
+  const closeBy = Math.floor(Date.now() / 1000) + QR_MIN * 60;
+  const j = await razorpay('POST', 'payments/qr_codes', { type: 'upi_qr', name: 'Voter Search', usage: 'single_use', fixed_amount: true,
+    payment_amount: Math.round(Number(rs) * 100), description: `${n} searches${who ? ` · ${who}` : ''}`.slice(0, 100), close_by: closeBy,
+    notes: { purchase: String(id), searches: String(n) } });
+  if (!j.ok || !isQrId(j.id)) return { error: (j.error && j.error.description) || `http ${j.http}`, raw: j };
+  return { txn: j.id, image: j.image_url || '', closeBy: new Date(closeBy * 1000).toISOString() };
 }
 // the checkout's answer: Razorpay signs "<order id>|<payment id>" with our key secret
 function razorpaySigned(order, payment, sig) {
@@ -933,6 +963,17 @@ function razorpayHook(req, b) {
 // the order's state → 'paid' | 'open', with the amount paid in ₹. A payment only authorized (an account set to capture
 // by hand) is captured here, so the money is taken and the order counts as paid.
 async function razorpayStatus(r) {
+  if (isQrId(r.txn)) {   // a UPI QR: its payments
+    const ps = await razorpay('GET', `payments/qr_codes/${r.txn}/payments`);
+    for (const p of (ps.ok && ps.items) || []) {
+      if (p.status === 'captured') return { st: 'paid', amount: Number(p.amount) / 100 };
+      if (p.status === 'authorized') {
+        const c = await razorpay('POST', `payments/${p.id}/capture`, { amount: p.amount, currency: p.currency || 'INR' });
+        if (c.ok && c.status === 'captured') return { st: 'paid', amount: Number(c.amount) / 100 };
+      }
+    }
+    return { st: 'open' };
+  }
   if (!isOrderId(r.txn)) return { st: 'open' };
   const o = await razorpay('GET', `orders/${r.txn}`);
   if (!o.ok) return { st: 'open' };
@@ -1030,6 +1071,6 @@ async function candReach(id, slugs) {
 }
 
 module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
+  FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

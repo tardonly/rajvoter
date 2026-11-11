@@ -243,6 +243,16 @@ with the ₹ received. An open one can be checked with Razorpay again, or closed
 payment never came. Village admins don't see purchases. Requests left open from before (WhatsApp requests to admins,
 JaduPe, Instamojo) show there too, for the superadmin to close.
 
+**💳 QR से भुगतान (selling for someone else):** a village admin's tab on the admin page (the superadmin has it too,
+without commission). The admin types a customer's mobile number — only people that admin looks after are found (the
+ones they made, or everyone in their villages with "सभी व्यक्ति") — picks a pack and taps **QR बनाएं**. The server makes
+a **Razorpay UPI QR code** (Payments → QR Codes, which must be turned on for the Razorpay account): single use, for the
+pack's exact price, closing after 30 minutes. The customer scans it in any UPI app and pays; the page checks every few
+seconds and shows **✓ भुगतान मिला**. The searches go to the customer's login, and the admin gets the **एडमिन को %** set in
+the superadmin's रेफ़रल · वॉलेट tab (default 10%) in their own **👛 वॉलेट**, shown on the same tab, where they can withdraw
+it to UPI or turn it into searches. Up to 50 QRs a day per admin. Add `qr_code.credited` to the Razorpay webhook's events
+so a payment is credited even if the admin's page was closed. The 🔔 list shows which admin made each such sale.
+
 ## Coupons (कूपन)
 
 The superadmin makes coupons in the **🎟 कूपन** box on the admin page. A coupon gives one of three things:

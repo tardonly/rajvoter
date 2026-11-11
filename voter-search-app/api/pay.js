@@ -14,7 +14,8 @@
 //     (n + bonus, a coupon's free ones); left / bought: what the person now has.
 //   POST {action: 'start', token, village, ward} → the same, for ₹WARD_RS: all of that ward's slips (wardStart below;
 //     {paid: true} when this login already has them, or doesn't pay); its 'check' answers {status, kind: 'ward', ward}.
-//   POST <Razorpay's webhook: {event: 'order.paid' | 'payment.captured' | 'payment.authorized', payload: …}> → {ok}
+//   POST <Razorpay's webhook: {event: 'order.paid' | 'payment.captured' | 'payment.authorized' | 'qr_code.credited', payload: …}> → {ok}
+//     (qr_code.credited: a UPI QR a village admin made for someone, api/_routes/admin.js "agent_start")
 //     optional (the page's own check is enough, and so is the admin page): in Razorpay's dashboard → Webhooks, add
 //     https://<site>/api/pay with those events. It credits a person whose page closed before the check.
 //   Signed with RZP_WB_SECRET (razorpayHook in _lib.js); other events are answered and ignored. Webhooks only name the
@@ -27,7 +28,7 @@
 //   POST {action: 'wallet_searches', token, village, rs} → {wallet, got, left | bought}   ₹rs of it → rs searches
 //   POST {action: 'wallet_upi', token, village, rs, upi} → {wallet, wd}   ₹rs of it to that UPI ID (from ₹WALLET_MIN,
 //     one open withdrawal at a time, 3 a day); errors: wallet_min, wallet_low, bad_upi, wd_open, too_many, no_wallet
-const { refFor, refBuyer, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+const { refFor, refBuyer, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isTxnId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, b) => {
   if (!b.action && typeof b.event === 'string') {   // Razorpay's webhook
@@ -38,9 +39,10 @@ module.exports = route(async (req, res, b) => {
       if (w && w.payout === p.id) await wdSettle(w);
       return send(res, 200, { ok: true });
     }
-    if (!['order.paid', 'payment.captured', 'payment.authorized'].includes(b.event)) return send(res, 200, { ok: true });   // refunds, failures, links…: nothing to do
-    const pl = b.payload || {}, order = (pl.order && pl.order.entity && pl.order.entity.id) || (pl.payment && pl.payment.entity && pl.payment.entity.order_id);
-    const rid = isOrderId(order) ? await redis('GET', `rzp:${order}`) : null;
+    if (!['order.paid', 'payment.captured', 'payment.authorized', 'qr_code.credited'].includes(b.event)) return send(res, 200, { ok: true });   // refunds, failures, links…: nothing to do
+    const pl = b.payload || {}, order = (pl.qr_code && pl.qr_code.entity && pl.qr_code.entity.id) || (pl.order && pl.order.entity && pl.order.entity.id)
+      || (pl.payment && pl.payment.entity && pl.payment.entity.order_id);
+    const rid = isTxnId(order) ? await redis('GET', `rzp:${order}`) : null;
     if (rid) await settleOnline(rid);
     return send(res, 200, { ok: true });
   }
