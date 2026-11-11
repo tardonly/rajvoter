@@ -738,7 +738,10 @@ async function addPaid(u, n, r, by) {
 // admins don't pay (wardFree).
 const WARD_RS = 100;
 const wardKey = (uid, slug) => `wardpaid:${uid}:${slug}`;
-const wardFree = (u) => !!u && (u.role === 'super' || u.role === 'admin');
+// WARD_PAY: whether people pay for wards at all. Off for now (every ward's slips free for everyone, as for admins);
+// set WARD_PAY=1 in Vercel to charge ₹WARD_RS again (wards already paid for stay paid either way).
+const WARD_PAY = process.env.WARD_PAY === '1';
+const wardFree = (u) => !!u && (!WARD_PAY || u.role === 'super' || u.role === 'admin');
 const wardsPaid = async (u, slug) => (wardFree(u) || !u ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
