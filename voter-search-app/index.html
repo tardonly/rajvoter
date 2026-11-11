@@ -124,10 +124,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   a.buyback { text-decoration: none; text-align: center; }
   .savepw { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }   /* for the phone's password manager */
   .buypw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; font-weight: 700; user-select: all; word-break: break-all; }
-  #leftBadge { display: inline-block; border-radius: 8px; padding: 5px 10px; margin: 6px 6px 0 0; font-size: 13px;
-    background: #e0f2fe; color: #075985; }
-  #leftBadge.low { background: #fef3c7; color: #92400e; }
-  #leftBadge.none { background: #fee2e2; color: #991b1b; }
   #walletBtn { border: 1px solid #86efac; border-radius: 8px; padding: 5px 10px; margin: 6px 0 0 6px; font-size: 13px; background: #f0fdf4; color: #15803d; font-weight: 700; cursor: pointer; }
   .wallet .bal { text-align: center; font-size: 36px; font-weight: 800; color: #15803d; line-height: 1.1; margin-top: 4px; }
   .wallet .balsub { text-align: center; font-size: 13px; color: var(--muted); }
@@ -685,7 +681,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
     <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button>
-      <b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को रेफ़र करें</button></span></div>
+      <button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को रेफ़र करें</button></span></div>
   </header>
   <main>
     <button id="posterCard" class="hidden" type="button"></button>
@@ -2174,18 +2170,12 @@ const CPN_MSG = {
   cpn_min: (r) => L(`⚠ यह कूपन ${r.minN} या ज़्यादा सर्च के पैक पर है`, `⚠ This coupon is for packs of ${r.minN} or more searches`),
   cpn_max: (r) => L(`⚠ यह कूपन ${r.maxN} तक सर्च के पैक पर है`, `⚠ This coupon is for packs of up to ${r.maxN} searches`),
 };
-// a signed-up login: how many searches are left (amber at 3 or fewer, red at none) and the button for more
+// a signed-up login: the buttons for more searches, the wallet and referring friends
 function buyMoreButton() {
-  const show = PREPAID && !DEMO && searchesLeft != null, b = $('leftBadge');
   $('buyMore').classList.toggle('hidden', !CAN_BUY || DEMO);
   $('invite').classList.toggle('hidden', !MY_REF || DEMO);
   $('walletBtn').classList.toggle('hidden', WALLET == null || DEMO);
   if (WALLET != null) $('walletBtn').textContent = WALLET ? L(`💰 वॉलेट ₹${WALLET} · कैश करें ›`, `💰 Wallet ₹${WALLET} · Cash out ›`) : L('💰 वॉलेट ₹0', '💰 Wallet ₹0');
-  b.classList.toggle('hidden', !show);
-  if (!show) return;
-  b.textContent = L(`🔍 ${searchesLeft} सर्च बाकी`, `🔍 ${searchesLeft} searches left`);
-  b.classList.toggle('low', searchesLeft > 0 && searchesLeft <= 3);
-  b.classList.toggle('none', searchesLeft === 0);
 }
 // search packs: [searches, ₹], as PACKS in api/_lib.js
 const PACKS = [[100, 50], [200, 100], [500, 200], [800, 325], [1000, 400]];
