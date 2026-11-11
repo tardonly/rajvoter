@@ -250,8 +250,7 @@ let upstashSrc = null;
 const upstashForCopy = () => upstashSrc || (upstashSrc = UPSTASH_TCP ? tcpDb(UPSTASH_TCP, 'REDIS_URL (Upstash)') : KV_URL && KV_TOKEN && MAIN_DB !== USER_DB ? restDb(KV_URL, KV_TOKEN) : null);
 const COPY_DONE = MONGO_DB ? 'mongocopied' : 'usermoved';   // when the copy finished; 'mongocopied' is not a USER_KEYS key
 const canMoveUserData = () => (MONGO_DB ? !!upstashForCopy() : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
-async function copyToMongo(cursor) {
-  const src = upstashForCopy();
+async function copyToMongo(cursor, src = upstashForCopy()) {   // src: another way to reach Upstash (app-build/copy-to-mongo.cjs)
   const [next, found] = await src.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
   const keys = USER_DB || process.env.COPY_SKIP_USER_KEYS ? found.filter((k) => !USER_KEYS.test(k.slice(KEY_PREFIX.length))) : found;
   if (!keys.length) return { next: String(next), keys: 0 };
@@ -262,8 +261,8 @@ async function copyToMongo(cursor) {
   await MONGO_DB.importKeys(keys.map((key, i) => ({ key, type: types[i], value: vals[i], ttl: Number(ttls[i]) })));
   return { next: String(next), keys: keys.length };
 }
-async function moveUserData(cursor) {
-  if (MONGO_DB) return copyToMongo(cursor);
+async function moveUserData(cursor, src) {
+  if (MONGO_DB) return copyToMongo(cursor, src || undefined);
   const [next, found] = await MAIN_DB.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
   const keys = found.filter((k) => USER_KEYS.test(k.slice(KEY_PREFIX.length)));
   if (!keys.length) return { next: String(next), keys: 0 };
