@@ -511,7 +511,7 @@ async function takeFree(slug, rule, want) {
   if (got < want) await redis('HINCRBY', 'freegiven', slug, got - want);
   return got;
 }
-// Referrals (रेफ़रल): a user's invite link is <site>/<village>?ref=<their id> (the app's 🎁 दोस्तों को बुलाएं button). A new
+// Referrals (रेफ़रल): a user's invite link is <site>/<village>?ref=<their id> (the app's 🎁 दोस्तों को रेफ़र करें button). A new
 // number that signs up through it gets `joiner` extra searches (not a number that signed up before), and the login
 // keeps refBy / refByName. Every time that person pays (addPaid, wardDone), the inviter gets `pct`% of what they paid as
 // ₹ cashback in their wallet (walletAdd below), and on every `bonusAt`-th friend who buys (the 5th, 10th…) `bonus` ₹ more

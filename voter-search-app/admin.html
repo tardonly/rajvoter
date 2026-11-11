@@ -854,12 +854,12 @@ function showRefRule(rule) {
   $('refCard').classList.toggle('hidden', !rule);
   $('tabRef').classList.toggle('hidden', !rule);
   if (!rule) return;
-  $('refTitle').textContent = L('रेफ़रल (दोस्तों को बुलाएं)', 'Referrals (invite friends)');
+  $('refTitle').textContent = L('रेफ़रल (दोस्तों को रेफ़र करें)', 'Referrals (invite friends)');
   const bon = rule.bonusAt && rule.bonus;
-  $('refNow').textContent = rule.on ? L(`चालू · बुलाने वाले को हर ख़रीद पर ${rule.pct}% कैशबैक${bon ? `, हर ${rule.bonusAt}वें दोस्त पर ₹${rule.bonus} बोनस` : ''}, दोस्त को ${rule.joiner} सर्च`,
+  $('refNow').textContent = rule.on ? L(`चालू · रेफ़र करने वाले को हर ख़रीद पर ${rule.pct}% कैशबैक${bon ? `, हर ${rule.bonusAt}वें दोस्त पर ₹${rule.bonus} बोनस` : ''}, दोस्त को ${rule.joiner} सर्च`,
     `on · inviter ${rule.pct}% cashback on every purchase${bon ? `, ₹${rule.bonus} bonus every ${rule.bonusAt}th friend` : ''}, friend ${rule.joiner} searches`) : L('बंद', 'off');
-  $('refOnText').textContent = L('चालू — ऐप में 🎁 दोस्तों को बुलाएं बटन दिखेगा', 'On — the app shows the 🎁 Invite friends button');
-  $('refInvText').textContent = L('बुलाने वाले को % कैशबैक, वॉलेट में (दोस्त की हर ख़रीद पर)', 'Cashback % for the inviter, into their wallet (on every purchase of the friend)');
+  $('refOnText').textContent = L('चालू — ऐप में 🎁 दोस्तों को रेफ़र करें बटन दिखेगा', 'On — the app shows the 🎁 Refer friends button');
+  $('refInvText').textContent = L('रेफ़र करने वाले को % कैशबैक, वॉलेट में (दोस्त की हर ख़रीद पर)', 'Cashback % for the inviter, into their wallet (on every purchase of the friend)');
   $('refAtText').textContent = L('हर इतने दोस्तों पर बोनस (जो ख़रीदें; 0 = बंद)', 'Bonus every this many friends (who buy; 0 = off)');
   $('refBonusText').textContent = L('बोनस ₹ (वॉलेट में)', 'Bonus ₹ (into the wallet)');
   $('refAgentText').textContent = L('एडमिन को % (उनके QR से हुई हर बिक्री पर, वॉलेट में)', 'Admin % (on every sale by their QR, into their wallet)');
@@ -2065,7 +2065,7 @@ function person(u) {
   const invited = users.filter((x) => x.refBy === u.id), invBought = invited.filter((x) => x.refPaid).length;
   const refLine = u.refByName || invited.length || u.refEarned || u.refCash || u.wallet ? el('div', 'info', [
     u.refByName && L(`🎁 ${u.refByName} के लिंक से जुड़े`, `🎁 Joined through ${u.refByName}'s link`),
-    (invited.length || u.refEarned || u.refCash) && L(`इनके बुलाए: ${invited.length} लोग · ${u.refBought || invBought} ने सर्च खरीदीं · इनाम${u.refCash ? ` ₹${u.refCash} कैशबैक` : ''}${u.refBonus ? ` (₹${u.refBonus} बोनस सहित)` : ''}${u.refEarned ? ` ${u.refEarned} सर्च` : ''}`,
+    (invited.length || u.refEarned || u.refCash) && L(`इनके रेफ़र किए: ${invited.length} लोग · ${u.refBought || invBought} ने सर्च खरीदीं · इनाम${u.refCash ? ` ₹${u.refCash} कैशबैक` : ''}${u.refBonus ? ` (₹${u.refBonus} बोनस सहित)` : ''}${u.refEarned ? ` ${u.refEarned} सर्च` : ''}`,
       `Invited ${invited.length} · ${u.refBought || invBought} bought searches · reward${u.refCash ? ` ₹${u.refCash} cashback` : ''}${u.refBonus ? ` (incl. ₹${u.refBonus} bonus)` : ''}${u.refEarned ? ` ${u.refEarned} searches` : ''}`),
     (u.wallet || u.walletOut) && L(`💰 वॉलेट ₹${u.wallet}${u.walletOut ? ` · ₹${u.walletOut} UPI में निकाले` : ''}`, `💰 Wallet ₹${u.wallet}${u.walletOut ? ` · ₹${u.walletOut} taken out by UPI` : ''}`),
   ].filter(Boolean).join(' · ')) : null;

@@ -445,7 +445,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     #listBody .lempty { grid-column: 1 / -1; }
   }
 
-  /* पर्ची सेटिंग: the login's own posters, one over every printed slip and one over the PDF's first page */
+  /* पर्ची सेटिंग: the login's own posters, one over every printed slip and one over every page of the PDF */
   .posterpop .ph { font-size: 15px; font-weight: 700; margin: 14px 0 6px; }
   .posterpop .ph small { font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
   .pslot { position: relative; border: 2px dashed #93c5fd; border-radius: 12px; background: #f0f7ff; overflow: hidden; }
@@ -479,24 +479,28 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .slip .pcut b { font-size: 18px; line-height: 1; }
   .pbig { border-radius: 6px; }
 
-  /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page */
-  #printArea { display: none; }
+  /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page.
+     The sizes sit outside @media print so printSlips() can lay the slips out off screen (#printArea.measure) and
+     cut them into A4 pages itself: a ward's or family's PDF then has the big poster at the top of every page. */
+  #printArea { display: none; font-size: 0; }
+  #printArea.measure { display: block; position: absolute; left: -10000px; top: 0; width: 194mm; visibility: hidden; }
+  #printArea .ppage:not(:last-child) { break-after: page; page-break-after: always; }
+  #printArea .slip { display: inline-block; vertical-align: top; width: 94mm; margin: 0 2mm 2mm 0; font-size: 13px;
+    break-inside: avoid; page-break-inside: avoid; }
+  #printArea .slip .epic { font-size: 19px; }
+  #printArea .slip .line b { font-size: 15px; }
+  #printArea .slip .kendra { font-size: 11px; }
+  #printArea .slip .time { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #printArea .pbig { width: 190mm; max-height: 134mm; object-fit: contain; margin: 0 0 3mm; border-radius: 0; break-after: avoid; }
+  #printArea .slip .ptop { max-height: 52mm; object-fit: contain; }
+  #printArea .slip .pcut { font-size: 8.5pt; padding: 1.5mm 2mm; }
+  #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
+  #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @media print {
     @page { size: A4; margin: 8mm; }
     html, body { background: #fff; }
     body > section, .footer, .fabinstall, .topelec { display: none !important; }
-    #printArea { display: block; font-size: 0; }
-    #printArea .slip { display: inline-block; vertical-align: top; width: 94mm; margin: 0 2mm 2mm 0; font-size: 13px;
-      break-inside: avoid; page-break-inside: avoid; }
-    #printArea .slip .epic { font-size: 19px; }
-    #printArea .slip .line b { font-size: 15px; }
-    #printArea .slip .kendra { font-size: 11px; }
-    #printArea .slip .time { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    #printArea .pbig { width: 190mm; max-height: 135mm; object-fit: contain; margin: 0 0 3mm; border-radius: 0; break-after: avoid; }
-    #printArea .slip .ptop { max-height: 40mm; object-fit: contain; }
-    #printArea .slip .pcut { font-size: 8.5pt; padding: 1.5mm 2mm; }
-    #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
-    #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #printArea { display: block; }
   }
 </style>
 </head>
@@ -680,7 +684,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
     <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button>
-      <b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button></span></div>
+      <b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को रेफ़र करें</button></span></div>
   </header>
   <main>
     <button id="posterCard" class="hidden" type="button"></button>
@@ -1601,19 +1605,61 @@ async function printSlips(rows, title) {
   await posterLoad();
   const area = $('printArea'); area.innerHTML = '';
   const frag = document.createDocumentFragment();
-  if (POSTER.big && rows.length > 1) frag.append(posterImg(POSTER.big, 'pbig'));   // a ward's or a family's PDF
   for (const r of rows) frag.append(slip(r, true));
   area.append(frag);
-  // the pictures must be ready before the print screen takes its copy of the page
+  // the pictures must be ready before the slips are measured and the print screen takes its copy of the page
   await Promise.all([...area.querySelectorAll('img')].map((i) => (i.decode ? i.decode().catch(() => null) : null)));
+  if (POSTER.big && rows.length > 1) await posterPages(area);   // a ward's or a family's PDF: the poster on every page
   const old = document.title;
   document.title = title;                 // becomes the suggested PDF file name
   window.addEventListener('afterprint', () => { document.title = old; area.innerHTML = ''; }, { once: true });
   window.print();
 }
+// cut the slips into A4 pages with the big poster at the top of each: lay them out off screen at print size, take
+// them a line (two slips side by side) at a time, and start a new page when the next line would not fit under the poster
+async function posterPages(area) {
+  const big = posterImg(POSTER.big, 'pbig');
+  area.classList.add('measure');
+  area.prepend(big);
+  if (big.decode) await big.decode().catch(() => null);
+  const mm = 96 / 25.4;
+  const room = (297 - 16 - 5) * mm;   // A4 less the 8 mm margins and a little slack for the phone's own rounding
+  const top = big.getBoundingClientRect().height + 3 * mm;
+  const lines = [];
+  for (const d of area.querySelectorAll('.slip')) {
+    const r = d.getBoundingClientRect(), last = lines[lines.length - 1];
+    if (last && Math.abs(last.y - r.top) < 1) { last.slips.push(d); last.h = Math.max(last.h, r.height); }
+    else lines.push({ y: r.top, h: r.height, slips: [d] });
+  }
+  area.classList.remove('measure');
+  big.remove();
+  const pages = [];
+  let page = null, used = 0;
+  for (const l of lines) {
+    const h = l.h + 2 * mm;
+    if (!page || (used + h > room - top && page.childElementCount > 1)) {
+      page = el('div', 'ppage'); page.append(pages.length ? big.cloneNode() : big); pages.push(page); used = 0;
+    }
+    page.append(...l.slips); used += h;
+  }
+  area.replaceChildren(...pages);
+  await Promise.all([...area.querySelectorAll('.pbig')].map((i) => (i.decode ? i.decode().catch(() => null) : null)));
+}
+
 // ---------- पर्ची सेटिंग: this login's posters (api/_routes/poster.js), kept on the server so they follow the login ----------
-// top: a banner over every printed slip; big: one poster over the first page of a ward's or family's PDF
+// top: a banner over every printed slip; big: a poster over every page of a ward's or family's PDF
 let POSTER = { top: '', big: '' }, posterFor = null, posterAsk = null;
+// the most each poster may take on paper, in mm: the PDF poster no more than an A5 sheet laid sideways (the 190 mm page
+// width by 134 mm, so 10 : 7), the slip poster no more than the slip itself (94 × 52 mm); a taller picture is turned away
+const POSTER_MAX = { big: { w: 190, h: 134, px: 1600 }, top: { w: 94, h: 52, px: 1200 } };
+const posterSizeTip = (slot) => {
+  const m = POSTER_MAX[slot], cm = (v) => String(v / 10), hpx = Math.round(m.px * m.h / m.w);
+  return slot === 'big'
+    ? L(`पेज पर ${cm(m.w)} × ${cm(m.h)} सेमी तक (A5 से बड़ा नहीं) · फोटो जैसे ${m.px} × ${hpx} px या ज़्यादा चौड़ी`,
+      `Up to ${cm(m.w)} × ${cm(m.h)} cm on the page (no bigger than A5) · a picture like ${m.px} × ${hpx} px or wider`)
+    : L(`पर्ची जितना: ${cm(m.w)} × ${cm(m.h)} सेमी तक · फोटो जैसे ${m.px} × ${hpx} px या ज़्यादा चौड़ी`,
+      `As big as the slip: up to ${cm(m.w)} × ${cm(m.h)} cm · a picture like ${m.px} × ${hpx} px or wider`);
+};
 const posterOk = () => !DEMO && (can('print') || can('wardPdf'));
 function posterImg(src, cls) { const i = el('img', cls); i.src = src; i.alt = ''; return i; }
 // an example poster (poster-sample-*.jpg, a made-up candidate), shown faded where this login has none yet, so people
@@ -1649,11 +1695,12 @@ function posterLoad() {   // once per login; a failed load is tried again next t
   return posterAsk;
 }
 // a picture from the phone, shrunk to a JPEG of at most `w` pixels across (and 2000 down) and ~300 KB
-function posterShrink(file, w) {
+function posterShrink(file, w, maxRatio) {
   return new Promise((ok, bad) => {
     const url = URL.createObjectURL(file), img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
+      if (img.naturalHeight / img.naturalWidth > maxRatio * 1.03) return bad(new Error('tall'));   // 3% leeway for a rough crop
       let width = Math.min(w, img.naturalWidth), height = Math.round(img.naturalHeight * width / img.naturalWidth);
       if (height > 2000) { width = Math.round(width * 2000 / height); height = 2000; }
       const c = document.createElement('canvas');
@@ -1702,11 +1749,11 @@ function posterDraw() {
       btns.append(del);
     }
     box.append(btns);
-    body.append(h, box);
+    body.append(h, box, el('div', 'pk psize', `📐 ${posterSizeTip(slot)}`));
     if (!POSTER[slot]) body.append(el('div', 'pk', L('ऊपर नमूना है — उम्मीदवार की फोटो, नाम और चुनाव चिन्ह वाली चौड़ी फोटो लगाएँ', 'Above is a sample — use a wide picture with the candidate\'s photo, name and symbol')));
   };
   slotBox('top', L('हर पर्ची के ऊपर पोस्टर', 'Poster over every slip'), L('पतली, चौड़ी फोटो', 'a thin, wide picture'));
-  slotBox('big', L('PDF के सबसे ऊपर बड़ा पोस्टर', 'Big poster at the top of the PDF'), L('वार्ड / परिवार की PDF में', 'in a ward\'s or family\'s PDF'));
+  slotBox('big', L('PDF के हर पेज पर ऊपर बड़ा पोस्टर', 'Big poster at the top of every PDF page'), L('वार्ड / परिवार की PDF में', 'in a ward\'s or family\'s PDF'));
   // a made-up voter, printed as the real slips will be
   body.append(el('div', 'ph', L('पर्ची ऐसी दिखेगी', 'The slip will look like this')));
   const prev = el('div'); prev.id = 'posterPrev';
@@ -1724,8 +1771,16 @@ $('posterFile').addEventListener('change', async () => {
   const box = document.querySelector(`.pslot[data-slot=${slot}]`);
   if (box) box.classList.add('busy');
   let img;
-  try { img = await posterShrink(f, slot === 'big' ? 1600 : 1200); }
-  catch (e) { if (box) box.classList.remove('busy'); $('posterNote').textContent = L('यह फोटो नहीं खुल रही — दूसरी चुनें', 'This picture would not open — pick another'); return; }
+  const m = POSTER_MAX[slot];
+  try { img = await posterShrink(f, m.px, m.h / m.w); }
+  catch (e) {
+    if (box) box.classList.remove('busy');
+    $('posterNote').textContent = e.message === 'tall'
+      ? (slot === 'big' ? L(`यह फोटो A5 से बड़ी पड़ेगी — ${posterSizeTip(slot)}`, `This picture would be bigger than A5 — ${posterSizeTip(slot)}`)
+        : L(`यह फोटो पर्ची से बड़ी पड़ेगी — ${posterSizeTip(slot)}`, `This picture would be bigger than the slip — ${posterSizeTip(slot)}`))
+      : L('यह फोटो नहीं खुल रही — दूसरी चुनें', 'This picture would not open — pick another');
+    return;
+  }
   posterSave(slot, img);
 });
 function posterClose() { $('posterPop').classList.add('hidden'); }
@@ -2331,12 +2386,12 @@ const refBonusOn = () => !!(MY_REF && MY_REF.bonusAt && MY_REF.bonus);
 const refBonusText = () => L(`हर ${MY_REF.bonusAt}वें दोस्त पर ₹${MY_REF.bonus} एक्स्ट्रा`, `₹${MY_REF.bonus} extra on every ${MY_REF.bonusAt}th friend`);
 // friends still to bring for the next bonus (count: friends who have bought)
 const refToBonus = () => MY_REF.bonusAt - ((MY_REF.count || 0) % MY_REF.bonusAt);
-// the invite banner: 🤑 दोस्त जोड़ो, पैसे कमाओ — tapping it sends the invite link (the 🎁 button's)
+// the invite banner: 🤑 दोस्तों को रेफ़र करें, पैसे कमाओ — tapping it sends the invite link (the 🎁 button's)
 function refBanner() {
   const b = el('div', 'cpnbanner refbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0;
   const pct = MY_REF.pct, bon = refBonusOn();
-  b.append(el('span', null, L(`🤑 दोस्त जोड़ो, पैसे कमाओ! दोस्त की हर ख़रीद पर ${pct}% कैशबैक सीधे आपके वॉलेट में${bon ? ` + ${refBonusText()} 🎉` : ''} — UPI में निकालें या सर्च लें`,
-    `🤑 Bring friends, earn cash! ${pct}% cashback on every purchase your friends make, straight to your wallet${bon ? ` + ${refBonusText()} 🎉` : ''} — take it to UPI or as searches`)),
+  b.append(el('span', null, L(`🤑 दोस्तों को रेफ़र करें, पैसे कमाओ! दोस्त की हर ख़रीद पर ${pct}% कैशबैक सीधे आपके वॉलेट में${bon ? ` + ${refBonusText()} 🎉` : ''} — UPI में निकालें या सर्च लें`,
+    `🤑 Refer friends, earn cash! ${pct}% cashback on every purchase your friends make, straight to your wallet${bon ? ` + ${refBonusText()} 🎉` : ''} — take it to UPI or as searches`)),
     el('b', null, L('WhatsApp पर भेजें ›', 'Send on WhatsApp ›')));
   const go = () => $('invite').click();
   b.addEventListener('click', go);
@@ -2360,12 +2415,12 @@ async function cpnBanners() {
   box.scrollLeft = 0;
   box.classList.remove('hidden');
 }
-// 🎁 दोस्तों को बुलाएं: this login's invite link on WhatsApp; the inviter gets ₹ cashback in their wallet when the friend first buys
+// 🎁 दोस्तों को रेफ़र करें: this login's invite link on WhatsApp; the inviter gets ₹ cashback in their wallet when the friend first buys
 $('invite').addEventListener('click', () => {
   if (!MY_REF) return;
   const pct = MY_REF.pct, gets = MY_REF.joiner, bon = refBonusOn();
-  if (!confirm(L(`🤑 दोस्त जोड़ो, पैसे कमाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} वो जब भी सर्च ख़रीदे, ${pct}% कैशबैक आपके वॉलेट में! 💰${bon ? `\n🎉 ${refBonusText()} — बस ${refToBonus()} दोस्त और!` : ''}\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतनी ज़्यादा कमाई।`,
-    `🤑 Bring friends, earn cash!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} every time they buy, ${pct}% comes to your wallet as cashback! 💰${bon ? `\n🎉 ${refBonusText()} — just ${refToBonus()} more friends!` : ''}\nTake the wallet money to UPI or turn it into searches. The more friends, the more you earn.`))) return;
+  if (!confirm(L(`🤑 दोस्तों को रेफ़र करें, पैसे कमाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} वो जब भी सर्च ख़रीदे, ${pct}% कैशबैक आपके वॉलेट में! 💰${bon ? `\n🎉 ${refBonusText()} — बस ${refToBonus()} दोस्त और!` : ''}\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतनी ज़्यादा कमाई।`,
+    `🤑 Refer friends, earn cash!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} every time they buy, ${pct}% comes to your wallet as cashback! 💰${bon ? `\n🎉 ${refBonusText()} — just ${refToBonus()} more friends!` : ''}\nTake the wallet money to UPI or turn it into searches. The more friends, the more you earn.`))) return;
   const link = `${location.origin}/${SLUG}?ref=${MY_REF.code}`;
   const text = L(`🗳️ ${VILLAGE ? VILLAGE.name : ''} की पूरी वोटर लिस्ट अब फ़ोन पर! नाम लिखते ही पर्ची, परिवार और बूथ — सेकंडों में।${gets ? `\n🎁 मेरे लिंक से जुड़ें और पाएं ${gets} सर्च बोनस:` : '\n👉 मेरे लिंक से जुड़ें:'}\n${link}`,
     `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
@@ -2393,7 +2448,7 @@ async function walletOpen(note = '') {
   if (r.error) { box.replaceChildren(el('div', 'msg', walletErr(r))); return; }
   WALLET = r.wallet; buyMoreButton();
   if (r.ref !== undefined) MY_REF = r.ref;
-  box.replaceChildren(el('div', 'bal', `₹${WALLET}`), el('div', 'balsub', L('दोस्तों को बुलाने का कैशबैक', 'Cashback from inviting friends')));
+  box.replaceChildren(el('div', 'bal', `₹${WALLET}`), el('div', 'balsub', L('दोस्तों को रेफ़र करने का कैशबैक', 'Cashback from inviting friends')));
   if (note) { const m = el('div', 'msg ok', note); m.style.textAlign = 'center'; box.append(m); }
   // ₹ → searches
   const o1 = el('div', 'opt'), n1 = el('input', 'amt'), go1 = el('button', 'btn', L('सर्च लें', 'Get searches')), m1 = el('div', 'msg');
@@ -2421,7 +2476,7 @@ async function walletOpen(note = '') {
     el('div', 'k', r.auto ? L(`सीधे आपके UPI (PhonePe, Google Pay, Paytm…) में, कुछ मिनट में · कम से कम ₹${r.min}`, `Straight to your UPI (PhonePe, Google Pay, Paytm…) in a few minutes · at least ₹${r.min}`)
       : L(`आपके UPI (PhonePe, Google Pay, Paytm…) में 24 घंटे के अंदर · कम से कम ₹${r.min}`, `To your UPI (PhonePe, Google Pay, Paytm…) within 24 hours · at least ₹${r.min}`)));
   if (open) o2.append(el('div', 'msg ok', L(`₹${open.rs} → ${open.upi}: `, `₹${open.rs} → ${open.upi}: `) + L(...WD_ST[open.status])));
-  else if (WALLET < r.min) o2.append(el('div', 'k', L(`अभी ₹${r.min - WALLET} और चाहिए — दोस्तों को बुलाएं!`, `₹${r.min - WALLET} more needed — invite friends!`)));
+  else if (WALLET < r.min) o2.append(el('div', 'k', L(`अभी ₹${r.min - WALLET} और चाहिए — दोस्तों को रेफ़र करें!`, `₹${r.min - WALLET} more needed — refer friends!`)));
   else {
     o2.append(el('div', 'row'), m2);
     o2.querySelector('.row').append(upi, n2, go2);
@@ -2451,7 +2506,7 @@ async function walletOpen(note = '') {
     const myCode = String(MY_PHONE || '').replace(/\D/g, '').slice(-10) || MY_REF.code;
     box.append(el('div', 'balsub', L(`🤝 आपका रेफ़रल कोड: ${myCode} — कोई भी सर्च ख़रीदते समय यह डाले, तो ${MY_REF.pct}% आपके वॉलेट में`,
       `🤝 Your referral code: ${myCode} — when anyone enters it while buying searches, ${MY_REF.pct}% comes to your wallet`)));
-    const inv = el('button', 'btn more', L(`🎁 दोस्तों को बुलाएं — हर ख़रीद पर ${MY_REF.pct}% कैशबैक`, `🎁 Invite friends — ${MY_REF.pct}% cashback on every purchase`)); inv.type = 'button';
+    const inv = el('button', 'btn more', L(`🎁 दोस्तों को रेफ़र करें — हर ख़रीद पर ${MY_REF.pct}% कैशबैक`, `🎁 Refer friends — ${MY_REF.pct}% cashback on every purchase`)); inv.type = 'button';
     inv.addEventListener('click', () => { $('walletPop').classList.add('hidden'); $('invite').click(); });
     box.append(inv);
   }
@@ -2502,7 +2557,7 @@ async function lockPhone() {
   OTP_ON = !!r.otp;
   if (r.exists) return lockStepTo('pw', PW_NOTE());
   await signVillages();
-  const invited = r.refBy ? L(`${r.refBy} ने आपको बुलाया है। `, `${r.refBy} invited you. `) : '';
+  const invited = r.refBy ? L(`${r.refBy} ने आपको रेफ़र किया है। `, `${r.refBy} invited you. `) : '';
   lockStepTo('sign', invited + (r.free == null ? L(`नया नंबर — अपना नाम लिखें और गाँव चुनें: खाता तुरंत बनेगा। ${freeText(r.rule)}, उसके बाद ₹1 प्रति सर्च।`,
     `New number — type your name and choose your village: your login is made at once. ${freeText(r.rule)}; after that ₹1 per search.`)
     : r.free ? L(`नया नंबर — अपना नाम लिखें: खाता तुरंत बनेगा और ${r.free} सर्च मुफ़्त मिलेंगी। उसके बाद ₹1 प्रति सर्च।`,
