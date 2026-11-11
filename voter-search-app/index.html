@@ -279,12 +279,14 @@
     color: #9a3412; font-size: 13.5px; line-height: 1.5; }
   .demobar b { color: #7c2d12; }
   .demobar a { color: var(--accent); font-weight: 600; }
-  .demobar a.demologin { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 9px 12px;
-    border-radius: 10px; background: var(--accent); color: #fff; text-align: center; font-size: 16px; text-decoration: none; }
+  .homeacts a.demologin { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 11px 12px;
+    border-radius: 10px; background: var(--accent); color: #fff; text-align: center; font-size: 16px; font-weight: 600; text-decoration: none; }
+  .demobar a.demologin { padding: 9px 12px; }
   /* laptops: login, video and share on one line */
   @media (min-width: 900px) {
+    .homeacts:has(a.demologin) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .homeacts a.demologin { grid-column: auto; }
     .demobar .homeacts { grid-template-columns: repeat(3, max-content); max-width: none; }
-    .demobar a.demologin { grid-column: auto; }
     .demobar .homeacts button, .demobar a.demologin { padding: 8px 18px; }
   }
   #count.bad { color: var(--bad); }
@@ -636,7 +638,7 @@
     <img src="/icon-192.png" alt="">
     <h1>Voter Search</h1>
     <p id="homeMsg">अपना गाँव चुनें</p>
-    <div class="homeacts hidden" id="demoActs"><button id="demoHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
+    <div class="homeacts hidden" id="demoActs"><a class="demologin" href="/">🔑 लॉगिन / साइन-अप करें</a><button id="demoHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
     <div class="vfind hidden" id="vFind">
       <select id="vPs" aria-label="पंचायत समिति"></select>
       <input id="vSearch" type="search" placeholder="🔍 गाँव सर्च करें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -717,7 +719,7 @@ const STATIC_EN = {
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
   'डेमो देखें': 'Try the demo',
   'खाता नहीं है? बिना खाते के असली मतदाता सूची में सर्च करके देखें': 'No login? Try searching a real voter list without one',
-  '▶ 30 सेकंड में देखें ऐप का कमाल': '▶ See the app in action — 30 seconds',
+  '▶ 30 सेकंड में देखें ऐप का कमाल': '▶ See the app in action — 30 seconds', '🔑 लॉगिन / साइन-अप करें': '🔑 Log in / sign up',
   '📱 मोबाइल नंबर से साइन अप करें': '📱 Sign up with your mobile number', '🔍 फ़्री डेमो आज़माएं': '🔍 Try the free demo', '↻ फिर से देखें': '↻ Watch again',
   'पसंद आया? अभी शुरू करें': 'Liked it? Start now', '↗ शेयर करें': '↗ Share', '↗ शेयर': '↗ Share', 'शेयर करें': 'Share',
   'ऐप कैसे काम करता है': 'How the app works', 'वीडियो': 'Video', '📱 फ़ोन': '📱 Phone', '💻 लैपटॉप': '💻 Laptop', 'बंद करें': 'Close',
