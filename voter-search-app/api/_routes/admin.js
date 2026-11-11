@@ -54,7 +54,7 @@
 //   action "coupon_del", code → {ok}      superadmin
 //   action "wd_paid", id [, utr] / "wd_back", id → {wd}   superadmin: a wallet's UPI withdrawal (wdStart in _lib.js) sent
 //     by hand (with its UPI reference) / not sent, the ₹ back in the person's wallet; "settings" lists them (wds)
-//   action "ref_rule", on, inviter, joiner → {refRule}   superadmin: referral searches (refRule in _lib.js); "list" gives
+//   action "ref_rule", on, pct, joiner, bonusAt, bonus → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   the superadmin: which set of marks everyone uses from now on
 //                                         (each person may switch back for themself); a village admin: their own choice
@@ -77,7 +77,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // admin permissions from the request → only known ones
@@ -108,7 +108,7 @@ const view = (u) => ({
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
   // referrals: who invited this login, and what this login's invites earned (refRule in _lib.js)
   refBy: u.refBy || '', refByName: u.refByName || '', refPaid: u.refPaid === '1', refBought: Number(u.refBought) || 0, refEarned: Number(u.refEarned) || 0,
-  refCash: Number(u.refCash) || 0, wallet: walletOf(u), walletOut: Number(u.walletOut) || 0,   // ₹: referral cashback earned, in the wallet now, taken out by UPI
+  refCash: Number(u.refCash) || 0, refBonus: Number(u.refBonus) || 0, wallet: walletOf(u), walletOut: Number(u.walletOut) || 0,   // ₹: referral cashback earned, in the wallet now, taken out by UPI
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
   logins: Number(u.logins || 0), kicks: Number(u.kicks || 0),
@@ -151,10 +151,10 @@ module.exports = route(async (req, res, b) => {
 
   if (b.action === 'ref_rule') {   // superadmin: referrals (refRule in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
-    const n = (v) => { const x = Math.floor(Number(v)); return x >= 0 && x <= REF_MAX ? x : -1; };
-    const inviter = n(b.inviter), joiner = n(b.joiner);
-    if (inviter < 0 || joiner < 0) return send(res, 400, { error: 'ref_rule' });
-    await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'inviter', inviter, 'joiner', joiner, 'at', now, 'by', me.id);
+    const n = (v, max) => { const x = Math.floor(Number(v)); return v !== '' && v != null && x >= 0 && x <= max ? x : -1; };
+    const pct = n(b.pct, REF_PCT_MAX), joiner = n(b.joiner, REF_MAX), bonusAt = n(b.bonusAt, REF_AT_MAX), bonus = n(b.bonus, REF_MAX);
+    if (pct < 0 || joiner < 0 || bonusAt < 0 || bonus < 0) return send(res, 400, { error: 'ref_rule' });
+    await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'pct', pct, 'joiner', joiner, 'bonusAt', bonusAt, 'bonus', bonus, 'at', now, 'by', me.id);
     return send(res, 200, { refRule: await refRule() });
   }
   if (b.action === 'coupon_set') {   // superadmin: make or change a coupon (getCoupon in _lib.js)

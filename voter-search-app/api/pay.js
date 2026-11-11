@@ -24,7 +24,7 @@
 //   POST {action: 'wallet_searches', token, village, rs} → {wallet, got, left | bought}   ₹rs of it → rs searches
 //   POST {action: 'wallet_upi', token, village, rs, upi} → {wallet, wd}   ₹rs of it to that UPI ID (from ₹WALLET_MIN,
 //     one open withdrawal at a time, 3 a day); errors: wallet_min, wallet_low, bad_upi, wd_open, too_many, no_wallet
-const { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+const { refFor, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, b) => {
   if (!b.action && typeof b.event === 'string') {   // Razorpay's webhook
@@ -136,5 +136,5 @@ async function wallet(res, b, me) {
     return send(res, 200, { wallet: walletOf(await getUser(me.id)), wd: wdView(r.wd) });
   }
   const wds = await wdsOf(me.id), u = await getUser(me.id);   // after wdsOf: a failed withdrawal is back in the wallet
-  send(res, 200, { wallet: walletOf(u), min: WALLET_MIN, auto: payoutsOn(), upi: u.upi || '', wds: wds.map(wdView) });
+  send(res, 200, { wallet: walletOf(u), min: WALLET_MIN, auto: payoutsOn(), upi: u.upi || '', wds: wds.map(wdView), ref: await refFor(u) });
 }

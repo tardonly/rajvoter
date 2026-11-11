@@ -1110,7 +1110,7 @@ let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: a signed-
 // ONLINE: packs can also be paid here online through Razorpay: UPI, card, net banking, wallet (api/pay.js)
 let CAN_BUY = false, BOUGHT = null, ONLINE = false;
 let WALLET = null;   // ₹ cashback in this login's wallet (walletOf in api/_lib.js), null: no wallet
-let MY_REF = null;   // this login's invite code and reward ({code, give, joiner}; refFor in api/_lib.js), null: no invites
+let MY_REF = null;   // this login's invite code and reward ({code, pct, joiner, bonusAt, bonus, count}; refFor in api/_lib.js), null: no invites
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
   if (r.left != null) searchesLeft = r.left;
@@ -2124,12 +2124,17 @@ function cpnCard(c, go, label = L('अभी लें ›', 'Get it ›')) {
   b.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   return b;
 }
-// the invite banner: 🎁 दोस्त लाओ, ₹ कैशबैक पाओ — tapping it sends the invite link (the 🎁 button's)
+// the referral offer in words (MY_REF: refFor in api/_lib.js): "5% कैशबैक" and "हर 5वें दोस्त पर ₹100 बोनस"
+const refBonusOn = () => !!(MY_REF && MY_REF.bonusAt && MY_REF.bonus);
+const refBonusText = () => L(`हर ${MY_REF.bonusAt}वें दोस्त पर ₹${MY_REF.bonus} एक्स्ट्रा`, `₹${MY_REF.bonus} extra on every ${MY_REF.bonusAt}th friend`);
+// friends still to bring for the next bonus (count: friends who have bought)
+const refToBonus = () => MY_REF.bonusAt - ((MY_REF.count || 0) % MY_REF.bonusAt);
+// the invite banner: 🤑 दोस्त जोड़ो, पैसे कमाओ — tapping it sends the invite link (the 🎁 button's)
 function refBanner() {
   const b = el('div', 'cpnbanner refbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0;
-  const give = MY_REF ? MY_REF.give : 0;
-  b.append(el('span', null, L(`🎁 दोस्त लाओ, ₹${give} कैशबैक पाओ! हर दोस्त की पहली ख़रीद पर ₹${give} सीधे आपके वॉलेट में — UPI में निकालें या सर्च लें`,
-    `🎁 Bring friends, get ₹${give} cashback! ₹${give} into your wallet on every friend's first purchase — take it to UPI or as searches`)),
+  const pct = MY_REF.pct, bon = refBonusOn();
+  b.append(el('span', null, L(`🤑 दोस्त जोड़ो, पैसे कमाओ! दोस्त की हर ख़रीद पर ${pct}% कैशबैक सीधे आपके वॉलेट में${bon ? ` + ${refBonusText()} 🎉` : ''} — UPI में निकालें या सर्च लें`,
+    `🤑 Bring friends, earn cash! ${pct}% cashback on every purchase your friends make, straight to your wallet${bon ? ` + ${refBonusText()} 🎉` : ''} — take it to UPI or as searches`)),
     el('b', null, L('WhatsApp पर भेजें ›', 'Send on WhatsApp ›')));
   const go = () => $('invite').click();
   b.addEventListener('click', go);
@@ -2156,9 +2161,9 @@ async function cpnBanners() {
 // 🎁 दोस्तों को बुलाएं: this login's invite link on WhatsApp; the inviter gets ₹ cashback in their wallet when the friend first buys
 $('invite').addEventListener('click', () => {
   if (!MY_REF) return;
-  const give = MY_REF.give, gets = MY_REF.joiner;
-  if (!confirm(L(`🎁 दोस्त लाओ, ₹${give} कैशबैक पाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} उसकी पहली ख़रीद पर ₹${give} आपके वॉलेट में! 💰\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतना ज़्यादा कैशबैक।`,
-    `🎁 Bring friends, get ₹${give} cashback!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} ₹${give} goes into your wallet on their first buy! 💰\nTake the wallet money to UPI or turn it into searches. The more friends, the more cashback.`))) return;
+  const pct = MY_REF.pct, gets = MY_REF.joiner, bon = refBonusOn();
+  if (!confirm(L(`🤑 दोस्त जोड़ो, पैसे कमाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} वो जब भी सर्च ख़रीदे, ${pct}% कैशबैक आपके वॉलेट में! 💰${bon ? `\n🎉 ${refBonusText()} — बस ${refToBonus()} दोस्त और!` : ''}\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतनी ज़्यादा कमाई।`,
+    `🤑 Bring friends, earn cash!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} every time they buy, ${pct}% comes to your wallet as cashback! 💰${bon ? `\n🎉 ${refBonusText()} — just ${refToBonus()} more friends!` : ''}\nTake the wallet money to UPI or turn it into searches. The more friends, the more you earn.`))) return;
   const link = `${location.origin}/${SLUG}?ref=${MY_REF.code}`;
   const text = L(`🗳️ ${VILLAGE ? VILLAGE.name : ''} की पूरी मतदाता सूची अब फ़ोन पर! नाम लिखते ही पर्ची, परिवार और बूथ — सेकंडों में।${gets ? `\n🎁 मेरे लिंक से जुड़ें और पाएं ${gets} सर्च बोनस:` : '\n👉 मेरे लिंक से जुड़ें:'}\n${link}`,
     `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
@@ -2185,6 +2190,7 @@ async function walletOpen(note = '') {
   const r = await api('pay', { action: 'wallet', token: token() });
   if (r.error) { box.replaceChildren(el('div', 'msg', walletErr(r))); return; }
   WALLET = r.wallet; buyMoreButton();
+  if (r.ref !== undefined) MY_REF = r.ref;
   box.replaceChildren(el('div', 'bal', `₹${WALLET}`), el('div', 'balsub', L('दोस्तों को बुलाने का कैशबैक', 'Cashback from inviting friends')));
   if (note) { const m = el('div', 'msg ok', note); m.style.textAlign = 'center'; box.append(m); }
   // ₹ → searches
@@ -2238,7 +2244,9 @@ async function walletOpen(note = '') {
     box.append(list);
   }
   if (MY_REF) {
-    const inv = el('button', 'btn more', L(`🎁 दोस्तों को बुलाएं — हर दोस्त पर ₹${MY_REF.give}`, `🎁 Invite friends — ₹${MY_REF.give} for each`)); inv.type = 'button';
+    if (refBonusOn()) box.append(el('div', 'balsub', L(`🎉 ${MY_REF.count || 0} दोस्तों ने ख़रीदा · ₹${MY_REF.bonus} बोनस के लिए बस ${refToBonus()} दोस्त और!`,
+      `🎉 ${MY_REF.count || 0} friends have bought · just ${refToBonus()} more for the ₹${MY_REF.bonus} bonus!`)));
+    const inv = el('button', 'btn more', L(`🎁 दोस्तों को बुलाएं — हर ख़रीद पर ${MY_REF.pct}% कैशबैक`, `🎁 Invite friends — ${MY_REF.pct}% cashback on every purchase`)); inv.type = 'button';
     inv.addEventListener('click', () => { $('walletPop').classList.add('hidden'); $('invite').click(); });
     box.append(inv);
   }

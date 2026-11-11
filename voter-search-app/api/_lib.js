@@ -513,23 +513,28 @@ async function takeFree(slug, rule, want) {
 }
 // Referrals (रेफ़रल): a user's invite link is <site>/<village>?ref=<their id> (the app's 🎁 दोस्तों को बुलाएं button). A new
 // number that signs up through it gets `joiner` extra searches (not a number that signed up before), and the login
-// keeps refBy / refByName. When that person first buys searches (addPaid), the inviter gets ₹`inviter` cashback in their
-// wallet (walletAdd below), once (field refPaid on the new login; the inviter counts refBought and refCash; refEarned is
-// the searches older rewards gave). The superadmin sets it on the admin page
-// (key "refrule", api/_routes/admin.js "ref_rule"), REF until then.
-const REF = { on: true, inviter: 20, joiner: 5 };
+// keeps refBy / refByName. Every time that person pays (addPaid, wardDone), the inviter gets `pct`% of what they paid as
+// ₹ cashback in their wallet (walletAdd below), and on every `bonusAt`-th friend who buys (the 5th, 10th…) `bonus` ₹ more
+// (refReward; field refPaid on the new login marks its first purchase; the inviter counts refBought, refCash, refBonus;
+// refEarned is the searches older rewards gave). The superadmin sets it on the admin page (key "refrule",
+// api/_routes/admin.js "ref_rule"), REF until then.
+const REF = { on: true, pct: 5, joiner: 5, bonusAt: 5, bonus: 100 };
+const REF_PCT_MAX = 50, REF_AT_MAX = 100;
 const REF_MAX = 1000;
 async function refRule() {
   const h = (await redis('HGETALL', 'refrule')) || [], o = {};
   for (let i = 0; i < h.length; i += 2) o[h[i]] = h[i + 1];
   const num = (v, d) => { const n = Math.floor(Number(v)); return n >= 0 && n <= REF_MAX && v !== undefined && v !== '' ? n : d; };
-  return { on: o.on === undefined ? REF.on : o.on === '1', inviter: num(o.inviter, REF.inviter), joiner: num(o.joiner, REF.joiner) };
+  const pct = num(o.pct, REF.pct), at = num(o.bonusAt, REF.bonusAt);
+  return { on: o.on === undefined ? REF.on : o.on === '1', pct: Math.min(pct, REF_PCT_MAX), joiner: num(o.joiner, REF.joiner),
+    bonusAt: Math.min(at, REF_AT_MAX), bonus: num(o.bonus, REF.bonus) };
 }
-// what the app needs for the invite button: this login's code and what the inviter gets; null for those who can't invite
+// what the app needs for the invite button: this login's code, what the inviter gets and how many of their friends have
+// bought (count, toward the next bonus); null for those who can't invite
 async function refFor(u) {
   if (!canBuy(u) || u.role !== 'user') return null;   // admins don't invite
   const rule = await refRule();
-  return rule.on ? { code: u.id, give: rule.inviter, joiner: rule.joiner } : null;
+  return rule.on ? { code: u.id, pct: rule.pct, joiner: rule.joiner, bonusAt: rule.bonusAt, bonus: rule.bonus, count: Number(u.refBought) || 0 } : null;
 }
 // the inviter behind a ?ref= code, for a new number: an active user login with another number, or null
 async function refInviter(code, phone) {
@@ -696,7 +701,7 @@ async function addPaid(u, n, r, by) {
   const first = await redis('HSETNX', `user:${u.id}`, 'bought', '1');   // 1: this is the login's first purchase
   const cpn = asked && r.coupon && (await useCoupon(r.coupon, u.id, Number(first) === 1)) ? r.coupon : '';
   const bonus = cpn ? Number(r.bonus) || 0 : 0;
-  await refReward(u.id);
+  await refReward(u.id, rs);
   await redis('HINCRBY', `user:${u.id}`, 'credits', n + bonus);
   await redis('SREM', 'free', u.id);
   const id = r ? r.id : await newReqId();
@@ -721,21 +726,30 @@ const wardsPaid = async (u, slug) => (wardFree(u) || !u ? [] : ((await redis('SM
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
   await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
+  await refReward(u.id, rs);
   await redis('HSET', `req:${r.id}`, 'status', 'done', 'doneAt', new Date().toISOString(), 'doneN', 0, 'doneRs', rs, 'doneBy', by.id, 'doneByName', by.name);
   await redis('HINCRBY', 'pay:rs', by.id, rs);
   await redis('HINCRBY', 'pay:count', by.id, 1);
   if (by.id !== 'admin') await redis('HSET', 'pay:name', by.id, by.name);
 }
-// a login's first purchase: its inviter (refBy) gets the rule's searches, once
-async function refReward(id) {
+// login id paid ₹rs: its inviter (refBy) gets the rule's pct% of it as cashback, and on its first purchase it counts
+// toward the inviter's refBought, every bonusAt-th of which brings the bonus too (HINCRBY: two friends buying at once
+// can't both be the 5th)
+async function refReward(id, rs) {
   const refBy = await redis('HGET', `user:${id}`, 'refBy');
-  if (!refBy || !(await redis('HSETNX', `user:${id}`, 'refPaid', '1'))) return;
+  if (!refBy) return;
+  const first = Number(await redis('HSETNX', `user:${id}`, 'refPaid', '1')) === 1;
   const rule = await refRule(), inv = await getUser(refBy);
-  if (!rule.on || !rule.inviter || !inv || inv.retired === '1') return;
-  await walletAdd(inv.id, rule.inviter);
-  await redis('HINCRBY', `user:${inv.id}`, 'refCash', rule.inviter);
-  await redis('HINCRBY', `user:${inv.id}`, 'refBought', 1);
-  await redis('HSET', `user:${id}`, 'refGave', rule.inviter, 'refGaveRs', '1');
+  if (!inv || inv.retired === '1') return;
+  const count = first ? Number(await redis('HINCRBY', `user:${inv.id}`, 'refBought', 1)) : 0;
+  if (!rule.on) return;
+  const cash = rule.pct && rs > 0 ? Math.max(1, Math.round((rs * rule.pct) / 100)) : 0;
+  const extra = first && rule.bonusAt && rule.bonus && count % rule.bonusAt === 0 ? rule.bonus : 0;
+  if (!cash && !extra) return;
+  await walletAdd(inv.id, cash + extra);
+  await redis('HINCRBY', `user:${inv.id}`, 'refCash', cash + extra);
+  if (extra) await redis('HINCRBY', `user:${inv.id}`, 'refBonus', extra);
+  if (cash) await redis('HINCRBY', `user:${id}`, 'refGave', cash);
 }
 // Wallet (वॉलेट): ₹ cashback, so far only from referrals (refReward). Kept as field "wallet" on user:<id> (walletIn: all
 // ever added). The person may (api/pay.js 'wallet…'):
@@ -993,7 +1007,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };
