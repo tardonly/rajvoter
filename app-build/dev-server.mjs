@@ -19,7 +19,9 @@ const root = join(here, '..', 'voter-search-app');
 const PORT = Number(process.env.PORT || 8765);
 process.env.DATA_KEY ||= readFileSync(join(here, 'DATA_KEY.txt'), 'utf8').trim();
 process.env.ADMIN_PASSWORD ||= 'admin-test';
-process.env.KV_REST_API_URL = `http://127.0.0.1:${PORT}/__redis`;
+// DEV_UPSTASH_URL: use another dev server's store (http://127.0.0.1:<its port>/__redis) as Upstash — with MONGODB_URI set,
+// the admin page then copies that server's data into MongoDB
+process.env.KV_REST_API_URL = process.env.DEV_UPSTASH_URL || `http://127.0.0.1:${PORT}/__redis`;
 process.env.KV_REST_API_TOKEN = 'local';
 // DEV_OTP=1: sign-up asks for an OTP; the "provider" is /__otp here, and /__otp/last?mobile=<10 digits> shows the code
 if (process.env.DEV_OTP) process.env.OTP_SEND_URL = `http://127.0.0.1:${PORT}/__otp?mobile={mobile}&otp={otp}`;

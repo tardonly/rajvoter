@@ -91,6 +91,8 @@
 //                                               into USER_REDIS_URL (moveUserData in _lib.js); the admin page repeats it
 //                                               from cursor '0' until next is '0'. "list" says dbCopy: 'todo' | 'done'
 //                                               while both databases are set (key "usermoved" = when it finished)
+//                                               With MONGODB_URI: copies everything from Upstash into MongoDB instead
+//                                               (Upstash keeps its copy); "list" then also says dbTo: 'mongo'
 //   action "req_reject", rid         → {req}    superadmin: closes an open purchase without searches (status 'rejected',
 //                                               doneAt, doneByName = who closed it), e.g. a payment that never came
 // progress: [{key, slug, cand, name, candName, marks: {done, coming, absent}, wards: [{ward, total, done, coming, absent}],
@@ -101,7 +103,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { wardPayOn, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { wardPayOn, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // parties (पार्टी): hash "parties", id → JSON {name, icon, created}; icon a small PNG/JPEG data URL made by the admin page
@@ -344,7 +346,7 @@ module.exports = route(async (req, res, b) => {
     const users = shown.filter((u) => mine(u) && (!b.village || u.village === b.village)).map(withUse);
     const admins = isSuper ? shown.filter((u) => u.role === 'admin').map(withUse) : undefined;
     const dbCopy = isSuper && canMoveUserData() ? (moved ? 'done' : 'todo') : undefined;
-    return send(res, 200, { dbCopy, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins,
+    return send(res, 200, { dbCopy, dbTo: dbCopy && usesMongo ? 'mongo' : undefined, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins,
       villageList: villageList(me.villages), areaSize: areaSizes(me.villages), parties,
       cands: cands.map(({ id, name, village: v, created, party }) => ({ id, name, village: v, created, party: party || '' })) });
       // villageList: names of my villages (the list is not public)

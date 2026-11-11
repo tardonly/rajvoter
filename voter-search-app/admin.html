@@ -284,8 +284,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
 
     <!-- after USER_REDIS_URL is set: the superadmin moves the logins, requests and payments made before out of Upstash, once -->
     <div class="card hidden" id="dbCopy">
-      <b>लोगों का डेटाबेस (USER_REDIS_URL) जुड़ गया है</b>
-      <div class="sub">पहले बने यूज़र, एडमिन, उनके पासवर्ड, अनुरोध और भुगतान अभी Upstash में हैं — तब तक वे लॉगिन नहीं कर पाएंगे। एक बार नीचे दबाएं: ये सब नए डेटाबेस में चले जाएंगे और Upstash से हट जाएंगे। पर्चियों के निशान और उम्मीदवार Upstash में ही रहेंगे।</div>
+      <b id="dbCopyHead">लोगों का डेटाबेस (USER_REDIS_URL) जुड़ गया है</b>
+      <div class="sub" id="dbCopyText">पहले बने यूज़र, एडमिन, उनके पासवर्ड, अनुरोध और भुगतान अभी Upstash में हैं — तब तक वे लॉगिन नहीं कर पाएंगे। एक बार नीचे दबाएं: ये सब नए डेटाबेस में चले जाएंगे और Upstash से हट जाएंगे। पर्चियों के निशान और उम्मीदवार Upstash में ही रहेंगे।</div>
       <button class="btn" id="dbCopyBtn" type="button">लोगों का डेटा नए डेटाबेस में ले जाएं</button>
       <div class="sub" id="dbCopyMsg"></div>
     </div>
@@ -720,6 +720,12 @@ async function openPanel() {
   AREA_SIZE = r.areaSize || {};
   setup(); showMarks(r);
   $('dbCopy').classList.toggle('hidden', r.dbCopy !== 'todo');
+  if (r.dbTo === 'mongo') {   // MONGODB_URI: everything comes over from Upstash, and Upstash keeps its copy
+    $('dbCopyHead').textContent = L('MongoDB जुड़ गया है', 'MongoDB is connected');
+    $('dbCopyText').textContent = L('पुराना सारा डेटा — यूज़र, एडमिन, पासवर्ड, अनुरोध, भुगतान, पर्चियों के निशान, उम्मीदवार — अभी Upstash में है, तब तक पुराने लोग लॉगिन नहीं कर पाएंगे। एक बार नीचे दबाएं: सब MongoDB में कॉपी हो जाएगा (Upstash में भी बना रहेगा)।',
+      'All the old data — users, admins, passwords, requests, payments, slip marks, candidates — is still in Upstash, so older logins won\'t work until it is copied. Press once below: everything is copied into MongoDB (Upstash keeps its copy too).');
+    $('dbCopyBtn').textContent = L('सारा डेटा MongoDB में ले जाएं', 'Copy all data into MongoDB');
+  }
   for (const id of ['tabRef', 'tabCpn', 'tabFree']) $(id).classList.toggle('hidden', me.role !== 'super');   // filled when opened
   $('tabSell').classList.toggle('hidden', me.role !== 'super' && me.role !== 'admin');
   showTab(saved.get('adminTab') || 'people');   // after the panel shows, so the chosen tab can be scrolled into sight

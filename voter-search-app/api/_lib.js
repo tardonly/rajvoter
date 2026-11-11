@@ -14,6 +14,9 @@
 //                   https://2factor.in/API/V1/<API key>/SMS/{mobile}/{otp}/<template name>  (voice call: …/VOICE/{mobile}/{otp})
 //                   GET by default; OTP_SEND_METHOD=POST with OTP_SEND_BODY (the same placeholders, e.g. JSON) posts
 //                   instead. A reply that isn't 2xx, or says "Status": "Error" / false, counts as not sent.
+//   MONGODB_URI     MongoDB (added by Vercel's MongoDB Atlas integration; MONGODB_DB optional, else the database in
+//                   the address, else "rajelection"). When set, everything is kept there instead of Redis (mongoDb below),
+//                   and the superadmin copies what Upstash holds into it once (admin page, moveUserData below).
 //   KEY_PREFIX      optional, default "rv:": put in front of every database key, so this app can share one
 //                   database with another app (e.g. the older single-village Adsar app) without mixing data
 const crypto = require('crypto');
@@ -27,6 +30,7 @@ function findEnv(names) {
 const KV_URL = findEnv(['KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL']);
 const KV_TOKEN = findEnv(['KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN']);
 const USER_URL = process.env.USER_REDIS_URL || '';
+const MONGO_URL = findEnv(['MONGODB_URI', 'MONGO_URL', 'MONGODB_URL']);
 const KEY_PREFIX = process.env.KEY_PREFIX ?? 'rv:';
 
 // A database: call(cmd) runs one command, pipe(cmds) several in one round trip; both take whole keys (prefix included).
@@ -73,14 +77,151 @@ function tcpDb(url) {
     },
   };
 }
+// … or MongoDB (MONGODB_URI), answering the same Redis commands, so nothing else in the app changes. One document per
+// key in the collection "kv": {_id: key, s: string} | {h: {field: value}} | {m: [members]}, and exp (a Date) when the
+// key has a time limit. A TTL index removes expired documents; until it does, reads treat them as gone and a write
+// first deletes them. Hashes are changed with $setField / $getField, so any field name works (dots, a leading $).
+function mongoDb(url) {
+  let coll = null;
+  const kv = () => coll || (coll = (async () => {
+    const { MongoClient } = require('mongodb');
+    const client = new MongoClient(url, { maxPoolSize: 10, serverSelectionTimeoutMS: 8000 });
+    await client.connect();
+    let db = client.db(process.env.MONGODB_DB || undefined);
+    if (db.databaseName === 'test' && !process.env.MONGODB_DB) db = client.db('rajelection');
+    const c = db.collection('kv');
+    c.createIndex({ exp: 1 }, { expireAfterSeconds: 0 }).catch((e) => console.error('MONGODB_URI index:', e.message));
+    return c;
+  })().catch((e) => { coll = null; throw e; }));
+  const READ = new Set(['GET', 'HGET', 'HMGET', 'HGETALL', 'SMEMBERS', 'SISMEMBER', 'SCARD', 'TYPE', 'PTTL']);
+  const live = (d, now) => (d && !(d.exp && d.exp.getTime() <= now) ? d : null);
+  const has = (o, f) => !!o && Object.prototype.hasOwnProperty.call(o, f);
+  function read([cmd, , ...a], d, now) {
+    switch (cmd) {
+      case 'GET': return d && d.s !== undefined ? d.s : null;
+      case 'HGET': return d && has(d.h, a[0]) ? d.h[a[0]] : null;
+      case 'HMGET': return a.map((f) => (d && has(d.h, f) ? d.h[f] : null));
+      case 'HGETALL': return d && d.h ? Object.entries(d.h).flat() : [];
+      case 'SMEMBERS': return (d && d.m) || [];
+      case 'SISMEMBER': return d && d.m && d.m.includes(a[0]) ? 1 : 0;
+      case 'SCARD': return (d && d.m && d.m.length) || 0;
+      case 'TYPE': return !d ? 'none' : d.h ? 'hash' : d.m ? 'set' : 'string';
+      case 'PTTL': return !d ? -2 : d.exp ? d.exp.getTime() - now : -1;
+    }
+  }
+  const H = { $ifNull: ['$h', {}] };
+  const getF = (f) => ({ $getField: { field: { $literal: f }, input: H } });
+  const num = (x) => ({ $toLong: { $ifNull: [x, '0'] } });
+  const upBefore = { upsert: true, returnDocument: 'before' }, upAfter = { upsert: true, returnDocument: 'after' };
+  async function write(c, [cmd, k, ...a], now) {
+    const id = { _id: k };
+    switch (cmd) {
+      case 'SET': {   // SET key value [EX seconds | PX ms] [NX]
+        const opt = a.slice(1).map((x) => x.toUpperCase()), doc = { s: a[0] };
+        const ex = opt.indexOf('EX'), px = opt.indexOf('PX');
+        if (ex >= 0) doc.exp = new Date(now + Number(a[ex + 2]) * 1000);
+        if (px >= 0) doc.exp = new Date(now + Number(a[px + 2]));
+        if (opt.includes('NX')) {
+          try { await c.insertOne({ _id: k, ...doc }); return 'OK'; } catch (e) { if (e.code === 11000) return null; throw e; }
+        }
+        await c.replaceOne(id, doc, { upsert: true });
+        return 'OK';
+      }
+      case 'INCR': case 'DECR': {
+        const d = await c.findOneAndUpdate(id, [{ $set: { s: { $toString: { $add: [num('$s'), cmd === 'INCR' ? 1 : -1] } } } }], upAfter);
+        return Number(d.s);
+      }
+      case 'EXPIRE': case 'PEXPIRE':
+        return (await c.updateOne(id, { $set: { exp: new Date(now + Number(a[0]) * (cmd === 'EXPIRE' ? 1000 : 1)) } })).matchedCount;
+      case 'DEL': return (await c.deleteOne(id)).deletedCount;
+      case 'HSET': {
+        let h = H;
+        for (let i = 0; i < a.length; i += 2) h = { $setField: { field: { $literal: a[i] }, input: h, value: { $literal: a[i + 1] } } };
+        const d = await c.findOneAndUpdate(id, [{ $set: { h } }], upBefore);
+        return a.filter((f, i) => i % 2 === 0 && !has(d && d.h, f)).length;
+      }
+      case 'HSETNX': {
+        const h = { $setField: { field: { $literal: a[0] }, input: H, value: { $ifNull: [getF(a[0]), { $literal: a[1] }] } } };
+        const d = await c.findOneAndUpdate(id, [{ $set: { h } }], upBefore);
+        return has(d && d.h, a[0]) ? 0 : 1;
+      }
+      case 'HDEL': {
+        let h = H;
+        for (const f of a) h = { $unsetField: { field: { $literal: f }, input: h } };
+        const d = await c.findOneAndUpdate(id, [{ $set: { h } }], { returnDocument: 'before' });
+        return a.filter((f) => has(d && d.h, f)).length;
+      }
+      case 'HINCRBY': {
+        const h = { $setField: { field: { $literal: a[0] }, input: H, value: { $toString: { $add: [num(getF(a[0])), Number(a[1])] } } } };
+        const d = await c.findOneAndUpdate(id, [{ $set: { h } }], upAfter);
+        return Number(d.h[a[0]]);
+      }
+      case 'SADD': {
+        const d = await c.findOneAndUpdate(id, { $addToSet: { m: { $each: a } } }, upBefore);
+        return new Set(a.filter((x) => !(d && d.m && d.m.includes(x)))).size;
+      }
+      case 'SREM': {
+        const d = await c.findOneAndUpdate(id, { $pull: { m: { $in: a } } }, { returnDocument: 'before' });
+        return new Set(a.filter((x) => d && d.m && d.m.includes(x))).size;
+      }
+      case 'SCAN': {   // everything in one step: SCAN 0 MATCH <prefix>* → ['0', keys]
+        const m = a.map((x) => x.toUpperCase()).indexOf('MATCH'), pre = m >= 0 ? a[m + 1].replace(/\*$/, '') : '';
+        const re = new RegExp('^' + pre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const docs = await c.find({ _id: re, $or: [{ exp: null }, { exp: { $gt: new Date(now) } }] }, { projection: { _id: 1 } }).toArray();
+        return ['0', docs.map((d) => d._id)];
+      }
+      default: throw new Error('unsupported ' + cmd);
+    }
+  }
+  // Commands run in order; a run of commands on different keys goes together: the reads in one find, the writes at once.
+  async function pipe(cmds) {
+    const c = await kv(), out = new Array(cmds.length);
+    cmds = cmds.map((x) => { const y = x.map(String); y[0] = y[0].toUpperCase(); return y; });
+    for (let i = 0; i < cmds.length;) {
+      const seen = new Set(), run = [];
+      while (i < cmds.length && !seen.has(cmds[i][1])) { seen.add(cmds[i][1]); run.push(i++); }
+      const now = Date.now();
+      const reads = run.filter((j) => READ.has(cmds[j][0])), writes = run.filter((j) => !READ.has(cmds[j][0]));
+      const wkeys = writes.filter((j) => cmds[j][0] !== 'SCAN').map((j) => cmds[j][1]);
+      await Promise.all([
+        reads.length && c.find({ _id: { $in: reads.map((j) => cmds[j][1]) } }).toArray().then((docs) => {
+          const by = new Map(docs.map((d) => [d._id, live(d, now)]));
+          for (const j of reads) out[j] = read(cmds[j], by.get(cmds[j][1]) || null, now);
+        }),
+        writes.length && (wkeys.length ? c.deleteMany({ _id: { $in: wkeys }, exp: { $lte: new Date(now) } }) : Promise.resolve())
+          .then(() => Promise.all(writes.map(async (j) => { out[j] = await write(c, cmds[j], now); }))),
+      ]);
+    }
+    return out;
+  }
+  // The copy from Upstash: [{key, type, value, ttl}] in one round trip. What MongoDB already has wins: a string is only
+  // set where missing, a hash only gains the fields it lacks, a set gains members.
+  async function importKeys(items) {
+    const c = await kv(), now = Date.now(), ops = [];
+    for (const { key, type, value, ttl } of items) {
+      const exp = ttl > 0 ? { exp: new Date(now + ttl) } : {};
+      if (type === 'string') ops.push({ updateOne: { filter: { _id: key }, update: { $setOnInsert: { s: String(value), ...exp } }, upsert: true } });
+      else if (type === 'hash') {
+        const obj = {};
+        for (let i = 0; i < value.length; i += 2) obj[value[i]] = String(value[i + 1]);
+        ops.push({ updateOne: { filter: { _id: key }, update: [{ $set: { h: { $mergeObjects: [{ $literal: obj }, H] }, ...(ttl > 0 ? { exp: { $ifNull: ['$exp', exp.exp] } } : {}) } }], upsert: true } });
+      } else if (type === 'set' && value.length) {
+        ops.push({ updateOne: { filter: { _id: key }, update: { $addToSet: { m: { $each: value.map(String) } }, ...(ttl > 0 ? { $setOnInsert: exp } : {}) }, upsert: true } });
+      }
+    }
+    if (ops.length) await c.bulkWrite(ops, { ordered: false });
+  }
+  return { call: async (cmd) => (await pipe([cmd]))[0], pipe, importKeys };
+}
 const USER_DB = !USER_URL ? null : /^rediss?:\/\//i.test(USER_URL) ? tcpDb(USER_URL)
   : restDb(USER_URL.replace(/\/+$/, ''), process.env.USER_REDIS_TOKEN);
 const MAIN_DB = KV_URL || !USER_DB ? restDb(KV_URL, KV_TOKEN) : USER_DB;   // only USER_REDIS_URL set: everything there
+const MONGO_DB = MONGO_URL ? mongoDb(MONGO_URL) : null;   // set: everything is kept in MongoDB
 // People's data (keys without KEY_PREFIX): logins, password index, the sign-up set, bought searches used, pack requests,
 // online payments, payments per admin and their handovers, OTP codes, the "moved" marker, and the indexes of logins by
 // mobile number and of the admins (buildIndexes below)
 const USER_KEYS = /^(user:|pw:|users$|free$|paid:|req:|reqs$|reqopen:|reqlock:|jtxn:|rzp:|pay:|settle:|otp:|usermoved$|phone:|admins$|idxbuilt$)/;
-const dbOf = (key) => (USER_DB && USER_KEYS.test(key) ? USER_DB : MAIN_DB);
+const dbOf = (key) => MONGO_DB || (USER_DB && USER_KEYS.test(key) ? USER_DB : MAIN_DB);
 
 // Every command the app uses takes exactly one key, right after the command name; that key gets KEY_PREFIX.
 const prefixed = ([name, key, ...args]) => [name, KEY_PREFIX + key, ...args];
@@ -99,8 +240,22 @@ async function pipeline(cmds) {
 // Moving people's data to USER_REDIS_URL: copies Upstash's USER_KEYS into it, then removes them from Upstash, one SCAN
 // step per call (cursor '0' to start; → {next, keys}, next '0' = done). What is already in the new database wins: a value
 // is only filled in where it is missing (strings SET NX, hash fields HSETNX, set members SADD), so it is safe to run again.
-const canMoveUserData = () => !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB);
+// With MONGODB_URI set it copies everything instead (every key with KEY_PREFIX) from Upstash into MongoDB and leaves
+// Upstash as it was, as a backup; the same "only where missing" rule makes it safe to run again.
+const canMoveUserData = () => (MONGO_DB ? !!(KV_URL && KV_TOKEN) : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
+async function copyToMongo(cursor) {
+  const src = restDb(KV_URL, KV_TOKEN);
+  const [next, keys] = await src.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
+  if (!keys.length) return { next: String(next), keys: 0 };
+  const types = await src.pipe(keys.map((k) => ['TYPE', k]));
+  const [vals, ttls] = await Promise.all([
+    src.pipe(keys.map((k, i) => [{ string: 'GET', hash: 'HGETALL', set: 'SMEMBERS' }[types[i]] || 'TYPE', k])),
+    src.pipe(keys.map((k) => ['PTTL', k]))]);
+  await MONGO_DB.importKeys(keys.map((key, i) => ({ key, type: types[i], value: vals[i], ttl: Number(ttls[i]) })));
+  return { next: String(next), keys: keys.length };
+}
 async function moveUserData(cursor) {
+  if (MONGO_DB) return copyToMongo(cursor);
   const [next, found] = await MAIN_DB.call(['SCAN', String(cursor || '0'), 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 300]);
   const keys = found.filter((k) => USER_KEYS.test(k.slice(KEY_PREFIX.length)));
   if (!keys.length) return { next: String(next), keys: 0 };
@@ -1094,5 +1249,5 @@ async function candReach(id, slugs) {
 
 module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
-  OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
+  OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };
