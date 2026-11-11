@@ -417,6 +417,13 @@
         <button class="btn" id="freeSave" type="button">सेव करें</button>
         <div class="sub" id="freeMsg" style="margin:0"></div>
       </div>
+      <!-- ward slips: paid (₹100 a ward) or free, for everyone (api/_routes/admin.js "ward_pay"); each person's own choice is on their card -->
+      <div class="phead" style="margin-top:18px"><b id="wpTitle"></b> · <span id="wpNow"></span></div>
+      <div class="stack" style="margin-top:8px">
+        <label class="fr"><input type="checkbox" id="wpOn"> <span id="wpOnText"></span></label>
+        <div class="sub" id="wpHow" style="margin:0"></div>
+        <div class="sub" id="wpMsg" style="margin:0"></div>
+      </div>
     </div>
 
     <div class="card pane" data-tab="admins" id="adminCard">
@@ -688,7 +695,7 @@ function loadSettings() {   // superadmin: free searches, referrals and coupons 
     const r = await api({ action: 'settings' });
     if (r.error) { for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = errText(r); return; }
     settingsIn = true;
-    showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
+    showWardPay(r.wardPay); showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
     loadCouponUses();
   })();
   return settingsBusy.finally(() => { settingsBusy = null; });
@@ -775,6 +782,42 @@ $('freeSave').addEventListener('click', async () => {
   showFreeRule(r.freeRule);
   $('freeMsg').textContent = L('✓ सेव हो गया — अब से नए साइन-अप पर लागू', '✓ Saved — applies to new sign-ups from now');
 });
+// ward slips (wardFree in api/_lib.js): ₹100 a ward for everyone, or free; a person's own choice (on their card) wins
+let WARD_PAY = null;
+function showWardPay(on) {
+  WARD_PAY = !!on;
+  $('wpTitle').textContent = L('वार्ड की पर्चियाँ डाउनलोड', 'Ward slips download');
+  $('wpNow').textContent = on ? L('₹100 प्रति वार्ड', '₹100 a ward') : L('सबके लिए मुफ़्त', 'free for everyone');
+  $('wpOnText').textContent = L('पैसे लें (₹100 प्रति वार्ड) — बंद करें तो सबके लिए मुफ़्त', 'Charge (₹100 a ward) — off = free for everyone');
+  $('wpHow').textContent = L('किसी एक व्यक्ति के लिए अलग: व्यक्ति tab में उसके कार्ड पर "वार्ड पर्चियाँ" चुनें। एडमिन कभी पैसे नहीं देते।', 'For one person: choose "Ward slips" on their card in the People tab. Admins never pay.');
+  $('wpOn').checked = WARD_PAY;
+  if (me && users.length) render();   // the person cards say what "as for everyone" is now
+}
+$('wpOn').addEventListener('change', async () => {
+  const on = $('wpOn').checked;
+  $('wpOn').disabled = true; $('wpMsg').textContent = '';
+  const r = await api({ action: 'ward_pay', on });
+  $('wpOn').disabled = false;
+  if (r.error) { $('wpOn').checked = !on; $('wpMsg').textContent = errText(r); return; }
+  showWardPay(r.wardPay);
+  $('wpMsg').textContent = L('✓ सेव हो गया — अगली सर्च से लागू', '✓ Saved — applies from the next search');
+});
+// superadmin, on a person's card: ward slips as for everyone, always free, or always paid
+function wardPayBox(u) {
+  const box = el('div', 'limit'), sel = el('select');
+  const all = WARD_PAY == null ? '' : WARD_PAY ? L(' (अभी ₹100)', ' (now ₹100)') : L(' (अभी मुफ़्त)', ' (now free)');
+  for (const [v, t] of [['', L(`सबके जैसा${all}`, `As for everyone${all}`)], ['free', L('मुफ़्त', 'Free')], ['pay', L('₹100 प्रति वार्ड', '₹100 a ward')]]) sel.add(new Option(t, v));
+  sel.value = u.wardpay || '';
+  sel.addEventListener('change', async () => {
+    sel.disabled = true;
+    const r = await api({ action: 'ward_pay_user', id: u.id, mode: sel.value });
+    sel.disabled = false;
+    if (r.error) { sel.value = u.wardpay || ''; $('listMsg').textContent = errText(r); return; }
+    u.wardpay = r.user.wardpay; $('listMsg').textContent = '';
+  });
+  box.append(L('वार्ड पर्चियाँ:', 'Ward slips:'), sel);
+  return box;
+}
 // referrals (refRule in api/_lib.js): the inviter's % cashback on a friend's every purchase and bonus every bonusAt-th
 // friend who buys, the friend's searches on joining
 function showRefRule(rule) {
@@ -1940,7 +1983,7 @@ function person(u) {
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
       limitBox(u, 'listMsg', refresh));   // a daily limit
   }
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]),
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]), ...(me.role === 'super' ? [wardPayBox(u)] : []),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(me.role === 'super' ? [moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');

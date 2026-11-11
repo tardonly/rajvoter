@@ -738,11 +738,22 @@ async function addPaid(u, n, r, by) {
 // admins don't pay (wardFree).
 const WARD_RS = 100;
 const wardKey = (uid, slug) => `wardpaid:${uid}:${slug}`;
-// WARD_PAY: whether people pay for wards at all. Off for now (every ward's slips free for everyone, as for admins);
-// set WARD_PAY=1 in Vercel to charge ₹WARD_RS again (wards already paid for stay paid either way).
-const WARD_PAY = process.env.WARD_PAY === '1';
-const wardFree = (u) => !!u && (!WARD_PAY || u.role === 'super' || u.role === 'admin');
-const wardsPaid = async (u, slug) => (wardFree(u) || !u ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
+// Whether people pay for wards, set by the superadmin on the admin page (api/_routes/admin.js "ward_pay"): key
+// "wardpay" '1' = they pay, '0' = every ward free; not set yet → env WARD_PAY=1 to pay, else free. Per person, the
+// superadmin may override it (admin.js "ward_pay_user"; user field "wardpay"): 'free' = never pays, 'pay' = pays even
+// while it is off for everyone, '' = as for everyone. Wards already paid for stay paid either way.
+async function wardPayOn() {
+  const v = await redis('GET', 'wardpay');
+  return v === '1' ? true : v === '0' ? false : process.env.WARD_PAY === '1';
+}
+async function wardFree(u) {
+  if (!u) return false;
+  if (u.role === 'super' || u.role === 'admin') return true;
+  if (u.wardpay === 'free') return true;
+  if (u.wardpay === 'pay') return false;
+  return !(await wardPayOn());
+}
+const wardsPaid = async (u, slug) => (!u || (await wardFree(u)) ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
   await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
@@ -1073,7 +1084,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

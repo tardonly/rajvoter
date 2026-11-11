@@ -243,6 +243,11 @@ with the ₹ received. An open one can be checked with Razorpay again, or closed
 payment never came. Village admins don't see purchases. Requests left open from before (WhatsApp requests to admins,
 JaduPe, Instamojo) show there too, for the superadmin to close.
 
+**Ward slips free or paid:** the superadmin's **साइन-अप पर मुफ़्त सर्च** tab has **वार्ड की पर्चियाँ डाउनलोड**: ticked =
+₹100 a ward, unticked = every ward free for everyone (key `wardpay`; before it is first set, env `WARD_PAY=1` charges,
+else free). Each person's card (व्यक्ति tab, superadmin only) has **वार्ड पर्चियाँ**: सबके जैसा / मुफ़्त / ₹100 प्रति वार्ड,
+which wins over the switch for that person (user field `wardpay`). Admins never pay; wards already paid for stay paid.
+
 **💳 QR से भुगतान (selling for someone else):** a village admin's tab on the admin page (the superadmin has it too,
 without commission). The admin types a customer's mobile number — only people that admin looks after are found (the
 ones they made, or everyone in their villages with "सभी व्यक्ति") — picks a pack and taps **QR बनाएं**. The server makes

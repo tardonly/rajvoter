@@ -105,7 +105,8 @@ module.exports = route(async (req, res, b) => {
 
   const named = !!(String(b.name || '').trim() || String(b.rel || '').trim());
   if (!named && !b.family && b.ward && !b.all && user.demo) return send(res, 403, { error: 'no_ward_list' });
-  if (b.all && !user.demo && !wardFree(user) && Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
+  const wfree = await wardFree(user);   // this login doesn't pay for wards (wardFree in _lib.js)
+  if (b.all && !user.demo && !wfree && Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
     return send(res, 402, { error: 'pay_ward', rs: WARD_RS });
   }
   if (b.all && user.demo) return send(res, 403, { error: 'no_pdf' });
@@ -141,12 +142,12 @@ module.exports = route(async (req, res, b) => {
   } else {
     const after = parseInt(b.after, 10) || 0;
     const rest = after ? hits.filter((r) => r.box > after) : hits;
-    const open = wardFree(user) || Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) === 1;
+    const open = wfree || Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) === 1;
     const room = open ? PAGE : Math.max(0, Math.min(PAGE, FREE_WARD - (hits.length - rest.length)));   // free ones not shown yet
     page = rest.slice(0, room);
     more = rest.length > page.length && (open || hits.length - rest.length + page.length < FREE_WARD);
     locked = !open && rest.length > page.length && !more;
   }
   send(res, 200, { total, more, ...(locked ? { locked: true, rs: WARD_RS } : {}), results: await withMarks(v.slug, page, user.cand, user.survey), wards: load(v.data).wards, perms: user.perms, survey: user.survey,
-    wp: wardFree(user) || (await wardsPaid(user, v.slug)), ...left });
+    wp: wfree || (await wardsPaid(user, v.slug)), ...left });
 });

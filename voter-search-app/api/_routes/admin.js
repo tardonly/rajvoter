@@ -67,6 +67,10 @@
 //                                         to show them; 50 a day per admin. sale: {id, n, rs, status, name, phone, village,
 //                                         created, closeBy, image (the QR picture), cash (the admin's ₹, once paid)}
 //   action "agent_check", rid      → {sale}   asks Razorpay how it stands (settleOnline): paid → searches added, ₹ to the admin
+//   action "ward_pay", on            → {wardPay}   superadmin: people pay ₹WARD_RS per ward's slips (true) or every ward is
+//                                         free (false) (wardFree in _lib.js); "settings" gives wardPay
+//   action "ward_pay_user", id, mode ('free' | 'pay' | '') → {user}   superadmin: that person's own setting (user field
+//                                         wardpay; '' = as for everyone); view's wardpay
 //   action "ref_rule", on, pct, joiner, bonusAt, bonus, apct → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   the superadmin: which set of marks everyone uses from now on
@@ -90,7 +94,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { wardPayOn, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // admin permissions from the request → only known ones
@@ -119,6 +123,7 @@ const view = (u) => ({
   phone: u.phone || '', note: u.note || '', created: u.created, lastSeen: u.lastSeen || null,
   by: u.by || '', byName: u.byName || '', credits: credits(u), prepaid: isPrepaid(u), canBuy: canBuy(u), bought: u.bought === '1', self: u.self === '1',   // signed-up logins: credits = free + paid searches in all, bought = was given paid ones   // who made this login (admin id 'admin' = the superadmin); older logins: ''
   retired: u.retired === '1', retiredAt: u.retiredAt || null,
+  wardpay: u.wardpay === 'free' || u.wardpay === 'pay' ? u.wardpay : '',   // ward slips: this person's own setting (wardFree in _lib.js)
   // referrals: who invited this login, and what this login's invites earned (refRule in _lib.js)
   refBy: u.refBy || '', refByName: u.refByName || '', refPaid: u.refPaid === '1', refBought: Number(u.refBought) || 0, refEarned: Number(u.refEarned) || 0,
   refCash: Number(u.refCash) || 0, refBonus: Number(u.refBonus) || 0, wallet: walletOf(u), walletOut: Number(u.walletOut) || 0,   // ₹: referral cashback earned, in the wallet now, taken out by UPI
@@ -212,6 +217,11 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { sale: await saleView(await settleOnline(r.id)) });
   }
 
+  if (b.action === 'ward_pay') {   // superadmin: ward slips paid or free for everyone (wardFree in _lib.js)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    await redis('SET', 'wardpay', b.on ? '1' : '0');
+    return send(res, 200, { wardPay: await wardPayOn() });
+  }
   if (b.action === 'ref_rule') {   // superadmin: referrals (refRule in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const n = (v, max) => { const x = Math.floor(Number(v)); return v !== '' && v != null && x >= 0 && x <= max ? x : -1; };
@@ -326,7 +336,7 @@ module.exports = route(async (req, res, b) => {
     const ws = await Promise.all(all.map(wdSettle));
     const who = new Map((await getUsers([...new Set(ws.map((w) => w.user))])).map((u) => [u.id, u]));
     const wds = ws.map((w) => ({ ...wdView(w), user: w.user, name: (who.get(w.user) || {}).name || '', phone: (who.get(w.user) || {}).phone || '' }));
-    return send(res, 200, { freeRule: free, refRule: ref, coupons, wds });
+    return send(res, 200, { freeRule: free, refRule: ref, coupons, wds, wardPay: await wardPayOn() });
   }
   if (b.action === 'wd_paid' || b.action === 'wd_back') {   // superadmin: a UPI withdrawal sent by hand, or not sent
     if (!isSuper) return send(res, 403, { error: 'super_only' });
@@ -562,6 +572,13 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
+  if (b.action === 'ward_pay_user') {   // superadmin: this person pays for ward slips or not, whatever the switch for everyone says
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });   // admins never pay
+    const mode = ['free', 'pay'].includes(b.mode) ? b.mode : '';
+    await redis('HSET', `user:${user.id}`, 'wardpay', mode);
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
   if (b.action === 'limit' || b.action === 'extra') {
     if (user.role !== 'user' && !isSuper) return send(res, 400, { error: 'not_user' });   // an admin's: the superadmin sets it
     if (b.action === 'limit') {

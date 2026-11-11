@@ -105,7 +105,7 @@ module.exports = route(async (req, res, b) => {
 async function wardStart(req, res, b, me, via) {
   const v = village(b.village), w = parseInt(b.ward, 10);
   if (!v || !(w > 0) || !(v.wards || []).map(Number).includes(w)) return send(res, 400, { error: 'no_ward' });
-  if (wardFree(me) || Number(await redis('SISMEMBER', wardKey(me.id, v.slug), String(w))) === 1) return send(res, 200, { paid: true });
+  if ((await wardFree(me)) || Number(await redis('SISMEMBER', wardKey(me.id, v.slug), String(w))) === 1) return send(res, 200, { paid: true });
   const k = `reqs:${me.id}:${today()}`;
   if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
   await redis('EXPIRE', k, 86400);
