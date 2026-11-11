@@ -386,6 +386,7 @@
   #installHide { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: #fce7f3; color: #9d174d; font-size: 14px; line-height: 1; }
   html.noinstall .fabinstall, html.noinstall .footinstall, html.installhidden .fabinstall { display: none !important; }   /* opened as the app, or iPhone/iPad; or put away */
   .topelec { width: calc(100% - 24px); max-width: 720px; margin: 0 auto; }
+  body:has(#lock.hidden) .topelec { display: none; }   /* only on the login page, not once logged in */
   #installPop .card { max-width: 480px; }
   #installClose { padding: 3px 10px; font-size: 18px; line-height: 1; }
   #installPop h3 { font-size: 15px; margin: 12px 0 4px; }
@@ -854,7 +855,7 @@ function setMode(survey) {
 }
 setMode(false);
 
-// ---------- चुनाव की तारीखें: a banner on the login page and in the app, with the days left to the सरपंच vote ----------
+// ---------- चुनाव की तारीखें: a banner on the login page (hidden once logged in), with the days left to the सरपंच vote ----------
 // Each election drops off the day after it; the banner goes once all are past. Dates are India dates (YYYY-MM-DD).
 const ELECTIONS = [
   { date: '2026-11-14', hi: 'जिला परिषद सदस्य व पंचायत समिति सदस्य', en: 'Zila Parishad & Panchayat Samiti members' },
