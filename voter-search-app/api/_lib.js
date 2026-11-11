@@ -241,9 +241,13 @@ async function pipeline(cmds) {
 // step per call (cursor '0' to start; → {next, keys}, next '0' = done). What is already in the new database wins: a value
 // is only filled in where it is missing (strings SET NX, hash fields HSETNX, set members SADD), so it is safe to run again.
 // With MONGODB_URI set it copies everything instead (every key with KEY_PREFIX) into MongoDB, first from USER_REDIS_URL
-// (people's data, and the newest copy of it), then from Upstash (cursor "1:<n>" while on the second one), and leaves
-// both as they were, as a backup; the same "only where missing" rule makes it safe to run again.
-const COPY_SOURCES = () => [USER_DB, KV_URL && KV_TOKEN && MAIN_DB !== USER_DB ? restDb(KV_URL, KV_TOKEN) : null].filter(Boolean);
+// (the outside Redis with people's data, and the newest copy of it), then from Upstash (cursor "1:<n>" while on the
+// second one), and leaves both as they were, as a backup; the same "only where missing" rule makes it safe to run again.
+// Upstash is read over its own protocol (REDIS_URL, which Vercel's Upstash integration adds) when that is set, else REST.
+const UPSTASH_TCP = /^rediss?:\/\//i.test(process.env.REDIS_URL || '') && process.env.REDIS_URL !== USER_URL ? process.env.REDIS_URL : '';
+let upstashSrc = null;
+const upstashForCopy = () => upstashSrc || (upstashSrc = UPSTASH_TCP ? tcpDb(UPSTASH_TCP) : KV_URL && KV_TOKEN && MAIN_DB !== USER_DB ? restDb(KV_URL, KV_TOKEN) : null);
+const COPY_SOURCES = () => [USER_DB, upstashForCopy()].filter(Boolean);
 const canMoveUserData = () => (MONGO_DB ? COPY_SOURCES().length > 0 : !!(USER_DB && KV_URL && KV_TOKEN && MAIN_DB !== USER_DB));
 async function copyToMongo(cursor) {
   const srcs = COPY_SOURCES();
