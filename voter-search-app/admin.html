@@ -655,6 +655,8 @@ const MSG = EN ? {
 // 919876543210 → "+91 98765 43210"
 const showPhone = (p) => (/^91\d{10}$/.test(p) ? `+91 ${p.slice(2, 7)} ${p.slice(7)}` : p ? `+${p}` : '');
 const vName = (slug) => (villages[slug] ? (EN ? enName(slug) : villages[slug].name) : slug || '—');
+// on a card: the village with its panchayat samiti, "<village> (<samiti>)"
+const vFull = (slug) => { const v = villages[slug]; return v && v.panchayatSamiti ? `${vName(slug)} (${v.panchayatSamiti})` : vName(slug); };
 const candOf = (id) => cands.find((c) => c.id === id);
 // a mark group (progress entry): the village's own marks, or one candidate's; key "<village>|<candidate id>"
 const groupName = (g) => {
@@ -1788,7 +1790,7 @@ function renderCands() {
   for (const c of cands) {
     const row = el('div', 'candrow'), members = users.filter((u) => u.cand === c.id && !u.retired);
     const nm = el('div', 'name', c.name);
-    if (many) nm.append(el('span', 'badge vil', vName(c.village)));
+    if (many) nm.append(el('span', 'badge vil', vFull(c.village)));
     nm.append(el('span', 'badge cand', L(`${members.length} कार्यकर्ता`, `${members.length} worker${members.length === 1 ? '' : 's'}`)));
     const pRow = el('div', 'row'), pSel = el('select');
     pSel.setAttribute('aria-label', L('पार्टी', 'Party'));
@@ -2019,13 +2021,13 @@ function person(u) {
   if (isAdmin) {   // whole samitis, then the villages given one by one
     for (const k of u.samitis || []) nm.append(el('span', 'badge vil sam', L(`पं.स. ${samitiName(k)} · ${u.villages.filter((s) => villages[s] && samitiOf(villages[s]) === k).length} गाँव`,
       `PS ${samitiName(k)} · ${u.villages.filter((s) => villages[s] && samitiOf(villages[s]) === k).length} villages`)));
-    for (const s of u.samitis ? u.ownVillages.filter((s) => !(villages[s] && u.samitis.includes(samitiOf(villages[s])))) : u.villages) nm.append(el('span', 'badge vil', vName(s)));
+    for (const s of u.samitis ? u.ownVillages.filter((s) => !(villages[s] && u.samitis.includes(samitiOf(villages[s])))) : u.villages) nm.append(el('span', 'badge vil', vFull(s)));
   }
-  else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vName(u.village)));
+  else if (!$('fVillage').value) nm.append(el('span', 'badge vil', vFull(u.village)));
   if (!isAdmin) {   // the villages this person opens besides their own: whole ZP / PS wards, then one by one
     for (const k of u.areas || []) nm.append(el('span', 'badge vil sam', `${areaName(k)} · ${L(`${AREA_SIZE[k] || areaSlugs(k).length} गाँव`, `${AREA_SIZE[k] || areaSlugs(k).length} villages`)}`));   // all of the ward's, not only this admin's
     const inAreas = new Set((u.areas || []).flatMap(areaSlugs));
-    for (const s of (u.more || []).filter((x) => !inAreas.has(x))) nm.append(el('span', 'badge vil', `+ ${vName(s)}`));
+    for (const s of (u.more || []).filter((x) => !inAreas.has(x))) nm.append(el('span', 'badge vil', `+ ${vFull(s)}`));
   }
   if (u.kicks) nm.append(el('span', 'badge warn', L(`एक साथ दो फ़ोन: ${u.kicks} बार`, `Two phones at once: ${u.kicks}×`)));
   if (u.prepaid) nm.append(el('span', 'badge paid', u.bought ? L(`₹ भुगतान किया · कुल ${u.credits} सर्च`, `₹ paid · ${u.credits} searches in all`)
