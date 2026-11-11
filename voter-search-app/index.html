@@ -393,15 +393,12 @@
   #installPop ol { font-size: 17px; }
   .footinstall { border: 0; background: none; padding: 0; font: inherit; color: var(--pink-dark); font-weight: 600; cursor: pointer; }
 
-  /* footer: who made the app and how to reach them */
+  /* footer: how to reach us */
   .footer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 18px;
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--card);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; color: var(--muted); }
   .footer a { color: inherit; text-decoration: none; }
   .footer a:hover { text-decoration: underline; }
-  .footer .by { display: inline-flex; align-items: center; gap: 6px; }
-  .footer .by img { width: 22px; height: 22px; border-radius: 6px; }
-  .footer .by b { color: #12473f; font-size: 14px; }
 
   /* laptops and big tablets: the header's boxes on one line, the slips side by side, the village list in columns */
   @media (min-width: 900px) {
@@ -682,9 +679,7 @@
 </section>
 
 <footer class="footer">
-  <a class="by" href="https://digyai.com" target="_blank" rel="noopener">Powered by <img src="/digyai-logo.png" alt=""> <b>DigyAi</b></a>
   <a href="https://wa.me/917888924374" target="_blank" rel="noopener">WhatsApp +91 7888924374</a>
-  <a href="mailto:ram@digyai.com">ram@digyai.com</a>
   <span>Mon–Sat, 10:00–19:00 IST</span>
   <button class="footinstall" data-install type="button">📲 ऐप इंस्टॉल करें</button>
 </footer>
