@@ -209,6 +209,8 @@
   .titlebar .who { font-size: 12px; color: var(--muted); font-weight: 400; display: block; }
   .titlebar button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px; color: var(--muted); flex: none; }
   .tb-actions { display: flex; gap: 6px; flex: none; }
+  /* phones with many header buttons (admins): the buttons wrap to more lines instead of making the page wider than the screen */
+  @media (max-width: 600px) { .tb-actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; } .titlebar { align-items: flex-start; } }
   #switchBtn { display: inline-block; margin-left: 8px; vertical-align: 2px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 1px 8px; font-size: 12.5px; color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
   @media (max-width: 480px) { .titlebar .appname { display: none; } }   /* phones: village name and its button on one line */
@@ -433,18 +435,27 @@
   }
 
   /* पर्ची सेटिंग: the login's own posters, one over every printed slip and one over the PDF's first page */
-  #posterBtn { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-weight: 600; border-radius: 8px; padding: 4px 10px; margin: 6px 6px 0 0; font-size: 13px; }
   .posterpop .ph { font-size: 15px; font-weight: 700; margin: 14px 0 6px; }
   .posterpop .ph small { font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
   .pslot { position: relative; border: 2px dashed #93c5fd; border-radius: 12px; background: #f0f7ff; overflow: hidden; }
-  .pslot.empty { min-height: 110px; display: flex; align-items: center; justify-content: center; }
+  .pslot.empty { position: relative; }
+  .pslot.empty img.sample { opacity: .45; filter: saturate(.8); }
   .pslot img { display: block; width: 100%; height: auto; }
   .pslot .pbtns { position: absolute; inset: auto 0 8px 0; display: flex; justify-content: center; gap: 8px; }
-  .pslot.empty .pbtns { position: static; flex-direction: column; align-items: center; padding: 16px; text-align: center; }
+  .pslot.empty .pbtns { inset: 0; align-items: center; }
+  .posterpop .pk { font-size: 12px; color: var(--muted); margin: 4px 2px 0; }
+  .slip img.sample, .pbig.sample { opacity: .45; }
+  .ptag { display: inline-block; font-size: 11.5px; font-weight: 700; color: #92400e; background: #fef3c7; border-radius: 6px; padding: 2px 8px; margin: 0 0 6px; }
+  /* the main screen: this login's slip poster (or a sample) with a link into पर्ची सेटिंग */
+  #posterCard { display: block; width: 100%; text-align: left; padding: 0; margin: 10px 0 4px; border: 1px solid #e2e8f0; border-radius: 14px;
+    background: #fff; overflow: hidden; box-shadow: 0 2px 8px rgba(15,23,42,.08); cursor: pointer; font: inherit; color: inherit; }
+  #posterCard img { display: block; width: 100%; height: auto; max-height: 150px; object-fit: cover; }
+  #posterCard img.sample { opacity: .55; }
+  #posterCard .go { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-weight: 700; color: #1e3a8a; font-size: 15px; }
+  @media (min-width: 900px) { #posterCard { max-width: 640px; } }
   .pslot button { border: 0; border-radius: 999px; padding: 8px 16px; font-size: 15px; font-weight: 700; background: #fff; color: #1d4ed8;
     box-shadow: 0 2px 8px rgba(0, 0, 0, .18); }
   .pslot button.del { color: var(--bad); }
-  .pslot .k { font-size: 12.5px; color: var(--muted); }
   .pslot.busy { opacity: .55; pointer-events: none; }
   #posterPrev .slip { margin: 0; }
   #posterPrev .pbig { margin-bottom: 8px; }
@@ -649,10 +660,11 @@
       <!-- which marks this person uses: the survey before the election or polling day (api/signup.js 'mark_mode') -->
       <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
-    <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button><button id="posterBtn" class="hidden" type="button">🖼 पर्ची पोस्टर</button>
+    <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button>
       <b id="leftBadge" class="hidden"></b><button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को बुलाएं</button></span></div>
   </header>
   <main>
+    <button id="posterCard" class="hidden" type="button"></button>
     <div id="results"></div>
     <button class="btn hidden" id="more" type="button">और दिखाएं</button>
   </main>
@@ -1590,7 +1602,46 @@ async function printSlips(rows, title) {
 let POSTER = { top: '', big: '' }, posterFor = null, posterAsk = null;
 const posterOk = () => !DEMO && (can('print') || can('wardPdf'));
 function posterImg(src, cls) { const i = el('img', cls); i.src = src; i.alt = ''; return i; }
-function posterButton() { $('posterBtn').classList.toggle('hidden', !posterOk()); if (posterOk()) posterLoad(); }
+// a made-up poster, drawn faded where this login has none yet, so people see what kind of picture goes there
+function posterSample(slot) {
+  const big = slot === 'big', W = 1200, H = big ? 420 : 260;
+  const t = (a, b) => L(a, b).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const face = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fef3c7" stroke="#f5d48a" stroke-width="8"/>
+    <circle cx="${cx}" cy="${cy - r * .22}" r="${r * .36}" fill="#b45309" opacity=".55"/>
+    <path d="M${cx - r * .7} ${cy + r * .78} Q${cx} ${cy + r * .05} ${cx + r * .7} ${cy + r * .78} Z" fill="#b45309" opacity=".55"/>`;
+  const sym = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="22" fill="#fffbeb" stroke="#f5d48a" stroke-width="6"/>
+    <path d="M${x + w * .2} ${y + h * .48} Q${x + w / 2} ${y + h * .08} ${x + w * .8} ${y + h * .48} Z" fill="#64748b"/>
+    <path d="M${x + w / 2} ${y + h * .46} V${y + h * .66} q0 ${h * .08} ${-w * .08} ${h * .06}" stroke="#64748b" stroke-width="7" fill="none"/>
+    <text x="${x + w / 2}" y="${y + h * .88}" font-size="${h * .13}" text-anchor="middle" fill="#475569" font-weight="700">${t('चुनाव चिन्ह', 'Symbol')}</text>`;
+  const body = big
+    ? `${face(200, 225, 160)}${sym(940, 50, 220, 320)}
+       <text x="600" y="80" font-size="36" text-anchor="middle" fill="#92400e">${t('आपका एक वोट, गाँव का विकास', 'Your one vote, your village\'s progress')}</text>
+       <text x="600" y="190" font-size="92" text-anchor="middle" fill="#fff8e1" font-weight="800" stroke="#a16207" stroke-width="2">${t('उम्मीदवार का नाम', 'Candidate name')}</text>
+       <text x="600" y="260" font-size="40" text-anchor="middle" fill="#fff">${t('सरपंच प्रत्याशी · ग्राम पंचायत', 'Sarpanch candidate · Gram Panchayat')}</text>
+       <rect x="400" y="300" width="400" height="60" rx="30" fill="#fffbeb"/>
+       <text x="600" y="342" font-size="34" text-anchor="middle" fill="#92400e" font-weight="700">${t('भारी मतों से विजयी बनाएँ', 'Vote for a big win')}</text>`
+    : `${face(140, 130, 105)}${sym(990, 25, 180, 210)}
+       <text x="590" y="130" font-size="84" text-anchor="middle" fill="#fff8e1" font-weight="800" stroke="#a16207" stroke-width="2">${t('उम्मीदवार का नाम', 'Candidate name')}</text>
+       <text x="590" y="195" font-size="38" text-anchor="middle" fill="#fff">${t('सरपंच प्रत्याशी · ग्राम पंचायत', 'Sarpanch candidate · Gram Panchayat')}</text>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="Noto Sans Devanagari, Mukta, sans-serif">
+    <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#4d7c5a"/><stop offset=".5" stop-color="#6b9a6f"/><stop offset="1" stop-color="#4d7c5a"/></linearGradient></defs>
+    <rect width="${W}" height="${H}" fill="url(#g)"/><rect y="${H - 14}" width="${W}" height="14" fill="#f5d48a"/>${body}</svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+// the poster, or the faded sample, as a picture
+function posterPic(slot, cls) {
+  const i = posterImg(POSTER[slot] || posterSample(slot), cls);
+  if (!POSTER[slot]) i.classList.add('sample');
+  return i;
+}
+function posterCard() {
+  const c = $('posterCard'); c.classList.toggle('hidden', !posterOk());
+  if (!posterOk()) return;
+  c.innerHTML = '';
+  const go = el('div', 'go'); go.append(el('span', null, POSTER.top ? L('पर्ची पोस्टर बदलें', 'Change the slip poster') : L('अपना पोस्टर लगाएँ', 'Put up your poster')), el('span', null, '›'));
+  c.append(posterPic('top'), go);
+}
+function posterButton() { posterCard(); if (posterOk()) posterLoad().then(posterCard); }
 function posterLoad() {   // once per login; a failed load is tried again next time
   if (!posterOk()) { POSTER = { top: '', big: '' }; return Promise.resolve(); }
   if (posterFor === token() && posterAsk) return posterAsk;
@@ -1637,7 +1688,7 @@ async function posterSave(slot, img) {
   POSTER = { top: r.top || '', big: r.big || '' };
   $('posterNote').textContent = img ? L('✓ सेव हो गया — अब हर पर्ची और PDF पर यही पोस्टर छपेगा', '✓ Saved — every slip and PDF now prints with it')
     : L('पोस्टर हटा दिया', 'Poster removed');
-  posterDraw();
+  posterDraw(); posterCard();
 }
 function posterDraw() {
   const body = $('posterBody'); body.innerHTML = '';
@@ -1648,23 +1699,27 @@ function posterDraw() {
     const add = el('button', null, POSTER[slot] ? L('📷 बदलें', '📷 Change') : L('📷 पोस्टर जोड़ें', '📷 Add a poster')); add.type = 'button';
     add.addEventListener('click', () => { posterSlot = slot; $('posterFile').value = ''; $('posterFile').click(); });
     btns.append(add);
+    box.append(posterPic(slot));
     if (POSTER[slot]) {
-      box.append(posterImg(POSTER[slot]));
       const del = el('button', 'del', L('हटाएं', 'Remove')); del.type = 'button';
       del.addEventListener('click', () => posterSave(slot, ''));
       btns.append(del);
-    } else btns.append(el('div', 'k', L('उम्मीदवार की फोटो, नाम और चुनाव चिन्ह वाली चौड़ी फोटो', 'A wide picture with the candidate\'s photo, name and symbol')));
+    }
     box.append(btns);
     body.append(h, box);
+    if (!POSTER[slot]) body.append(el('div', 'pk', L('ऊपर नमूना है — उम्मीदवार की फोटो, नाम और चुनाव चिन्ह वाली चौड़ी फोटो लगाएँ', 'Above is a sample — use a wide picture with the candidate\'s photo, name and symbol')));
   };
   slotBox('top', L('हर पर्ची के ऊपर पोस्टर', 'Poster over every slip'), L('पतली, चौड़ी फोटो', 'a thin, wide picture'));
   slotBox('big', L('PDF के सबसे ऊपर बड़ा पोस्टर', 'Big poster at the top of the PDF'), L('वार्ड / परिवार की PDF में', 'in a ward\'s or family\'s PDF'));
   // a made-up voter, printed as the real slips will be
   body.append(el('div', 'ph', L('पर्ची ऐसी दिखेगी', 'The slip will look like this')));
   const prev = el('div'); prev.id = 'posterPrev';
+  if (!POSTER.top) prev.append(el('div', 'ptag', L('नमूना पोस्टर — अपना पोस्टर जोड़ने पर यहाँ वही दिखेगा', 'Sample poster — yours shows here once added')));
   const w = (VILLAGE.wards || [])[0] || 1;
-  prev.append(slip({ ward: w, box: 1, epic: 'RJ/00/000/000001', hname: 'किशन सिंह', name: 'Kishan Singh', rel: 'पिता', hrel: 'भंवर सिंह',
-    relname: 'Bhanwar Singh', house: '1', age: 45, sex: 'पुरुष', kendra: '1 - राजकीय उच्च माध्यमिक विद्यालय' }, true));
+  const one = slip({ ward: w, box: 1, epic: 'RJ/00/000/000001', hname: 'किशन सिंह', name: 'Kishan Singh', rel: 'पिता', hrel: 'भंवर सिंह',
+    relname: 'Bhanwar Singh', house: '1', age: 45, sex: 'पुरुष', kendra: '1 - राजकीय उच्च माध्यमिक विद्यालय' }, true);
+  if (!POSTER.top) one.prepend(posterPic('top', 'ptop'));
+  prev.append(one);
   body.append(prev);
 }
 $('posterFile').addEventListener('change', async () => {
@@ -1678,7 +1733,7 @@ $('posterFile').addEventListener('change', async () => {
   posterSave(slot, img);
 });
 function posterClose() { $('posterPop').classList.add('hidden'); }
-$('posterBtn').addEventListener('click', async () => {
+$('posterCard').addEventListener('click', async () => {
   $('posterPop').classList.remove('hidden'); $('posterNote').textContent = '';
   posterDraw(); await posterLoad(); posterDraw();
 });
