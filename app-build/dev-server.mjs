@@ -136,7 +136,7 @@ http.createServer(async (req, res) => {
   }
   const api = url.pathname.match(/^\/api\/([a-z]+)$/);
   // the same rewrite as vercel.json: the functions that need the voter data all run in api/data.js
-  if (api && ['search', 'mark', 'admin', 'progress'].includes(api[1])) { url.searchParams.set('fn', api[1]); api[1] = 'data'; req.url = `/api/data${url.search}`; }
+  if (api && ['search', 'mark', 'admin', 'progress', 'poster'].includes(api[1])) { url.searchParams.set('fn', api[1]); api[1] = 'data'; req.url = `/api/data${url.search}`; }
   if (api && existsSync(join(root, 'api', api[1] + '.js'))) {
     req.body = raw ? JSON.parse(raw) : {};
     req.query = Object.fromEntries(url.searchParams);
