@@ -5,8 +5,10 @@
 // Writes voter-search-app/api/_data/<village>.enc for each and voter-search-app/api/_villages.json (names and
 // slip details, no voter data). The same key must be set as the DATA_KEY environment variable in Vercel.
 //
-// Each .enc file: "RVZ1", 12-byte iv, 16-byte GCM tag, 32-byte HMAC of voters.json (so an unchanged village is not
-// rewritten and git sees no change), then voters.json brotli-compressed and AES-256-GCM encrypted.
+// Each .enc file: "RVZ2", 12-byte iv, 16-byte GCM tag, 32-byte HMAC of voters.json (so an unchanged village is not
+// rewritten and git sees no change), then voters.json turned column-wise ("cols": one array per field in place of
+// "rows"; about 20% smaller once compressed) with only the parts the app reads (kendra, fields, cols), brotli-compressed at the highest quality and AES-256-GCM encrypted.
+// (RVZ1, rows as in voters.json at brotli quality 9, is still read by api/_search.js; a rebuild writes RVZ2.)
 // Vercel bundles api/_data into the one data function (api/data.js), which may be at most 250 MB: a warning is printed near that.
 //
 // Usage:  node app-build/encrypt.mjs    (creates DATA_KEY.txt the first time)
@@ -33,7 +35,7 @@ const folders = readdirSync(root).filter((d) => !d.startsWith('.') && statSync(j
 
 mkdirSync(outDir, { recursive: true });
 const villages = {};
-const MAGIC = Buffer.from('RVZ1');
+const MAGIC = Buffer.from('RVZ2');
 let changed = 0;
 for (const slug of folders.sort()) {
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) || RESERVED.has(slug)) {
@@ -53,7 +55,9 @@ for (const slug of folders.sort()) {
   if (!same) {
     const iv = randomBytes(12);
     const c = createCipheriv('aes-256-gcm', key, iv);
-    const z = brotliCompressSync(plain, { params: { [Z.BROTLI_PARAM_QUALITY]: 9, [Z.BROTLI_PARAM_SIZE_HINT]: plain.length } });
+    // only what api/_search.js reads: "imported" is the import's own note and "seats" goes to _villages.json below
+    const cols = Buffer.from(JSON.stringify({ kendra: data.kendra, fields: data.fields, cols: data.fields.map((f, i) => data.rows.map((r) => r[i])) }));
+    const z = brotliCompressSync(cols, { params: { [Z.BROTLI_PARAM_QUALITY]: 11, [Z.BROTLI_PARAM_LGWIN]: 24, [Z.BROTLI_PARAM_SIZE_HINT]: cols.length } });
     const ct = Buffer.concat([c.update(z), c.final()]);
     writeFileSync(out, Buffer.concat([MAGIC, iv, c.getAuthTag(), h, ct]));
     changed++;

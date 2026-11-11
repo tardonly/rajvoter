@@ -124,9 +124,10 @@ real changes). `--no-build` skips the encrypt step. The newest version of each v
 time, the one with more in it); unreadable files are listed and skipped.
 
 **Size limit:** the encrypted voter data is bundled into the search functions, and Vercel allows 250 MB per function.
-Compressed, a village takes about 70 KB (145 villages = 10 MB), so roughly 3,000 villages fit; `encrypt.mjs` warns
-above 200 MB. All of Rajasthan (about 11,000 gram panchayats) does not fit: that needs the data moved out of the
-deployment (e.g. to S3) first.
+Each `.enc` ("RVZ2") holds only what the app reads (`kendra`, `fields` and the rows stored column by column), brotli
+quality 11, so a village takes about 47 KB: the 3,639 phase-4 panchayats are 172 MB. `encrypt.mjs` warns above 200 MB.
+All of Rajasthan (about 11,000 gram panchayats) does not fit: that needs the data moved out of the deployment (e.g. to
+S3) first.
 
 - A village goes to our folder with the same Hindi name and पंचायत समिति (their `ridi` → our `riri`, `baijasar` →
   `baijasar-rajalwara`, `bigga-bass-ramsara` → `bigga-ramsara`), else to the last part of `panchayat` (`…/adsar` →
