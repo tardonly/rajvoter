@@ -300,7 +300,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <button type="button" data-tab="people">यूज़र</button>
       <button type="button" data-tab="admins" class="hidden" id="adminTab">एडमिन</button>
       <button type="button" data-tab="cands">उम्मीदवार</button>
-      <button type="button" data-tab="prog">प्रगति</button>
+      <button type="button" data-tab="prog">वोटर रिपोर्ट</button>
       <button type="button" data-tab="voters">वोटर लिस्ट</button>
       <button type="button" data-tab="clear">निशान हटाएं</button>
       <button type="button" data-tab="sell" class="hidden" id="tabSell">💳 QR से भुगतान</button>
@@ -498,7 +498,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     </div>
 
     <div class="card pane" data-tab="prog">
-      <div class="bar2"><h2>वार्ड अनुसार प्रगति</h2><button class="btn ghost" id="reload" type="button">ताज़ा करें</button></div>
+      <div class="bar2"><h2>वोटर रिपोर्ट</h2><button class="btn ghost" id="reload" type="button">ताज़ा करें</button></div>
       <div id="prog"></div>
       <div class="foot" id="progFoot"></div>
     </div>
@@ -578,7 +578,7 @@ const STATIC_EN = {
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
   'एडमिन पासवर्ड': 'Admin password', 'मोबाइल नंबर (अपना बनाया पासवर्ड हो तो)': 'Mobile number (if you chose your own password)', 'लॉगिन': 'Log in', 'एडमिन': 'Admin', '← सर्च': '← Search', 'लॉग आउट': 'Log out',
   'पार्टियाँ': 'Parties', 'चुनाव चिन्ह चुनें': 'Choose symbol', 'पार्टी का नाम': 'Party name', 'पार्टी जोड़ें': 'Add party',
-  'यूज़र': 'People', 'उम्मीदवार': 'Candidates', 'प्रगति': 'Progress', 'वोटर लिस्ट': 'Voter list', 'निशान हटाएं': 'Clear marks',
+  'यूज़र': 'People', 'उम्मीदवार': 'Candidates', 'वोटर रिपोर्ट': 'Voter report', 'वोटर लिस्ट': 'Voter list', 'निशान हटाएं': 'Clear marks',
   'बंद करें': 'Close', 'कॉपी करें': 'Copy', 'WhatsApp पर भेजें': 'Send on WhatsApp',
   'यह पासवर्ड सिर्फ़ अभी दिखेगा। भूल जाएं तो "नया पासवर्ड" से दूसरा बनाएं।': 'This password is shown only now. If it is forgotten, make another with "New password".',
   'नया एडमिन जोड़ें': 'Add a new admin', 'एडमिन सिर्फ़ अपने गाँवों में लोग जोड़ और बंद कर सकता है।': 'An admin can add and switch off people only in their own villages.',
@@ -587,7 +587,7 @@ const STATIC_EN = {
   'गाँव': 'Village', 'सभी गाँव': 'All villages',
   'हर उम्मीदवार के कार्यकर्ता (3–4 पासवर्ड) एक समूह हैं: वे सिर्फ़ अपने उम्मीदवार के निशान लगाते और देखते हैं,\n        दूसरे उम्मीदवार के लोग ये निशान नहीं देख सकते। बिना उम्मीदवार वाले लोग गाँव के आम निशान देखते हैं।':
     'Each candidate\'s workers (3–4 passwords) are a group: they set and see only their own candidate\'s marks, and other candidates\' people cannot see them. People without a candidate see the village\'s common marks.',
-  'उम्मीदवार का नाम': 'Candidate\'s name', 'उम्मीदवार बनाएं': 'Create candidate', 'वार्ड अनुसार प्रगति': 'Progress by ward',
+  'उम्मीदवार का नाम': 'Candidate\'s name', 'उम्मीदवार बनाएं': 'Create candidate',
   'ताज़ा करें': 'Refresh', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards', 'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter',
   'बाकी': 'Remaining', 'और दिखाएं': 'Show more', 'पर्चियों के निशान हटाएं': 'Clear the marks on the slips',
   'बटन दबाने पर उस गाँव के उस रंग के सभी निशान सबके फ़ोन से हट जाएंगे।': 'A button clears all marks of that colour in that village, on everyone\'s phone.',
@@ -1348,7 +1348,7 @@ setInterval(() => {
 // ---------- progress per ward, one table per village ----------
 function showProgress() {
   const box = $('prog'); box.innerHTML = '';
-  if (!STATS) { box.append(el('div', 'empty', L('⏳ प्रगति लोड हो रही है…', '⏳ Loading progress…'))); $('progFoot').textContent = ''; return; }
+  if (!STATS) { box.append(el('div', 'empty', L('⏳ वोटर रिपोर्ट लोड हो रही है…', '⏳ Loading voter report…'))); $('progFoot').textContent = ''; return; }
   let more = null;
   if (STATS.partial) {   // many villages: only those with marks, or the first pages, came (api/_routes/admin.js "stats")
     const left = STATS.groups - progress.length, step = Math.min(STATS_PAGE, left);
@@ -1529,9 +1529,9 @@ const reqWhat = (r) => (r.kind === 'ward' ? L(`वार्ड ${r.ward} की 
   : L(`${r.n}${r.bonus ? ` + ${r.bonus}` : ''} सर्च · ₹${r.rs}`, `${r.n}${r.bonus ? ` + ${r.bonus}` : ''} searches · ₹${r.rs}`));
 // no ward / wardPdf boxes any more: anyone may open a ward's first slips and buy the rest (api/_routes/search.js)
 const PERM_NAME = EN ? { mark: 'Can set marks', print: 'Print slips',
-  progress: 'Can see progress by ward', list: 'Can see the voter list' }
+  progress: 'Can see the voter report', list: 'Can see the voter list' }
   : { mark: 'निशान लगा सकते हैं', print: 'पर्ची प्रिंट',
-  progress: 'वार्ड अनुसार प्रगति देख सकते हैं', list: 'वोटर लिस्ट देख सकते हैं' };
+  progress: 'वोटर रिपोर्ट देख सकते हैं', list: 'वोटर लिस्ट देख सकते हैं' };
 function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
   for (const [p, label] of Object.entries(PERM_NAME)) {
