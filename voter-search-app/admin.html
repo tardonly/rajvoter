@@ -788,7 +788,7 @@ function showWds(list) {
 let COUPONS = [], cpnEdit = null;
 const cpnWhat = (c) => (c.kind === 'pct' ? `${c.value}% छूट${c.maxOff ? ` (₹${c.maxOff} तक)` : ''}` : c.kind === 'rs' ? `₹${c.value} छूट`
   : c.kind === 'bonuspct' ? `${c.value}% ज़्यादा सर्च मुफ़्त${c.maxOff ? ` (${c.maxOff} सर्च तक)` : ''}` : `${c.value} सर्च मुफ़्त`);
-const cpnRules = (c) => [c.show ? 'खरीद विंडो में दिखता है' : 'छुपा (सिर्फ़ कोड से)', c.minN && c.maxN ? `${c.minN}–${c.maxN} सर्च के पैक पर` : c.minN ? `${c.minN}+ सर्च के पैक पर` : c.maxN ? `${c.maxN} तक सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
+const cpnRules = (c) => [c.show ? 'खरीद विंडो में दिखता है (जो इसे अभी लगा सकें उन्हें)' : 'छुपा (सिर्फ़ कोड से)', c.minN && c.maxN ? `${c.minN}–${c.maxN} सर्च के पैक पर` : c.minN ? `${c.minN}+ सर्च के पैक पर` : c.maxN ? `${c.maxN} तक सर्च के पैक पर` : '', c.once ? 'एक व्यक्ति एक बार' : '', c.first ? 'सिर्फ़ पहली खरीद' : '',
   c.until ? `${c.until} तक` : '', `${c.used}${c.maxUses ? `/${c.maxUses}` : ''} बार इस्तेमाल`].filter(Boolean).join(' · ');
 function showCoupons(list) {
   $('cpnCard').classList.toggle('hidden', !list);
