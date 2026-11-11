@@ -1290,7 +1290,7 @@ function slip(r, forPrint, inFamily) {
     tools.append(pb);
   }
   if (!forPrint && !inFamily && String(r.house || '').trim()) {
-    const fb = el('button', 'fam', L('परिवार', 'Family')); fb.type = 'button';
+    const fb = el('button', 'fam', L('परिवार खोलें', 'Open family')); fb.type = 'button';
     fb.addEventListener('click', () => toggleFamily(r, d, fb));
     tools.append(fb);
   }
@@ -1346,11 +1346,11 @@ function slip(r, forPrint, inFamily) {
 // everyone else at the same house number in the ward, opened under the slip
 async function toggleFamily(r, d, btn) {
   const open = d.nextElementSibling && d.nextElementSibling.classList.contains('family') ? d.nextElementSibling : null;
-  if (open) { open.remove(); btn.classList.remove('on'); btn.textContent = L('परिवार', 'Family'); return; }
+  if (open) { open.remove(); btn.classList.remove('on'); btn.textContent = L('परिवार खोलें', 'Open family'); return; }
   btn.disabled = true; btn.textContent = L('ला रहे हैं…', 'Loading…');
   const x = await api('search', { family: `${r.ward}:${r.box}`, searchId, token: token() });
   counted(x);
-  btn.disabled = false; btn.textContent = L('परिवार', 'Family');
+  btn.disabled = false; btn.textContent = L('परिवार खोलें', 'Open family');
   if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
   if (x.error) { alert(MSG[x.error] || MSG.server); return; }
   const others = x.results.filter((v) => v.box !== r.box);
