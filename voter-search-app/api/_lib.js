@@ -919,15 +919,28 @@ async function wardPayOn() {
   const v = await redis('GET', 'wardpay');
   return v === '1' ? true : v === '0' ? false : process.env.WARD_PAY === '1';
 }
-async function wardFree(u) {
+// Per ज़िला and per पंचायत समिति too (admin.js "ward_pay_area"): hash "wardpayarea", field "d:<district>" or
+// "s:<district>|<samiti>" (samitiKey) = '1' pay / '0' free, by the ward's village. The person's own setting wins, then
+// the samiti's, then the district's, then the switch for everyone.
+async function wardPayAreas() {
+  const a = (await redis('HGETALL', 'wardpayarea')) || [], o = {};
+  for (let i = 0; i + 1 < a.length; i += 2) o[a[i]] = String(a[i + 1]);
+  return o;
+}
+async function wardFree(u, slug) {
   if (!u) return false;
   if (u.role === 'super') return true;
   if (u.wardpay === 'free') return true;
   if (u.wardpay === 'pay') return false;
+  const v = slug && VILLAGES[slug];
+  if (v) {
+    const areas = await wardPayAreas(), set = areas[`s:${samitiKey(v)}`] ?? areas[`d:${v.district || ''}`];
+    if (set === '1' || set === '0') return set === '0';
+  }
   return !(await wardPayOn());
 }
-const wardsPaid = async (u, slug) => (!u || (await wardFree(u)) ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
-const wardsAz = async (u, slug) => (!u || (await wardFree(u)) ? [] : ((await redis('SMEMBERS', wardAzKey(u.id, slug))) || []).map(String));
+const wardsPaid = async (u, slug) => (!u || (await wardFree(u, slug)) ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
+const wardsAz = async (u, slug) => (!u || (await wardFree(u, slug)) ? [] : ((await redis('SMEMBERS', wardAzKey(u.id, slug))) || []).map(String));
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
   await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
@@ -1260,7 +1273,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

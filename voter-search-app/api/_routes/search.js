@@ -106,7 +106,7 @@ module.exports = route(async (req, res, b) => {
 
   const named = !!(String(b.name || '').trim() || String(b.rel || '').trim());
   if (!named && !b.family && b.ward && !b.all && user.demo) return send(res, 403, { error: 'no_ward_list' });
-  const wfree = await wardFree(user);   // this login doesn't pay for wards (wardFree in _lib.js)
+  const wfree = await wardFree(user, v.slug);   // this login doesn't pay for wards (wardFree in _lib.js)
   if (b.all && !user.demo && !wfree && Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
     return send(res, 402, { error: 'pay_ward', rs: WARD_RS });
   }
