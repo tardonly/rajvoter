@@ -109,11 +109,18 @@ function search(slug, { name = '', rel = '', ward = '' }) {
   name = String(name).trim().slice(0, 60); rel = String(rel).trim().slice(0, 60);
   const pool = ward ? rows.filter((r) => String(r.ward) === String(ward)) : rows;
   if (!name && !rel) return ward ? [...pool].sort((a, b) => a.box - b.box) : [];   // only a ward: all its voters in box order
+  // A voter ID is one person in the whole village, so it is looked up in every ward, whichever ward is chosen.
+  // Hindi digits (voice typing) count as digits; spaces, "/" and "-" are dropped.
+  const id = !rel && name.replace(/[०-९]/g, (d) => d.charCodeAt(0) - 0x966).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const byId = (k) => rows.filter((r) => r._epic.includes(k)).sort((a, b) => a.ward - b.ward || a.box - b.box);
+  if (id && ((/\d{3,}/.test(id) && /[A-Z]/.test(id)) || /^RJ\d/.test(id) || /^\d{6,}$/.test(id))) {
+    return byId(id);   // "RMX1247550", "rmx 1247550", "RJ/02/011/0054853", or just the number part "1247550"
+  }
   const hq = !rel && houseQuery(name);                                                        // house number
-  if (hq) return pool.filter((r) => hq(r._house)).sort((a, b) => a.ward - b.ward || a.box - b.box);
-  if ((/\d{3,}/.test(name) && /[a-z]/i.test(name)) || /^rj\W?\d/i.test(name)) {                // voter ID
-    const k = name.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    return pool.filter((r) => r._epic.includes(k));
+  if (hq) {
+    const homes = pool.filter((r) => hq(r._house)).sort((a, b) => a.ward - b.ward || a.box - b.box);
+    // no such house: 4–5 digits may be the end of a voter ID ("7550")
+    return homes.length || !/^\d{4,5}$/.test(id) ? homes : rows.filter((r) => r._epic.endsWith(id)).sort((a, b) => a.ward - b.ward || a.box - b.box);
   }
   const nq = name && (isHindi(name) ? ['_nHi', normHi(name)] : ['_nEn', normEn(name)]);
   const rq = rel && (isHindi(rel) ? ['_rHi', normHi(rel)] : ['_rEn', normEn(rel)]);
