@@ -265,9 +265,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .fields input, .fields select { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .fields input:focus, .fields select:focus { outline: none; border-color: var(--accent); }
   .row2 { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
-  .qmic { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
-  #micBtn { padding: 0 14px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; font-size: 20px; }
-  #micBtn.on { background: var(--pink); border-color: var(--pink); animation: micpulse 1s ease-in-out infinite; }
+  /* 🎤 sits inside the name box, at its right edge */
+  .qmic { position: relative; }
+  .qmic:has(#micBtn:not(.hidden)) #qName { padding-right: 48px; }
+  #micBtn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; padding: 0;
+    border: 0; border-radius: 50%; background: transparent; font-size: 19px; line-height: 36px; text-align: center; }
+  #micBtn.on { background: var(--pink); animation: micpulse 1s ease-in-out infinite; }
   @keyframes micpulse { 50% { box-shadow: 0 0 0 6px rgba(224, 36, 94, .25); } }
   .micmsg { font-size: 14px; color: var(--pink-dark); font-weight: 600; }
   /* ↺ रीसेट: empties every search box and filter */
