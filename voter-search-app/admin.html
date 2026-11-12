@@ -443,6 +443,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <div class="stack" style="margin-top:8px">
         <label class="fr"><input type="checkbox" id="wpOn"> <span id="wpOnText"></span></label>
         <div class="sub" id="wpHow" style="margin:0"></div>
+        <!-- per ज़िला / पंचायत समिति (api/_routes/admin.js "ward_pay_area") -->
+        <select id="wpDistrict"></select>
+        <div class="stack" id="wpAreas"></div>
         <div class="sub" id="wpMsg" style="margin:0"></div>
       </div>
     </div>
@@ -743,7 +746,7 @@ function loadSettings() {   // superadmin: free searches, referrals and coupons 
     const r = await api({ action: 'settings' });
     if (r.error) { for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = errText(r); return; }
     settingsIn = true;
-    showWardPay(r.wardPay); showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
+    WARD_AREAS = r.wardPayAreas || {}; showWardPay(r.wardPay); showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
     loadCouponUses();
   })();
   return settingsBusy.finally(() => { settingsBusy = null; });
@@ -837,10 +840,50 @@ function showWardPay(on) {
   $('wpTitle').textContent = L('वार्ड की पर्चियाँ डाउनलोड', 'Ward slips download');
   $('wpNow').textContent = on ? L('₹50 प्रति वार्ड', '₹50 a ward') : L('सबके लिए मुफ़्त', 'free for everyone');
   $('wpOnText').textContent = L('पैसे लें (₹50 प्रति वार्ड) — बंद करें तो सबके लिए मुफ़्त', 'Charge (₹50 a ward) — off = free for everyone');
-  $('wpHow').textContent = L('किसी एक यूज़र के लिए अलग: यूज़र tab में उसके कार्ड पर "वार्ड पर्चियाँ" चुनें। सिर्फ़ सुपर-एडमिन कभी पैसे नहीं देते।', 'For one person: choose "Ward slips" on their card in the People tab. Only the superadmin never pays.');
+  $('wpHow').textContent = L('किसी एक यूज़र के लिए अलग: यूज़र tab में उसके कार्ड पर "वार्ड पर्चियाँ" चुनें। सिर्फ़ सुपर-एडमिन कभी पैसे नहीं देते।', 'For one person: choose "Ward slips" on their card in the People tab. Only the superadmin never pays.') + ' ' + L('एक व्यक्ति की अपनी सेटिंग सबसे ऊपर, फिर पंचायत समिति, फिर ज़िला, फिर सबके लिए वाला स्विच।', 'A person\'s own setting wins, then the samiti\'s, then the district\'s, then the switch for everyone.');
   $('wpOn').checked = WARD_PAY;
   if (me && users.length) render();   // the person cards say what "as for everyone" is now
+  wardAreas();
 }
+// per ज़िला and पंचायत समिति: choose the district, then its own setting and each samiti's ('' = as the level above)
+let WARD_AREAS = {};
+function wardAreas() {
+  const dSel = $('wpDistrict'), keep = dSel.value, all = Object.keys(villages);
+  const ds = [...new Set(all.map(distOf))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  const set = (f) => (WARD_AREAS[f] === '1' ? ' · ₹50' : WARD_AREAS[f] === '0' ? L(' · मुफ़्त', ' · free') : '');
+  dSel.length = 0;
+  dSel.add(new Option(L('ज़िला / पंचायत समिति के हिसाब से अलग — ज़िला चुनें', 'Different per district / panchayat samiti — choose district'), ''));
+  for (const d of ds) {
+    const n = Object.keys(WARD_AREAS).filter((f) => f.startsWith(`s:${d}|`)).length;
+    dSel.add(new Option(`${d}${set(`d:${d}`)}${n ? L(` · ${n} समिति अलग`, ` · ${n} samiti set`) : ''}`, d));
+  }
+  dSel.value = ds.includes(keep) ? keep : '';
+  const box = $('wpAreas'); box.textContent = '';
+  const d = dSel.value;
+  if (!d) return;
+  const dNow = WARD_AREAS[`d:${d}`];
+  const above = (v) => (v === '1' ? L('₹50', '₹50') : v === '0' ? L('मुफ़्त', 'free') : WARD_PAY ? L('₹50', '₹50') : L('मुफ़्त', 'free'));
+  const row = (kind, key, label, parent) => {
+    const r = el('label', 'fr'), sel = el('select');
+    for (const [v, t] of [['', L(`ऊपर जैसा (अभी ${above(parent)})`, `As above (now ${above(parent)})`)], ['pay', L('₹50 प्रति वार्ड', '₹50 a ward')], ['free', L('मुफ़्त', 'Free')]]) sel.add(new Option(t, v));
+    const f = `${kind}:${key}`;
+    sel.value = WARD_AREAS[f] === '1' ? 'pay' : WARD_AREAS[f] === '0' ? 'free' : '';
+    sel.addEventListener('change', async () => {
+      sel.disabled = true; $('wpMsg').textContent = '';
+      const res = await api({ action: 'ward_pay_area', kind, key, mode: sel.value });
+      sel.disabled = false;
+      if (res.error) { $('wpMsg').textContent = errText(res); wardAreas(); return; }
+      WARD_AREAS = res.wardPayAreas || {}; wardAreas();
+      $('wpMsg').textContent = L('✓ सेव हो गया — अगली सर्च से लागू', '✓ Saved — applies from the next search');
+    });
+    r.append(el('span', null, label), sel);
+    box.append(r);
+  };
+  row('d', d, L(`पूरा ज़िला ${d}`, `All of ${d} district`), undefined);
+  const keys = [...new Set(all.filter((s) => distOf(s) === d).map((s) => samitiOf(villages[s])))].filter(Boolean).sort((a, b) => samOnly(a).localeCompare(samOnly(b)));
+  for (const k of keys) row('s', k, L(`पंचायत समिति ${samOnly(k)}`, `Panchayat samiti ${samOnly(k)}`), dNow);
+}
+$('wpDistrict').addEventListener('change', wardAreas);
 $('wpOn').addEventListener('change', async () => {
   const on = $('wpOn').checked;
   $('wpOn').disabled = true; $('wpMsg').textContent = '';
