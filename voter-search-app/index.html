@@ -269,8 +269,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .qmic { position: relative; }
   .qmic:has(#micBtn:not(.hidden)) #qName { padding-right: 48px; }
   #micBtn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; padding: 0;
-    border: 0; border-radius: 50%; background: transparent; font-size: 19px; line-height: 36px; text-align: center; }
-  #micBtn.on { background: var(--pink); animation: micpulse 1s ease-in-out infinite; }
+    border: 0; border-radius: 50%; background: transparent; color: var(--accent); display: grid; place-items: center; cursor: pointer; }
+  #micBtn svg { fill: currentColor; display: block; }
+  #micBtn:hover { background: rgba(31, 78, 140, .08); }
+  #micBtn.on { background: var(--pink); color: #fff; animation: micpulse 1s ease-in-out infinite; }
   @keyframes micpulse { 50% { box-shadow: 0 0 0 6px rgba(224, 36, 94, .25); } }
   .micmsg { font-size: 14px; color: var(--pink-dark); font-weight: 600; }
   /* ↺ रीसेट: empties every search box and filter */
@@ -683,7 +685,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <!-- बोलकर सर्च: the mic fills the name box by speech (Web Speech API, Hindi); hidden where the browser has none -->
-      <div class="qmic"><input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search"><button id="micBtn" class="hidden" type="button" title="बोलकर सर्च" aria-label="बोलकर सर्च">🎤</button></div>
+      <div class="qmic"><input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search"><button id="micBtn" class="hidden" type="button" title="बोलकर सर्च" aria-label="बोलकर सर्च"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg></button></div>
       <div id="micMsg" class="micmsg hidden" role="status"></div>
       <div class="row2">
         <input id="qRel" type="search" placeholder="पिता / पति का नाम" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
