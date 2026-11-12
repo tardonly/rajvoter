@@ -311,7 +311,7 @@ const demoId = (device) => `demo_${device}`;
 // (in the order given: a person's own village first)
 const villageList = (slugs) => (slugs || Object.keys(VILLAGES)).filter((slug) => Object.hasOwn(VILLAGES, slug)).map((slug) => {
   const v = VILLAGES[slug];
-  return { slug, name: v.name, title: v.title, panchayatSamiti: v.panchayatSamiti || '', district: v.district || '', zp: v.zp ?? '', ps: v.ps ?? '' };
+  return { slug, name: v.name, title: v.title, panchayatSamiti: v.panchayatSamiti || '', district: v.district || '', zp: v.zp ?? '', ps: v.ps ?? '', voters: v.voters || 0 };
 });
 
 // A village admin looks after the villages given to them one by one (field villages "a,b") and every village of the

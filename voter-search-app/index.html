@@ -196,7 +196,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .homebar a, .homebar button { border-radius: 8px; padding: 5px 12px; font-size: 14px; text-decoration: none; }
   #homeAdmin { background: var(--accent); color: #fff; font-weight: 600; }
   #homeOut { border: 1px solid var(--line); background: #fff; color: var(--muted); }
-  /* many villages: search box (spelling need not be exact) and a पंचायत समिति filter */
+  /* many villages: search box (spelling need not be exact), a ज़िला filter, then a पंचायत समिति filter */
   .vfind { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 8px; text-align: left; }
   .vfind input, .vfind select { width: 100%; padding: 10px 12px; font-size: 16px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .vfind input:focus, .vfind select:focus { outline: none; border-color: var(--accent); }
@@ -651,7 +651,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     <p id="homeMsg">अपना गाँव चुनें</p>
     <div class="homeacts hidden" id="demoActs"><a class="demologin" href="/">🔑 लॉगिन / साइन-अप करें</a><button id="demoHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="demoShare" class="share" type="button">↗ शेयर करें</button></div>
     <div class="vfind hidden" id="vFind">
+      <select id="vDist" aria-label="ज़िला"></select>
       <select id="vPs" aria-label="पंचायत समिति"></select>
+      <select id="vSort" aria-label="क्रम"><option value="">नाम से (अ–ज्ञ)</option><option value="more">ज़्यादा वोटर पहले</option><option value="less">कम वोटर पहले</option></select>
       <input id="vSearch" type="search" placeholder="🔍 गाँव सर्च करें / Village" autocomplete="off" autocorrect="off" spellcheck="false">
       <div class="vcount" id="vCount"></div>
     </div>
@@ -740,7 +742,7 @@ const STATIC_EN = {
   'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
   'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव सर्च करें / Village': '🔍 Search village / गाँव',
-  'पंचायत समिति': 'Panchayat samiti', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
+  'पंचायत समिति': 'Panchayat samiti', 'ज़िला': 'District', 'नाम से (अ–ज्ञ)': 'By name (A–Z)', 'ज़्यादा वोटर पहले': 'Most voters first', 'कम वोटर पहले': 'Fewest voters first', 'क्रम': 'Order', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
   'नाम / Name / मकान नं. / Voter ID': 'Name / नाम / House no. / Voter ID', 'पिता / पति का नाम': 'Father\'s / husband\'s name',
   'निशान से छाँटें': 'Filter by mark', '↺ रीसेट': '↺ Reset', 'सर्च साफ़ करें': 'Clear the search',
   'आगे': 'Next', '← नंबर बदलें': '← Change number', 'एडमिन? सीधे पासवर्ड से खोलें': 'Admin? Open with the password',
@@ -2017,23 +2019,43 @@ function myVillages(list) {
   homeList = list;
   const many = list.length > 5;
   $('vFind').classList.toggle('hidden', !many);
-  const sams = [...new Set(list.map((v) => v.panchayatSamiti).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'hi'));
-  $('vPs').replaceChildren(new Option(L('सभी पंचायत समिति', 'All panchayat samitis'), ''), ...sams.map((p) => new Option(`${L('पंचायत समिति', 'Panchayat samiti')} ${p}`, p)));
-  $('vPs').classList.toggle('hidden', sams.length < 2);
-  const keep = store.get('vPs');
-  $('vPs').value = sams.includes(keep) ? keep : '';
+  const dists = [...new Set(list.map((v) => v.district).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'hi'));
+  $('vDist').replaceChildren(new Option(L('सभी ज़िले', 'All districts'), ''), ...dists.map((d) => new Option(d, d)));
+  $('vDist').classList.toggle('hidden', dists.length < 2);
+  const keepD = store.get('vDist');
+  $('vDist').value = dists.includes(keepD) ? keepD : '';
+  samitiFilter(store.get('vPs'));
+  const admin = !DEMO && savedLogin() === 'tok:admin';   // superadmin and village admins: sort by the number of voters
+  $('vSort').classList.toggle('hidden', !admin);
+  $('vSort').value = admin && ['more', 'less'].includes(store.get('vSort')) ? store.get('vSort') : '';
   showVillages();
 }
-// the village cards, narrowed by the search box and the पंचायत समिति filter
+// the पंचायत समिति filter: the samitis of the chosen district (all of them when no district is chosen), by name only
+// when a district is chosen, else with the district after it. Its value is "district|samiti".
+const psKey = (v) => `${v.district || ''}|${v.panchayatSamiti}`;
+function samitiFilter(keep) {
+  const d = $('vDist').value, seen = new Map();
+  for (const v of homeList) if (v.panchayatSamiti && (!d || v.district === d) && !seen.has(psKey(v))) seen.set(psKey(v), v);
+  const sams = [...seen].sort((a, b) => a[1].panchayatSamiti.localeCompare(b[1].panchayatSamiti, 'hi'));
+  $('vPs').replaceChildren(new Option(L('सभी पंचायत समितियाँ', 'All panchayat samitis'), ''),
+    ...sams.map(([k, v]) => new Option(d || !v.district ? v.panchayatSamiti : `${v.panchayatSamiti} (${v.district})`, k)));
+  $('vPs').classList.toggle('hidden', sams.length < 2);
+  $('vPs').value = seen.has(keep) ? keep : '';
+}
+// the village cards, narrowed by the search box and the ज़िला / पंचायत समिति filters
 let homeList = [];
 function showVillages() {
-  const q = $('vSearch').value.trim(), ps = $('vPs').value;
-  let list = homeList.filter((v) => !ps || v.panchayatSamiti === ps);
+  const q = $('vSearch').value.trim(), d = $('vDist').value, ps = $('vPs').value;
+  let list = homeList.filter((v) => (!d || v.district === d) && (!ps || psKey(v) === ps));
+  const sort = $('vSort').classList.contains('hidden') ? '' : $('vSort').value;
   if (q) list = list.map((v) => [villageScore(q, v), v]).filter(([sc]) => sc != null).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+  if (sort) list = [...list].sort((a, b) => (sort === 'more' ? -1 : 1) * ((a.voters || 0) - (b.voters || 0)) || vn(a).localeCompare(vn(b), 'hi'));
   const box = $('villages'); box.innerHTML = '';
   for (const v of list) {
     const a = el('a', null, vn(v)); a.href = pageOf(v.slug); a.append(el('small', null, EN ? `${vt(v)} · ${v.name}` : v.title));
-    const where = [v.panchayatSamiti && `${L('पंचायत समिति', 'Panchayat samiti')} ${v.panchayatSamiti}`, v.district && `${L('ज़िला', 'District')} ${v.district}`].filter(Boolean).join(' · ');
+    // the samiti and district only while they aren't already chosen above; the number of voters when known
+    const where = [!ps && v.panchayatSamiti && `${L('पंचायत समिति', 'Panchayat samiti')} ${v.panchayatSamiti}`, !d && v.district && `${L('ज़िला', 'District')} ${v.district}`,
+      v.voters && L(`${v.voters.toLocaleString('en-IN')} वोटर`, `${v.voters.toLocaleString('en-IN')} voters`)].filter(Boolean).join(' · ');
     if (where) a.append(el('small', null, where));
     box.append(a);
   }
@@ -2041,7 +2063,9 @@ function showVillages() {
     : L('कोई गाँव नहीं मिला — स्पेलिंग बदलकर देखें', 'No village found — try another spelling');
 }
 $('vSearch').addEventListener('input', showVillages);
+$('vDist').addEventListener('change', () => { store.set('vDist', $('vDist').value, true); samitiFilter(''); store.set('vPs', '', true); showVillages(); });
 $('vPs').addEventListener('change', () => { store.set('vPs', $('vPs').value, true); showVillages(); });
+$('vSort').addEventListener('change', () => { store.set('vSort', $('vSort').value, true); showVillages(); });
 // Fuzzy village search, Hindi or English: the same folding as the voter search on the server (api/_search.js), so
 // "कितासर", "kitasar", "keetasar" and "kitsar" all find कितासर. Lower score = better; null = no match.
 function foldEn(s) {
