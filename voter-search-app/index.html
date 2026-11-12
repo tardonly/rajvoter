@@ -265,6 +265,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .fields input, .fields select { width: 100%; padding: 10px 12px; font-size: 17px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
   .fields input:focus, .fields select:focus { outline: none; border-color: var(--accent); }
   .row2 { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
+  .qmic { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+  #micBtn { padding: 0 14px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; font-size: 20px; }
+  #micBtn.on { background: var(--pink); border-color: var(--pink); animation: micpulse 1s ease-in-out infinite; }
+  @keyframes micpulse { 50% { box-shadow: 0 0 0 6px rgba(224, 36, 94, .25); } }
+  .micmsg { font-size: 14px; color: var(--pink-dark); font-weight: 600; }
   /* ↺ रीसेट: empties every search box and filter */
   #qReset { padding: 0 12px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; color: var(--accent);
     font-size: 15px; font-weight: 600; white-space: nowrap; }
@@ -674,7 +679,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
-      <input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      <!-- बोलकर सर्च: the mic fills the name box by speech (Web Speech API, Hindi); hidden where the browser has none -->
+      <div class="qmic"><input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search"><button id="micBtn" class="hidden" type="button" title="बोलकर सर्च" aria-label="बोलकर सर्च">🎤</button></div>
+      <div id="micMsg" class="micmsg hidden" role="status"></div>
       <div class="row2">
         <input id="qRel" type="search" placeholder="पिता / पति का नाम" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
         <select id="qWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
@@ -2051,6 +2058,40 @@ for (const id of ['qName', 'qRel']) {
   $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); search(); $(id).blur(); } });
 }
 $('qWard').addEventListener('change', () => search());
+// बोलकर सर्च: tap 🎤, say a name (or मकान नं. / voter ID); what is heard goes into the name box and is searched.
+// Hindi (hi-IN) recognition, which also writes English names and digits as said. Tap again to stop.
+(() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const btn = $('micBtn'), msg = $('micMsg');
+  let rec = null;
+  const say = (t) => { msg.textContent = t; msg.classList.toggle('hidden', !t); };
+  const stop = () => { btn.classList.remove('on'); btn.setAttribute('aria-pressed', 'false'); rec = null; };
+  btn.classList.remove('hidden');
+  btn.addEventListener('click', () => {
+    if (rec) { rec.stop(); return; }
+    rec = new SR();
+    rec.lang = 'hi-IN'; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
+    let heard = '';
+    rec.onresult = (e) => {
+      heard = [...e.results].map((r) => r[0].transcript).join(' ').replace(/[।.,?!]+/g, ' ').replace(/\s+/g, ' ').trim();
+      $('qName').value = heard;
+      say(L(`🎤 ${heard}`, `🎤 ${heard}`));
+    };
+    rec.onerror = (e) => {
+      say(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? L('माइक की अनुमति दें (ब्राउज़र सेटिंग में)', 'Allow the microphone (browser settings)')
+        : e.error === 'no-speech' ? L('कुछ सुनाई नहीं दिया — फिर से 🎤 दबाकर बोलें', 'Heard nothing — tap 🎤 and speak again')
+        : e.error === 'network' ? L('बोलकर सर्च के लिए इंटरनेट चाहिए', 'Voice search needs the internet') : L('फिर से कोशिश करें', 'Please try again'));
+    };
+    rec.onend = () => {
+      stop();
+      if (heard) { say(''); searchId = ''; clearTimeout(timer); search(); }
+    };
+    try { rec.start(); } catch { stop(); return; }
+    btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
+    say(L('🎤 बोलिए… नाम, मकान नं. या वोटर ID', '🎤 Speak… a name, house no. or voter ID'));
+  });
+})();
 // ↺ रीसेट: every box and filter empty again, back to the hint; the next name is a new search
 $('qReset').addEventListener('click', () => {
   $('qName').value = ''; $('qRel').value = ''; $('qWard').value = ''; $('qMark').value = '';
