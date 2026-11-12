@@ -25,7 +25,7 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, WARD_RS, WARD_AZ_RS, wardKey, wardAzKey, wardFree, wardsPaid, wardsAz, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
+const { DEMO, village, whoIs, WARD_RS, WARD_AZ_RS, wardKey, wardAzKey, wardFree, wardsPaid, wardsAz, MARKS, markKey, marksFor, allMarks, slipsFor, allSlips, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
 const { load, search, family, publicFields } = require('../_search.js');
 const HI = new Intl.Collator('hi').compare;   // Hindi dictionary order, अ to ज्ञ (a ward's slips in name order)
 
@@ -93,7 +93,9 @@ async function withMarks(slug, list, cand, survey) {   // cand: the searcher's c
   const results = list.map(publicFields);
   const marks = await marksFor(slug, results.map(markKey), cand, survey);
   const sv = survey ? [] : await marksFor(slug, results.map(markKey), cand, true);   // polling day: the survey mark too
-  results.forEach((r, i) => { r.mark = marks[i].m; r.markBy = marks[i].by; r.markAt = marks[i].at; r.sm = sv[i] ? sv[i].m : ''; });
+  const dv = await slipsFor(slug, results.map(markKey), cand);   // पर्ची दी
+  results.forEach((r, i) => { r.mark = marks[i].m; r.markBy = marks[i].by; r.markAt = marks[i].at; r.sm = sv[i] ? sv[i].m : '';
+    if (dv[i].m) r.slip = { by: dv[i].by, at: dv[i].at }; });
   return results;
 }
 
@@ -138,6 +140,10 @@ module.exports = route(async (req, res, b) => {
   if (filter === 'none' || MARKS.includes(filter)) {
     const marks = await allMarks(v.slug, user.cand, user.survey);
     hits = hits.filter((r) => !r.del && ((marks[markKey(r)] || {}).m || 'none') === filter);
+  }
+  if (filter === 'slip' || filter === 'noslip') {   // पर्ची दी / पर्ची नहीं दी
+    const given = await allSlips(v.slug, user.cand);
+    hits = hits.filter((r) => !r.del && !!given[markKey(r)] === (filter === 'slip'));
   }
   const total = hits.length;
   let page, more, locked = false;

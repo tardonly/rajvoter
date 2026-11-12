@@ -250,6 +250,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .chips .absent { border-color: #dc2626; color: #b91c1c; } .chips .none { border-color: #9ca3af; color: #374151; }
   .chips .done.on { background: #16a34a; color: #fff; } .chips .coming.on { background: #facc15; color: #422006; }
   .chips .absent.on { background: #dc2626; color: #fff; } .chips .none.on { background: #4b5563; color: #fff; }
+  .chips .dslip, .chips .dnoslip { border-color: #7c3aed; color: #6d28d9; } .chips .dslip.on, .chips .dnoslip.on { background: #7c3aed; color: #fff; }
   .voter { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid #eee; }
   .voter:first-child { border-top: 0; }
   .voter .no { flex: none; width: 54px; font-size: 12px; color: var(--muted); line-height: 1.3; font-variant-numeric: tabular-nums; }
@@ -380,6 +381,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .marks .done { border: 1.5px solid #16a34a; color: #15803d; }  .marks .done.on { background: #16a34a; color: #fff; }
   .marks .coming { border: 1.5px solid #ca8a04; color: #854d0e; } .marks .coming.on { background: #facc15; color: #422006; }
   .marks .absent { border: 1.5px solid #dc2626; color: #dc2626; } .marks .absent.on { background: #dc2626; color: #fff; }
+  /* पर्ची दी: the slip was handed over; its own row under the marks, in every mode */
+  .dgiven { display: flex; align-items: center; gap: 8px; padding: 6px; border-top: 1px dashed var(--line); background: #fafafa; }
+  .dgiven button { padding: 6px 10px; font-size: 14px; border-radius: 8px; background: #fff; font-weight: 600; color: #6d28d9; border: 1.5px solid #c4b5fd; }
+  .dgiven button.on { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+  .dgiven small { font-size: 12px; color: var(--muted); }
+  .family .fh .tbtn.dall { color: #6d28d9; border-color: #c4b5fd; }
+  .prog .c-slip { color: #6d28d9; }
   .stag { padding: 4px 8px; border-top: 1px dashed var(--line); font-size: 13px; font-weight: 600; background: #fafafa; }
   .stag.c-done { color: #15803d; } .stag.c-coming { color: #854d0e; } .stag.c-absent { color: #b91c1c; }
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
@@ -647,6 +655,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <button type="button" class="coming" data-s="coming">आ रहे हैं <b>0</b></button>
       <button type="button" class="absent" data-s="absent">वोटर नहीं है <b>0</b></button>
       <button type="button" class="none" data-s="none">बाकी <b>0</b></button>
+      <button type="button" class="dslip" data-s="slip">📨 पर्ची दी <b>0</b></button>
+      <button type="button" class="dnoslip" data-s="noslip">पर्ची नहीं दी <b>0</b></button>
     </div>
     <div id="listBody"></div>
     <button id="listMore" class="hidden" type="button">और दिखाएं</button>
@@ -693,6 +703,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
         <option value="done">सिर्फ़ ✓ वोट दिया</option>
         <option value="coming">सिर्फ़ आ रहे हैं</option>
         <option value="absent">सिर्फ़ वोटर नहीं है</option>
+        <option value="noslip">सिर्फ़ जिन्हें पर्ची नहीं दी</option>
+        <option value="slip">सिर्फ़ जिन्हें पर्ची दी</option>
       </select>
       <!-- which marks this person uses: the survey before the election or polling day (api/signup.js 'mark_mode') -->
       <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
@@ -761,7 +773,7 @@ const STATIC_EN = {
   'निशान से छाँटें': 'Filter by mark', '↺ रीसेट': '↺ Reset', 'सर्च साफ़ करें': 'Clear the search',
   'आगे': 'Next', '← नंबर बदलें': '← Change number', 'एडमिन? सीधे पासवर्ड से खोलें': 'Admin? Open with the password',
   'आपका नाम': 'Your name', 'गाँव': 'Village',
-  'सर्च खरीदें': 'Buy searches', '🛒 सर्च खरीदें': '🛒 Buy searches', '🛒 और सर्च खरीदें': '🛒 Buy more searches', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked',
+  'सर्च खरीदें': 'Buy searches', '🛒 सर्च खरीदें': '🛒 Buy searches', '🛒 और सर्च खरीदें': '🛒 Buy more searches', '📨 पर्ची दी': '📨 Slip given', 'पर्ची नहीं दी': 'Slip not given', 'सभी मतदाता': 'All voters', 'सिर्फ़ बिना निशान वाले': 'Only unmarked', 'सिर्फ़ जिन्हें पर्ची नहीं दी': 'Only slip not given', 'सिर्फ़ जिन्हें पर्ची दी': 'Only slip given',
   'सिर्फ़ ✓ वोट दिया': 'Only ✓ voted', 'सिर्फ़ आ रहे हैं': 'Only coming', 'सिर्फ़ वोटर नहीं है': 'Only not a voter',
 };
 function translatePage() {
@@ -1352,8 +1364,14 @@ function slip(r, forPrint, inFamily) {
       row.append(b);
     }
     d.append(row);
+    if (!DEMO) {   // पर्ची दी, beside the marks of either set
+      const dr = el('div', 'dgiven'), db = el('button', null, L('📨 पर्ची दी', '📨 Slip given')); db.type = 'button';
+      db.addEventListener('click', () => setSlip([r], [d], !d.dataset.slip));
+      dr.append(db, el('small')); d.append(dr);
+    }
   }
   d.dataset.by = r.markBy || ''; d.dataset.at = r.markAt || '';
+  showSlip(d, r.slip);
   if (!forPrint) showSurvey(d, r.sm);
   if (DEMO) [r.mark, r.markBy, r.markAt] = demoMarks()[`${r.ward}:${r.box}`] || [];
   showMark(d, r.mark, r.markBy, r.markAt);
@@ -1387,6 +1405,16 @@ async function toggleFamily(r, d, btn) {
       fh.after(tree); tb.classList.add('on');
     });
     fh.append(tb);
+  }
+  const live = x.results.filter((v) => !v.del);
+  if (can('mark') && !DEMO && live.length > 1) {   // पर्ची दी for the whole house at once
+    const da = el('button', 'tbtn dall'); da.type = 'button';
+    const label = () => { const all = live.every((v) => slips.get(v.box) && slips.get(v.box).dataset.slip);
+      da.textContent = all ? L(`📨 पूरे परिवार की पर्ची हटाएं (${live.length})`, `📨 Undo slips for the family (${live.length})`)
+        : L(`📨 पूरे परिवार को पर्ची दी (${live.length})`, `📨 Slips given to the whole family (${live.length})`); return all; };
+    label();
+    da.addEventListener('click', async () => { da.disabled = true; await setSlip(live, live.map((v) => slips.get(v.box)), !label()); da.disabled = false; label(); });
+    fh.append(da);
   }
   if (can('print') && x.results.some((v) => !v.del)) {   // every slip of the house in one PDF
     const fp = el('button', 'tbtn', L('पूरे परिवार की पर्चियाँ · प्रिंट / PDF', "Whole family's slips · Print / PDF")); fp.type = 'button';
@@ -1599,6 +1627,26 @@ async function setMark(r, d, m) {
   r.mark = mark; d.dataset.by = x.by; d.dataset.at = x.at;
   showMark(d, mark, x.by, x.at);
 }
+// पर्ची दी on a slip: lit button, who gave it and when
+function showSlip(d, s) {
+  if (s) d.dataset.slip = '1'; else delete d.dataset.slip;
+  if (s && s.by != null) { d.dataset.sby = s.by; d.dataset.sat = s.at || ''; }
+  const b = d.querySelector('.dgiven button'), sm = d.querySelector('.dgiven small');
+  if (!b) return;
+  b.classList.toggle('on', !!s);
+  b.textContent = s ? L('📨 पर्ची दी ✓', '📨 Slip given ✓') : L('📨 पर्ची दी', '📨 Slip given');
+  sm.textContent = s ? [who(s.by), s.at && when(s.at)].filter(Boolean).join(', ') : '';
+}
+// one voter, or a whole house (rows and their slips on screen, d may be missing for one); on: give or take back
+async function setSlip(rows, ds, on) {
+  const before = ds.map((d) => (d && d.dataset.slip ? { by: d.dataset.sby, at: d.dataset.sat } : null));
+  ds.forEach((d) => d && showSlip(d, on ? {} : null));   // at once; undone if the server refuses
+  const x = await api('mark', { token: token(), set: 'slip', keys: rows.map((r) => `${r.ward}:${r.box}`), mark: on ? '1' : '' });
+  if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
+  if (x.error) { ds.forEach((d, i) => d && showSlip(d, before[i])); alert(MSG[x.error] || MSG.server); return; }
+  const s = on ? { by: x.by, at: x.at } : null;
+  rows.forEach((r, i) => { r.slip = s; if (ds[i]) showSlip(ds[i], s); });
+}
 // marks set on another phone reach this one without a new search: every minute, and when the app comes back on screen
 async function refreshMarks() {
   const slips = [...document.querySelectorAll('#results .slip[data-key]')];   // family slips included
@@ -1612,6 +1660,7 @@ async function refreshMarks() {
     d.dataset.by = k.by; d.dataset.at = k.at;
     showMark(d, k.m, k.by, k.at);
     showSurvey(d, k.sm);
+    showSlip(d, k.d);
   }
   if (x.perms) updatePerms(x.perms);
 }
@@ -1835,9 +1884,9 @@ async function progLoad() {
     const t = el('table', 'prog');
     const hr = el('tr');
     for (const [c, txt] of [[null, L('वार्ड', 'Ward')], [null, L('कुल', 'Total')], ['c-done', MARKS.done], ['c-coming', MARK_NAME.coming],
-      ['c-absent', MARK_NAME.absent], [null, L('बाकी', 'Left')]]) hr.append(el('th', c, txt));
+      ['c-absent', MARK_NAME.absent], [null, L('बाकी', 'Left')], ['c-slip', L('📨 पर्ची', '📨 Slip')]]) hr.append(el('th', c, txt));
     const th = el('thead'); th.append(hr); t.append(th);
-    const tb = el('tbody'), sum = { total: 0, done: 0, coming: 0, absent: 0 };
+    const tb = el('tbody'), sum = { total: 0, done: 0, coming: 0, absent: 0, slip: 0 };
     for (const w of g.wards) for (const k of Object.keys(sum)) sum[k] += w[k];
     for (const w of [...g.wards, sum]) {
       const tr = el('tr', w === sum ? 'sum' : null);
@@ -1849,7 +1898,10 @@ async function progLoad() {
         if (tap && n) c.addEventListener('click', () => listOpen(w === sum ? '' : w.ward, k));
         tr.append(c);
       }
-      const bar = el('tr', 'mrow'), td = el('td'), m = el('div', 'pmeter'); td.colSpan = 6;
+      const sl = el('td', `c-slip${tap && w.total - (w.slip || 0) ? ' go' : ''}`, w.slip || 0);   // a tap: who still has no slip
+      if (tap && w.total - (w.slip || 0)) sl.addEventListener('click', () => listOpen(w === sum ? '' : w.ward, 'noslip'));
+      tr.append(sl);
+      const bar = el('tr', 'mrow'), td = el('td'), m = el('div', 'pmeter'); td.colSpan = 7;
       for (const k of ['done', 'coming', 'absent']) { const i = el('i', k); i.style.width = `${(100 * w[k]) / (w.total || 1)}%`; m.append(i); }
       td.append(m); bar.append(td); tb.append(tr, bar);
     }
@@ -1879,10 +1931,11 @@ function listCounts(wards) {   // the numbers on the four buttons and the ward c
   $('listWard').length = 1;
   for (const w of wards) $('listWard').add(new Option(`${L('वार्ड', 'Ward')} ${w.ward}`, w.ward));
   $('listWard').value = wards.some((w) => String(w.ward) === keep) ? keep : '';
-  const n = { done: 0, coming: 0, absent: 0, none: 0 };
+  const n = { done: 0, coming: 0, absent: 0, none: 0, slip: 0, noslip: 0 };
   for (const w of wards) {
     if ($('listWard').value && String(w.ward) !== $('listWard').value) continue;
     n.done += w.done; n.coming += w.coming; n.absent += w.absent; n.none += w.total - w.done - w.coming - w.absent;
+    n.slip += w.slip || 0; n.noslip += w.total - (w.slip || 0);
   }
   document.querySelectorAll('#listStatus button').forEach((b) => {
     b.querySelector('b').textContent = n[b.dataset.s];
@@ -1898,9 +1951,9 @@ function listRow(x) {
   const rel = (EN && x.relname) || x.hrel;
   body.append(nm, el('div', 'info', [rel && `${x.rel ? relWord(x.rel) : L('पिता/पति', 'Father/husband')}: ${rel}`, x.house && `${L('मकान', 'House')} ${x.house}`,
     x.age && `${L('आयु', 'Age')} ${x.age}`, sexWord(x.sex)].filter(Boolean).join(' · ')));
-  if (ls.status !== 'none' && (x.by || x.at)) {
+  if (ls.status !== 'none' && ls.status !== 'noslip' && (x.by || x.at)) {
     const at = x.at ? new Date(x.at).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-    body.append(el('div', `info c-${ls.status}`, [MARK_NAME[ls.status], who(x.by), at].filter(Boolean).join(' · ')));
+    body.append(el('div', `info c-${ls.status}`, [ls.status === 'slip' ? L('पर्ची दी', 'Slip given') : MARK_NAME[ls.status], who(x.by), at].filter(Boolean).join(' · ')));
   }
   row.append(no, body);
   return row;
@@ -1916,7 +1969,7 @@ async function listLoad(more) {
   listCounts(r.wards);
   ls.rows = more ? ls.rows.concat(r.rows) : r.rows;
   if (!more) $('listBody').innerHTML = '';
-  if (!ls.rows.length) $('listBody').append(el('div', 'lempty', ls.status === 'none' ? L('सब पर्चियों पर निशान लग गए हैं', 'Every slip has a mark') : L('इस रंग का कोई निशान नहीं', 'No marks of this colour')));
+  if (!ls.rows.length) $('listBody').append(el('div', 'lempty', ls.status === 'none' ? L('सब पर्चियों पर निशान लग गए हैं', 'Every slip has a mark') : ls.status === 'noslip' ? L('सबको पर्ची मिल गई है', 'Everyone got a slip') : L('इस रंग का कोई निशान नहीं', 'No marks of this colour')));
   for (const x of r.rows) $('listBody').append(listRow(x));
   $('listMore').classList.toggle('hidden', !r.more);
   if (r.more) $('listMore').textContent = L(`और दिखाएं (${r.total - ls.rows.length} बाकी)`, `Show more (${r.total - ls.rows.length} left)`);

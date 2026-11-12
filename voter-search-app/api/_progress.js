@@ -1,12 +1,12 @@
 // Marks per ward (वार्ड अनुसार प्रगति) and the voters behind them (मतदाता सूची), shared by the admin page (api/_routes/admin.js)
 // and the app (api/_routes/progress.js).
 const { load } = require('./_search.js');
-const { village, MARKS, allMarks, markHash, getCand, redis } = require('./_lib.js');
+const { village, MARKS, allMarks, allSlips, markHash, getCand, redis } = require('./_lib.js');
 
 // how many slips of a village (of one candidate's group) carry each mark, overall and per ward, and the backup its last
 // "clear" left
 // survey: which set of marks (markModeOf in _lib.js); all, bk: already read (the admin page reads every village at once)
-async function markSummary(slug, cand, survey, all, bk) {
+async function markSummary(slug, cand, survey, all, bk, slips) {
   all ||= await allMarks(slug, cand.id, survey);
   const zero = () => Object.fromEntries(MARKS.map((m) => [m, 0]));
   const marks = zero(), perWard = {};
@@ -23,21 +23,32 @@ async function markSummary(slug, cand, survey, all, bk) {
     const w = perWard[key.split(':')[0]];
     if (w) w[m]++;
   }
+  // पर्ची दी: how many slips were handed over (slip), overall and per ward
+  let slip = 0;
+  for (const w of Object.values(perWard)) w.slip = 0;
+  for (const key of Object.keys(slips || (slips = await allSlips(slug, cand.id)))) {
+    if (!onRoll.has(key)) continue;
+    slip++;
+    const w = perWard[key.split(':')[0]];
+    if (w) w.slip++;
+  }
   if (bk === undefined) bk = await redis('GET', `${markHash(slug, cand.id, survey)}:backup`);
   let backup = null;
   try { if (bk) { const j = JSON.parse(bk); backup = { n: j.flat.length / 2, at: j.at }; } } catch (e) { /* ignore a broken backup */ }
-  return { key: `${slug}|${cand.id}`, slug, cand: cand.id, name: village(slug).name, candName: cand.name || '', marks,
+  return { key: `${slug}|${cand.id}`, slug, cand: cand.id, name: village(slug).name, candName: cand.name || '', marks, slip,
     wards: Object.values(perWard).sort((a, b) => a.ward - b.ward), backup };
 }
 
 // मतदाता सूची: voters of a village (of one candidate's group) carrying a mark ('done' | 'coming' | 'absent') or none yet
-// ('none'), in ward and box order, LIST_PAGE at a time from offset; null for an unknown status
+// ('none'), or whose slip was handed over ('slip') or not yet ('noslip'), in ward and box order, LIST_PAGE at a time from offset; null for an unknown status
 const LIST_PAGE = 100;
 async function markedList(slug, candId, survey, status, ward, offset) {
-  if (status !== 'none' && !MARKS.includes(status)) return null;
-  const all = await allMarks(slug, candId, survey);
+  const slipList = status === 'slip' || status === 'noslip';   // पर्ची दी / पर्ची नहीं दी
+  if (status !== 'none' && !slipList && !MARKS.includes(status)) return null;
+  const all = slipList ? await allSlips(slug, candId) : await allMarks(slug, candId, survey);
   const want = (r) => {
     const m = all[`${r.ward}:${r.box}`];
+    if (slipList) return !!m === (status === 'slip');
     return status === 'none' ? !(m && MARKS.includes(m.m)) : !!m && m.m === status;
   };
   const hits = load(slug).rows.filter((r) => !r.del && (!ward || String(r.ward) === String(ward)) && want(r))

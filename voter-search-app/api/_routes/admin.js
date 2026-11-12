@@ -105,7 +105,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { wardPayOn, wardPayAreas, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { wardPayOn, wardPayAreas, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, slipHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // parties (पार्टी): hash "parties", id → JSON {name, icon, created}; icon a small PNG/JPEG data URL made by the admin page
@@ -320,19 +320,21 @@ module.exports = route(async (req, res, b) => {
   // marks, a backup or a candidate get a progress table (all: true asks for every one).
   const stats = async (all, onlyMarked) => {
     const cands = await candsOf(me.villages, true), groups = groupsOf(me.villages, cands);
-    const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id, me.survey)], ['GET', `${markHash(g.slug, g.cand.id, me.survey)}:backup`]])) : [];
-    const marksBy = groups.map((g, i) => marksFrom(read[2 * i]));
+    // three reads per group: its marks, its last-clear backup and its पर्ची दी set (slipHash in _lib.js)
+    const read = groups.length ? await pipeline(groups.flatMap((g) => [['HGETALL', markHash(g.slug, g.cand.id, me.survey)], ['GET', `${markHash(g.slug, g.cand.id, me.survey)}:backup`],
+      ['HGETALL', slipHash(g.slug, g.cand.id)]])) : [];
+    const marksBy = groups.map((g, i) => marksFrom(read[3 * i])), slipsBy = groups.map((g, i) => marksFrom(read[3 * i + 2]));
     const marked = {};
     for (const m of marksBy) for (const { byId } of Object.values(m)) if (byId) marked[byId] = (marked[byId] || 0) + 1;
     if (onlyMarked) return { marked, survey: me.survey };   // the person list's numbers: no voter files read
     // all: how many groups to give (a page of STATS_ALL more each time the page asks), those with marks first
     // a candidate shows in its own village even before any marks; in its workers' other villages only once marked there
-    const busy = (i) => (groups[i].cand.id && groups[i].cand.village === groups[i].slug) || read[2 * i + 1] || Object.keys(marksBy[i]).length;
+    const busy = (i) => (groups[i].cand.id && groups[i].cand.village === groups[i].slug) || read[3 * i + 1] || Object.keys(marksBy[i]).length || Object.keys(slipsBy[i]).length;
     const idx = groups.map((g, i) => i);
     const keep = groups.length <= STATS_ALL ? idx
       : all ? [...idx.filter(busy), ...idx.filter((i) => !busy(i))].slice(0, Math.max(STATS_ALL, all)).sort((x, y) => x - y)
       : idx.filter(busy);
-    const progress = await Promise.all(keep.map((i) => markSummary(groups[i].slug, groups[i].cand, me.survey, marksBy[i], read[2 * i + 1])));
+    const progress = await Promise.all(keep.map((i) => markSummary(groups[i].slug, groups[i].cand, me.survey, marksBy[i], read[3 * i + 1], slipsBy[i])));
     return { progress, marked, partial: keep.length < groups.length, groups: groups.length, survey: me.survey };
   };
   if (b.action === 'stats') return send(res, 200, await stats(Math.min(10000, Math.max(0, parseInt(b.all, 10) || 0)), b.only === 'marked'));
@@ -440,9 +442,10 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'clearMarks' || b.action === 'restoreMarks') {
     const g = await groupOf();
     if (g.error) return send(res, g.error[0], { error: g.error[1] });
-    const key = markHash(b.village, g.cand.id, me.survey), backupKey = `${key}:backup`;
+    // slips: '1' clears or restores the पर्ची दी set (slipHash in _lib.js) instead of the marks in use; status is then 'all'
+    const key = b.slips ? slipHash(b.village, g.cand.id) : markHash(b.village, g.cand.id, me.survey), backupKey = `${key}:backup`;
     if (b.action === 'clearMarks') {
-      if (b.status !== 'all' && !MARKS.includes(b.status)) return send(res, 400, { error: 'bad_mark' });
+      if (b.status !== 'all' && (b.slips || !MARKS.includes(b.status))) return send(res, 400, { error: 'bad_mark' });
       const flat = (await redis('HGETALL', key)) || [];
       const gone = [];
       for (let i = 0; i < flat.length; i += 2) if (b.status === 'all' || String(flat[i + 1]).split('|')[0] === b.status) gone.push(flat[i], flat[i + 1]);
