@@ -25,8 +25,9 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, WARD_RS, wardKey, wardFree, wardsPaid, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
+const { DEMO, village, whoIs, WARD_RS, WARD_AZ_RS, wardKey, wardAzKey, wardFree, wardsPaid, wardsAz, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
 const { load, search, family, publicFields } = require('../_search.js');
+const HI = new Intl.Collator('hi').compare;   // Hindi dictionary order, अ to ज्ञ (a ward's slips in name order)
 
 const FREE_WARD = 20;   // slips of a ward anyone may list before paying for it
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
@@ -109,6 +110,11 @@ module.exports = route(async (req, res, b) => {
   if (b.all && !user.demo && !wfree && Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
     return send(res, 402, { error: 'pay_ward', rs: WARD_RS });
   }
+  // name order (अ–ज्ञ) is bought on its own (WARD_AZ_RS, api/pay.js wardStart with az)
+  const az = b.all && b.sort === 'az';
+  if (az && !user.demo && !wfree && Number(await redis('SISMEMBER', wardAzKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
+    return send(res, 402, { error: 'pay_az', rs: WARD_AZ_RS });
+  }
   if (b.all && user.demo) return send(res, 403, { error: 'no_pdf' });
   const use = await countSearch(req, user, b, named);
   if (use.error) return send(res, 429, use);
@@ -116,7 +122,8 @@ module.exports = route(async (req, res, b) => {
 
   // every voter of one ward, in box order, to print or save that ward's slips
   if (b.all) {
-    const rows = load(v.data).rows.filter((r) => String(r.ward) === String(b.ward) && !r.del).sort((x, y) => x.box - y.box);
+    const rows = load(v.data).rows.filter((r) => String(r.ward) === String(b.ward) && !r.del)
+      .sort(az ? (x, y) => HI(x.hname || x.name || '', y.hname || y.name || '') || HI(x.hrel || x.relname || '', y.hrel || y.relname || '') || x.box - y.box : (x, y) => x.box - y.box);
     if (!rows.length) return send(res, 404, { error: 'no_ward' });
     return send(res, 200, { total: rows.length, results: rows.map(publicFields), ...left });
   }
@@ -149,5 +156,5 @@ module.exports = route(async (req, res, b) => {
     locked = !open && rest.length > page.length && !more;
   }
   send(res, 200, { total, more, ...(locked ? { locked: true, rs: WARD_RS } : {}), results: await withMarks(v.slug, page, user.cand, user.survey), wards: load(v.data).wards, perms: user.perms, survey: user.survey,
-    wp: wfree || (await wardsPaid(user, v.slug)), ...left });
+    wp: wfree || (await wardsPaid(user, v.slug)), wz: wfree || (await wardsAz(user, v.slug)), ...left });
 });

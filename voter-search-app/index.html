@@ -378,6 +378,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .stag { padding: 4px 8px; border-top: 1px dashed var(--line); font-size: 13px; font-weight: 600; background: #fafafa; }
   .stag.c-done { color: #15803d; } .stag.c-coming { color: #854d0e; } .stag.c-absent { color: #b91c1c; }
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  #wardAzBtn { border: 1.5px solid #d97706; border-radius: 8px; padding: 4px 10px; margin: 6px 6px 0 0; font-size: 13px; background: #fff7ed; color: #b45309; font-weight: 600; }
+  .wardopt { display: flex; flex-direction: column; gap: 6px; text-align: left; margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; max-width: 420px; }
+  .wardopt label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+  .wardopt label input { margin-top: 3px; }
+  .wardopt .hint { font-size: 12px; color: var(--muted); }
+  .wardopt b.q { font-size: 14px; }
   #wardPrint { border: 0; border-radius: 8px; padding: 5px 10px; margin: 6px 6px 0 0; font-size: 13px; background: var(--accent); color: #fff; font-weight: 600; }
 
   /* install as an app: a button at the top of every page (and a link in the footer), and the steps */
@@ -684,8 +690,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <!-- which marks this person uses: the survey before the election or polling day (api/signup.js 'mark_mode') -->
       <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
-    <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button>
+    <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button><button id="wardAzBtn" class="hidden" type="button"></button>
       <button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को रेफ़र करें</button></span></div>
+    <div id="wardPanel" class="hidden"></div>
   </header>
   <main>
     <button id="posterCard" class="hidden" type="button"></button>
@@ -1238,6 +1245,7 @@ async function search(more = false, force = false) {
   if (r.error === 'credits' || (r.error === 'limit' && CAN_BUY && !DEMO)) buyOpen();   // no searches left: the buying window
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   if (r.perms) updatePerms(r.perms);
+  if (r.wz != null) WARD_AZ = r.wz;
   if (r.wp != null) { WARD_PAID = r.wp; wardButton(); }
   total = r.total;
   if (!more) { $('results').innerHTML = ''; shown = 0; }
@@ -1261,9 +1269,7 @@ function wardLock(w, rest, rs) {
   d.append(el('div', 'big', '🔒'), el('b', null, L(`वार्ड ${w} की ${rest} पर्चियाँ और हैं`, `${rest} more slips in ward ${w}`)),
     el('div', 'k', L(`सिर्फ़ ₹${rs} में पूरा वार्ड खोलें — सभी पर्चियाँ देखें, निशान लगाएं और PDF डाउनलोड करें। एक बार खरीदें, हमेशा के लिए।`,
       `Unlock the whole ward for just ₹${rs} — see every slip, mark them and download the PDF. Buy once, yours for good.`)));
-  const b = el('button', 'btn', L(`🔓 ₹${rs} में पूरा वार्ड खोलें`, `🔓 Unlock the ward for ₹${rs}`)); b.type = 'button';
-  b.addEventListener('click', () => wardPay(w, b));
-  d.append(b);
+  d.append(wardChoice(w, 'buy', rs));
   return d;
 }
 // the admin (for a village admin: the superadmin) can change what this login may do at any time; the next answer from the
@@ -1927,34 +1933,81 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') listClose(
 
 // A whole ward's slips cost WARD_RS once per ward (api/pay.js wardStart): the button says the price until this login has
 // paid for that ward (WARD_PAID: the wards paid for in this village, from every search answer; true = admins, who don't pay)
-const WARD_RS = 50;
-let WARD_PAID = [];
-const wardPaid = (w) => WARD_PAID === true || (Array.isArray(WARD_PAID) && WARD_PAID.map(String).includes(String(w)));
+// Name order (नाम क्रम, अ–ज्ञ) is WARD_AZ_RS more: with the ward (₹WARD_RS + ₹WARD_AZ_RS) or later on its own (WARD_AZ:
+// the wards bought in name order too, answer field wz; true = this login doesn't pay)
+const WARD_RS = 50, WARD_AZ_RS = 50;
+let WARD_PAID = [], WARD_AZ = [];
+const inList = (list, w) => list === true || (Array.isArray(list) && list.map(String).includes(String(w)));
+const wardPaid = (w) => inList(WARD_PAID, w);
+const wardAz = (w) => wardPaid(w) && inList(WARD_AZ, w);
+const addTo = (list, w) => (Array.isArray(list) ? [...new Set([...list.map(String), String(w)])] : list);
 function wardButton() {
   const w = $('qWard').value;
   $('wardPrint').classList.toggle('hidden', DEMO || !w || !(wardPaid(w) || (CAN_BUY && ONLINE)));
   $('wardPrint').textContent = wardPaid(w) ? L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें (PDF)`, `⬇ Download ward ${w} slips (PDF)`)
     : L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें · ₹${WARD_RS}`, `⬇ Download ward ${w} slips · ₹${WARD_RS}`);
+  $('wardAzBtn').classList.toggle('hidden', DEMO || !w || !wardPaid(w) || wardAz(w) || !(CAN_BUY && ONLINE));
+  $('wardAzBtn').textContent = L(`🔤 नाम क्रम (अ–ज्ञ) भी लें · ₹${WARD_AZ_RS} और`, `🔤 Get name order (A–Z) too · ₹${WARD_AZ_RS} more`);
+  if ($('wardPanel').dataset.w !== String(w)) $('wardPanel').classList.add('hidden');
+}
+// the choice of order: 'buy' → box order ₹WARD_RS or box + name order ₹(WARD_RS + WARD_AZ_RS), then the payment;
+// 'get' (name order bought too) → which order to download in
+let choiceN = 0;
+function wardChoice(w, mode, rs = WARD_RS) {
+  const d = el('div', 'wardopt'), name = `wo${++choiceN}`;
+  const opts = mode === 'buy'
+    ? [['', L(`बॉक्स क्रम · ₹${rs}`, `Box order · ₹${rs}`), L('वोटर सूची जैसा क्रम', 'The same order as the voter list')],
+      ['az', L(`बॉक्स क्रम + नाम क्रम (अ–ज्ञ) · ₹${rs + WARD_AZ_RS}`, `Box order + name order (A–Z) · ₹${rs + WARD_AZ_RS}`), L('दोनों क्रम में डाउनलोड कर सकेंगे', 'Download in either order')]]
+    : [['', L('बॉक्स क्रम', 'Box order'), L('वोटर सूची जैसा क्रम', 'The same order as the voter list')],
+      ['az', L('नाम क्रम (अ–ज्ञ)', 'Name order (A–Z)'), L('अनिल, आशा, इन्द्रा…', 'Anil, Asha, Indra…')]];
+  if (mode === 'get') d.append(el('b', 'q', L('किस क्रम में डाउनलोड करें?', 'Download in which order?')));
+  const btn = el('button', 'btn'); btn.type = 'button';
+  const pick = () => (d.querySelector(`input[name="${name}"]:checked`) || {}).value || '';
+  const label = () => { btn.textContent = mode === 'get' ? L('⬇ डाउनलोड करें (PDF)', '⬇ Download (PDF)')
+    : pick() ? L(`🔓 ₹${rs + WARD_AZ_RS} में खरीदें`, `🔓 Buy for ₹${rs + WARD_AZ_RS}`) : L(`🔓 ₹${rs} में पूरा वार्ड खोलें`, `🔓 Unlock the ward for ₹${rs}`); };
+  for (const [v, t, h] of opts) {
+    const lb = el('label'), inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = v;
+    inp.checked = mode === 'get' ? v === 'az' : v === '';
+    inp.addEventListener('change', label);
+    const tx = el('div'); tx.append(el('div', null, t), el('div', 'hint', h));
+    lb.append(inp, tx); d.append(lb);
+  }
+  label();
+  btn.addEventListener('click', () => (mode === 'get' ? wardDownload(w, pick()) : wardPay(w, btn, !!pick(), true)));
+  d.append(btn);
+  return d;
+}
+function wardPanel(w, mode) {
+  const p = $('wardPanel');
+  if (!p.classList.contains('hidden') && p.dataset.w === String(w) && p.dataset.mode === mode) return p.classList.add('hidden');
+  p.dataset.w = String(w); p.dataset.mode = mode;
+  p.replaceChildren(wardChoice(w, mode));
+  p.classList.remove('hidden');
 }
 // a ward just paid for: if it is the one on screen, list it again, now with every slip
 function wardOpened(w) {
   wardButton();
   if (String($('qWard').value) === String(w) && !$('qName').value.trim() && !$('qRel').value.trim()) search(false, true);
 }
-// pay ₹WARD_RS for ward w in Razorpay's window (locked name and number, as for a pack); payReturn then offers the download
-async function wardPay(w, from = null) {   // from: the 🔓 button under a ward's free slips (else the download button)
+// pay for ward w in Razorpay's window (locked name and number, as for a pack); payReturn then offers the download
+// az: in name order too (for a ward already bought: only that, ₹WARD_AZ_RS); dl: download it at once when nothing is due
+async function wardPay(w, from = null, az = false, dl = false) {   // from: the button pressed (else the download button)
   const btn = from || $('wardPrint'), label = btn.textContent;
   btn.disabled = true; btn.textContent = L('⏳ भुगतान खुल रहा है…', '⏳ Opening the payment…');
-  const [r] = await Promise.all([api('pay', { action: 'start', token: token(), ward: w }), rzpScript().catch(() => null)]);
-  const reset = () => { btn.disabled = false; if (from) from.textContent = label; else wardButton(); };
-  if (r.paid) { WARD_PAID = Array.isArray(WARD_PAID) ? [...WARD_PAID, String(w)] : WARD_PAID; reset(); wardOpened(w); return from ? null : btn.click(); }
+  const [r] = await Promise.all([api('pay', { action: 'start', token: token(), ward: w, ...(az ? { az: true } : {}) }), rzpScript().catch(() => null)]);
+  const reset = () => { btn.disabled = false; if (from) btn.textContent = label; wardButton(); };
+  if (r.paid) {
+    WARD_PAID = addTo(WARD_PAID, w); if (r.az) WARD_AZ = addTo(WARD_AZ, w);
+    reset(); $('wardPanel').classList.add('hidden'); wardOpened(w);
+    return dl || !from ? wardDownload(w, az && r.az ? 'az' : '') : null;
+  }
   if (r.order && window.Razorpay) {
     new window.Razorpay({
       key: r.key, order_id: r.order, amount: r.amount, currency: 'INR', name: 'Voter Search', description: r.description,
       prefill: { name: r.name, contact: r.contact, email: 'void@razorpay.com' },
       readonly: { name: true, contact: !!r.contact, email: true }, hidden: { contact: !!r.contact, email: true },
       theme: { color: '#b4235a' },
-      handler: (resp) => { reset(); payReturn(r.id, resp); },
+      handler: (resp) => { reset(); $('wardPanel').classList.add('hidden'); payReturn(r.id, resp); },
       modal: { ondismiss: reset, confirm_close: true },
     }).open();
     return;
@@ -1964,19 +2017,30 @@ async function wardPay(w, from = null) {   // from: the 🔓 button under a ward
     : L('⚠ अभी ऑनलाइन भुगतान नहीं हो पा रहा — थोड़ी देर बाद फिर कोशिश करें।', '⚠ Online payment is not working right now — please try again a little later.');
   $('count').classList.add('bad');
 }
-$('wardPrint').addEventListener('click', async () => {
-  const w = $('qWard').value, btn = $('wardPrint');
-  if (!w || btn.disabled) return;
-  if (!wardPaid(w)) return wardPay(w);
+// a paid ward's slips as a PDF: sort 'az' = name order (अ–ज्ञ, bought on its own), else box order
+async function wardDownload(w, sort = '') {
+  const btn = $('wardPrint');
+  if (btn.disabled) return;
   btn.disabled = true; btn.textContent = L('पर्चियाँ आ रही हैं…', 'Loading the slips…');
-  const r = await api('search', { token: token(), ward: w, all: true });
+  const r = await api('search', { token: token(), ward: w, all: true, ...(sort ? { sort } : {}) });
   counted(r);
   btn.disabled = false; wardButton();
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
-  if (r.error === 'pay_ward') { WARD_PAID = Array.isArray(WARD_PAID) ? WARD_PAID.filter((x) => String(x) !== String(w)) : []; wardButton(); return wardPay(w); }
+  if (r.error === 'pay_ward') { WARD_PAID = Array.isArray(WARD_PAID) ? WARD_PAID.filter((x) => String(x) !== String(w)) : []; wardButton(); return wardPanel(w, 'buy'); }
+  if (r.error === 'pay_az') { WARD_AZ = Array.isArray(WARD_AZ) ? WARD_AZ.filter((x) => String(x) !== String(w)) : []; wardButton(); return wardPay(w, $('wardAzBtn'), true, true); }
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
-  printSlips(r.results, L(`पर्चियाँ ${VILLAGE.name} वार्ड ${w} (${r.total})`, `Slips ${vn(VILLAGE)} ward ${w} (${r.total})`));
+  $('wardPanel').classList.add('hidden');
+  printSlips(r.results, sort === 'az' ? L(`पर्चियाँ ${VILLAGE.name} वार्ड ${w} · नाम क्रम (${r.total})`, `Slips ${vn(VILLAGE)} ward ${w} · name order (${r.total})`)
+    : L(`पर्चियाँ ${VILLAGE.name} वार्ड ${w} (${r.total})`, `Slips ${vn(VILLAGE)} ward ${w} (${r.total})`));
+}
+$('wardPrint').addEventListener('click', () => {
+  const w = $('qWard').value;
+  if (!w || $('wardPrint').disabled) return;
+  if (!wardPaid(w)) return wardPanel(w, 'buy');
+  if (wardAz(w)) return wardPanel(w, 'get');
+  wardDownload(w);
 });
+$('wardAzBtn').addEventListener('click', () => { const w = $('qWard').value; if (w) wardPay(w, $('wardAzBtn'), true, true); });
 
 // typing searches once the person pauses (fewer requests to the server); Enter searches at once
 for (const id of ['qName', 'qRel']) {
@@ -2852,11 +2916,12 @@ async function payReturn(id, resp = null, tries = 0) {
   buyMoreButton();   // the search count on the page, at once
   const ok = el('button', 'btn', L('ठीक है', 'OK')); ok.type = 'button'; ok.addEventListener('click', buyClose);
   if (r.kind === 'ward' && r.status === 'done') {   // a ward's slips: paid → download them from here
-    if (r.village === SLUG && Array.isArray(WARD_PAID)) WARD_PAID = [...WARD_PAID, String(r.ward)];
+    if (r.village === SLUG) { WARD_PAID = addTo(WARD_PAID, r.ward); if (r.az) WARD_AZ = addTo(WARD_AZ, r.ward); }
     if (r.village === SLUG) wardOpened(r.ward);
     const get = el('button', 'btn', L(`⬇ वार्ड ${r.ward} की पर्चियाँ डाउनलोड / प्रिंट करें`, `⬇ Download / print ward ${r.ward}'s slips`)); get.type = 'button';
     get.addEventListener('click', () => { buyClose(); $('qWard').value = String(r.ward); wardButton(); $('wardPrint').click(); });
-    box.replaceChildren(el('div', 'amt', '🎉'), el('b', null, L(`भुगतान हो गया — वार्ड ${r.ward} की सभी पर्चियाँ आपकी हैं!`, `Payment done — all of ward ${r.ward}'s slips are yours!`)),
+    box.replaceChildren(el('div', 'amt', '🎉'), el('b', null, r.az ? L(`भुगतान हो गया — वार्ड ${r.ward} की पर्चियाँ अब नाम क्रम (अ–ज्ञ) में भी!`, `Payment done — ward ${r.ward}'s slips in name order (A–Z) too!`)
+      : L(`भुगतान हो गया — वार्ड ${r.ward} की सभी पर्चियाँ आपकी हैं!`, `Payment done — all of ward ${r.ward}'s slips are yours!`)),
       el('div', 'k', L('अब पूरे वार्ड की पर्चियाँ दिखेंगी — और जब चाहें दोबारा डाउनलोड कर सकते हैं।', 'Every slip of the ward now shows — and you can download them again any time.')), get, ok);
     wardButton();
     return;

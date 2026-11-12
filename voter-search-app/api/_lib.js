@@ -907,6 +907,10 @@ async function addPaid(u, n, r, by) {
 // pays; village admins pay like everyone else (wardFree).
 const WARD_RS = 50;
 const wardKey = (uid, slug) => `wardpaid:${uid}:${slug}`;
+// the same ward in name order too (नाम क्रम, अ–ज्ञ; api/_routes/search.js "all" with sort 'az'): ₹WARD_AZ_RS more, bought with
+// the ward (₹WARD_RS + ₹WARD_AZ_RS) or later on its own; req field az '1'. Free exactly when the ward is (wardFree).
+const WARD_AZ_RS = 50;
+const wardAzKey = (uid, slug) => `wardaz:${uid}:${slug}`;
 // Whether people pay for wards, set by the superadmin on the admin page (api/_routes/admin.js "ward_pay"): key
 // "wardpay" '1' = they pay, '0' = every ward free; not set yet → env WARD_PAY=1 to pay, else free. Per person, the
 // superadmin may override it (admin.js "ward_pay_user"; user field "wardpay"): 'free' = never pays, 'pay' = pays even
@@ -923,9 +927,11 @@ async function wardFree(u) {
   return !(await wardPayOn());
 }
 const wardsPaid = async (u, slug) => (!u || (await wardFree(u)) ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
+const wardsAz = async (u, slug) => (!u || (await wardFree(u)) ? [] : ((await redis('SMEMBERS', wardAzKey(u.id, slug))) || []).map(String));
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
   await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
+  if (r.az === '1') await redis('SADD', wardAzKey(u.id, r.wv), String(r.ward));
   await refReward(u.id, rs, r.ref);
   await redis('HSET', `req:${r.id}`, 'status', 'done', 'doneAt', new Date().toISOString(), 'doneN', 0, 'doneRs', rs, 'doneBy', by.id, 'doneByName', by.name);
   await redis('HINCRBY', 'pay:rs', by.id, rs);
@@ -1254,7 +1260,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardsPaid, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

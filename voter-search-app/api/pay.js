@@ -12,7 +12,8 @@
 //     → {status: 'open' | 'done' | 'rejected', n, got, bonus, left | bought}   after the checkout (with what it handed
 //     back) or on coming back to the page: the server asks Razorpay (settleOnline in _lib.js). got: searches added
 //     (n + bonus, a coupon's free ones); left / bought: what the person now has.
-//   POST {action: 'start', token, village, ward} → the same, for ₹WARD_RS: all of that ward's slips (wardStart below;
+//   POST {action: 'start', token, village, ward[, az]} → the same, for ₹WARD_RS: all of that ward's slips (wardStart below;
+//     az: in name order too, ₹WARD_AZ_RS more, or only that for a ward already bought;
 //     {paid: true} when this login already has them, or doesn't pay); its 'check' answers {status, kind: 'ward', ward}.
 //   POST <Razorpay's webhook: {event: 'order.paid' | 'payment.captured' | 'payment.authorized' | 'qr_code.credited', payload: …}> → {ok}
 //     (qr_code.credited: a UPI QR a village admin made for someone, api/_routes/admin.js "agent_start")
@@ -28,7 +29,7 @@
 //   POST {action: 'wallet_searches', token, village, rs} → {wallet, got, left | bought}   ₹rs of it → rs searches
 //   POST {action: 'wallet_upi', token, village, rs, upi} → {wallet, wd}   ₹rs of it to that UPI ID (from ₹WALLET_MIN,
 //     one open withdrawal at a time, 3 a day); errors: wallet_min, wallet_low, bad_upi, wd_open, too_many, no_wallet
-const { refFor, refBuyer, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isTxnId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+const { refFor, refBuyer, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, WARD_AZ_RS, wardKey, wardAzKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isTxnId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, b) => {
   if (!b.action && typeof b.event === 'string') {   // Razorpay's webhook
@@ -63,7 +64,7 @@ module.exports = route(async (req, res, b) => {
     // a forged checkout answer is refused outright; a genuine one is still checked with Razorpay (settleOnline)
     if (b.razorpay_signature && !(b.razorpay_order_id === r.txn && razorpaySigned(r.txn, b.razorpay_payment_id, b.razorpay_signature))) return send(res, 400, { error: 'bad_signature' });
     const now = await settleOnline(r.id), u = await getUser(me.id), left = await creditsLeft(u);
-    if (r.kind === 'ward') return send(res, 200, { status: now.status, kind: 'ward', ward: Number(r.ward), village: r.wv });
+    if (r.kind === 'ward') return send(res, 200, { status: now.status, kind: 'ward', ward: Number(r.ward), village: r.wv, az: r.az === '1' });
     const got = now.status === 'done' ? Number(now.doneN) || Number(now.n) : 0;
     return send(res, 200, { status: now.status, n: Number(now.n), got, bonus: got ? Math.max(0, got - Number(now.n)) : 0, ...(isPrepaid(u) ? { left } : { bought: left }) });
   }
@@ -103,25 +104,30 @@ module.exports = route(async (req, res, b) => {
 // the ward list comes from _villages.json: this function doesn't ship the voter data (only api/data.js does, vercel.json)
 // a whole ward's slips: ₹WARD_RS for ward b.ward of village b.village (once; then search.js "all" gives it any time)
 async function wardStart(req, res, b, me, via) {
-  const v = village(b.village), w = parseInt(b.ward, 10);
+  const v = village(b.village), w = parseInt(b.ward, 10), az = !!b.az;
   if (!v || !(w > 0) || !(v.wards || []).map(Number).includes(w)) return send(res, 400, { error: 'no_ward' });
-  if ((await wardFree(me)) || Number(await redis('SISMEMBER', wardKey(me.id, v.slug), String(w))) === 1) return send(res, 200, { paid: true });
+  if (await wardFree(me)) return send(res, 200, { paid: true, az: true });
+  const has = Number(await redis('SISMEMBER', wardKey(me.id, v.slug), String(w))) === 1;
+  const hasAz = has && Number(await redis('SISMEMBER', wardAzKey(me.id, v.slug), String(w))) === 1;
+  if (has && (!az || hasAz)) return send(res, 200, { paid: true, az: hasAz });
+  // az: the ward in name order too, ₹WARD_AZ_RS more (only that, for a ward bought before in box order)
+  const rs = (has ? 0 : WARD_RS) + (az ? WARD_AZ_RS : 0);
   const k = `reqs:${me.id}:${today()}`;
   if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
   await redis('EXPIRE', k, 86400);
   const id = await newReqId();
-  const m = await razorpayCreate({ id, rs: WARD_RS, ward: `${v.slug} ${w}` });
+  const m = await razorpayCreate({ id, rs, ward: `${v.slug} ${w}${az ? ' az' : ''}` });
   if (m.error) {
     console.error('razorpay order', m.error, m.raw);
     return send(res, 502, { error: 'gateway', detail: m.error });
   }
-  await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, v.slug), 'kind', 'ward', 'ward', w, 'wv', v.slug, 'n', 0, 'rs', WARD_RS, ...(via ? ['ref', via.id] : []),
+  await redis('HSET', `req:${id}`, 'user', me.id, 'village', buyVillage(me, v.slug), 'kind', 'ward', 'ward', w, 'wv', v.slug, 'n', 0, 'rs', rs, ...(az ? ['az', '1'] : []), ...(via ? ['ref', via.id] : []),
     'created', new Date().toISOString(), 'status', 'open', 'to', GATEWAY.id, 'gw', 'razorpay', 'txn', m.txn);
   await redis('SET', `rzp:${m.txn}`, id);
   await redis('SADD', 'reqs', id);
   const mobile = String(me.phone || '').replace(/\D/g, '').slice(-10);
-  send(res, 200, { id, key: process.env.RAZORPAY_KEY_ID, order: m.txn, amount: WARD_RS * 100, name: me.name || '',
-    contact: /^[6-9]\d{9}$/.test(mobile) ? `+91${mobile}` : '', description: `Ward ${w} slips` });
+  send(res, 200, { id, key: process.env.RAZORPAY_KEY_ID, order: m.txn, amount: rs * 100, name: me.name || '',
+    contact: /^[6-9]\d{9}$/.test(mobile) ? `+91${mobile}` : '', description: has ? `Ward ${w} slips in name order` : `Ward ${w} slips${az ? ' + name order' : ''}` });
 }
 
 // the wallet's actions (see the top of this file)
