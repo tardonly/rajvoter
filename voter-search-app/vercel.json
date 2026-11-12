@@ -25,7 +25,7 @@
   ],
   "rewrites": [
     {
-      "source": "/api/:fn(search|mark|admin|progress|poster)",
+      "source": "/api/:fn(search|mark|admin|progress|poster|team)",
       "destination": "/api/data?fn=:fn"
     },
     {

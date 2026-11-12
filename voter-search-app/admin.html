@@ -224,6 +224,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .chips .absent { border-color: #dc2626; color: #b91c1c; } .chips .none { border-color: #9ca3af; color: #374151; }
   .chips .done.on { background: #16a34a; color: #fff; } .chips .coming.on { background: #facc15; color: #422006; }
   .chips .absent.on { background: #dc2626; color: #fff; } .chips .none.on { background: #4b5563; color: #fff; }
+  .wardchips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 6px 0; font-size: 14px; }
+  .wardchips span { color: var(--muted); margin-right: 2px; }
+  .wardchips button { min-width: 34px; padding: 3px 8px; border-radius: 999px; border: 1.5px solid #d1d5db; background: #fff; font: inherit; font-size: 13.5px; }
+  .wardchips button.on { background: #1f4e8c; border-color: #1f4e8c; color: #fff; }
   .chips .dslip, .chips .dnoslip { border-color: #7c3aed; color: #6d28d9; } .chips .dslip.on, .chips .dnoslip.on { background: #7c3aed; color: #fff; }
   .voter { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid #eee; }
   .voter:first-child { border-top: 0; }
@@ -898,6 +902,25 @@ $('wpOn').addEventListener('change', async () => {
   $('wpMsg').textContent = L('✓ सेव हो गया — अगली सर्च से लागू', '✓ Saved — applies from the next search');
 });
 // superadmin, on a person's card: ward slips as for everyone, always free, or always paid
+// किसे कौन-सा वार्ड: the wards this person hands out slips in; they see them under "मेरा काम" in the app
+function wardsBox(u) {
+  const box = el('div', 'wardchips');
+  box.append(el('span', null, L('पर्ची बाँटने के वार्ड:', 'Wards to hand out slips:')));
+  for (const w of u.villageWards || []) {
+    const b = el('button', u.wards.includes(w) ? 'on' : null, String(w)); b.type = 'button';
+    b.addEventListener('click', async () => {
+      const want = u.wards.includes(w) ? u.wards.filter((x) => x !== w) : [...u.wards, w];
+      box.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+      const r = await api({ action: 'wards', id: u.id, wards: want });
+      box.querySelectorAll('button').forEach((x) => { x.disabled = false; });
+      if (r.error) { $('listMsg').textContent = errText(r); return; }
+      $('listMsg').textContent = ''; u.wards = r.user.wards;
+      box.querySelectorAll('button').forEach((x) => x.classList.toggle('on', u.wards.includes(Number(x.textContent))));
+    });
+    box.append(b);
+  }
+  return box;
+}
 function wardPayBox(u) {
   const box = el('div', 'limit'), sel = el('select');
   const all = WARD_PAY == null ? '' : WARD_PAY ? L(' (अभी ₹50)', ' (now ₹50)') : L(' (अभी मुफ़्त)', ' (now free)');
@@ -1621,9 +1644,9 @@ const reqWhat = (r) => (r.kind === 'ward' ? L(`वार्ड ${r.ward} की 
   : L(`${r.n}${r.bonus ? ` + ${r.bonus}` : ''} सर्च · ₹${r.rs}`, `${r.n}${r.bonus ? ` + ${r.bonus}` : ''} searches · ₹${r.rs}`));
 // no ward / wardPdf boxes any more: anyone may open a ward's first slips and buy the rest (api/_routes/search.js)
 const PERM_NAME = EN ? { mark: 'Can set marks', print: 'Print slips',
-  progress: 'Can see the voter report', list: 'Can see the voter list' }
+  progress: 'Can see the voter report', list: 'Can see the voter list', team: 'Leads a team (invite link, assigns wards)' }
   : { mark: 'निशान लगा सकते हैं', print: 'पर्ची प्रिंट',
-  progress: 'वोटर रिपोर्ट देख सकते हैं', list: 'वोटर लिस्ट देख सकते हैं' };
+  progress: 'वोटर रिपोर्ट देख सकते हैं', list: 'वोटर लिस्ट देख सकते हैं', team: 'टीम संभाल सकते हैं (लिंक से जोड़ना, वार्ड देना)' };
 function permBoxes(u, msg = 'listMsg', saved) {
   const box = el('div', 'perms');
   for (const [p, label] of Object.entries(PERM_NAME)) {
@@ -2219,7 +2242,7 @@ function person(u) {
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
       limitBox(u, 'listMsg', refresh), wardPayBox(u));   // a daily limit; ward slips paid or free
   }
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]), ...(me.role === 'super' ? [wardPayBox(u)] : []),
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...((u.villageWards || []).length ? [wardsBox(u)] : []), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]), ...(me.role === 'super' ? [wardPayBox(u)] : []),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(me.role === 'super' ? [moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');

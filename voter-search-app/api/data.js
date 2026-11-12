@@ -1,5 +1,5 @@
 // The one function that carries the voter data (api/_data, ~44 MB): /api/search, /api/mark, /api/admin,
-// /api/progress and /api/poster all run here (vercel.json rewrites them to /api/data?fn=<name>), so Vercel stores the data once per
+// /api/progress, /api/poster and /api/team all run here (vercel.json rewrites them to /api/data?fn=<name>), so Vercel stores the data once per
 // deployment instead of once per function. The handlers themselves are in api/_routes/<name>.js.
 // Depending on the rewrite, req.url is "/api/data?fn=<name>" or the original "/api/<name>" (see manifest.js), so both
 // are read.
@@ -9,6 +9,7 @@ const ROUTES = {
   admin: () => require('./_routes/admin.js'),
   progress: () => require('./_routes/progress.js'),
   poster: () => require('./_routes/poster.js'),
+  team: () => require('./_routes/team.js'),
 };
 
 module.exports = (req, res) => {

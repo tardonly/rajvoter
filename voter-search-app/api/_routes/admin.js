@@ -154,6 +154,10 @@ const view = (u) => ({
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
   logins: Number(u.logins || 0), kicks: Number(u.kicks || 0),
+  // टीम (api/_routes/team.js): the wards this person hands out slips in, their own village's wards to choose from, and
+  // whether a team leader took them in through the link
+  wards: u.role === 'user' ? String(u.wards || '').split(',').map(Number).filter(Boolean) : [],
+  villageWards: u.role === 'user' && village(u.village) ? village(u.village).wards : [], team: !!u.team,
 });
 
 // a pack request as the admin page sees it
@@ -627,6 +631,14 @@ module.exports = route(async (req, res, b) => {
 
   if (b.action === 'note') {   // the admins' own note on a person: shown only on the admin page, never in the app
     await redis('HSET', `user:${user.id}`, 'note', String(b.note || '').trim().slice(0, 1000));
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'wards') {   // किसे कौन-सा वार्ड: the wards this person hands out slips in (मेरा काम in the app)
+    if (user.role !== 'user') return send(res, 400, { error: 'not_user' });
+    const own = village(user.village) ? village(user.village).wards : [];
+    const ws = [...new Set((Array.isArray(b.wards) ? b.wards : []).map((w) => parseInt(w, 10)))].filter((w) => own.includes(w)).sort((x, y) => x - y);
+    await redis('HSET', `user:${user.id}`, 'wards', ws.join(','));
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 

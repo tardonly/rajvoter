@@ -592,8 +592,9 @@ async function whoIs(token, slug) {
 // person. Admins and the superadmin can do all of them.
 //   mark: set status marks on slips · ward: list a whole ward without a name · wardPdf: print / save a whole ward's
 //   slips · print: the प्रिंट / PDF button on a slip
-const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress', 'list'];   // progress: वार्ड अनुसार प्रगति in the app,
-// list: its मतदाता सूची (voters by mark) — both api/_routes/progress.js
+const PERMS = ['mark', 'ward', 'wardPdf', 'print', 'progress', 'list', 'team'];   // progress: वार्ड अनुसार प्रगति in the app,
+// list: its मतदाता सूची (voters by mark) — both api/_routes/progress.js; team: lead a टीम (invite link, जोड़ें, wards:
+// api/_routes/team.js)
 const DEFAULT_PERMS = ['mark', 'print', 'progress'];   // for new users, and users added before permissions existed
 const permsOf = (u) => (u.perms === undefined ? DEFAULT_PERMS.slice() : String(u.perms).split(',').filter((p) => PERMS.includes(p)));
 // an admin's in the app: all of them until the superadmin sets them (admins made before these could be set)

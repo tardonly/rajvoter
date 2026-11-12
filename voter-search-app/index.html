@@ -388,6 +388,39 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .dgiven small { font-size: 12px; color: var(--muted); }
   .family .fh .tbtn.dall { color: #6d28d9; border-color: #c4b5fd; }
   .prog .c-slip { color: #6d28d9; }
+  /* टीम: privacy line, the join link's heading, मेरा काम and the leader's screen */
+  .priv { display: flex; gap: 6px; align-items: flex-start; margin-top: 12px; padding: 7px 10px; border-radius: 9px; background: #ecfdf5;
+    border: 1px solid #a7f3d0; color: #065f46; font-size: 12.5px; text-align: left; line-height: 1.45; }
+  .priv:empty { display: none; }
+  .teamnote { margin: -8px 0 14px; padding: 8px 10px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 14px; font-weight: 600; }
+  .workcard { background: var(--card); border: 1.5px solid #c4b5fd; border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; display: grid; gap: 7px; }
+  .workcard .wh { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; }
+  .workcard .wh small { font-weight: 400; color: var(--muted); }
+  .workcard .wrow { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; font-size: 14px; }
+  .workcard .wbar { height: 7px; background: #ede9fe; border-radius: 4px; overflow: hidden; }
+  .workcard .wbar i { display: block; height: 100%; background: #7c3aed; }
+  .workcard .wbtn { border: 1px solid #c4b5fd; color: #6d28d9; background: #fff; border-radius: 8px; padding: 4px 9px; font-size: 13px; font-weight: 600; }
+  .workcard .houses { display: grid; gap: 4px; max-height: 320px; overflow-y: auto; }
+  .workcard .house { display: flex; justify-content: space-between; gap: 8px; align-items: center; width: 100%; text-align: left; border: 1px solid var(--line);
+    background: #fff; border-radius: 8px; padding: 6px 9px; font-size: 14px; }
+  .workcard .house b { font-variant-numeric: tabular-nums; color: #6d28d9; white-space: nowrap; }
+  .workcard .pend { color: #92400e; background: #fffbeb; border-radius: 8px; padding: 7px 9px; font-size: 14px; }
+  #teamBody .sec { margin: 12px 0 4px; font-weight: 700; font-size: 15px; }
+  #teamBody .tlink { display: grid; gap: 6px; padding: 9px; border: 1px solid var(--line); border-radius: 10px; background: #f9fafb; }
+  #teamBody .tlink code { font-size: 13px; word-break: break-all; }
+  #teamBody .tlink .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  #teamBody button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 10px; font-size: 14px; font-weight: 600; }
+  #teamBody button.wa { background: #16a34a; border-color: #16a34a; color: #fff; }
+  #teamBody button.go { background: #1f4e8c; border-color: #1f4e8c; color: #fff; }
+  #teamBody button.no { color: var(--bad); border-color: #fca5a5; }
+  #teamBody .tp { padding: 8px 0; border-top: 1px solid #eee; display: grid; gap: 6px; }
+  #teamBody .tp:first-of-type { border-top: 0; }
+  #teamBody .tp .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  #teamBody .tp .sub { font-size: 13px; color: var(--muted); }
+  #teamBody .req { border: 1.5px solid #f59e0b; border-radius: 10px; padding: 6px 10px; background: #fffbeb; }
+  #teamBody .wsel { display: flex; flex-wrap: wrap; gap: 5px; }
+  #teamBody .wsel button { min-width: 36px; padding: 3px 8px; border-radius: 999px; font-weight: 500; }
+  #teamBody .wsel button.on { background: #1f4e8c; border-color: #1f4e8c; color: #fff; }
   .stag { padding: 4px 8px; border-top: 1px dashed var(--line); font-size: 13px; font-weight: 600; background: #fafafa; }
   .stag.c-done { color: #15803d; } .stag.c-coming { color: #854d0e; } .stag.c-absent { color: #b91c1c; }
   .countrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
@@ -534,6 +567,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     <img src="/icon-192.png" alt="">
     <h1>Voter Search</h1>
     <p id="lockSub"></p>
+    <div id="teamNote" class="teamnote hidden"></div>
     <form id="lockForm" novalidate>
       <!-- the mobile number first: a known number then gets the password box, a new one signs up -->
       <input id="phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर डालें">
@@ -563,6 +597,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <div class="lockalt"><button id="phoneBack" class="hidden" type="button">← नंबर बदलें</button><button id="pwOnly" type="button">एडमिन? सीधे पासवर्ड से खोलें</button></div>
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
+    <div class="priv" id="lockPriv"></div>
     <div id="demoLink" class="demolink hidden"><span>खाता नहीं है? बिना खाते के असली वोटर लिस्ट में सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
@@ -633,6 +668,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <span><button id="progReload" type="button">↻ रिफ्रेश</button> <button id="progClose" type="button" aria-label="बंद करें">✕</button></span></div>
     <div id="progBody"></div>
     <div class="note" id="progNote"></div>
+    <div class="priv" id="progPriv"></div>
   </div>
 </div>
 
@@ -643,6 +679,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     <div class="note" id="posterNote"></div>
   </div>
   <input id="posterFile" type="file" accept="image/*" hidden>
+</div>
+
+<div id="teamPop" class="progpop hidden" role="dialog" aria-label="टीम">
+  <div class="card">
+    <div class="head"><h2 id="teamTitle">टीम</h2>
+      <span><button id="teamReload" type="button">↻ रिफ्रेश</button> <button id="teamClose" type="button" aria-label="बंद करें">✕</button></span></div>
+    <div id="teamBody"></div>
+    <div class="note" id="teamNoteMsg"></div>
+  </div>
 </div>
 
 <div id="listPop" class="progpop hidden" role="dialog" aria-label="वोटर लिस्ट">
@@ -686,7 +731,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   <div class="cpnbanners hidden" id="cpnBanners"></div>
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><button id="teamBtn" class="hidden" type="button">टीम</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <!-- बोलकर सर्च: the mic fills the name box by speech (Web Speech API, Hindi); hidden where the browser has none -->
@@ -714,6 +759,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     <div id="wardPanel" class="hidden"></div>
   </header>
   <main>
+    <div id="workCard" class="workcard hidden"></div>
     <button id="posterCard" class="hidden" type="button"></button>
     <div id="results"></div>
     <button class="btn hidden" id="more" type="button">और दिखाएं</button>
@@ -765,7 +811,7 @@ const STATIC_EN = {
   'दूसरे ऐप में शेयर करें': 'Share in another app', 'लिंक कॉपी करें': 'Copy link', 'वीडियो पेज का लिंक कॉपी करें': 'Copy the videos page link',
   '⬇ वीडियो (फ़ोन)': '⬇ Video (phone)', '⬇ वीडियो (लैपटॉप)': '⬇ Video (laptop)',
   'आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।': 'The icon opens this page without the browser. Internet is still needed.',
-  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
+  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'टीम': 'Team', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
   'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव सर्च करें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'ज़िला': 'District', 'नाम से (अ–ज्ञ)': 'By name (A–Z)', 'ज़्यादा वोटर पहले': 'Most voters first', 'कम वोटर पहले': 'Fewest voters first', 'क्रम': 'Order', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
@@ -817,6 +863,13 @@ const store = {  // localStorage can be blocked (private mode); then the user ju
   const u = new URL(location.href), ref = u.searchParams.get('ref');
   if (ref && /^[0-9a-f]{10}$/.test(ref)) store.set('ref', ref, true);
   if (ref != null) { u.searchParams.delete('ref'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+}
+// a team leader's link (<site>/<village>?team=<code>, api/_routes/team.js): kept on this phone until the person has logged
+// in and asked to join, and taken off the address
+{
+  const u = new URL(location.href), tc = u.searchParams.get('team');
+  if (tc && /^[a-z0-9]{8}$/.test(tc)) store.set('teamJoin', JSON.stringify({ slug: SLUG, code: tc }), true);
+  if (tc != null) { u.searchParams.delete('team'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
 }
 // this app is online-only: remove any offline cache an older version may have installed
 if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
@@ -976,7 +1029,7 @@ function showApp(name, admin, villages, perms, cand, role) {
   $('pwBtn').classList.toggle('hidden', DEMO || !MY_PHONE);   // a person's own login (not the superadmin's, not the demo)
   // logins with several villages, and a signed-up login that may still move itself to another village
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1) && !MOVES_LEFT);
-  IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); posterButton(); buyMoreButton(); cpnBanners();
+  IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); posterButton(); buyMoreButton(); cpnBanners(); teamStart();
   $('modeRow').classList.toggle('hidden', DEMO || role === 'super');   // the superadmin switches everyone on the admin page
   if (DEMO) {   // ← वापस: back to the start page; गाँव बदलें: back to the demo's villages
     $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); $('switchBtn').href = '/demo'; demoBar();
@@ -1296,7 +1349,7 @@ function wardLock(w, rest, rs) {
 function updatePerms(p) {
   if (!Array.isArray(p) || p.join() === PERMS.join()) return;
   PERMS = p;
-  wardButton(); progButton(); listButton();
+  wardButton(); progButton(); listButton(); teamButton();
   if (shown) search(false, true);   // redraw the slips with the right buttons
 }
 
@@ -1646,6 +1699,7 @@ async function setSlip(rows, ds, on) {
   if (x.error) { ds.forEach((d, i) => d && showSlip(d, before[i])); alert(MSG[x.error] || MSG.server); return; }
   const s = on ? { by: x.by, at: x.at } : null;
   rows.forEach((r, i) => { r.slip = s; if (ds[i]) showSlip(ds[i], s); });
+  if (!$('workCard').classList.contains('hidden')) workCard();   // मेरा काम counts
 }
 // marks set on another phone reach this one without a new search: every minute, and when the app comes back on screen
 async function refreshMarks() {
@@ -1986,6 +2040,177 @@ $('listBtn').addEventListener('click', () => listOpen());
 $('listReload').addEventListener('click', () => listLoad());
 $('listClose').addEventListener('click', listClose);
 $('listMore').addEventListener('click', () => listLoad(true));
+
+// ---------- टीम (api/_routes/team.js): the leader's screen, the worker's मेरा काम, joining through the WhatsApp link ----------
+// Only what is true: other candidates cannot see a team's marks (markHash in api/_lib.js); the village admin and the
+// superadmin can.
+const PRIV = L('🔒 आपकी टीम का हिसाब सिर्फ़ आपकी टीम देखती है। दूसरा उम्मीदवार इसे नहीं देख सकता।',
+  '🔒 Only your team sees your team\'s marks and counts. No other candidate can see them.');
+$('lockPriv').textContent = L('🔒 आपकी टीम के निशान और गिनती सिर्फ़ आपकी टीम देखती है।', '🔒 Only your team sees your team\'s marks and counts.');
+$('progPriv').textContent = PRIV;
+const teamJoin = () => { try { const j = JSON.parse(store.get('teamJoin')); return j && j.slug === SLUG ? j : null; } catch (e) { return null; } };
+// the join link's heading on the login page, before anyone logs in
+if (teamJoin()) api('team', { action: 'code', code: teamJoin().code }).then((r) => {
+  if (r.error) { store.del('teamJoin'); return; }
+  $('teamNote').textContent = L(`👥 ${r.teamName} की टीम में जुड़ें — अपने मोबाइल नंबर से लॉगिन या साइन-अप करें`,
+    `👥 Join ${r.teamName}'s team — log in or sign up with your mobile number`);
+  $('teamNote').classList.remove('hidden');
+});
+const TEAM_MSG = {
+  team_link: L('यह टीम लिंक अब नहीं चलता — टीम वालों से नया लिंक माँगें', 'This team link no longer works — ask the team for a new one'),
+  team_other: L('यह लिंक किसी और गाँव का है, या एडमिन टीम में नहीं जुड़ते', 'This link is for another village, or admins do not join teams'),
+  no_team: L('टीम संभालने की अनुमति नहीं है — एडमिन से पूछें', 'You may not lead a team — ask your admin'),
+  not_your_ward: L('यह वार्ड आपको नहीं दिया गया', 'This ward was not given to you'),
+};
+const teamErr = (r) => TEAM_MSG[r.error] || MSG[r.error] || MSG.server;
+const leadsTeam = () => !DEMO && (IS_ADMIN || can('team'));
+function teamButton() { $('teamBtn').classList.toggle('hidden', !leadsTeam()); }
+async function teamStart() {
+  teamButton();
+  if (DEMO) return;
+  const j = teamJoin();
+  if (j) {   // came through a leader's link: ask to join, once
+    store.del('teamJoin');
+    const r = await api('team', { action: 'join', token: token(), code: j.code });
+    if (r.error) alert(teamErr(r));
+  }
+  workCard();
+}
+// मेरा काम: a worker's wards with the slips handed out there, and the houses still waiting
+async function workCard() {
+  const r = await api('team', { action: 'mine', token: token() });
+  const box = $('workCard');
+  box.replaceChildren();
+  if (r.error || (!r.pending && !r.wards.length && !(r.team && !r.lead))) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  if (r.pending) {
+    box.append(el('div', 'pend', L('⏳ टीम में जुड़ने की अर्ज़ी भेज दी। टीम वालों के "जोड़ें" दबाते ही आप टीम में होंगे।',
+      '⏳ Your request to join the team is sent. You are in once the team taps "Add".')));
+    return;
+  }
+  const wh = el('div', 'wh'); wh.append(L('📋 मेरा काम', '📋 My work'), el('small', null, r.teamName ? L(`${r.teamName} की टीम`, `${r.teamName}'s team`) : ''));
+  box.append(wh);
+  if (!r.wards.length) { box.append(el('div', 'pend', L('आप टीम में हैं। अभी कोई वार्ड नहीं दिया गया।', 'You are in the team. No ward given yet.'))); return; }
+  for (const w of r.wards) {
+    const row = el('div', 'wrow'), bar = el('div', 'wbar'), i = el('i');
+    i.style.width = `${(100 * w.slip) / (w.total || 1)}%`; bar.append(i);
+    const hb = el('button', 'wbtn', L('🏠 बाकी घर', '🏠 Houses left')); hb.type = 'button';
+    const list = el('div', 'houses hidden');
+    hb.addEventListener('click', () => housesLeft(w.ward, list, hb));
+    row.append(el('b', null, `${L('वार्ड', 'Ward')} ${w.ward}`), bar, el('span', null, L(`${w.slip} / ${w.total} पर्ची`, `${w.slip} / ${w.total} slips`)));
+    box.append(row, hb, list);
+  }
+}
+async function housesLeft(ward, list, btn) {
+  if (!list.classList.contains('hidden')) { list.classList.add('hidden'); return; }
+  btn.disabled = true;
+  const r = await api('team', { action: 'houses', token: token(), ward });
+  btn.disabled = false;
+  if (r.error) { alert(teamErr(r)); return; }
+  list.replaceChildren(el('div', 'sub', r.total ? L(`वार्ड ${ward}: ${r.total} घरों में पर्ची बाकी`, `Ward ${ward}: ${r.total} houses still waiting`)
+    : L(`वार्ड ${ward} में सबको पर्ची मिल गई 🎉`, `Everyone in ward ${ward} got a slip 🎉`)));
+  for (const h of r.houses) {
+    const b = el('button', 'house'); b.type = 'button';
+    b.append(el('span', null, L(`मकान ${h.house} · ${h.head} जी का परिवार`, `House ${h.house} · ${who(h.head)}'s family`)), el('b', null, L(`${h.left}/${h.n} बाकी`, `${h.left}/${h.n} left`)));
+    b.addEventListener('click', () => {   // the house's voters, by house number in that ward
+      $('qWard').value = String(ward); $('qName').value = h.house; $('qRel').value = ''; $('qMark').value = '';
+      search(); window.scrollTo({ top: $('workCard').offsetTop + $('workCard').offsetHeight, behavior: 'smooth' });
+    });
+    list.append(b);
+  }
+  list.classList.remove('hidden');
+}
+// the leader's टीम screen: the link to share, requests to add, the team and each one's wards
+const tm = { data: null, open: '' };
+async function teamLoad(action = 'view', extra = {}) {
+  $('teamNoteMsg').textContent = action === 'view' ? L('आ रहा है…', 'Loading…') : '';
+  const r = await api('team', { action, token: token(), ...extra });
+  if (r.error) { $('teamNoteMsg').textContent = teamErr(r); return; }
+  tm.data = r; $('teamNoteMsg').textContent = ''; teamDraw();
+}
+function wardPicker(all, chosen) {
+  const box = el('div', 'wsel'), set = new Set(chosen);
+  const allB = el('button', null, L('सारे', 'All')); allB.type = 'button';
+  const draw = () => { box.querySelectorAll('button[data-w]').forEach((b) => b.classList.toggle('on', set.has(Number(b.dataset.w)))); allB.classList.toggle('on', set.size === all.length); };
+  allB.addEventListener('click', () => { if (set.size === all.length) set.clear(); else all.forEach((w) => set.add(w)); draw(); });
+  box.append(allB);
+  for (const w of all) {
+    const b = el('button', null, String(w)); b.type = 'button'; b.dataset.w = w;
+    b.addEventListener('click', () => { if (set.has(w)) set.delete(w); else set.add(w); draw(); });
+    box.append(b);
+  }
+  draw();
+  return { box, get: () => [...set].sort((a, b) => a - b) };
+}
+function teamDraw() {
+  const r = tm.data, body = $('teamBody');
+  $('teamTitle').textContent = L(`टीम · ${r.teamName}`, `Team · ${r.teamName}`);
+  body.replaceChildren(el('div', 'priv', PRIV));
+  // the link
+  const link = `${location.origin}/${SLUG}?team=${r.code}`;
+  const msg = L(`${r.teamName} ने आपको ${VILLAGE.name} चुनाव की टीम में बुलाया है। यह लिंक खोलें और अपने मोबाइल नंबर से जुड़ें:\n${link}`,
+    `${r.teamName} has invited you to the ${vn(VILLAGE)} election team. Open this link and join with your mobile number:\n${link}`);
+  const lk = el('div', 'tlink'), btns = el('div', 'btns');
+  const wa = el('button', 'wa', L('WhatsApp पर टीम लिंक भेजें', 'Send the team link on WhatsApp')); wa.type = 'button';
+  wa.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener'));
+  const cp = el('button', null, L('लिंक कॉपी करें', 'Copy link')); cp.type = 'button';
+  cp.addEventListener('click', async () => { $('teamNoteMsg').textContent = (await copyText(link)) ? L('लिंक कॉपी हो गया', 'Link copied') : link; });
+  const nw = el('button', null, L('नया लिंक बनाएं', 'Make a new link')); nw.type = 'button';
+  nw.addEventListener('click', () => { if (confirm(L('नया लिंक बनाएं? पुराना लिंक फिर नहीं चलेगा।', 'Make a new link? The old one stops working.'))) teamLoad('newlink'); });
+  btns.append(wa, cp, nw);
+  lk.append(el('div', null, L('यह लिंक भेजें। जो खोलेगा, वह अर्ज़ी भेजेगा; आपके "जोड़ें" दबाने पर ही टीम में आएगा।',
+    'Send this link. Whoever opens it sends a request; they join only when you tap "Add".')), el('code', null, link), btns);
+  body.append(lk);
+  // requests
+  if (r.reqs.length) {
+    body.append(el('div', 'sec', L(`जुड़ने की अर्ज़ी (${r.reqs.length})`, `Requests to join (${r.reqs.length})`)));
+    for (const q of r.reqs) {
+      const row = el('div', 'tp req'), top = el('div', 'top');
+      top.append(el('b', null, who(q.name)), el('span', 'sub', `${q.phone} · ${when(q.at)}`));
+      row.append(top);
+      if (tm.open === `r:${q.id}`) {
+        const pick = wardPicker(r.wards, []), ok = el('button', 'go', L('टीम में जोड़ें', 'Add to team')); ok.type = 'button';
+        ok.addEventListener('click', () => { tm.open = ''; teamLoad('accept', { id: q.id, wards: pick.get() }); });
+        row.append(el('div', 'sub', L(`${who(q.name)} के वार्ड चुनें (बाद में भी बदल सकते हैं)`, `Pick ${who(q.name)}'s wards (can change later)`)), pick.box, ok);
+      } else {
+        const btns2 = el('div', 'btns'), add = el('button', 'go', L('जोड़ें', 'Add')), no = el('button', 'no', L('मना करें', 'Decline'));
+        add.type = 'button'; no.type = 'button';
+        add.addEventListener('click', () => { tm.open = `r:${q.id}`; teamDraw(); });
+        no.addEventListener('click', () => { if (confirm(L(`${who(q.name)} की अर्ज़ी मना करें?`, `Decline ${who(q.name)}'s request?`))) teamLoad('reject', { id: q.id }); });
+        btns2.append(add, no); btns2.style.display = 'flex'; btns2.style.gap = '6px'; row.append(btns2);
+      }
+      body.append(row);
+    }
+  }
+  // members
+  body.append(el('div', 'sec', L(`कार्यकर्ता (${r.members.length})`, `Workers (${r.members.length})`)));
+  if (!r.members.length) body.append(el('div', 'sub', L('अभी टीम में कोई नहीं। ऊपर का लिंक WhatsApp पर भेजें।', 'No one in the team yet. Send the link above on WhatsApp.')));
+  for (const m of r.members) {
+    const row = el('div', 'tp'), top = el('div', 'top');
+    top.append(el('b', null, who(m.name)), el('span', 'sub', m.phone));
+    row.append(top, el('div', 'sub', m.wards.length ? L(`वार्ड ${m.wards.join(', ')} · ${m.slip}/${m.total} पर्ची बँटी`, `Ward ${m.wards.join(', ')} · ${m.slip}/${m.total} slips given`)
+      : L('वार्ड नहीं दिया', 'No ward given')));
+    if (tm.open === `m:${m.id}`) {
+      const pick = wardPicker(r.wards, m.wards), sv = el('button', 'go', L('सेव करें', 'Save')), rm = el('button', 'no', L('टीम से हटाएं', 'Remove from team'));
+      sv.type = 'button'; rm.type = 'button';
+      sv.addEventListener('click', () => { tm.open = ''; teamLoad('wards', { id: m.id, wards: pick.get() }); });
+      rm.addEventListener('click', () => { if (confirm(L(`${who(m.name)} को टीम से हटाएं?`, `Remove ${who(m.name)} from the team?`))) { tm.open = ''; teamLoad('remove', { id: m.id }); } });
+      const b2 = el('div'); b2.style.display = 'flex'; b2.style.gap = '6px'; b2.append(sv, rm);
+      row.append(pick.box, b2);
+    } else {
+      const ed = el('button', null, L('वार्ड बदलें', 'Change wards')); ed.type = 'button';
+      ed.addEventListener('click', () => { tm.open = `m:${m.id}`; teamDraw(); });
+      row.append(ed);
+    }
+    body.append(row);
+  }
+}
+function teamClose() { $('teamPop').classList.add('hidden'); tm.open = ''; }
+$('teamBtn').addEventListener('click', () => { $('teamPop').classList.remove('hidden'); teamLoad(); });
+$('teamReload').addEventListener('click', () => teamLoad());
+$('teamClose').addEventListener('click', teamClose);
+$('teamPop').addEventListener('click', (e) => { if (e.target === $('teamPop')) teamClose(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') teamClose(); });
 $('listWard').addEventListener('change', () => listLoad());
 document.querySelectorAll('#listStatus button').forEach((b) => b.addEventListener('click', () => { ls.status = b.dataset.s; listLoad(); }));
 $('listPop').addEventListener('click', (e) => { if (e.target === $('listPop')) listClose(); });
