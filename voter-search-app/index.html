@@ -2068,32 +2068,41 @@ $('qWard').addEventListener('change', () => search());
 (() => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
-  const btn = $('micBtn'), msg = $('micMsg');
-  let rec = null;
+  const btn = $('micBtn'), msg = $('micMsg'), box = $('qName');
+  let rec = null, heard = '', quiet = null;
   const say = (t) => { msg.textContent = t; msg.classList.toggle('hidden', !t); };
-  const stop = () => { btn.classList.remove('on'); btn.setAttribute('aria-pressed', 'false'); rec = null; };
+  const clean = (t) => t.replace(/[।.,?!]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // Stop on our own after a pause: 1.8 s after the last word, or 7 s if nothing is said at all.
+  const wait = (ms) => { clearTimeout(quiet); quiet = setTimeout(() => rec && rec.stop(), ms); };
+  const done = () => {
+    clearTimeout(quiet); btn.classList.remove('on'); btn.setAttribute('aria-pressed', 'false'); rec = null;
+    if (heard) { searchId = ''; clearTimeout(timer); search(); }
+  };
   btn.classList.remove('hidden');
   btn.addEventListener('click', () => {
     if (rec) { rec.stop(); return; }
+    heard = ''; say('');
     rec = new SR();
-    rec.lang = 'hi-IN'; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = false;
-    let heard = '';
+    rec.lang = 'hi-IN'; rec.interimResults = true; rec.maxAlternatives = 1; rec.continuous = true;
     rec.onresult = (e) => {
-      heard = [...e.results].map((r) => r[0].transcript).join(' ').replace(/[।.,?!]+/g, ' ').replace(/\s+/g, ' ').trim();
-      $('qName').value = heard;
+      // Final words so far + the words still being heard, written into the box as they come.
+      let fin = '', live = '';
+      for (const r of e.results) (r.isFinal ? (fin += ' ' + r[0].transcript) : (live += ' ' + r[0].transcript));
+      heard = clean(fin + ' ' + live);
+      box.value = heard;
+      wait(1800);
     };
     rec.onerror = (e) => {
+      if (e.error === 'aborted') return;
       say(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? L('माइक की अनुमति दें (ब्राउज़र सेटिंग में)', 'Allow the microphone (browser settings)')
         : e.error === 'no-speech' ? L('कुछ सुनाई नहीं दिया — फिर से 🎤 दबाकर बोलें', 'Heard nothing — tap 🎤 and speak again')
+        : e.error === 'audio-capture' ? L('माइक नहीं मिला', 'No microphone found')
         : e.error === 'network' ? L('बोलकर सर्च के लिए इंटरनेट चाहिए', 'Voice search needs the internet') : L('फिर से कोशिश करें', 'Please try again'));
     };
-    rec.onend = () => {
-      stop();
-      if (heard) { say(''); searchId = ''; clearTimeout(timer); search(); }
-    };
-    try { rec.start(); } catch { stop(); return; }
-    btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
-    say('');
+    rec.onend = done;
+    try { rec.start(); } catch { rec = null; say(L('फिर से कोशिश करें', 'Please try again')); return; }
+    box.value = ''; btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
+    wait(7000);
   });
 })();
 // ↺ रीसेट: every box and filter empty again, back to the hint; the next name is a new search
