@@ -16,7 +16,7 @@
 //     'accept' {id, wards} · 'reject' {id} · 'remove' {id} · 'wards' {id, wards} · 'newlink'  → the same as 'view'
 const crypto = require('crypto');
 const { village, redis, pipeline, whoIs, getUser, getUsers, getCand, candReach, allSlips, markKey, DEFAULT_PERMS, send, route } = require('../_lib.js');
-const { load } = require('../_search.js');
+const { load, familyHead } = require('../_search.js');
 
 const CODE_RE = /^[a-z0-9]{8}$/;
 const groupKey = (slug, cand) => `${slug}|${cand || ''}`;
@@ -110,15 +110,12 @@ module.exports = route(async (req, res, b) => {
       for (const r of load(v.data).rows) {
         if (r.ward !== ward || r.del) continue;
         const h = String(r.house || '').trim() || `#${r.box}`;
-        if (!houses.has(h)) houses.set(h, { house: h, head: null, n: 0, left: 0, key: markKey(r) });
+        if (!houses.has(h)) houses.set(h, { house: h, rows: [], n: 0, left: 0, key: markKey(r) });
         const x = houses.get(h);
-        x.n++;
+        x.n++; x.rows.push(r);
         if (!given[markKey(r)]) x.left++;
-        // the family's name: its eldest man, else its eldest voter
-        const age = Number(r.age) || 0, man = /^(M|पु)/i.test(String(r.sex || ''));
-        if (!x.head || (man && !x.head.man) || (man === x.head.man && age > x.head.age)) x.head = { name: r.hname || r.name, age, man };
       }
-      const list = [...houses.values()].filter((x) => x.left).map((x) => ({ ...x, head: x.head.name }))
+      const list = [...houses.values()].filter((x) => x.left).map(({ rows, ...x }) => { const hd = familyHead(rows); return { ...x, head: hd.hname || hd.name }; })
         .sort((x, y) => (parseInt(x.house, 10) || 1e9) - (parseInt(y.house, 10) || 1e9) || String(x.house).localeCompare(String(y.house)));
       return send(res, 200, { ward, houses: list.slice(0, 400), more: list.length > 400, total: list.length });
     }

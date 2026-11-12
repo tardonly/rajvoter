@@ -388,6 +388,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .dgiven small { font-size: 12px; color: var(--muted); }
   .family .fh .tbtn.dall { color: #6d28d9; border-color: #c4b5fd; }
   .prog .c-slip { color: #6d28d9; }
+  .fammode { display: flex; gap: 6px; margin: 2px 0 8px; }
+  .fammode button { flex: 1; padding: 6px 8px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-size: 14px; font-weight: 600; color: var(--muted); }
+  .fammode button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .famrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; background: var(--card);
+    border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 8px; font-size: 15px; }
+  .famrow small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .famrow .n { background: #e3ecf8; color: var(--accent); font-weight: 700; border-radius: 8px; padding: 2px 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .famback { margin: 0 0 10px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 12px; font-size: 14px; font-weight: 600; color: var(--accent); }
   /* टीम: privacy line, the join link's heading, मेरा काम and the leader's screen */
   .priv { display: flex; gap: 6px; align-items: flex-start; margin-top: 12px; padding: 7px 10px; border-radius: 9px; background: #ecfdf5;
     border: 1px solid #a7f3d0; color: #065f46; font-size: 12.5px; text-align: left; line-height: 1.45; }
@@ -737,6 +745,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <!-- बोलकर सर्च: the mic fills the name box by speech (Web Speech API, Hindi); hidden where the browser has none -->
       <div class="qmic"><input id="qName" type="search" placeholder="नाम / Name / मकान नं. / Voter ID" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search"><button id="micBtn" class="hidden" type="button" title="बोलकर सर्च" aria-label="बोलकर सर्च">🎤</button></div>
       <div id="micMsg" class="micmsg hidden" role="status"></div>
+      <!-- परिवार से: one row per house where someone matches the name (api/_routes/search.js houses) -->
+      <div class="fammode" id="famMode" role="group" aria-label="सर्च"><button type="button" data-fm="0" class="on">वोटर से</button><button type="button" data-fm="1">👪 परिवार से</button></div>
       <div class="row2">
         <input id="qRel" type="search" placeholder="पिता / पति का नाम" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
         <select id="qWard" aria-label="वार्ड"><option value="">सभी वार्ड</option></select>
@@ -811,7 +821,7 @@ const STATIC_EN = {
   'दूसरे ऐप में शेयर करें': 'Share in another app', 'लिंक कॉपी करें': 'Copy link', 'वीडियो पेज का लिंक कॉपी करें': 'Copy the videos page link',
   '⬇ वीडियो (फ़ोन)': '⬇ Video (phone)', '⬇ वीडियो (लैपटॉप)': '⬇ Video (laptop)',
   'आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।': 'The icon opens this page without the browser. Internet is still needed.',
-  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'टीम': 'Team', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
+  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'टीम': 'Team', 'वोटर से': 'By voter', '👪 परिवार से': '👪 By family', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
   'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव सर्च करें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'ज़िला': 'District', 'नाम से (अ–ज्ञ)': 'By name (A–Z)', 'ज़्यादा वोटर पहले': 'Most voters first', 'कम वोटर पहले': 'Fewest voters first', 'क्रम': 'Order', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
@@ -1290,10 +1300,63 @@ function hint() {
 }
 // a name with one letter matches nearly everyone: wait for a second one (a house number like 5 is fine)
 const tooShort = (s) => s && !/^\d+$/.test(s) && s.replace(/\s/g, '').length < 2;
+// परिवार से: the houses where someone matches, one row each; a tap opens that family (slips, वंशावली, PDF, पर्ची दी)
+let FAM_MODE = false;
+async function familySearch(q, force) {
+  const asked = ['fam', q.name, q.rel, q.ward, q.ward ? q.mark : ''].join('|');
+  if (!force && asked === lastAsked) return;
+  lastAsked = asked;
+  $('count').classList.remove('bad'); $('more').classList.add('hidden');
+  if (tooShort(q.name) || tooShort(q.rel)) { ++seq; $('results').innerHTML = ''; $('count').textContent = L('कम से कम दो अक्षर लिखें', 'Type at least two letters'); return; }
+  const mine = ++seq;
+  $('count').textContent = L('सर्च कर रहे हैं…', 'Searching…');
+  const r = await api('search', { ...q, houses: 1, searchId, token: token() });
+  counted(r);
+  if (mine !== seq) return;
+  if (r.error) lastAsked = '';
+  if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
+  if (r.error === 'credits' || (r.error === 'limit' && CAN_BUY && !DEMO)) buyOpen();
+  if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
+  if (r.perms) updatePerms(r.perms);
+  famRows(r);
+}
+function famRows(r) {
+  $('results').innerHTML = ''; shown = 0;
+  for (const h of r.houses) {
+    const b = el('button', 'famrow'), t = el('span');
+    t.append(el('b', null, L(`${h.head} जी का परिवार`, `${EN && h.hhead ? h.hhead : h.head}'s family`)),
+      el('small', null, [`${L('वार्ड', 'Ward')} ${h.ward}`, h.house && `${L('मकान', 'House')} ${h.house}`, h.hits.join(', ')].filter(Boolean).join(' · ')));
+    b.type = 'button'; b.append(t, el('span', 'n', L(`${h.n} वोट`, `${h.n} votes`)));
+    b.addEventListener('click', () => familyOpen(h, r));
+    $('results').append(b);
+  }
+  $('count').textContent = (r.total ? L(`${r.total} परिवार मिले`, `${r.total} famil${r.total === 1 ? 'y' : 'ies'} found`) + (r.total > r.houses.length ? L(` · पहले ${r.houses.length}`, ` · first ${r.houses.length}`) : '')
+    : L('कोई परिवार नहीं मिला — स्पेलिंग बदलकर देखें', 'No family found — try another spelling')) + leftNote();
+}
+async function familyOpen(h, list) {
+  $('count').textContent = L('ला रहे हैं…', 'Loading…');
+  const x = await api('search', { family: h.key, searchId, token: token() });
+  counted(x);
+  if (SESSION_ERRORS.includes(x.error)) return signOut(MSG[x.error]);
+  if (x.error || !x.results.length) { $('count').textContent = MSG[x.error] || MSG.server; return; }
+  const back = el('button', 'famback', L('← परिवार लिस्ट', '← Family list')); back.type = 'button';
+  back.addEventListener('click', () => famRows(list));
+  const head = x.results.find((v) => `${v.ward}:${v.box}` === h.key) || x.results[0], d = slip(head);
+  $('results').replaceChildren(back, d);
+  $('count').textContent = L(`${h.head} जी का परिवार · ${h.n} वोट`, `${EN && h.hhead ? h.hhead : h.head}'s family · ${h.n} votes`);
+  const fb = d.querySelector('button.fam');
+  if (fb) toggleFamily(head, d, fb); else $('results').append(el('div', 'hint', L('इस वोटर का मकान नंबर नहीं है', 'This voter has no house number')));
+}
+document.querySelectorAll('#famMode button').forEach((b) => b.addEventListener('click', () => {
+  FAM_MODE = b.dataset.fm === '1';
+  document.querySelectorAll('#famMode button').forEach((x) => x.classList.toggle('on', x === b));
+  lastAsked = ''; search(false, true);
+}));
 async function search(more = false, force = false) {
   clearTimeout(timer);
   const q = { name: $('qName').value.trim(), rel: $('qRel').value.trim(), ward: $('qWard').value, mark: $('qMark').value };
   const named = !!(q.name || q.rel);
+  if (FAM_MODE && named) return familySearch(q, force);
   const asked = [q.name, q.rel, q.ward, q.ward ? q.mark : ''].join('|');
   if (!more && !force && asked === lastAsked) return;   // same search as the one on screen (e.g. a space typed and removed)
   lastAsked = asked;

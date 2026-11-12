@@ -139,7 +139,17 @@ function family(slug, key) {
   return rows.filter((r) => r.ward === ward && r.house === me.house).sort((a, b) => a.box - b.box);
 }
 
+// a family's name (रामनारायण जी का परिवार): the eldest man of the house, else its eldest voter
+function familyHead(rows) {
+  let head = null;
+  for (const r of rows) {
+    const age = Number(r.age) || 0, man = /^(M|पु)/i.test(String(r.sex || ''));
+    if (!head || (man && !head.man) || (man === head.man && age > head.age)) head = { r, age, man };
+  }
+  return head ? head.r : null;
+}
+
 const publicFields = ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra, del }) =>
   ({ ward, box, epic, hname, hrel, rel, house, age, sex, name, relname, kendra, del });
 
-module.exports = { load, search, family, publicFields };
+module.exports = { load, search, family, familyHead, publicFields };

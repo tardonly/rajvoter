@@ -1,6 +1,9 @@
 // POST {village, token, name, rel, ward, mark, offset, after} → {total, more, results: [...up to 10 voters, each with its
 //   status mark and who set it, and on polling day its survey mark sm], wards, perms, survey (markModeOf in _lib.js)}
 // POST {village, token, family: "<ward>:<box>"} → {total, results: everyone at that voter's house number in that ward}
+// POST {village, token, name, rel, ward, houses: 1} → {total, houses: [{ward, house, head, hhead, n, hits, key}]}   परिवार से:
+//   the houses where someone matches, best match first, one row each (n voters on the roll, hits the names that matched,
+//   key a voter of the house for the family list above); one search like any other, MAX_HOUSES at most
 // POST {village, token, ward, all: true} → {total, results: [every voter of that ward]}   once that ward is paid for
 //   (₹WARD_RS, api/pay.js; the superadmin and village admins don't pay), else 402 {error: 'pay_ward', rs}. Other
 //   answers carry wp: the wards this login has paid for here, or true when it doesn't pay.
@@ -26,7 +29,8 @@
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
 const { DEMO, village, whoIs, WARD_RS, WARD_AZ_RS, wardKey, wardAzKey, wardFree, wardsPaid, wardsAz, MARKS, markKey, marksFor, allMarks, slipsFor, allSlips, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
-const { load, search, family, publicFields } = require('../_search.js');
+const { load, search, family, familyHead, publicFields } = require('../_search.js');
+const MAX_HOUSES = 60;
 const HI = new Intl.Collator('hi').compare;   // Hindi dictionary order, अ to ज्ञ (a ward's slips in name order)
 
 const FREE_WARD = 20;   // slips of a ward anyone may list before paying for it
@@ -144,6 +148,21 @@ module.exports = route(async (req, res, b) => {
   if (filter === 'slip' || filter === 'noslip') {   // पर्ची दी / पर्ची नहीं दी
     const given = await allSlips(v.slug, user.cand);
     hits = hits.filter((r) => !r.del && !!given[markKey(r)] === (filter === 'slip'));
+  }
+  if (b.houses && named) {   // परिवार से: one row per house
+    const rows = load(v.data).rows, seen = new Map();
+    for (const r of hits) {
+      const h = String(r.house || '').trim(), k = h ? `${r.ward}|${h}` : `${r.ward}|#${r.box}`;
+      if (!seen.has(k)) seen.set(k, { ward: r.ward, house: h, hits: [] });
+      const x = seen.get(k);
+      if (x.hits.length < 3) x.hits.push(r.hname || r.name);
+    }
+    const houses = [...seen.values()].slice(0, MAX_HOUSES).map((x) => {
+      const fam = x.house ? rows.filter((r) => r.ward === x.ward && String(r.house || '').trim() === x.house) : [];
+      const live = fam.filter((r) => !r.del), head = familyHead(live.length ? live : fam) || hits.find((r) => r.ward === x.ward);
+      return { ...x, n: live.length || 1, head: head.hname || head.name, hhead: head.name || '', key: `${head.ward}:${head.box}` };
+    });
+    return send(res, 200, { total: seen.size, houses, perms: user.perms, survey: user.survey, ...left });
   }
   const total = hits.length;
   let page, more, locked = false;
