@@ -99,10 +99,26 @@ if (process.env.DEV_USER_REDIS) {
   }).listen(PORT + 1, '127.0.0.1');
 }
 
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.json': 'application/json', '.mp4': 'video/mp4' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.json': 'application/json', '.mp4': 'video/mp4', '.xml': 'application/xml' };
+
+// vercel.json's "headers" (X-Robots-Tag, Cache-Control …) applied to the address as typed, like Vercel. A source is a
+// path-to-regexp pattern: ':name(regex)', ':name' (one segment), '(regex)'; everything else is literal.
+const srcRe = (src) => {
+  let re = '', i = 0;
+  const group = () => { let d = 0, j = i; do { if (src[j] === '\\') j++; else if (src[j] === '(') d++; else if (src[j] === ')') d--; j++; } while (d && j < src.length); const g = src.slice(i, j); i = j; return g; };
+  while (i < src.length) {
+    if (src[i] === ':') { i++; while (/\w/.test(src[i] || '')) i++; re += src[i] === '(' ? group() : '([^/]+?)'; }
+    else if (src[i] === '(') re += group();
+    else re += src[i++].replace(/[.*+?^${}|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`^${re}$`, 'i');
+};
+const vercelHeaders = () => JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8')).headers.map((h) => [srcRe(h.source), h.headers]);
+
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+  for (const [re, hs] of vercelHeaders()) if (re.test(url.pathname)) for (const h of hs) res.setHeader(h.key, h.value);
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const raw = Buffer.concat(chunks).toString('utf8');
@@ -113,6 +129,7 @@ http.createServer(async (req, res) => {
   if (seg && !seg[2] && seg[1].startsWith('demo-')) { res.writeHead(307, { Location: `/demo/${seg[1].slice(5)}` }); return res.end(); }
   if (/^\/demo\/[a-z0-9-]+$/.test(url.pathname)) url.pathname = '/index.html';   // a demo village: /demo/<village>
   else if (url.pathname === '/promo') url.pathname = '/promo.html';   // the videos page
+  else if (url.pathname === '/rajasthan-voter-list') url.pathname = '/rajasthan-voter-list.html';   // the public page for search engines
   else if (url.pathname === '/admin' || /^\/\d{8}$/.test(url.pathname)) url.pathname = '/admin.html';   // /<8 digits>: a search request
   else if (seg && seg[1] !== 'api' && !existsSync(join(root, url.pathname))) {
     if (seg[2] === '/manifest.webmanifest') { url.pathname = '/api/manifest'; url.searchParams.set('village', seg[1]); }

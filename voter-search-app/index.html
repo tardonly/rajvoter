@@ -9,14 +9,68 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
 <script src="/ga.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#c2185b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Voter Search">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="icon" href="/icon-192.png">
-<title>Voter Search</title>
+<title>Voter Search (मतदाता खोज) — राजस्थान पंचायत चुनाव मतदाता सूची | rajelection.com</title>
+<!-- search engines: "/" may be indexed; the same file at /<village>, /demo/<village> gets "X-Robots-Tag: noindex" from vercel.json -->
+<meta name="description" content="राजस्थान ग्राम पंचायत की वार्ड वार मतदाता सूची अब फ़ोन में: नाम से वोटर खोजें, मतदाता पर्ची बनाएं, मतदान के दिन निशान लगाएं। Rajasthan panchayat voter list search, voter slips and ward reports for sarpanch and ward candidates.">
+<link rel="canonical" href="https://www.rajelection.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Voter Search · rajelection.com">
+<meta property="og:locale" content="hi_IN">
+<meta property="og:title" content="Voter Search (मतदाता खोज) — राजस्थान पंचायत चुनाव की मतदाता सूची">
+<meta property="og:description" content="वार्ड वार मतदाता सूची, नाम से सर्च, मतदाता पर्ची और मतदान दिवस रिपोर्ट — सरपंच, वार्ड पंच, पंचायत समिति और ज़िला परिषद उम्मीदवारों के लिए।">
+<meta property="og:url" content="https://www.rajelection.com/">
+<meta property="og:image" content="https://www.rajelection.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Voter Search (मतदाता खोज) — राजस्थान पंचायत चुनाव की मतदाता सूची">
+<meta name="twitter:description" content="Rajasthan panchayat voter list on your phone: search by name, print voter slips, mark votes on polling day.">
+<meta name="twitter:image" content="https://www.rajelection.com/icon-512.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.rajelection.com/#org",
+      "name": "DigyAi",
+      "url": "https://www.rajelection.com/",
+      "logo": "https://www.rajelection.com/digyai-logo.png",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+91-78889-24374",
+        "contactType": "customer support",
+        "areaServed": "IN",
+        "availableLanguage": ["hi", "en"]
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.rajelection.com/#website",
+      "url": "https://www.rajelection.com/",
+      "name": "Voter Search",
+      "alternateName": ["मतदाता खोज", "rajelection.com"],
+      "inLanguage": "hi-IN",
+      "publisher": { "@id": "https://www.rajelection.com/#org" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://www.rajelection.com/#app",
+      "name": "Voter Search (मतदाता खोज)",
+      "url": "https://www.rajelection.com/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Android, iOS, Windows, macOS (web browser)",
+      "inLanguage": ["hi", "en"],
+      "description": "राजस्थान पंचायत चुनाव के लिए वार्ड वार मतदाता सूची में नाम से सर्च, मतदाता पर्ची, परिवार, सर्वे और मतदान दिवस रिपोर्ट।",
+      "publisher": { "@id": "https://www.rajelection.com/#org" }
+    }
+  ]
+}
+</script>
 <script>
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
@@ -57,6 +111,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .langbtn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px;
     color: var(--accent); font-weight: 600; white-space: nowrap; }
   .lockbox { position: relative; }
+  .aboutlink { display: block; margin-top: 14px; font-size: 13px; color: var(--accent); }
   .lockbox > .langbtn { position: absolute; top: 10px; right: 10px; }
   /* signing up with a mobile number (api/signup.js), and the window for more searches */
   #signStep { display: grid; gap: 8px; margin-bottom: 12px; }
@@ -561,6 +616,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     </form>
     <div id="lockMsg" class="info">खुल रहा है…</div>
     <div id="demoLink" class="demolink hidden"><span>खाता नहीं है? बिना खाते के असली वोटर लिस्ट में सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
+    <!-- a plain link for people and search engines: what the app is, without a login -->
+    <a class="aboutlink" href="/rajasthan-voter-list">मतदाता सूची ऐप के बारे में जानें · About this app</a>
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
 </section>

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<!-- The public page for search engines and visitors: what the app does, in plain text that needs no JS and no login.
+     It holds no voter's personal data — only totals from api/_villages.json and the district names. -->
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-5Z2LNDRF');</script>
+<!-- End Google Tag Manager -->
+<script src="/ga.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#c2185b">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
+<title>राजस्थान पंचायत चुनाव मतदाता सूची — वार्ड वार वोटर लिस्ट, मतदाता पर्ची | Voter Search</title>
+<meta name="description" content="राजस्थान ग्राम पंचायत की वार्ड वार मतदाता सूची (वोटर लिस्ट) फ़ोन में: नाम से वोटर खोजें, मतदाता पर्ची प्रिंट करें, सरपंच चुनाव के दिन वोट के निशान लगाएं। Rajasthan panchayat voter list, ward wise, with voter slips.">
+<link rel="canonical" href="https://www.rajelection.com/rajasthan-voter-list">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Voter Search · rajelection.com">
+<meta property="og:locale" content="hi_IN">
+<meta property="og:title" content="राजस्थान पंचायत चुनाव मतदाता सूची — वार्ड वार, फ़ोन में">
+<meta property="og:description" content="नाम से वोटर खोजें, मतदाता पर्ची प्रिंट करें, मतदान दिवस पर निशान लगाएं — सरपंच, वार्ड पंच, पंचायत समिति और ज़िला परिषद उम्मीदवारों के लिए।">
+<meta property="og:url" content="https://www.rajelection.com/rajasthan-voter-list">
+<meta property="og:image" content="https://www.rajelection.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Rajasthan panchayat voter list — ward wise, on your phone">
+<meta name="twitter:description" content="Search voters by name, print voter slips and mark votes on polling day. For sarpanch and ward candidates.">
+<meta name="twitter:image" content="https://www.rajelection.com/icon-512.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.rajelection.com/#org",
+      "name": "DigyAi",
+      "url": "https://www.rajelection.com/",
+      "logo": "https://www.rajelection.com/digyai-logo.png",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+91-78889-24374",
+        "contactType": "customer support",
+        "areaServed": "IN",
+        "availableLanguage": ["hi", "en"]
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://www.rajelection.com/#app",
+      "name": "Voter Search (मतदाता खोज)",
+      "url": "https://www.rajelection.com/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Android, iOS, Windows, macOS (web browser)",
+      "inLanguage": ["hi", "en"],
+      "description": "राजस्थान पंचायत चुनाव के लिए वार्ड वार मतदाता सूची में नाम से सर्च, मतदाता पर्ची, परिवार, सर्वे और मतदान दिवस रिपोर्ट।",
+      "publisher": { "@id": "https://www.rajelection.com/#org" }
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://www.rajelection.com/rajasthan-voter-list#page",
+      "url": "https://www.rajelection.com/rajasthan-voter-list",
+      "name": "राजस्थान पंचायत चुनाव मतदाता सूची — वार्ड वार वोटर लिस्ट, मतदाता पर्ची",
+      "inLanguage": "hi-IN",
+      "about": { "@id": "https://www.rajelection.com/#app" },
+      "publisher": { "@id": "https://www.rajelection.com/#org" },
+      "breadcrumb": {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Voter Search", "item": "https://www.rajelection.com/" },
+          { "@type": "ListItem", "position": 2, "name": "राजस्थान मतदाता सूची", "item": "https://www.rajelection.com/rajasthan-voter-list" }
+        ]
+      }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "क्या यह सरकारी वेबसाइट है?",
+          "acceptedAnswer": { "@type": "Answer", "text": "नहीं। Voter Search एक निजी ऐप है (DigyAi)। यह राज्य निर्वाचन आयोग, राजस्थान द्वारा प्रकाशित पंचायत निर्वाचक नामावली को फ़ोन पर आसानी से खोजने लायक बनाता है। आधिकारिक जानकारी के लिए राज्य निर्वाचन आयोग की वेबसाइट देखें।" }
+        },
+        {
+          "@type": "Question",
+          "name": "मतदाता सूची में अपना या किसी का नाम कैसे खोजें?",
+          "acceptedAnswer": { "@type": "Answer", "text": "मोबाइल नंबर से साइन अप करें, अपना ज़िला, पंचायत समिति और ग्राम पंचायत चुनें, फिर नाम, पिता या पति का नाम, मकान नंबर या Voter ID लिखें। हिंदी या English दोनों में सर्च होता है, गलत स्पेलिंग भी चलती है।" }
+        },
+        {
+          "@type": "Question",
+          "name": "वार्ड वार मतदाता सूची और मतदाता पर्ची कैसे मिलेगी?",
+          "acceptedAnswer": { "@type": "Answer", "text": "हर वोटर की पर्ची ऐप में बनती है, जिसे WhatsApp पर भेज सकते हैं या प्रिंट कर सकते हैं। पूरे वार्ड की पर्चियाँ एक साथ PDF में डाउनलोड करके ई-मित्र या प्रिंटर से छपवा सकते हैं।" }
+        },
+        {
+          "@type": "Question",
+          "name": "क्या बिना खाते के आज़मा सकते हैं?",
+          "acceptedAnswer": { "@type": "Answer", "text": "हाँ। फ़्री डेमो में कुछ गाँवों के पहले वार्डों में बिना खाते के सर्च करके देख सकते हैं: www.rajelection.com/demo" }
+        },
+        {
+          "@type": "Question",
+          "name": "क्या मतदाताओं की जानकारी सबके लिए खुली है?",
+          "acceptedAnswer": { "@type": "Answer", "text": "नहीं। मतदाताओं की जानकारी केवल लॉगिन के बाद ऐप में दिखती है और सर्वर पर एन्क्रिप्ट करके रखी जाती है। यह पेज किसी मतदाता की जानकारी नहीं दिखाता।" }
+        }
+      ]
+    }
+  ]
+}
+</script>
+<style>
+  :root {
+    --bg: #f3f4f6; --card: #fff; --ink: #111; --muted: #4b5563; --line: #d1d5db;
+    --pink: #e0245e; --pink-dark: #c2185b; --accent: #1f4e8c; --green: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { line-height: 1.6; }
+  main { max-width: 860px; margin: 0 auto; padding: 0 16px 32px; }
+  a { color: var(--accent); }
+  header.top { display: flex; align-items: center; gap: 10px; max-width: 860px; margin: 0 auto; padding: 14px 16px 0; }
+  header.top img { width: 40px; height: 40px; border-radius: 10px; }
+  header.top b { font-size: 18px; }
+  header.top span { color: var(--muted); font-size: 13px; }
+  h1 { font-size: 26px; line-height: 1.3; margin: 18px 0 10px; color: var(--pink-dark); }
+  h2 { font-size: 20px; margin: 28px 0 8px; }
+  h3 { font-size: 16px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; }
+  .lead { font-size: 17px; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 6px; }
+  .cta { display: inline-block; padding: 11px 18px; border-radius: 10px; font-weight: 600; text-decoration: none; }
+  .cta.signup { background: var(--green); color: #fff; }
+  .cta.demo { background: #fff; color: var(--pink-dark); border: 1.5px solid var(--pink); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 18px 0 4px; }
+  .stat { background: var(--card); border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .stat b { display: block; font-size: 22px; color: var(--accent); }
+  .stat span { font-size: 14px; color: var(--muted); }
+  .note { font-size: 13px; color: var(--muted); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .card p { margin: 0; font-size: 15px; color: var(--muted); }
+  ol, ul { padding-left: 22px; margin: 0 0 12px; }
+  li { margin-bottom: 4px; }
+  .districts { columns: 2 160px; font-size: 15px; }
+  details { background: var(--card); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+  summary { font-weight: 600; cursor: pointer; }
+  details p { margin: 8px 0 0; color: var(--muted); }
+  section.en { border-top: 1px solid var(--line); margin-top: 32px; }
+  footer { border-top: 1px solid var(--line); background: var(--card); padding: 14px 16px; text-align: center;
+    font-size: 14px; color: var(--muted); }
+  footer a { margin: 0 8px; }
+</style>
+</head>
+<body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5Z2LNDRF" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+<header class="top">
+  <img src="/icon-192.png" alt="Voter Search" width="40" height="40">
+  <div><b>Voter Search</b> <span>· मतदाता खोज · rajelection.com</span></div>
+</header>
+
+<main>
+  <h1>राजस्थान पंचायत चुनाव मतदाता सूची — वार्ड वार, अब आपके फ़ोन में</h1>
+  <p class="lead">Voter Search में राजस्थान की ग्राम पंचायतों की <strong>वार्ड वार मतदाता सूची</strong> (वोटर लिस्ट) है।
+    नाम लिखते ही वोटर मिल जाता है, उसकी <strong>मतदाता पर्ची</strong> तुरंत बनती है, और मतदान के दिन आप हर वोटर पर निशान
+    लगा सकते हैं — कौन वोट दे आया, कौन बाकी है। <strong>सरपंच चुनाव</strong>, वार्ड पंच, पंचायत समिति सदस्य और ज़िला परिषद
+    सदस्य के उम्मीदवारों और उनकी टीम के लिए बना है।</p>
+  <div class="ctas">
+    <a class="cta signup" href="/">📱 मोबाइल नंबर से साइन अप करें</a>
+    <a class="cta demo" href="/demo">🔍 फ़्री डेमो आज़माएं</a>
+  </div>
+
+  <div class="stats" aria-label="ऐप में कितनी मतदाता सूचियाँ हैं">
+    <div class="stat"><b>24</b><span>ज़िले</span></div>
+    <div class="stat"><b>3,600+</b><span>ग्राम पंचायत</span></div>
+    <div class="stat"><b>32,000+</b><span>वार्ड</span></div>
+    <div class="stat"><b>1 करोड़+</b><span>मतदाता</span></div>
+  </div>
+  <p class="note">नवंबर 2026 तक। नई ग्राम पंचायतें लगातार जुड़ रही हैं — अपना गाँव साइन अप करते समय सूची में देखें।</p>
+
+  <h2>मतदाता सूची में नाम कैसे खोजें</h2>
+  <ol>
+    <li><a href="/">rajelection.com</a> खोलें और अपना मोबाइल नंबर डालें।</li>
+    <li>अपना ज़िला, पंचायत समिति और ग्राम पंचायत चुनें, नाम और पासवर्ड बनाएं।</li>
+    <li>वोटर का नाम, पिता या पति का नाम, मकान नंबर या Voter ID लिखें — हिंदी या English में। गलत स्पेलिंग भी चलेगी।</li>
+    <li>वोटर की पर्ची खोलें: WhatsApp पर भेजें या प्रिंट करें।</li>
+  </ol>
+  <p>फ़ोन की होम स्क्रीन पर ऐप की तरह इंस्टॉल हो जाता है; लैपटॉप पर भी चलता है।</p>
+
+  <h2>उम्मीदवारों के लिए सब कुछ एक जगह</h2>
+  <div class="cards">
+    <div class="card"><h3>📋 वार्ड वार मतदाता सूची</h3>
+      <p>हर वार्ड की पूरी सूची, मकान नंबर और परिवार के साथ। सूची से हटाए गए नाम (मृत्यु, स्थानांतरित, दोहराए गए) अलग दिखते हैं।</p></div>
+    <div class="card"><h3>🧾 मतदाता पर्ची</h3>
+      <p>हर वोटर की पर्ची में नाम, पिता/पति का नाम, वार्ड, बूथ और मतदान केंद्र। पूरे वार्ड की पर्चियाँ एक PDF में — ई-मित्र से प्रिंट करवाएं।</p></div>
+    <div class="card"><h3>🖼 पर्ची पर आपका पोस्टर</h3>
+      <p>हर पर्ची पर उम्मीदवार का पोस्टर लगाकर बाँटें।</p></div>
+    <div class="card"><h3>✅ मतदान दिवस</h3>
+      <p>वोट दे आए, आने वाले, बाहर गए — हर वोटर पर एक टैप में निशान। हर वार्ड में कितने वोट पड़े, कितने बाकी, पूरी रिपोर्ट।</p></div>
+    <div class="card"><h3>🗳 चुनाव से पहले सर्वे</h3>
+      <p>घर-घर जाकर हर वोटर पर निशान: अपना वोट, सोच रहे हैं, विपक्ष। किस वार्ड में कहाँ मेहनत चाहिए, साफ़ दिखता है।</p></div>
+    <div class="card"><h3>👨‍👩‍👧 परिवार और वंशावली</h3>
+      <p>एक नाम से पूरा परिवार — घर-घर संपर्क आसान।</p></div>
+    <div class="card"><h3>🏘 पंचायत समिति / ज़िला परिषद</h3>
+      <p>जिनके क्षेत्र में कई ग्राम पंचायतें हैं, उनकी टीम के लिए सारे गाँव एक लॉगिन में।</p></div>
+  </div>
+
+  <h2>किन ज़िलों की मतदाता सूची है</h2>
+  <ul class="districts">
+    <li>श्रीगंगानगर</li><li>बांसवाड़ा</li><li>जैसलमेर</li><li>चूरू</li><li>चित्तौड़गढ़</li><li>बूंदी</li>
+    <li>बालोतरा</li><li>डीडवाना-कुचामन</li><li>करौली</li><li>जयपुर</li><li>टोंक</li><li>बारां</li>
+    <li>सीकर</li><li>हनुमानगढ़</li><li>खैरथल-तिजारा</li><li>झुंझुनू</li><li>प्रतापगढ़</li><li>जालोर</li>
+    <li>ब्यावर</li><li>धौलपुर</li><li>सलूम्बर</li><li>भरतपुर</li><li>बीकानेर</li><li>डीग</li>
+  </ul>
+  <p>आपके ज़िले या गाँव की सूची नहीं दिख रही? WhatsApp पर बताएं: <a href="https://wa.me/917888924374" rel="noopener">+91 78889 24374</a></p>
+
+  <h2>अक्सर पूछे जाने वाले सवाल</h2>
+  <details open>
+    <summary>क्या यह सरकारी वेबसाइट है?</summary>
+    <p>नहीं। Voter Search एक निजी ऐप है (DigyAi)। यह राज्य निर्वाचन आयोग, राजस्थान द्वारा प्रकाशित पंचायत निर्वाचक नामावली को फ़ोन पर आसानी से खोजने लायक बनाता है। आधिकारिक जानकारी के लिए राज्य निर्वाचन आयोग की वेबसाइट देखें।</p>
+  </details>
+  <details>
+    <summary>मतदाता सूची में अपना या किसी का नाम कैसे खोजें?</summary>
+    <p>मोबाइल नंबर से साइन अप करें, अपना ज़िला, पंचायत समिति और ग्राम पंचायत चुनें, फिर नाम, पिता या पति का नाम, मकान नंबर या Voter ID लिखें। हिंदी या English दोनों में सर्च होता है, गलत स्पेलिंग भी चलती है।</p>
+  </details>
+  <details>
+    <summary>वार्ड वार मतदाता सूची और मतदाता पर्ची कैसे मिलेगी?</summary>
+    <p>हर वोटर की पर्ची ऐप में बनती है, जिसे WhatsApp पर भेज सकते हैं या प्रिंट कर सकते हैं। पूरे वार्ड की पर्चियाँ एक साथ PDF में डाउनलोड करके ई-मित्र या प्रिंटर से छपवा सकते हैं।</p>
+  </details>
+  <details>
+    <summary>क्या बिना खाते के आज़मा सकते हैं?</summary>
+    <p>हाँ। फ़्री डेमो में कुछ गाँवों के पहले वार्डों में बिना खाते के सर्च करके देख सकते हैं: <a href="/demo">www.rajelection.com/demo</a></p>
+  </details>
+  <details>
+    <summary>क्या मतदाताओं की जानकारी सबके लिए खुली है?</summary>
+    <p>नहीं। मतदाताओं की जानकारी केवल लॉगिन के बाद ऐप में दिखती है और सर्वर पर एन्क्रिप्ट करके रखी जाती है। यह पेज किसी मतदाता की जानकारी नहीं दिखाता।</p>
+  </details>
+
+  <p>ऐप कैसे काम करता है, छोटे वीडियो में देखें: <a href="/promo">Voter Search वीडियो</a></p>
+
+  <section class="en" lang="en">
+    <h2>Rajasthan panchayat voter list app</h2>
+    <p>Voter Search (rajelection.com) puts the <strong>ward wise voter list of Rajasthan gram panchayats</strong> on your phone.
+      Search any voter by name, father's or husband's name, house number or Voter ID, in Hindi or English. Print or
+      WhatsApp a <strong>voter slip</strong> (मतदाता पर्ची), download a whole ward's slips as one PDF, run a door-to-door
+      survey before the election and mark who has voted on polling day. Built for <strong>sarpanch election</strong>
+      (sarpanch chunav) candidates, ward panch, panchayat samiti and zila parishad candidates and their teams.</p>
+    <p>Voter lists for 3,600+ gram panchayats in 24 districts, based on the panchayat electoral rolls published by the
+      State Election Commission, Rajasthan. This is not a government website. Voter details are shown only after login.</p>
+    <div class="ctas">
+      <a class="cta signup" href="/">Sign up with your mobile number</a>
+      <a class="cta demo" href="/demo">Try the free demo</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <a href="/">Voter Search</a> · <a href="/promo">वीडियो</a> · <a href="https://wa.me/917888924374" rel="noopener">WhatsApp +91 78889 24374</a>
+  <div>DigyAi · Mon–Sat, 10:00–19:00 IST</div>
+</footer>
+</body>
+</html>
