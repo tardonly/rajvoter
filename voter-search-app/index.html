@@ -2081,7 +2081,6 @@ $('qWard').addEventListener('change', () => search());
     rec.onresult = (e) => {
       heard = [...e.results].map((r) => r[0].transcript).join(' ').replace(/[।.,?!]+/g, ' ').replace(/\s+/g, ' ').trim();
       $('qName').value = heard;
-      say(L(`🎤 ${heard}`, `🎤 ${heard}`));
     };
     rec.onerror = (e) => {
       say(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? L('माइक की अनुमति दें (ब्राउज़र सेटिंग में)', 'Allow the microphone (browser settings)')
@@ -2094,7 +2093,7 @@ $('qWard').addEventListener('change', () => search());
     };
     try { rec.start(); } catch { stop(); return; }
     btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
-    say(L('🎤 बोलिए… नाम, मकान नं. या वोटर ID', '🎤 Speak… a name, house no. or voter ID'));
+    say('');
   });
 })();
 // ↺ रीसेट: every box and filter empty again, back to the hint; the next name is a new search
