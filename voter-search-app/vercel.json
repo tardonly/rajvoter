@@ -139,7 +139,7 @@
       ]
     },
     {
-      "source": "/:village((?!promo$|rajasthan-voter-list$)[a-z0-9-]+)",
+      "source": "/:village((?!promo$|rajasthan-voter-list$|demo$)[a-z0-9-]+)",
       "headers": [
         {
           "key": "X-Robots-Tag",

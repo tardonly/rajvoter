@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="icon" href="/icon-192.png">
 <title>Voter Search (मतदाता खोज) — राजस्थान पंचायत चुनाव मतदाता सूची | rajelection.com</title>
-<!-- search engines: "/" may be indexed; the same file at /<village>, /demo/<village> gets "X-Robots-Tag: noindex" from vercel.json -->
+<!-- search engines: "/" and "/demo" may be indexed (the script below gives /demo its own title); the same file at /<village>, /demo/<village> gets "X-Robots-Tag: noindex" from vercel.json -->
 <meta name="description" content="राजस्थान ग्राम पंचायत की वार्ड वार मतदाता सूची अब फ़ोन में: नाम से वोटर खोजें, मतदाता पर्ची बनाएं, मतदान के दिन निशान लगाएं। Rajasthan panchayat voter list search, voter slips and ward reports for sarpanch and ward candidates.">
 <link rel="canonical" href="https://www.rajelection.com/">
 <meta property="og:type" content="website">
@@ -27,6 +27,20 @@
 <meta name="twitter:title" content="Voter Search (मतदाता खोज) — राजस्थान पंचायत चुनाव की मतदाता सूची">
 <meta name="twitter:description" content="Rajasthan panchayat voter list on your phone: search by name, print voter slips, mark votes on polling day.">
 <meta name="twitter:image" content="https://www.rajelection.com/icon-512.png">
+<script>
+// www.rajelection.com/demo (the village choice, no voter data) is its own page for Google: its own title, description
+// and address. /demo/<village> stays out of search (robots.txt + noindex in vercel.json).
+if (/^\/demo\/?$/i.test(location.pathname)) {
+  const t = 'फ़्री डेमो — बिना खाते के राजस्थान पंचायत वोटर लिस्ट सर्च करें | Voter Search';
+  const d = 'Voter Search का फ़्री डेमो: अपना गाँव चुनें और बिना खाते, बिना पासवर्ड के असली मतदाता सूची में नाम से सर्च करके देखें, पर्ची बनाएं। Free demo of the Rajasthan panchayat voter list search.';
+  document.title = t;
+  for (const [sel, attr, val] of [['meta[name="description"]', 'content', d], ['link[rel="canonical"]', 'href', 'https://www.rajelection.com/demo'],
+    ['meta[property="og:url"]', 'content', 'https://www.rajelection.com/demo'], ['meta[property="og:title"]', 'content', t],
+    ['meta[property="og:description"]', 'content', d], ['meta[name="twitter:title"]', 'content', t], ['meta[name="twitter:description"]', 'content', d]]) {
+    document.querySelector(sel)?.setAttribute(attr, val);
+  }
+}
+</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
