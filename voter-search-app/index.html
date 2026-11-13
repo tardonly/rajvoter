@@ -102,7 +102,7 @@
   .demolink { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 10px 12px; border-radius: 10px;
     background: #fff7ed; border: 1px solid #fed7aa; font-size: 13.5px; color: #7c2d12; text-align: left; }
   .demolink span { flex: 1; }
-  .demolink a { flex: none; padding: 6px 12px; border-radius: 8px; background: #ea580c; color: #fff; font-size: 14px;
+  .demolink a { flex: none; padding: 6px 12px; border-radius: 8px; background: #c2410c; color: #fff; font-size: 14px;
     font-weight: 600; text-decoration: none; white-space: nowrap; }
   /* हिंदी / English: the whole app in either language, remembered on this phone */
   .langbtn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px;
@@ -190,7 +190,7 @@
   #buyMore { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: #16a34a; color: #fff; font-weight: 600; }
   .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .homeacts button { padding: 11px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
-  .homeacts .share { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .homeacts .share { background: #15803d; border-color: #15803d; color: #fff; }   /* darker green: readable white text */
   #home .homeacts { margin: -6px 0 14px; }
   .demobar .homeacts { margin-top: 8px; max-width: 460px; }
   .demobar .homeacts button { padding: 8px 6px; font-size: 15px; }
@@ -580,7 +580,7 @@
 <div class="fabinstall" id="installFab"><button data-install type="button">📲 ऐप इंस्टॉल करें</button><button id="installHide" type="button" aria-label="हटाएं" title="हटाएं">✕</button></div>
 <div class="elecbar topelec hidden"></div>
 
-<section id="lock" class="loading">
+<section id="lock" class="loading" role="main">
   <div class="lockbox">
     <button class="langbtn" data-lang type="button"></button>
     <img src="/icon-192.png" alt="">
@@ -621,6 +621,57 @@
     <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
   </div>
 </section>
+<!-- Drawn before the first paint so nothing moves once the main script runs (PageSpeed: layout shift): the election
+     banner, and on the start page for someone not logged in, the login card as homeLock() leaves it -->
+<script>
+// ---------- चुनाव की तारीखें: a banner on the login page (hidden once logged in), with the days left to the सरपंच vote ----------
+// Each election drops off the day after it; the banner goes once all are past. Dates are India dates (YYYY-MM-DD).
+const ELECTIONS = [
+  { date: '2026-11-14', hi: 'जिला परिषद सदस्य व पंचायत समिति सदस्य', en: 'Zila Parishad & Panchayat Samiti members' },
+  { date: '2026-11-16', hi: 'सरपंच', en: 'Sarpanch', count: true },
+];
+function electionBanner() {
+  const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch (e) { return false; } })();
+  const L = (hi, en) => (EN ? en : hi), LOCALE = L('hi-IN', 'en-IN');
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);   // India's date
+  const days = (d) => Math.round((Date.parse(d) - Date.parse(today)) / 86400e3);
+  const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const next = ELECTIONS.filter((e) => days(e.date) >= 0);
+  for (const bar of document.querySelectorAll('.elecbar')) {
+    bar.classList.toggle('hidden', !next.length);
+    bar.replaceChildren();
+    if (!next.length) continue;
+    bar.append(el('b', null, L('🗳 चुनाव', '🗳 Elections')));
+    const c = next.find((e) => e.count);
+    if (c) {
+      const n = days(c.date);
+      bar.append(el('span', 'left', n === 0 ? L('सरपंच चुनाव आज', 'Sarpanch vote today') : n === 1 ? L('सरपंच चुनाव कल', 'Sarpanch vote tomorrow')
+        : L(`सरपंच चुनाव में ${n} दिन बाकी`, `${n} days to the sarpanch vote`)));
+    }
+    for (const e of next) {
+      const line = el('div');
+      line.append(`${L(e.hi, e.en)}: `, el('b', null, days(e.date) === 0 ? `${L('आज', 'today')}, ${fmtDate(e.date)}` : fmtDate(e.date)));
+      bar.append(line);
+    }
+  }
+}
+electionBanner();
+(() => {
+  const [, p1 = ''] = location.pathname.split('/');
+  if (p1 && p1 !== 'index.html' && p1 !== 'index') return;   // a village page: its own card
+  try {
+    for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) if (/^tok:/.test(s.key(i)) && s.key(i) !== 'tok:demo') return;
+    if (sessionStorage.getItem('homeMsg')) return;
+  } catch (e) {}
+  const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch (e) { return false; } })();
+  const $ = (id) => document.getElementById(id);
+  $('lockSub').textContent = EN ? 'Enter your mobile number' : 'अपना मोबाइल नंबर डालें';
+  $('demoLink').classList.remove('hidden'); $('homeActs').classList.remove('hidden');
+  $('lock').classList.remove('loading'); $('lockMsg').textContent = '';
+  for (const b of $('lock').querySelectorAll('[data-lang]')) b.textContent = EN ? '🌐 हिंदी' : '🌐 English';
+})();
+</script>
 
 <div id="howPop" class="howpop hidden" role="dialog" aria-label="ऐप कैसे काम करता है">
   <div class="howbar">
@@ -723,7 +774,7 @@
   </div>
 </div>
 
-<section id="home" class="hidden">
+<section id="home" class="hidden" role="main">
   <div class="lockbox">
     <div class="homebar"><button class="langbtn" data-lang type="button"></button><a id="homeAdmin" class="hidden" href="/admin">एडमिन</a><button id="homeOut" type="button">लॉग आउट</button></div>
     <img src="/icon-192.png" alt="">
@@ -962,35 +1013,7 @@ function setMode(survey) {
 }
 setMode(false);
 
-// ---------- चुनाव की तारीखें: a banner on the login page (hidden once logged in), with the days left to the सरपंच vote ----------
-// Each election drops off the day after it; the banner goes once all are past. Dates are India dates (YYYY-MM-DD).
-const ELECTIONS = [
-  { date: '2026-11-14', hi: 'जिला परिषद सदस्य व पंचायत समिति सदस्य', en: 'Zila Parishad & Panchayat Samiti members' },
-  { date: '2026-11-16', hi: 'सरपंच', en: 'Sarpanch', count: true },
-];
-function electionBanner() {
-  const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);   // India's date
-  const days = (d) => Math.round((Date.parse(d) - Date.parse(today)) / 86400e3);
-  const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const next = ELECTIONS.filter((e) => days(e.date) >= 0);
-  for (const bar of document.querySelectorAll('.elecbar')) {
-    bar.classList.toggle('hidden', !next.length);
-    bar.replaceChildren();
-    if (!next.length) continue;
-    bar.append(el('b', null, L('🗳 चुनाव', '🗳 Elections')));
-    const c = next.find((e) => e.count);
-    if (c) {
-      const n = days(c.date);
-      bar.append(el('span', 'left', n === 0 ? L('सरपंच चुनाव आज', 'Sarpanch vote today') : n === 1 ? L('सरपंच चुनाव कल', 'Sarpanch vote tomorrow')
-        : L(`सरपंच चुनाव में ${n} दिन बाकी`, `${n} days to the sarpanch vote`)));
-    }
-    for (const e of next) {
-      const line = el('div');
-      line.append(`${L(e.hi, e.en)}: `, el('b', null, days(e.date) === 0 ? `${L('आज', 'today')}, ${fmtDate(e.date)}` : fmtDate(e.date)));
-      bar.append(line);
-    }
-  }
-}
+// the election banner (ELECTIONS, electionBanner) is drawn by the small script after #lock, before the first paint
 electionBanner();
 setInterval(electionBanner, 3600e3);   // a phone left open overnight moves on to the next day
 
