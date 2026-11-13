@@ -3002,6 +3002,8 @@ async function lockSignup() {
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
   showLock('');
   store.set(`tok:${slug}`, r.token, true);
+  // ChatGPT ads: a new login made (the event name only, no number or name)
+  try { window.oaiq && oaiq('measure', 'registration_completed', { type: 'customer_action' }); } catch {}
   // the new password, to write down; closing this goes into the village
   // A form with the number and the new password, so the phone's password manager offers to save them: Continue submits
   // it (Chrome / Safari ask "Save password?"), and where the browser allows it a button asks straight away.
