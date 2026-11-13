@@ -173,7 +173,6 @@
   a.buyback { text-decoration: none; text-align: center; }
   .savepw { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }   /* for the phone's password manager */
   .buypw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; font-weight: 700; user-select: all; word-break: break-all; }
-  #walletBtn { border: 1px solid #86efac; border-radius: 8px; padding: 5px 10px; margin: 6px 0 0 6px; font-size: 13px; background: #f0fdf4; color: #15803d; font-weight: 700; cursor: pointer; }
   .wallet .bal { text-align: center; font-size: 36px; font-weight: 800; color: #15803d; line-height: 1.1; margin-top: 4px; }
   .wallet .balsub { text-align: center; font-size: 13px; color: var(--muted); }
   .wallet .opt { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
@@ -188,7 +187,6 @@
   .wallet .wds { margin-top: 12px; font-size: 13px; }
   .wallet .wds div { border-top: 1px solid var(--line); padding: 6px 0; }
   .wallet .more { width: 100%; margin-top: 12px; }
-  #invite { border: 1px solid #c4b5fd; border-radius: 8px; padding: 5px 10px; margin: 6px 0 0 6px; font-size: 13px; background: #f5f3ff; color: #5b21b6; font-weight: 600; }
   #buyMore { border: 0; border-radius: 8px; padding: 5px 10px; margin-top: 6px; font-size: 13px; background: #16a34a; color: #fff; font-weight: 600; }
   .homeacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
   .homeacts button { padding: 11px 6px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-size: 16px; font-weight: 600; }
@@ -260,6 +258,9 @@
   .titlebar .who { font-size: 12px; color: var(--muted); font-weight: 400; display: block; }
   .titlebar button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 10px; font-size: 13px; color: var(--muted); flex: none; }
   .tb-actions { display: flex; gap: 6px; flex: none; }
+  /* wallet and refer: small, in the top bar after 🔑 */
+  .titlebar #walletBtn { border-color: #86efac; background: #f0fdf4; color: #15803d; font-weight: 700; padding: 4px 8px; }
+  .titlebar #invite { border-color: #c4b5fd; background: #f5f3ff; color: #5b21b6; font-weight: 600; padding: 4px 8px; }
   /* phones with many header buttons (admins): the buttons wrap to more lines instead of making the page wider than the screen */
   @media (max-width: 600px) { .tb-actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; min-width: 0; } .titlebar { align-items: flex-start; } }
   #switchBtn { display: inline-block; margin-left: 8px; vertical-align: 2px; border: 1px solid var(--line); background: #fff; border-radius: 8px;
@@ -744,7 +745,7 @@
   <div class="cpnbanners hidden" id="cpnBanners"></div>
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><button id="slipsBtn" class="hidden" type="button">वार्ड पर्चियाँ</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><button id="slipsBtn" class="hidden" type="button">वार्ड पर्चियाँ</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="walletBtn" class="hidden" type="button" aria-label="वॉलेट"></button><button id="invite" class="hidden" type="button">🎁 रेफ़र</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <!-- बोलकर सर्च: the mic fills the name box by speech (Web Speech API, Hindi); hidden where the browser has none -->
@@ -764,7 +765,7 @@
       </select>
     </div>
     <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button><button id="wardAzBtn" class="hidden" type="button"></button>
-      <button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को रेफ़र करें</button></span></div>
+      <button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button></span></div>
     <div id="wardPanel" class="hidden"></div>
   </header>
   <main>
@@ -1313,7 +1314,7 @@ async function search(more = false, force = false) {
   if (mine !== seq) return;                       // a newer search has started
   if (r.error) lastAsked = '';                    // let the same search be tried again
   if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
-  if (r.error === 'credits' || (r.error === 'limit' && CAN_BUY && !DEMO)) buyOpen();   // no searches left: the buying window
+  if (r.error === 'credits' && PREPAID && !DEMO) buyOpen();   // a self-made login with no searches left: the buying window (an admin-made one: talk to the admin)
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   if (r.perms) updatePerms(r.perms);
   if (r.wz != null) WARD_AZ = r.wz;
@@ -2406,10 +2407,13 @@ const CPN_MSG = {
 };
 // a signed-up login: the buttons for more searches, the wallet and referring friends
 function buyMoreButton() {
-  $('buyMore').classList.toggle('hidden', !CAN_BUY || DEMO);
+  // more searches: only for a self-made (signed-up) login, not one an admin made, and only once 5 or fewer are left
+  const left = searchesLeft == null ? null : Number(searchesLeft) || 0;
+  $('buyMore').classList.toggle('hidden', !CAN_BUY || !PREPAID || DEMO || left == null || left > 5);
+  $('invite').textContent = L('🎁 रेफ़र', '🎁 Refer');
   $('invite').classList.toggle('hidden', !MY_REF || DEMO);
   $('walletBtn').classList.toggle('hidden', WALLET == null || DEMO);
-  if (WALLET != null) $('walletBtn').textContent = WALLET ? L(`💰 वॉलेट ₹${WALLET} · कैश करें ›`, `💰 Wallet ₹${WALLET} · Cash out ›`) : L('💰 वॉलेट ₹0', '💰 Wallet ₹0');
+  if (WALLET != null) $('walletBtn').textContent = `💰₹${WALLET}`;
 }
 // search packs: [searches, ₹], as PACKS in api/_lib.js
 const PACKS = [[100, 50], [200, 100], [500, 200], [800, 325], [1000, 400]];
