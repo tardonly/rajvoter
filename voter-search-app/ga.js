@@ -10,6 +10,7 @@
 (function () {
   var GA_ID = 'G-G9EK9GTQ4J';   // the GA4 web stream's measurement ID: G-XXXXXXXXXX (analytics.google.com → Admin → Data streams)
   var GTM_ID = 'GTM-5Z2LNDRF';  // Tag Manager container; admin.html still starts it inline in its <head>
+  var GTM_ID2 = 'GTM-KKGXQWPM'; // a second container (ads); the public pages only, admin.html never loads it
   window.dataLayer = window.dataLayer || [];
   window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
   if (GA_ID) {
@@ -41,6 +42,8 @@
     if (GTM_ID && !gtmOn) {
       window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
       add('https://www.googletagmanager.com/gtm.js?id=' + GTM_ID);
+      // both containers read the one gtm.start above, so each sees one page view
+      if (GTM_ID2) add('https://www.googletagmanager.com/gtm.js?id=' + GTM_ID2);
     }
   }
   var evs = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
