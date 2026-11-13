@@ -602,9 +602,16 @@ const appPerms = (u) => (u.role === 'admin' && u.perms === undefined ? PERMS.sli
 // existed: all of them):
 //   add: make new users · own: see and look after the users they made · all: see and look after every user of their
 //   villages. (Admins no longer add searches or take payments: 'credits' and 'approve' stored on older admins are ignored.)
-const ADMIN_PERMS = ['add', 'own', 'all'];
+// Powers the superadmin may hand to a trusted admin (never on by default, not even for older admins):
+//   admins: make village admins of their own villages, promote their users to admin, and look after the admins they made
+//   arights: tick these same boxes on the admins they made (only the ones they have themselves)
+//   asearch: daily limit / extra searches of the admins they made
+//   gift: free searches added for good to a signed-up (self-made) user they look after
+const ADMIN_PERMS = ['add', 'own', 'all', 'admins', 'arights', 'asearch', 'gift'];
+const OLD_ADMIN_PERMS = ['add', 'own', 'all'];   // an admin made before these could be set
+const GIFT_MAX = 1000;   // free searches one "gift" may add
 const PROMOTED_PERMS = ['add', 'own'];   // a user made admin (api/_routes/admin.js "promote")
-const adminPermsOf = (u) => (u.role !== 'admin' ? [] : u.aperms === undefined ? ADMIN_PERMS.slice()
+const adminPermsOf = (u) => (u.role !== 'admin' ? [] : u.aperms === undefined ? OLD_ADMIN_PERMS.slice()
   : String(u.aperms).split(',').filter((p) => ADMIN_PERMS.includes(p)));
 // today's date in India, for the per-person daily search count
 const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -1269,7 +1276,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

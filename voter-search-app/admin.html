@@ -456,6 +456,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <form id="addAdminForm" class="stack" autocomplete="off">
         <input id="admName" type="text" placeholder="एडमिन का नाम" maxlength="60" required>
         <input id="admPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
+        <input id="admPw" class="hidden" type="text" placeholder="पासवर्ड (खाली = अपने आप बनेगा)" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false">
         <div class="vpick" id="admVillages"></div>
         <button class="btn" id="addAdminBtn" type="submit">एडमिन बनाएं</button>
       </form>
@@ -555,6 +556,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <select id="newVillage" required><option value="">गाँव चुनें</option></select>
       <input id="newName" type="text" placeholder="यूज़र का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
       <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
+      <input id="newPw" class="hidden" type="text" placeholder="पासवर्ड (खाली = अपने आप बनेगा)" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false">
       <div id="newAreas" class="checks hidden"></div>
       <select id="newCand" class="hidden" aria-label="उम्मीदवार"></select>
       <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
@@ -641,7 +643,7 @@ const MSG = EN ? {
   other_device: 'This password was opened on another phone — please log in again',
   offline: 'No internet', server: 'Server problem', name: 'Type a name', not_found: 'Person not found',
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
-  no_perm: 'You are not allowed to do this — ask the super admin', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000',
+  no_perm: 'You are not allowed to do this — ask the super admin', pw_short: 'Password: 6 to 40 characters', pw_taken: 'This number\'s other login has this password — choose another', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', free_rule: 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
   no_user: 'None of your people has this mobile number — add the person first (यूज़र tab)', no_online: 'Online payment is not set up', gateway: 'Razorpay problem',
   wallet_min: 'Withdraw at least the minimum', wallet_low: 'Not that much in the wallet', bad_upi: 'Type a correct UPI ID (name@bank)', wd_open: 'A withdrawal is already on its way', wallet_amount: 'Type the amount in ₹',
@@ -654,7 +656,7 @@ const MSG = EN ? {
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह यूज़र नहीं मिला',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
-  no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें',
+  no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', pw_short: 'पासवर्ड 6 से 40 अक्षर का रखें', pw_taken: 'इस नंबर के दूसरे खाते का यही पासवर्ड है — कोई और पासवर्ड चुनें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', free_rule: 'लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
   no_user: 'आपके यूज़र्स में यह मोबाइल नंबर नहीं है — पहले यूज़र tab में जोड़ें', no_online: 'ऑनलाइन भुगतान चालू नहीं है', gateway: 'Razorpay में दिक्कत',
   wallet_min: 'कम से कम न्यूनतम राशि निकालें', wallet_low: 'वॉलेट में इतने ₹ नहीं हैं', bad_upi: 'सही UPI ID लिखें (name@bank)', wd_open: 'एक निकासी पहले से चल रही है', wallet_amount: 'राशि ₹ में लिखें',
@@ -1319,6 +1321,7 @@ function goHome(msg) {
 const mayDo = (p) => !!me && (me.role === 'super' || (me.aperms || []).includes(p));
 function setup() {
   $('openAdd').classList.toggle('hidden', !mayDo('add'));
+  for (const id of ['newPw', 'admPw']) $(id).classList.toggle('hidden', me.role !== 'super');   // the superadmin may type a password
   $('bell').classList.toggle('hidden', me.role !== 'super');
   const mine = me.villages.filter((s) => villages[s]);
   $('meText').textContent = me.role === 'super' ? L('सुपर एडमिन · सभी गाँव', 'Super admin · all villages')
@@ -1337,8 +1340,8 @@ function setup() {
   // back to search: the village list when this admin has several villages, else straight to the one village
   $('backLink').classList.toggle('hidden', !mine.length);
   $('backLink').href = mine.length === 1 ? `/${mine[0]}` : '/';
-  $('adminTab').classList.toggle('hidden', me.role !== 'super');
-  if (me.role === 'super') $('admVillages').replaceChildren(villageChecks([]));
+  $('adminTab').classList.toggle('hidden', !mayDo('admins'));   // the superadmin, or an admin given 'admins'
+  if (mayDo('admins')) $('admVillages').replaceChildren(villageChecks([]));
   render();
 }
 
@@ -1386,7 +1389,8 @@ function villageChecks(checked, samitis = []) {
     const g = el('div', 'vgroup'), list = el('div', 'checks');
     g.dataset.d = distOf(slugs[0]); gs.push(g);
     const whole = el('input'); whole.type = 'checkbox'; whole.dataset.samiti = k; whole.checked = !!k && samitis.includes(k);
-    if (k) {
+    if (k && me.role !== 'super' && !(me.samitis || []).includes(k)) g.append(el('div', 'sam', samOnly(k)));   // not theirs whole: villages one by one
+    else if (k) {
       const head = el('label', 'sam'); head.append(whole, L(`${samOnly(k)} — पूरी, सभी ${slugs.length} गाँव`, `${samOnly(k)} — whole, all ${slugs.length} villages`));
       g.append(head);
     } else g.append(el('div', 'sam', L('अन्य गाँव', 'Other villages')));
@@ -1623,10 +1627,15 @@ function permBoxes(u, msg = 'listMsg', saved) {
 }
 
 // superadmin: what a village admin may do here (ADMIN_PERMS in api/_lib.js)
-const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they made', all: 'Sees every user of their villages' }
-  : { add: 'नए यूज़र बना सकते हैं', own: 'अपने बनाए यूज़र देख सकते हैं', all: 'अपने गाँवों के सभी यूज़र देख सकते हैं' };
+// (the last four: powers the superadmin hands to a trusted admin; a non-super admin sees and gives only the ones they have)
+const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they made', all: 'Sees every user of their villages',
+  admins: 'Can make admins (own villages) and look after them', arights: 'Can set these boxes on admins they made',
+  asearch: 'Can give searches to admins they made', gift: 'Can give free searches to signed-up users' }
+  : { add: 'नए यूज़र बना सकते हैं', own: 'अपने बनाए यूज़र देख सकते हैं', all: 'अपने गाँवों के सभी यूज़र देख सकते हैं',
+    admins: 'एडमिन बना सकते हैं (अपने गाँवों में) और उन्हें संभाल सकते हैं', arights: 'अपने बनाए एडमिन के ये अधिकार बदल सकते हैं',
+    asearch: 'अपने बनाए एडमिन को सर्च दे सकते हैं', gift: 'खुद बने यूज़र को मुफ़्त सर्च दे सकते हैं' };
 function adminPermBoxes(u, msg = 'listMsg') {
-  const box = el('div', 'perms'), keys = Object.keys(APERM_NAME);
+  const box = el('div', 'perms'), keys = Object.keys(APERM_NAME).filter((p) => mayDo(p));   // only powers this admin has
   for (const p of keys) {
     const l = el('label'), c = el('input');
     c.type = 'checkbox'; c.checked = (u.aperms || []).includes(p);
@@ -1669,6 +1678,24 @@ function limitBox(u, msg = 'listMsg', saved) {
   box.append(L('रोज़ की सर्च सीमा:', 'Searches per day:'), inp, save, more, note);
   return box;
 }
+// free searches for good to a signed-up user (action "gift"; the superadmin or an admin with 'gift')
+function giftBox(u, msg = 'listMsg') {
+  const box = el('div', 'limit'), inp = el('input'), give = el('button', 'btn ghost', L('🎁 मुफ़्त सर्च दें', '🎁 Give free searches'));
+  inp.type = 'number'; inp.min = 1; inp.max = 1000; inp.inputMode = 'numeric'; inp.placeholder = '50'; give.type = 'button';
+  give.addEventListener('click', async () => {
+    const n = parseInt(inp.value, 10);
+    if (!(n > 0 && n <= 1000)) { $(msg).textContent = L('1 से 1000 के बीच संख्या लिखें', 'Type a number from 1 to 1000'); return; }
+    if (!confirm(L(`${u.name} को ${n} मुफ़्त सर्च दें?`, `Give ${u.name} ${n} free searches?`))) return;
+    give.disabled = true;
+    const r = await api({ action: 'gift', id: u.id, n });
+    give.disabled = false;
+    if (r.error) { $(msg).textContent = errText(r); return; }
+    $(msg).textContent = L(`✓ ${u.name} को ${n} सर्च दी गईं`, `✓ Gave ${u.name} ${n} searches`); inp.value = '';
+    refresh();
+  });
+  box.append(L('मुफ़्त सर्च:', 'Free searches:'), inp, give);
+  return box;
+}
 
 // ---------- new password box ----------
 let shareTo = '', shareLink = '', shareTitle = '', shareName = '';   // phone number the WhatsApp button sends to ('' = WhatsApp asks for a contact)
@@ -1683,12 +1710,13 @@ function showPassword(u, pw) {
   $('sharePw').classList.toggle('wa', !!shareTo);
   // a new user starts with the default permissions and search limit, a new admin with all of them and the same limit: the
   // superadmin can change an admin's right here too
-  const isUser = u.role === 'user' && u.perms, isAdm = u.role === 'admin' && u.perms && me.role === 'super';
+  const isUser = u.role === 'user' && u.perms, isAdm = u.role === 'admin' && u.perms && (me.role === 'super' || mayDo('arights') || mayDo('asearch'));
   $('newPwPerms').classList.toggle('hidden', !isUser && !isAdm);
   $('newPwPerms').replaceChildren(...(isUser ? [el('div', 'ph', L('यह यूज़र क्या कर सकता है:', 'What this person may do:')), permBoxes(u, 'newPwMsg', refresh),
     ...(u.prepaid ? [] : [limitBox(u, 'newPwMsg', refresh)])]   // bought searches have no daily limit
-    : isAdm ? [el('div', 'ph', L('यह एडमिन क्या कर सकता है — ऐप में:', 'What this admin may do — in the app:')), permBoxes(u, 'newPwMsg', refresh),
-      el('div', 'ph', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u, 'newPwMsg'), limitBox(u, 'newPwMsg', refresh)] : []));
+    : isAdm ? [...(me.role === 'super' ? [el('div', 'ph', L('यह एडमिन क्या कर सकता है — ऐप में:', 'What this admin may do — in the app:')), permBoxes(u, 'newPwMsg', refresh)] : []),
+      ...(mayDo('arights') ? [el('div', 'ph', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u, 'newPwMsg')] : []),
+      ...(mayDo('asearch') ? [limitBox(u, 'newPwMsg', refresh)] : [])] : []));
   $('newPwMsg').textContent = '';
   $('newPw').classList.remove('hidden');
   $('newPw').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1826,10 +1854,10 @@ $('addForm').addEventListener('submit', async (e) => {
   if (!village) { $('addMsg').textContent = MSG.no_village; return; }
   if (!name) return;
   $('addBtn').disabled = true; $('addMsg').textContent = '';
-  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value, areas: areasIn($('newAreas')) });
+  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value, areas: areasIn($('newAreas')), password: $('newPw').value.trim() });
   $('addBtn').disabled = false;
-  if (r.error) { $('addMsg').textContent = errText(r); return; }
-  $('newName').value = ''; $('newPhone').value = '';
+  if (r.error) { $('addMsg').textContent = errText(r); if (r.password) { showPassword(r.user, r.password); refresh(); } return; }
+  $('newName').value = ''; $('newPhone').value = ''; $('newPw').value = '';
   closeAdd();
   showPassword(r.user, r.password);
   refresh();
@@ -1839,10 +1867,10 @@ $('addAdminForm').addEventListener('submit', async (e) => {
   const vs = checkedIn($('admVillages')), ss = samitisIn($('admVillages'));
   if (!vs.length && !ss.length) { $('addAdminMsg').textContent = L('कम से कम एक गाँव चुनें', 'Choose at least one village'); return; }
   $('addAdminBtn').disabled = true; $('addAdminMsg').textContent = '';
-  const r = await api({ action: 'add_admin', name: $('admName').value.trim(), phone: $('admPhone').value, villages: vs, samitis: ss });
+  const r = await api({ action: 'add_admin', name: $('admName').value.trim(), phone: $('admPhone').value, villages: vs, samitis: ss, password: $('admPw').value.trim() });
   $('addAdminBtn').disabled = false;
-  if (r.error) { $('addAdminMsg').textContent = errText(r); return; }
-  $('admName').value = ''; $('admPhone').value = ''; $('admVillages').replaceChildren(villageChecks([]));
+  if (r.error) { $('addAdminMsg').textContent = errText(r); if (r.password) { showPassword(r.user, r.password); refresh(); } return; }
+  $('admName').value = ''; $('admPhone').value = ''; $('admPw').value = ''; $('admVillages').replaceChildren(villageChecks([]));
   showPassword(r.user, r.password);
   refresh();
 });
@@ -1887,7 +1915,7 @@ function render() {
   paged(list, shown, person, `people:${filter}:${fv}:${q}`);
   renderCands();
   const al = $('adminList'); al.innerHTML = '';
-  if (me.role === 'super') {
+  if (mayDo('admins')) {
     const ad = admins.filter((u) => matches(u, qa));
     if (!ad.length) al.append(el('div', 'empty', admins.length ? L('इस खोज से कोई एडमिन नहीं मिला', 'No admin matches this search') : L('अभी कोई एडमिन नहीं', 'No admins yet')));
     paged(al, ad, person, `admins:${qa}`);
@@ -2197,12 +2225,16 @@ function person(u) {
   if (isAdmin && !u.retired && me.role === 'super') {   // the superadmin: what this admin may do, in the app and here, and their searches
     row.append(el('div', 'permhead', L('ऐप में:', 'In the app:')), permBoxes(u), el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u),
       limitBox(u, 'listMsg', refresh), wardPayBox(u));   // a daily limit; ward slips paid or free
+  } else if (isAdmin && !u.retired) {   // an admin given 'arights' / 'asearch', on an admin they made
+    if (mayDo('arights')) row.append(el('div', 'permhead', L('एडमिन पेज पर:', 'On the admin page:')), adminPermBoxes(u));
+    if (mayDo('asearch')) row.append(limitBox(u, 'listMsg', refresh));
   }
+  if (!isAdmin && !u.retired && u.prepaid && mayDo('gift')) row.append(giftBox(u));
   if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]), ...(me.role === 'super' ? [wardPayBox(u)] : []),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(me.role === 'super' ? [moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
-  if (!isAdmin && !u.retired && me.role === 'super') {   // a user becomes a village admin of their village, same login
+  if (!isAdmin && !u.retired && mayDo('admins')) {   // a user becomes a village admin of their village, same login
     const up = el('button', 'btn ghost', L('एडमिन बनाएं', 'Make admin'));
     up.addEventListener('click', () => act({ action: 'promote', id: u.id }, L(`${u.name} को ${vName(u.village)} का एडमिन बनाएं? वही नंबर और पासवर्ड रहेगा; वे नए यूज़र बना सकेंगे और अपने यूज़र देख सकेंगे। बाद में "एडमिन" टैब में बदल सकते हैं।`,
       `Make ${u.name} an admin of ${vName(u.village)}? Same number and password; they can make new users and see their own users. Change this later in the Admins tab.`)));
@@ -2232,6 +2264,14 @@ function person(u) {
   }
   const reset = el('button', 'btn ghost', L('नया पासवर्ड', 'New password'));
   reset.addEventListener('click', async () => {
+    if (me.role === 'super') {   // the superadmin may type the password; empty = a made-up one
+      const pw = prompt(L(`${u.name} का नया पासवर्ड लिखें (कम से कम 6 अक्षर)। खाली छोड़ें तो अपने आप बनेगा। पुराना पासवर्ड बंद हो जाएगा।`,
+        `Type ${u.name}'s new password (at least 6 characters), or leave it empty for a made-up one. The old password stops working.`), '');
+      if (pw === null) return;
+      const r = await act({ action: 'reset', id: u.id, password: pw.trim() });
+      if (r) showPassword(r.user, r.password);
+      return;
+    }
     const r = await act({ action: 'reset', id: u.id }, L(`${u.name} के लिए नया पासवर्ड बनाएं? पुराना पासवर्ड बंद हो जाएगा।`,
       `Make a new password for ${u.name}? The old password stops working.`));
     if (r) showPassword(r.user, r.password);

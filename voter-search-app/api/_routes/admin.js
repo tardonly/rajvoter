@@ -20,7 +20,10 @@
 //   action "add_admin", name, phone, villages: [slug, ...], samitis: ["<district>|<samiti>", ...] [, aperms] → {user, password}
 //                                         (superadmin only; samitis = whole पंचायत समितियाँ, villages added there later too)
 //   action "villages", id, villages, samitis               → {user}   change an admin's villages (superadmin only)
-//   action "reset",  id         → {user, password}   (new password for the same person; the old one stops working)
+//   action "reset",  id [, password] → {user, password}   (new password for the same person; the old one stops working;
+//                                         password: the superadmin's own choice instead of a made-up one, kept with the
+//                                         person's number like one they chose (setOwnPassword in _lib.js); "add" and
+//                                         "add_admin" take it too)
 //   action "retire", id         → {ok}               (password stops working; the phone is logged out at once)
 //   action "logout", id         → {ok}               (ends the person's current session; they can log in again)
 //   action "phone",  id, phone  → {user [, password]} (add or change the person's WhatsApp number; "" removes it). A
@@ -28,7 +31,11 @@
 //                                                       (ownPwHash in _lib.js), so they then get a new made-up one, shown once
 //   action "perms",  id, perms  → {user}             (what a user may do: any of PERMS in _lib.js; an admin's in the app:
 //                                                       superadmin only)
-//   action "aperms", id, aperms → {user}             superadmin: what a village admin may do here (ADMIN_PERMS)
+//   action "aperms", id, aperms → {user}             what a village admin may do here (ADMIN_PERMS): the superadmin, or
+//                                                       an admin with 'arights' on the admins they made (only powers they have)
+//   action "gift", id, n        → {user}             n free searches for good to a signed-up user ('gift' or superadmin)
+//   (an admin with 'admins' may also "add_admin" (their villages only), "promote", "villages" (within theirs), and
+//    reset / retire / logout / phone the admins they made; with 'asearch', "limit" / "extra" on those admins)
 //   action "promote", id        → {user}             superadmin: a user becomes a village admin of their village, same
 //                                                       login and password, with PROMOTED_PERMS
 //   ("limit" / "extra" on an admin: superadmin only; a village admin has no daily limit until one is set)
@@ -105,7 +112,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { wardPayOn, wardPayAreas, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, appPerms, ADMIN_PERMS, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { wardPayOn, wardPayAreas, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, setOwnPassword, badOwnPassword, ownPwHash, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // parties (पार्टी): hash "parties", id → JSON {name, icon, created}; icon a small PNG/JPEG data URL made by the admin page
@@ -180,6 +187,24 @@ module.exports = route(async (req, res, b) => {
   // 'all' every user of their villages, 'own' those they made
   const may = (p) => isSuper || me.aperms.includes(p);
   const mine = (u) => !!u && u.role === 'user' && (isSuper || (mayUse(u.village) && (may('all') || (may('own') && u.by === me.id))));
+  // an admin this one made and still looks after ('admins'); the superadmin: every admin
+  const mineAdmin = (u) => !!u && u.role === 'admin' && (isSuper || (may('admins') && u.by === me.id));
+  // powers a non-super admin hands on: only ones they have; a target's other powers (given by the superadmin) are kept
+  const grantable = (want, had = []) => (isSuper ? adminPermsIn(want)
+    : ADMIN_PERMS.filter((p) => (me.aperms.includes(p) ? Array.isArray(want) && want.includes(p) : had.includes(p))));
+  // villages / whole samitis a non-super admin may give an admin they make: only their own
+  const ownSamitis = (ss) => isSuper || ss.every((k) => (me.samitis || []).includes(k));
+  const ownVillages = (vs) => isSuper || vs.every((s) => mayUse(s));
+  // a password the superadmin typed for a login (b.password): '' none, else an error code or null when it can be used
+  const typedPw = () => String(b.password || '').trim();
+  const badTypedPw = async (phone, id = '') => {
+    const pw = typedPw();
+    if (!isSuper) return 'super_only';
+    if (badOwnPassword(pw)) return 'pw_short';
+    if (!phone) return 'phone';   // it works only together with the mobile number
+    const was = await redis('GET', `pw:${ownPwHash(phone, pw)}`);
+    return was && was !== id ? 'pw_taken' : null;
+  };
   const now = new Date().toISOString();
   // a new login made by this admin: fields = role and village(s) [and more]; → {id, password}
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
@@ -343,11 +368,11 @@ module.exports = route(async (req, res, b) => {
       isSuper && canMoveUserData() ? redis('GET', COPY_DONE) : null,
       allParties()]);
     let all = (await getUsers(ids)).sort((x, y) => (x.created < y.created ? 1 : -1));
-    if (!isSuper) {   // a village admin never sees another admin, not even that admin's person login (same mobile number)
+    if (!isSuper) {   // a village admin never sees another admin (but the ones they made), nor an admin's person login
       const adminPhones = new Set(all.filter((u) => u.role === 'admin' && u.phone).map((u) => u.phone));
-      all = all.filter((u) => !(u.phone && adminPhones.has(u.phone)));
+      all = all.filter((u) => mineAdmin(u) || !(u.phone && adminPhones.has(u.phone)));
     }
-    const shown = all.filter((u) => (mine(u) && (!b.village || u.village === b.village)) || (isSuper && u.role === 'admin'));
+    const shown = all.filter((u) => (mine(u) && (!b.village || u.village === b.village)) || mineAdmin(u));
     const day = today();
     const buyers = shown.filter((u) => isPrepaid(u) || credits(u) > 0);
     const counts = shown.length ? await pipeline([...shown.map((u) => ['GET', `searches:${u.id}:${day}`]), ...buyers.map((u) => ['GET', paidKey(u.id)])]) : [];
@@ -355,9 +380,9 @@ module.exports = route(async (req, res, b) => {
     const paid = Object.fromEntries(buyers.map((u, i) => [u.id, Number(counts[shown.length + i]) || 0]));
     const withUse = (u) => ({ ...view(u), searchesToday: searches[u.id] || 0, paidUsed: paid[u.id] || 0 });
     const users = shown.filter((u) => mine(u) && (!b.village || u.village === b.village)).map(withUse);
-    const admins = isSuper ? shown.filter((u) => u.role === 'admin').map(withUse) : undefined;
+    const admins = isSuper || may('admins') ? shown.filter((u) => u.role === 'admin').map(withUse) : undefined;
     const dbCopy = isSuper && canMoveUserData() ? (moved ? 'done' : 'todo') : undefined;
-    return send(res, 200, { dbCopy, dbTo: dbCopy && usesMongo ? 'mongo' : undefined, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins,
+    return send(res, 200, { dbCopy, dbTo: dbCopy && usesMongo ? 'mongo' : undefined, survey: me.survey, me: { id: me.id, role: me.role, name: me.name, villages: me.villages, samitis: isSuper ? [] : me.samitis || [], aperms: isSuper ? ADMIN_PERMS.slice() : me.aperms }, users, admins,
       villageList: villageList(me.villages), areaSize: areaSizes(me.villages), parties,
       cands: cands.map(({ id, name, village: v, created, party }) => ({ id, name, village: v, created, party: party || '' })) });
       // villageList: names of my villages (the list is not public)
@@ -534,12 +559,22 @@ module.exports = route(async (req, res, b) => {
         await candReach(c.id, ex.all);
       }
     } else {
-      if (!isSuper) return send(res, 403, { error: 'super_only' });
+      if (!may('admins')) return send(res, 403, { error: 'no_perm' });
       const vs = villageSlugs(b.villages), ss = samitiList(b.samitis);
       if (!vs.length && !ss.length) return send(res, 400, { error: 'no_village' });
-      fields = ['role', 'admin', 'villages', vs.join(','), 'samitis', ss.join(','), 'aperms', (Array.isArray(b.aperms) ? adminPermsIn(b.aperms) : ADMIN_PERMS).join(',')];
+      if (!ownVillages(vs) || !ownSamitis(ss)) return send(res, 403, { error: 'not_your_village' });
+      fields = ['role', 'admin', 'villages', vs.join(','), 'samitis', ss.join(','), 'aperms', grantable(Array.isArray(b.aperms) ? b.aperms : OLD_ADMIN_PERMS).join(',')];
+    }
+    if (typedPw()) {   // the superadmin's own password for this login
+      const bad = await badTypedPw(phone);
+      if (bad) return send(res, bad === 'super_only' ? 403 : 400, { error: bad });
     }
     const { id, password } = await newLogin(fields, name, phone);
+    if (typedPw()) {
+      const err = await setOwnPassword(await getUser(id), typedPw());
+      if (err) return send(res, 400, { error: err, user: view(await getUser(id)), password });   // made with the made-up one
+      return send(res, 200, { user: view(await getUser(id)), password: typedPw() });
+    }
     return send(res, 200, { user: view(await getUser(id)), password });
   }
 
@@ -557,33 +592,36 @@ module.exports = route(async (req, res, b) => {
 
   // everything below acts on one person: a village admin only on users of their villages, the superadmin on anyone
   const user = b.id ? await getUser(String(b.id)) : null;
-  if (!user || !(isSuper || mine(user))) return send(res, 404, { error: 'not_found' });
+  if (!user || !(isSuper || mine(user) || mineAdmin(user))) return send(res, 404, { error: 'not_found' });
   // nor manage an admin through that admin's person login (same mobile number; see "list")
-  if (!isSuper && user.phone && (await phoneLogins(user.phone)).some((x) => x.role === 'admin')) return send(res, 404, { error: 'not_found' });
+  if (!isSuper && !mineAdmin(user) && user.phone && (await phoneLogins(user.phone)).some((x) => x.role === 'admin')) return send(res, 404, { error: 'not_found' });
 
-  if (b.action === 'promote') {   // superadmin: a user becomes a village admin of their village, with the same login
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
+  if (b.action === 'promote') {   // a user becomes a village admin of their village, with the same login ('admins')
+    if (!may('admins')) return send(res, 403, { error: 'no_perm' });
     if (user.role !== 'user') return send(res, 400, { error: 'not_user' });
     if (!realVillage(user.village)) return send(res, 400, { error: 'no_village' });
+    if (!ownVillages(user.villages)) return send(res, 403, { error: 'not_your_village' });
     await redis('HSET', `user:${user.id}`, 'role', 'admin', 'villages', user.villages.join(','), 'samitis', '', 'cand', '',
-      'aperms', PROMOTED_PERMS.join(','), 'perms', appPerms(user).join(','), 'promotedAt', now);
+      'aperms', grantable(PROMOTED_PERMS).join(','), 'perms', appPerms(user).join(','), 'promotedAt', now,
+      ...(isSuper ? [] : ['by', me.id, 'byName', me.name]));   // promoted by an admin: now one they look after
     await buildIndexes();
     await redis('SADD', 'admins', user.id);
     await redis('SREM', 'free', user.id);
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
-  if (b.action === 'aperms') {   // superadmin: what a village admin may do on the admin page
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
+  if (b.action === 'aperms') {   // what a village admin may do on the admin page (the superadmin, or 'arights')
+    if (!may('arights')) return send(res, 403, { error: 'no_perm' });
     if (user.role !== 'admin') return send(res, 400, { error: 'not_admin' });
-    await redis('HSET', `user:${user.id}`, 'aperms', adminPermsIn(b.aperms).join(','));
+    await redis('HSET', `user:${user.id}`, 'aperms', grantable(b.aperms, user.aperms).join(','));
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
   if (b.action === 'villages') {
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    if (!may('admins')) return send(res, 403, { error: 'no_perm' });
     if (user.role !== 'admin') return send(res, 400, { error: 'not_admin' });
     const vs = villageSlugs(b.villages), ss = samitiList(b.samitis);
     if (!vs.length && !ss.length) return send(res, 400, { error: 'no_village' });
+    if (!ownVillages(vs) || !ownSamitis(ss)) return send(res, 403, { error: 'not_your_village' });
     await redis('HSET', `user:${user.id}`, 'villages', vs.join(','), 'samitis', ss.join(','));
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
@@ -642,7 +680,7 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
   if (b.action === 'limit' || b.action === 'extra') {
-    if (user.role !== 'user' && !isSuper) return send(res, 400, { error: 'not_user' });   // an admin's: the superadmin sets it
+    if (user.role !== 'user' && !may('asearch')) return send(res, 403, { error: 'no_perm' });   // an admin's: superadmin or 'asearch'
     if (b.action === 'limit') {
       const n = b.limit === '' || b.limit == null ? 0 : parseInt(b.limit, 10);
       if (!(n >= 0 && n <= 5000)) return send(res, 400, { error: 'bad_limit' });
@@ -655,6 +693,23 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
+  if (b.action === 'gift') {   // free searches for good to a signed-up user (creditsLeft in _lib.js)
+    if (!may('gift')) return send(res, 403, { error: 'no_perm' });
+    if (!isPrepaid(user)) return send(res, 400, { error: 'not_prepaid' });
+    const n = parseInt(b.n, 10);
+    if (!(n > 0 && n <= GIFT_MAX)) return send(res, 400, { error: 'bad_limit' });
+    await pipeline([['HINCRBY', `user:${user.id}`, 'credits', n], ['HINCRBY', `user:${user.id}`, 'gifted', n]]);
+    return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'reset' && typedPw()) {   // the superadmin's own choice of password
+    const bad = await badTypedPw(user.phone, user.id);
+    if (bad) return send(res, bad === 'super_only' ? 403 : 400, { error: bad });
+    const err = await setOwnPassword(user, typedPw());
+    if (err) return send(res, 400, { error: err });
+    await redis('HSET', `user:${user.id}`, 'retired', '0', 'session', '');
+    return send(res, 200, { user: view(await getUser(user.id)), password: typedPw() });
+  }
   if (b.action === 'reset') {
     const password = await freshPassword(), hash = pwHash(password);
     if (user.hash) await redis('DEL', `pw:${user.hash}`);
