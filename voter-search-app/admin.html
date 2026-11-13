@@ -898,7 +898,8 @@ $('wpOn').addEventListener('change', async () => {
 // superadmin, on a person's card: ward slips as for everyone, always free, or always paid
 function wardPayBox(u) {
   const box = el('div', 'limit'), sel = el('select');
-  const all = WARD_PAY == null ? '' : WARD_PAY ? L(' (अभी ₹50)', ' (now ₹50)') : L(' (अभी मुफ़्त)', ' (now free)');
+  // a self sign-up pays even where wards are free (wardFree in api/_lib.js) unless set to free here
+  const all = u.self ? L(' (खुद बनाया: ₹50)', ' (signed up: ₹50)') : WARD_PAY == null ? '' : WARD_PAY ? L(' (अभी ₹50)', ' (now ₹50)') : L(' (अभी मुफ़्त)', ' (now free)');
   for (const [v, t] of [['', L(`सबके जैसा${all}`, `As for everyone${all}`)], ['free', L('मुफ़्त', 'Free')], ['pay', L('₹50 प्रति वार्ड', '₹50 a ward')]]) sel.add(new Option(t, v));
   sel.value = u.wardpay || '';
   sel.addEventListener('change', async () => {

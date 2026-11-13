@@ -928,7 +928,7 @@ async function wardPayOn() {
 }
 // Per ज़िला and per पंचायत समिति too (admin.js "ward_pay_area"): hash "wardpayarea", field "d:<district>" or
 // "s:<district>|<samiti>" (samitiKey) = '1' pay / '0' free, by the ward's village. The person's own setting wins, then
-// the samiti's, then the district's, then the switch for everyone.
+// a self sign-up's pays (wardFree), then the samiti's, then the district's, then the switch for everyone.
 async function wardPayAreas() {
   const a = (await redis('HGETALL', 'wardpayarea')) || [], o = {};
   for (let i = 0; i + 1 < a.length; i += 2) o[a[i]] = String(a[i + 1]);
@@ -939,6 +939,9 @@ async function wardFree(u, slug) {
   if (u.role === 'super') return true;
   if (u.wardpay === 'free') return true;
   if (u.wardpay === 'pay') return false;
+  // signed up by themselves with a mobile number (api/signup.js): pays even where wards are free for everyone, the
+  // samiti or the district; only their own setting above (set by the superadmin) makes them free
+  if (u.self === '1') return false;
   const v = slug && VILLAGES[slug];
   if (v) {
     const areas = await wardPayAreas(), set = areas[`s:${samitiKey(v)}`] ?? areas[`d:${v.district || ''}`];
