@@ -607,7 +607,8 @@ const appPerms = (u) => (u.role === 'admin' && u.perms === undefined ? PERMS.sli
 //   arights: tick these same boxes on the admins they made (only the ones they have themselves)
 //   asearch: daily limit / extra searches of the admins they made
 //   gift: free searches added for good to a signed-up (self-made) user they look after
-const ADMIN_PERMS = ['add', 'own', 'all', 'admins', 'arights', 'asearch', 'gift'];
+//   wardpay: ward slips free / paid for a user they look after (wardFree; admin.js "ward_pay_user")
+const ADMIN_PERMS = ['add', 'own', 'all', 'admins', 'arights', 'asearch', 'gift', 'wardpay'];
 const OLD_ADMIN_PERMS = ['add', 'own', 'all'];   // an admin made before these could be set
 const GIFT_MAX = 1000;   // free searches one "gift" may add
 const PROMOTED_PERMS = ['add', 'own'];   // a user made admin (api/_routes/admin.js "promote")
@@ -940,7 +941,7 @@ async function wardFree(u, slug) {
   if (u.wardpay === 'free') return true;
   if (u.wardpay === 'pay') return false;
   // signed up by themselves with a mobile number (api/signup.js): pays even where wards are free for everyone, the
-  // samiti or the district; only their own setting above (set by the superadmin) makes them free
+  // samiti or the district; only their own setting above (the superadmin, or an admin with 'wardpay') makes them free
   if (u.self === '1') return false;
   const v = slug && VILLAGES[slug];
   if (v) {
