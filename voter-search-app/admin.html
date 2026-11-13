@@ -1672,9 +1672,9 @@ function limitBox(u, msg = 'listMsg', saved) {
 }
 
 // ---------- new password box ----------
-let shareTo = '', shareLink = '', shareTitle = '';   // phone number the WhatsApp button sends to ('' = WhatsApp asks for a contact)
+let shareTo = '', shareLink = '', shareTitle = '', shareName = '';   // phone number the WhatsApp button sends to ('' = WhatsApp asks for a contact)
 function showPassword(u, pw) {
-  shareTo = u.phone || '';
+  shareTo = u.phone || ''; shareName = String(u.name || '').trim();
   shareLink = u.role === 'admin' ? `${location.origin}/admin` : `${location.origin}/${u.village}`;
   shareTitle = u.role === 'admin' ? `Voter Search · ${L('एडमिन', 'Admin')}` : `Voter Search · ${vName(u.village)}`;
   $('newPwFor').textContent = u.role === 'admin' ? L(`एडमिन ${u.name} का पासवर्ड:`, `Password of admin ${u.name}:`)
@@ -1703,8 +1703,8 @@ $('copyPw').addEventListener('click', async () => {
 $('sharePw').addEventListener('click', () => {
   // the mobile number as the login page asks for it (10 digits), when the person has one
   const mobile = /^91\d{10}$/.test(shareTo) ? shareTo.slice(2) : shareTo ? `+${shareTo}` : '';
-  const text = L(`${shareTitle}\nलिंक: ${shareLink}\n${mobile ? `मोबाइल नंबर: ${mobile}\n` : ''}पासवर्ड: ${$('newPwText').textContent}\n(यह पासवर्ड किसी और को न दें)`,
-    `${shareTitle}\nLink: ${shareLink}\n${mobile ? `Mobile number: ${mobile}\n` : ''}Password: ${$('newPwText').textContent}\n(do not give this password to anyone else)`);
+  const text = L(`${shareTitle}\n${shareName ? `नाम: ${shareName}\n` : ''}लिंक: ${shareLink}\n${mobile ? `मोबाइल नंबर: ${mobile}\n` : ''}पासवर्ड: ${$('newPwText').textContent}\n(यह पासवर्ड किसी और को न दें)`,
+    `${shareTitle}\n${shareName ? `Name: ${shareName}\n` : ''}Link: ${shareLink}\n${mobile ? `Mobile number: ${mobile}\n` : ''}Password: ${$('newPwText').textContent}\n(do not give this password to anyone else)`);
   location.href = `https://wa.me/${shareTo}?text=` + encodeURIComponent(text);   // opens the chat with that number directly
 });
 
