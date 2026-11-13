@@ -556,7 +556,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
       <select id="newVillage" required><option value="">गाँव चुनें</option></select>
       <input id="newName" type="text" placeholder="यूज़र का नाम (जैसे रमेश, बूथ 54)" maxlength="60" required>
       <input id="newPhone" type="tel" inputmode="tel" placeholder="WhatsApp मोबाइल नंबर (जैसे 98765 43210)" maxlength="20">
-      <input id="newPw" class="hidden" type="text" placeholder="पासवर्ड (खाली = अपने आप बनेगा)" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <input id="newUserPw" class="hidden" type="text" placeholder="पासवर्ड (खाली = अपने आप बनेगा)" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false">
       <div id="newAreas" class="checks hidden"></div>
       <select id="newCand" class="hidden" aria-label="उम्मीदवार"></select>
       <button class="btn" id="addBtn" type="submit">पासवर्ड बनाएं</button>
@@ -1321,7 +1321,7 @@ function goHome(msg) {
 const mayDo = (p) => !!me && (me.role === 'super' || (me.aperms || []).includes(p));
 function setup() {
   $('openAdd').classList.toggle('hidden', !mayDo('add'));
-  for (const id of ['newPw', 'admPw']) $(id).classList.toggle('hidden', me.role !== 'super');   // the superadmin may type a password
+  for (const id of ['newUserPw', 'admPw']) $(id).classList.toggle('hidden', me.role !== 'super');   // the superadmin may type a password
   $('bell').classList.toggle('hidden', me.role !== 'super');
   const mine = me.villages.filter((s) => villages[s]);
   $('meText').textContent = me.role === 'super' ? L('सुपर एडमिन · सभी गाँव', 'Super admin · all villages')
@@ -1854,10 +1854,10 @@ $('addForm').addEventListener('submit', async (e) => {
   if (!village) { $('addMsg').textContent = MSG.no_village; return; }
   if (!name) return;
   $('addBtn').disabled = true; $('addMsg').textContent = '';
-  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value, areas: areasIn($('newAreas')), password: $('newPw').value.trim() });
+  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value, areas: areasIn($('newAreas')), password: $('newUserPw').value.trim() });
   $('addBtn').disabled = false;
   if (r.error) { $('addMsg').textContent = errText(r); if (r.password) { showPassword(r.user, r.password); refresh(); } return; }
-  $('newName').value = ''; $('newPhone').value = ''; $('newPw').value = '';
+  $('newName').value = ''; $('newPhone').value = ''; $('newUserPw').value = '';
   closeAdd();
   showPassword(r.user, r.password);
   refresh();
