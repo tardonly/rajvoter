@@ -1477,14 +1477,13 @@ function setMode(survey) {
   SURVEY = survey; MARK_NAME = MARK_SETS[survey ? 'survey' : 'poll'];
   document.querySelectorAll('#vsStatus button[data-s]').forEach((b) => { if (MARK_NAME[b.dataset.s]) b.firstChild.nodeValue = `${MARK_NAME[b.dataset.s]} `; });
   document.querySelectorAll('.marks button[data-s]').forEach((b) => { b.childNodes[1].nodeValue = MARK_NAME[b.dataset.s]; });
-  $('modeCard').classList.toggle('hidden', !me);
-  const forAll = !!me && me.role === 'super';
+  $('modeCard').classList.toggle('hidden', !me || me.role !== 'super');   // only the superadmin switches the marks
   $('modeTitle').textContent = L('पर्ची के निशान', 'Marks on the slips');
   $('modeNow').textContent = survey ? L('अभी: सर्वे', 'now: survey') : L('अभी: मतदान दिवस', 'now: polling day');
   $('modeHelp').textContent = L('सर्वे (चुनाव से पहले): अपना वोट / सोच रहे हैं / विपक्ष। मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है। दोनों के निशान अलग रखे जाते हैं — बदलने पर कोई निशान नहीं मिटता, और मतदान दिवस पर हर पर्ची पर उसका सर्वे का निशान भी दिखता है। ' +
-    (forAll ? 'यहाँ बदलने पर सबके फ़ोन बदल जाते हैं; उसके बाद हर यूज़र ऐप में अपने लिए फिर बदल सकता है।' : 'यह सिर्फ़ आपके लिए है — ऐप में भी बदल सकते हैं।'),
+    'यहाँ बदलने पर सबके फ़ोन बदल जाते हैं; ऐप में यूज़र इसे नहीं बदल सकते।',
     'Survey (before the election): our vote / undecided / opposition. Polling day: voted / coming / not a voter. The two are kept apart — switching erases no mark, and on polling day each slip also shows its survey mark. ' +
-    (forAll ? 'Switching here switches every phone; after that each person can switch back for themself in the app.' : 'This is only for you — you can switch in the app too.'));
+    'Switching here switches every phone; people cannot switch it in the app.');
   document.querySelectorAll('#modeCard button[data-mode]').forEach((b) => {
     b.textContent = b.dataset.mode === 'survey' ? L('सर्वे', 'Survey') : L('मतदान दिवस', 'Polling day');
     b.classList.toggle('on', (b.dataset.mode === 'survey') === survey);

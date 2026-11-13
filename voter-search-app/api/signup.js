@@ -25,7 +25,7 @@
 //   POST {action: 'coupon', token, village, code} → {coupon: {code, kind, value, minN}} or {error: 'cpn_…'}
 //   POST {action: 'coupons', token, village} → {coupons: [{code, kind, value, minN, maxN, until, first}]}   the coupons the
 //     superadmin lists in the buy window (show) that this login can use now, best first
-//   POST {action: 'mark_mode', token, village, mode: 'survey' | 'poll'} → {survey}   this person's own choice of marks
+//   POST {action: 'mark_mode', ...} → 403 super_only   (no longer per person: the superadmin switches everyone)
 //     (सर्वे / मतदान दिवस, markModeOf in _lib.js), until the superadmin next switches everyone
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
@@ -153,10 +153,7 @@ module.exports = route(async (req, res, b) => {
   if (b.action === 'mark_mode') {   // सर्वे / मतदान दिवस: which marks this person uses (markModeOf in _lib.js)
     const me = await whoIs(b.token, b.village);
     if (!me || me.status !== 'ok' || me.demo) return send(res, 401, { error: 'login' });
-    if (me.role === 'super') return send(res, 403, { error: 'super_only' });   // the superadmin: on the admin page, for everyone
-    if (b.mode !== 'survey' && b.mode !== 'poll') return send(res, 400, { error: 'bad_mark' });
-    await redis('HSET', `user:${me.id}`, 'markmode', b.mode, 'markmodeAt', new Date().toISOString());
-    return send(res, 200, { survey: b.mode === 'survey' });
+    return send(res, 403, { error: 'super_only' });   // only the superadmin switches, on the admin page, for everyone
   }
   if (b.action === 'coupons') {   // the buy window's list of coupons to tap, and the app's coupon banners (banner: true)
     const me = await whoIs(b.token, b.village);

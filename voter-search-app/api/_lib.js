@@ -1226,15 +1226,11 @@ const MARKS = ['done', 'coming', 'absent'];   // green: done · yellow: on the w
 // Two sets of marks, kept apart: the survey before the election (सर्वे: done = अपना वोट, coming = सोच रहे हैं,
 // absent = विपक्ष; hashes "smark:…") and polling day (मतदान दिवस: वोट दिया / आ रहे हैं / वोटर नहीं है; "mark:…"). The
 // buttons, reports, lists and "clear" work on the set in use, and on polling day each slip also shows its survey mark.
-// Which set: each person switches for themself in the app (user fields markmode 'survey' | 'poll' and markmodeAt,
-// api/signup.js "mark_mode"; a village admin also on the admin page), and the superadmin for everyone (keys "markmode"
-// and "markmodeat", api/_routes/admin.js "mark_mode"): the newer of the two wins, so the superadmin's switch on polling day
-// reaches every phone, and anyone may switch back afterwards. whoIs gives it as .survey, which the routes pass on.
-async function markModeOf(u) {   // u: a login's record, or null (the superadmin, a demo phone) → true for the survey
-  const [g, gAt] = await pipeline([['GET', 'markmode'], ['GET', 'markmodeat']]);
-  const all = g === 'survey';
-  if (!u || (u.markmode !== 'survey' && u.markmode !== 'poll')) return all;
-  return String(u.markmodeAt || '') > String(gAt || '') ? u.markmode === 'survey' : all;
+// Which set: only the superadmin decides, for everyone (keys "markmode" and "markmodeat", api/_routes/admin.js
+// "mark_mode"). A person's own old choice (user fields markmode / markmodeAt) no longer counts. whoIs gives it as
+// .survey, which the routes pass on.
+async function markModeOf() {   // the superadmin's choice for everyone → true for the survey
+  return (await redis('GET', 'markmode')) === 'survey';
 }
 const markKey = (v) => `${parseInt(v.ward, 10)}:${parseInt(v.box, 10)}`;
 const markHash = (slug, cand, survey) => `${survey ? 'smark' : 'mark'}:${slug}${cand ? `:c:${cand}` : ''}`;

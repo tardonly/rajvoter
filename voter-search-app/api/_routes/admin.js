@@ -292,8 +292,8 @@ module.exports = route(async (req, res, b) => {
   }
   if (b.action === 'mark_mode') {   // survey marks or polling-day marks (markModeOf in _lib.js)
     if (b.mode !== 'survey' && b.mode !== 'poll') return send(res, 400, { error: 'bad_mark' });
-    if (isSuper) await pipeline([['SET', 'markmode', b.mode], ['SET', 'markmodeat', now]]);   // everyone, from now on
-    else await redis('HSET', `user:${me.id}`, 'markmode', b.mode, 'markmodeAt', now);   // this admin only
+    if (!isSuper) return send(res, 403, { error: 'super_only' });   // only the superadmin, for everyone
+    await pipeline([['SET', 'markmode', b.mode], ['SET', 'markmodeat', now]]);
     return send(res, 200, { survey: b.mode === 'survey' });
   }
   if (b.action === 'free_rule') {   // superadmin: free searches for sign-ups (freeRule in _lib.js)

@@ -170,9 +170,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     color: #fff; font-size: 13px; line-height: 1; }
   .cpnchip small { font-size: 12px; color: #6b21a8; }
   .cpnchip.on { border-style: solid; background: #7c3aed; color: #fff; } .cpnchip.on small { color: #ede9fe; }
-  .moderow { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--muted); }
-  .moderow button { flex: 1; padding: 5px 8px; border: 1.5px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font-size: 13.5px; font-weight: 600; }
-  .moderow button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .cpnmsg.good { color: #15803d; font-weight: 600; }
   .cpnmsg.bad { color: #b91c1c; }
   .pack.on { border-color: #16a34a; background: #f0fdf4; box-shadow: 0 0 0 2px #16a34a inset; }
@@ -295,6 +292,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   .pmeter i { display: block; } .pmeter .done { background: #16a34a; } .pmeter .coming { background: #facc15; } .pmeter .absent { background: #dc2626; }
   /* वोटर लिस्ट: the voters behind the report's numbers, by mark, in the same kind of popup */
   #listBtn { border: 1px solid #93c5fd; background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+  #slipsBtn { border: 1px solid #f9a8d4; background: #fdf2f8; color: #be185d; font-weight: 600; }
+  /* वार्ड पर्चियाँ: one line per ward with its download (or price) button */
+  #slipsBody .srow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  #slipsBody .srow button { border: 1.5px solid #be185d; border-radius: 8px; padding: 5px 12px; background: #fff; color: #be185d; font-weight: 600; font-size: 14px; }
+  #slipsBody .srow button.paid { background: #be185d; color: #fff; }
+  #slipsBody .srow button:disabled { opacity: .45; }
   .prog td.go { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
   .lpick { display: flex; gap: 6px; }
   .lpick select { flex: 1; padding: 8px 10px; font-size: 15px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; }
@@ -494,7 +497,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
     .row2 { display: contents; }
     #qReset { order: 1; }   /* after the mark filter, at the end of the line */
     .fields > *, .row2 > * { grid-row: 1; }
-    #modeRow { grid-row: 2; grid-column: 1 / -1; justify-self: start; width: 340px; margin-top: 0; }   /* सर्वे / मतदान दिवस: its own line under the search */
     main { max-width: 1272px; padding: 14px 16px 28px; }
     #results, .family { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px; align-items: start; }
     html.big #results, html.big .family { grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); }
@@ -699,6 +701,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   <input id="posterFile" type="file" accept="image/*" hidden>
 </div>
 
+<div id="slipsPop" class="progpop hidden" role="dialog" aria-label="वार्ड पर्चियाँ">
+  <div class="card">
+    <div class="head"><h2>वार्ड पर्चियाँ (PDF)</h2><button id="slipsClose" type="button" aria-label="बंद करें">✕</button></div>
+    <div id="slipsBody"></div>
+  </div>
+</div>
+
 <div id="listPop" class="progpop hidden" role="dialog" aria-label="वोटर लिस्ट">
   <div class="card">
     <div class="head"><h2>वोटर लिस्ट</h2>
@@ -738,7 +747,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
   <div class="cpnbanners hidden" id="cpnBanners"></div>
   <header>
     <div class="titlebar"><b><span class="appname">Voter Search · </span><span id="vName"></span><a id="switchBtn" class="hidden" href="/">गाँव बदलें</a><span class="who" id="who"></span></b>
-      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
+      <span class="tb-actions"><button class="langbtn" data-lang data-short type="button"></button><a id="backBtn" class="hidden" href="/">← वापस</a><button id="bigBtn" type="button" aria-label="बड़े अक्षर" aria-pressed="false">अ+</button><button id="progBtn" class="hidden" type="button">वोटर रिपोर्ट</button><button id="listBtn" class="hidden" type="button">वोटर लिस्ट</button><button id="slipsBtn" class="hidden" type="button">वार्ड पर्चियाँ</button><a id="adminBtn" class="hidden" href="">एडमिन</a><button id="pwBtn" class="hidden" type="button" title="पासवर्ड बदलें" aria-label="पासवर्ड बदलें">🔑</button><button id="lockBtn" type="button">लॉग आउट</button></span></div>
     <div class="demobar hidden" id="demoBar"></div>
     <div class="fields">
       <!-- बोलकर सर्च: the mic fills the name box by speech (Web Speech API, Hindi); hidden where the browser has none -->
@@ -756,8 +765,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://ww
         <option value="coming">सिर्फ़ आ रहे हैं</option>
         <option value="absent">सिर्फ़ वोटर नहीं है</option>
       </select>
-      <!-- which marks this person uses: the survey before the election or polling day (api/signup.js 'mark_mode') -->
-      <div class="moderow hidden" id="modeRow" role="group" aria-label="निशान"><span>निशान:</span><button type="button" data-mode="survey">सर्वे</button><button type="button" data-mode="poll">मतदान दिवस</button></div>
     </div>
     <div class="countrow"><div id="count"></div><span><button id="wardPrint" class="hidden" type="button"></button><button id="wardAzBtn" class="hidden" type="button"></button>
       <button id="buyMore" class="hidden" type="button">🛒 और सर्च खरीदें</button><button id="walletBtn" class="hidden" type="button"></button><button id="invite" class="hidden" type="button">🎁 दोस्तों को रेफ़र करें</button></span></div>
@@ -815,7 +822,7 @@ const STATIC_EN = {
   'दूसरे ऐप में शेयर करें': 'Share in another app', 'लिंक कॉपी करें': 'Copy link', 'वीडियो पेज का लिंक कॉपी करें': 'Copy the videos page link',
   '⬇ वीडियो (फ़ोन)': '⬇ Video (phone)', '⬇ वीडियो (लैपटॉप)': '⬇ Video (laptop)',
   'आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।': 'The icon opens this page without the browser. Internet is still needed.',
-  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
+  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'वार्ड पर्चियाँ': 'Ward slips', 'वार्ड पर्चियाँ (PDF)': 'Ward slips (PDF)', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
   'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव सर्च करें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'ज़िला': 'District', 'नाम से (अ–ज्ञ)': 'By name (A–Z)', 'ज़्यादा वोटर पहले': 'Most voters first', 'कम वोटर पहले': 'Fewest voters first', 'क्रम': 'Order', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
@@ -951,7 +958,6 @@ function setMode(survey) {
   // the page's own words for the marks: the वोटर लिस्ट buttons and the filter under the ward
   document.querySelectorAll('#listStatus button[data-s]').forEach((b) => { if (MARK_NAME[b.dataset.s]) b.firstChild.nodeValue = `${MARK_NAME[b.dataset.s]} `; });
   document.querySelectorAll('#qMark option').forEach((o) => { if (MARKS[o.value]) o.textContent = `${L('सिर्फ़', 'Only')} ${FILTER[o.value]}`; });
-  document.querySelectorAll('#modeRow button[data-mode]').forEach((b) => b.classList.toggle('on', (b.dataset.mode === 'survey') === survey));
   // slips already on screen: new words on their buttons (their marks of the new set come with the same answer)
   if (changed) document.querySelectorAll('.slip .marks button[data-m]').forEach((x) => { x.textContent = MARK_NAME[x.dataset.m]; });
   return changed;
@@ -1027,7 +1033,6 @@ function showApp(name, admin, villages, perms, cand, role) {
   // logins with several villages, and a signed-up login that may still move itself to another village
   $('switchBtn').classList.toggle('hidden', !(villages && villages.length > 1) && !MOVES_LEFT);
   IS_ADMIN = !!admin; wardButton(); progButton(); listButton(); posterButton(); buyMoreButton(); cpnBanners();
-  $('modeRow').classList.toggle('hidden', DEMO || role === 'super');   // the superadmin switches everyone on the admin page
   if (DEMO) {   // ← वापस: back to the start page; गाँव बदलें: back to the demo's villages
     $('who').textContent = ''; $('lockBtn').classList.add('hidden'); $('backBtn').classList.remove('hidden'); $('switchBtn').href = '/demo'; demoBar();
   }
@@ -1315,7 +1320,7 @@ async function search(more = false, force = false) {
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   if (r.perms) updatePerms(r.perms);
   if (r.wz != null) WARD_AZ = r.wz;
-  if (r.wp != null) { WARD_PAID = r.wp; wardButton(); }
+  if (r.wp != null) { WARD_PAID = r.wp; WP_KNOWN = true; wardButton(); }
   total = r.total;
   if (!more) { $('results').innerHTML = ''; shown = 0; }
   const frag = document.createDocumentFragment();
@@ -1678,14 +1683,6 @@ async function refreshMarks() {
   if (x.perms) updatePerms(x.perms);
 }
 setInterval(refreshMarks, 60000);
-// सर्वे / मतदान दिवस: this person's own choice (until the superadmin next switches everyone); the slips on screen then
-// show the marks of the chosen set
-document.querySelectorAll('#modeRow button[data-mode]').forEach((b) => b.addEventListener('click', async () => {
-  if ((b.dataset.mode === 'survey') === SURVEY) return;
-  const r = await api('signup', { action: 'mark_mode', token: token(), mode: b.dataset.mode });   // api() switches the words
-  if (SESSION_ERRORS.includes(r.error)) return signOut(MSG[r.error]);
-  if (!r.error) refreshMarks();
-}));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarks(); });
 
 // ---------- printing / saving slips as PDF (the phone's print screen also offers "Save as PDF") ----------
@@ -2005,13 +2002,14 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') listClose(
 // Name order (नाम क्रम, अ–ज्ञ) is WARD_AZ_RS more: with the ward (₹WARD_RS + ₹WARD_AZ_RS) or later on its own (WARD_AZ:
 // the wards bought in name order too, answer field wz; true = this login doesn't pay)
 const WARD_RS = 50, WARD_AZ_RS = 50;
-let WARD_PAID = [], WARD_AZ = [];
+let WARD_PAID = [], WARD_AZ = [], WP_KNOWN = false;   // WP_KNOWN: a search has said which wards are paid
 const inList = (list, w) => list === true || (Array.isArray(list) && list.map(String).includes(String(w)));
 const wardPaid = (w) => inList(WARD_PAID, w);
 const wardAz = (w) => wardPaid(w) && inList(WARD_AZ, w);
 const addTo = (list, w) => (Array.isArray(list) ? [...new Set([...list.map(String), String(w)])] : list);
 function wardButton() {
   const w = $('qWard').value;
+  slipsButton();
   $('wardPrint').classList.toggle('hidden', DEMO || !w || !(wardPaid(w) || (CAN_BUY && ONLINE)));
   $('wardPrint').textContent = wardPaid(w) ? L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें (PDF)`, `⬇ Download ward ${w} slips (PDF)`)
     : L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें · ₹${WARD_RS}`, `⬇ Download ward ${w} slips · ₹${WARD_RS}`);
@@ -2019,6 +2017,33 @@ function wardButton() {
   $('wardAzBtn').textContent = L(`🔤 नाम क्रम (अ–ज्ञ) भी लें · ₹${WARD_AZ_RS} और`, `🔤 Get name order (A–Z) too · ₹${WARD_AZ_RS} more`);
   if ($('wardPanel').dataset.w !== String(w)) $('wardPanel').classList.add('hidden');
 }
+// वार्ड पर्चियाँ (top bar, next to वोटर लिस्ट): every ward of the village with its slip PDF in one place. A tap picks
+// that ward below and runs the same download / payment as the ward's own button (wardPrint).
+function slipsButton() {
+  const none = WP_KNOWN && !(CAN_BUY && ONLINE) && !(WARD_PAID === true || (Array.isArray(WARD_PAID) && WARD_PAID.length));   // nothing to download or buy
+  $('slipsBtn').classList.toggle('hidden', DEMO || !VILLAGE || !(VILLAGE.wards || []).length || none);
+}
+function slipsOpen() {
+  $('slipsBody').replaceChildren(...VILLAGE.wards.map((w) => {
+    const open = !WP_KNOWN || wardPaid(w);   // before the first search: shown as a download, the search below then decides
+    const row = el('div', 'srow'), b = el('button', open ? 'paid' : null); b.type = 'button';
+    b.textContent = open ? L('⬇ डाउनलोड', '⬇ Download') : `🔓 ₹${WARD_RS}`;
+    b.disabled = !open && !(CAN_BUY && ONLINE);
+    b.addEventListener('click', async () => {
+      $('slipsPop').classList.add('hidden');
+      $('qName').value = ''; $('qRel').value = ''; $('qWard').value = String(w);
+      await search(); wardButton();   // the ward's answer says whether it is paid for
+      if (!$('wardPrint').classList.contains('hidden')) $('wardPrint').click();
+      $('wardPrint').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    row.append(el('span', null, `${L('वार्ड', 'Ward')} ${w}`), b);
+    return row;
+  }));
+  $('slipsPop').classList.remove('hidden');
+}
+$('slipsBtn').addEventListener('click', slipsOpen);
+$('slipsClose').addEventListener('click', () => $('slipsPop').classList.add('hidden'));
+$('slipsPop').addEventListener('click', (e) => { if (e.target === $('slipsPop')) $('slipsPop').classList.add('hidden'); });
 // the choice of order: 'buy' → box order ₹WARD_RS or box + name order ₹(WARD_RS + WARD_AZ_RS), then the payment;
 // 'get' (name order bought too) → which order to download in
 let choiceN = 0;
@@ -2120,6 +2145,16 @@ for (const id of ['qName', 'qRel']) {
   $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); search(); $(id).blur(); } });
 }
 $('qWard').addEventListener('change', () => search());
+// scrolling the results with a finger puts the keyboard away (it covers half the screen while the name box has focus)
+(() => {
+  let y0 = null;
+  document.addEventListener('touchstart', (e) => { y0 = e.touches.length === 1 ? e.touches[0].clientY : null; }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    const f = document.activeElement;
+    if (y0 === null || !f || (f.id !== 'qName' && f.id !== 'qRel') || e.target === f) return;
+    if (Math.abs(e.touches[0].clientY - y0) > 12) { f.blur(); y0 = null; }
+  }, { passive: true });
+})();
 // बोलकर सर्च: tap 🎤, say a name (or मकान नं. / voter ID); what is heard goes into the name box and is searched.
 // Hindi (hi-IN) recognition, which also writes English names and digits as said. Tap again to stop.
 (() => {
