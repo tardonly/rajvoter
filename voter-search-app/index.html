@@ -235,6 +235,12 @@
   #lockMsg { min-height: 22px; margin-top: 10px; font-size: 14px; color: var(--bad); line-height: 1.5; }
   #lockMsg.info { color: var(--muted); }
   #lock.loading form, #lock.loading #lockSub, #lock.loading .demolink, #lock.loading .homeacts { display: none; }
+  /* the start page, not logged in (html.guest, set at the top of <body>): the whole card from the first paint */
+  html.guest #lock.loading form, html.guest #lock.loading #lockSub { display: block; }
+  html.guest #lock.loading .demolink { display: flex; }
+  html.guest #lock.loading .homeacts { display: grid; }
+  html.guest #lock.loading #lockMsg { visibility: hidden; }   /* no "खुल रहा है…" under a ready form; its space is kept */
+  html:not(.guest) #demoLink, html:not(.guest) #homeActs { display: none; }   /* the demo and video: start page only */
   #lockMsg a { color: var(--accent); font-weight: 600; }
   .villages { display: grid; gap: 8px; margin-top: 4px; }
   .villages a { display: block; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; color: var(--ink);
@@ -573,57 +579,24 @@
 </style>
 </head>
 <body>
+<script>
+// The start page for someone not logged in: html.guest shows the login card complete from the first paint (CSS
+// below), instead of the main script filling it in later and moving things (PageSpeed: layout shift).
+(() => {
+  const [, p1 = ''] = location.pathname.split('/');
+  if (p1 && p1 !== 'index.html' && p1 !== 'index') return;   // a village page: its own card
+  try { for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) if (/^tok:/.test(s.key(i)) && s.key(i) !== 'tok:demo') return; } catch (e) {}
+  document.documentElement.classList.add('guest');
+})();
+</script>
 <!-- Google Tag Manager (noscript) -->
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5Z2LNDRF" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <!-- End Google Tag Manager (noscript) -->
 <!-- install as an app: a floating button (✕ puts it away on this phone; the footer link stays), then the election dates -->
 <div class="fabinstall" id="installFab"><button data-install type="button">📲 ऐप इंस्टॉल करें</button><button id="installHide" type="button" aria-label="हटाएं" title="हटाएं">✕</button></div>
 <div class="elecbar topelec hidden"></div>
-
-<section id="lock" class="loading" role="main">
-  <div class="lockbox">
-    <button class="langbtn" data-lang type="button"></button>
-    <img src="/icon-192.png" alt="">
-    <h1>Voter Search</h1>
-    <p id="lockSub"></p>
-    <form id="lockForm" novalidate>
-      <!-- the mobile number first: a known number then gets the password box, a new one signs up -->
-      <input id="phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर डालें">
-      <div class="phonenote" id="phoneNote"></div>
-      <div id="pwStep" class="hidden">
-        <input id="pw" type="password" autocomplete="current-password" placeholder="पासवर्ड डालें" autocapitalize="none" autocorrect="off" spellcheck="false">
-        <label><input id="showPw" type="checkbox"> पासवर्ड दिखाएं</label>
-        <label><input id="remember" type="checkbox" checked> इस फ़ोन पर याद रखें</label>
-        <div class="lockalt"><button id="forgotPw" class="hidden" type="button">पासवर्ड भूल गए? OTP से नया बनाएं</button></div>
-      </div>
-      <!-- forgotten password (api/signup.js 'otp' + 'reset'): the code sent to the number, then a new password -->
-      <div id="resetStep" class="hidden">
-        <input id="resetOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="OTP डालें">
-        <input id="resetPw" type="password" autocomplete="new-password" placeholder="नया पासवर्ड (कम से कम 6 अक्षर)" autocapitalize="none" autocorrect="off" spellcheck="false">
-        <div class="lockalt"><button id="otpResend" type="button">OTP फिर भेजें</button></div>
-      </div>
-      <div id="signStep" class="hidden">
-        <select id="signDistrict" aria-label="ज़िला"></select>
-        <select id="signSamiti" aria-label="पंचायत समिति"></select>
-        <select id="signVillage" aria-label="गाँव"></select>
-        <input id="signName" type="text" maxlength="60" placeholder="आपका नाम">
-        <input id="signPw" type="password" autocomplete="new-password" maxlength="40" placeholder="अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)" autocapitalize="none" autocorrect="off" spellcheck="false">
-        <input id="signRef" type="text" maxlength="20" placeholder="🤝 रेफ़रल कोड / रेफ़र करने वाले का मोबाइल (हो तो)" autocapitalize="none" autocorrect="off" spellcheck="false">
-        <label><input id="showSignPw" type="checkbox"> पासवर्ड दिखाएं</label>
-      </div>
-      <button class="btn" id="unlockBtn" type="submit">आगे</button>
-      <div class="lockalt"><button id="phoneBack" class="hidden" type="button">← नंबर बदलें</button><button id="pwOnly" type="button">एडमिन? सीधे पासवर्ड से खोलें</button></div>
-    </form>
-    <div id="lockMsg" class="info">खुल रहा है…</div>
-    <div id="demoLink" class="demolink hidden"><span>खाता नहीं है? बिना खाते के असली वोटर लिस्ट में सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
-    <!-- a plain link for people and search engines: what the app is, without a login -->
-    <a class="aboutlink" href="/rajasthan-voter-list">मतदाता सूची ऐप के बारे में जानें · About this app</a>
-    <div class="homeacts hidden" id="homeActs"><button id="homeHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
-  </div>
-</section>
-<!-- Drawn before the first paint so nothing moves once the main script runs (PageSpeed: layout shift): the election
-     banner, and on the start page for someone not logged in, the login card as homeLock() leaves it -->
 <script>
+// drawn here, before the first paint, so the login card below never moves down (PageSpeed: layout shift)
 // ---------- चुनाव की तारीखें: a banner on the login page (hidden once logged in), with the days left to the सरपंच vote ----------
 // Each election drops off the day after it; the banner goes once all are past. Dates are India dates (YYYY-MM-DD).
 const ELECTIONS = [
@@ -657,21 +630,49 @@ function electionBanner() {
   }
 }
 electionBanner();
-(() => {
-  const [, p1 = ''] = location.pathname.split('/');
-  if (p1 && p1 !== 'index.html' && p1 !== 'index') return;   // a village page: its own card
-  try {
-    for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) if (/^tok:/.test(s.key(i)) && s.key(i) !== 'tok:demo') return;
-    if (sessionStorage.getItem('homeMsg')) return;
-  } catch (e) {}
-  const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch (e) { return false; } })();
-  const $ = (id) => document.getElementById(id);
-  $('lockSub').textContent = EN ? 'Enter your mobile number' : 'अपना मोबाइल नंबर डालें';
-  $('demoLink').classList.remove('hidden'); $('homeActs').classList.remove('hidden');
-  $('lock').classList.remove('loading'); $('lockMsg').textContent = '';
-  for (const b of $('lock').querySelectorAll('[data-lang]')) b.textContent = EN ? '🌐 हिंदी' : '🌐 English';
-})();
 </script>
+
+<section id="lock" class="loading" role="main">
+  <div class="lockbox">
+    <button class="langbtn" data-lang type="button"></button>
+    <img src="/icon-192.png" alt="">
+    <h1>Voter Search</h1>
+    <p id="lockSub">अपना मोबाइल नंबर डालें</p>
+    <form id="lockForm" novalidate>
+      <!-- the mobile number first: a known number then gets the password box, a new one signs up -->
+      <input id="phone" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="username" placeholder="मोबाइल नंबर डालें">
+      <div class="phonenote" id="phoneNote"></div>
+      <div id="pwStep" class="hidden">
+        <input id="pw" type="password" autocomplete="current-password" placeholder="पासवर्ड डालें" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <label><input id="showPw" type="checkbox"> पासवर्ड दिखाएं</label>
+        <label><input id="remember" type="checkbox" checked> इस फ़ोन पर याद रखें</label>
+        <div class="lockalt"><button id="forgotPw" class="hidden" type="button">पासवर्ड भूल गए? OTP से नया बनाएं</button></div>
+      </div>
+      <!-- forgotten password (api/signup.js 'otp' + 'reset'): the code sent to the number, then a new password -->
+      <div id="resetStep" class="hidden">
+        <input id="resetOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="OTP डालें">
+        <input id="resetPw" type="password" autocomplete="new-password" placeholder="नया पासवर्ड (कम से कम 6 अक्षर)" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <div class="lockalt"><button id="otpResend" type="button">OTP फिर भेजें</button></div>
+      </div>
+      <div id="signStep" class="hidden">
+        <select id="signDistrict" aria-label="ज़िला"></select>
+        <select id="signSamiti" aria-label="पंचायत समिति"></select>
+        <select id="signVillage" aria-label="गाँव"></select>
+        <input id="signName" type="text" maxlength="60" placeholder="आपका नाम">
+        <input id="signPw" type="password" autocomplete="new-password" maxlength="40" placeholder="अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <input id="signRef" type="text" maxlength="20" placeholder="🤝 रेफ़रल कोड / रेफ़र करने वाले का मोबाइल (हो तो)" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <label><input id="showSignPw" type="checkbox"> पासवर्ड दिखाएं</label>
+      </div>
+      <button class="btn" id="unlockBtn" type="submit">आगे</button>
+      <div class="lockalt"><button id="phoneBack" class="hidden" type="button">← नंबर बदलें</button><button id="pwOnly" type="button">एडमिन? सीधे पासवर्ड से खोलें</button></div>
+    </form>
+    <div id="lockMsg" class="info">खुल रहा है…</div>
+    <div id="demoLink" class="demolink"><span>खाता नहीं है? बिना खाते के असली वोटर लिस्ट में सर्च करके देखें</span><a href="/demo">डेमो देखें</a></div>
+    <!-- a plain link for people and search engines: what the app is, without a login -->
+    <a class="aboutlink" href="/rajasthan-voter-list">मतदाता सूची ऐप के बारे में जानें · About this app</a>
+    <div class="homeacts" id="homeActs"><button id="homeHow" type="button">▶ 30 सेकंड में देखें ऐप का कमाल</button><button id="homeShare" class="share" type="button">↗ शेयर करें</button></div>
+  </div>
+</section>
 
 <div id="howPop" class="howpop hidden" role="dialog" aria-label="ऐप कैसे काम करता है">
   <div class="howbar">
@@ -858,7 +859,7 @@ const STATIC_EN = {
   'OTP फिर भेजें': 'Send the OTP again', 'नया पासवर्ड (कम से कम 6 अक्षर)': 'New password (at least 6 characters)',
   'अपना पासवर्ड बनाएं (कम से कम 6 अक्षर)': 'Choose a password (at least 6 characters)', '🤝 रेफ़रल कोड / रेफ़र करने वाले का मोबाइल (हो तो)': '🤝 Referral code / referrer\'s mobile (if any)', 'पासवर्ड बदलें': 'Change password',
   '📲 ऐप इंस्टॉल करें': '📲 Install the app', 'ऐप इंस्टॉल करें': 'Install the app', 'निशान:': 'Marks:', 'सर्वे': 'Survey', 'मतदान दिवस': 'Polling day', 'हटाएं': 'Put away', 'निशान': 'Marks',
-  'मोबाइल नंबर डालें': 'Enter mobile number', 'पासवर्ड डालें': 'Enter password',
+  'मोबाइल नंबर डालें': 'Enter mobile number', 'अपना मोबाइल नंबर डालें': 'Enter your mobile number', 'पासवर्ड डालें': 'Enter password',
   'पासवर्ड दिखाएं': 'Show password', 'इस फ़ोन पर याद रखें': 'Remember on this phone', 'खोलें': 'Open', 'खुल रहा है…': 'Opening…',
   'डेमो देखें': 'Try the demo',
   'खाता नहीं है? बिना खाते के असली वोटर लिस्ट में सर्च करके देखें': 'No login? Try searching a real voter list without one',
@@ -2342,8 +2343,8 @@ function savedLogin() {
 function homeLock(msg, info) {
   $('home').classList.add('hidden');
   $('lockSub').textContent = L('अपना मोबाइल नंबर डालें', 'Enter your mobile number');
-  $('demoLink').classList.remove('hidden');   // the start page offers the demo to anyone without a password
-  $('homeActs').classList.remove('hidden');   // and a short video of the app in use, and a share button
+  document.documentElement.classList.add('guest');   // the start page offers the demo to anyone without a password,
+  // and a short video of the app in use, and a share button (#demoLink, #homeActs)
   showLock(msg, info);
 }
 $('homeOut').addEventListener('click', () => { logoutAll(); if (location.pathname === '/') homeLock(''); else goHome(''); });
