@@ -41,6 +41,10 @@
       "destination": "/rajasthan-voter-list.html"
     },
     {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
       "source": "/:req(\\d{8})",
       "destination": "/admin.html"
     },
