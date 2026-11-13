@@ -91,8 +91,8 @@ async function countSearch(req, user, b, named) {
 
 async function withMarks(slug, list, cand, survey) {   // cand: the searcher's candidate group, whose marks they see
   const results = list.map(publicFields);
-  const marks = await marksFor(slug, results.map(markKey), cand, survey);
-  const sv = survey ? [] : await marksFor(slug, results.map(markKey), cand, true);   // polling day: the survey mark too
+  const keys = results.map(markKey);   // the marks and (polling day) the survey marks too, read at the same time
+  const [marks, sv] = await Promise.all([marksFor(slug, keys, cand, survey), survey ? [] : marksFor(slug, keys, cand, true)]);
   results.forEach((r, i) => { r.mark = marks[i].m; r.markBy = marks[i].by; r.markAt = marks[i].at; r.sm = sv[i] ? sv[i].m : ''; });
   return results;
 }
@@ -100,6 +100,9 @@ async function withMarks(slug, list, cand, survey) {   // cand: the searcher's c
 module.exports = route(async (req, res, b) => {
   const v = village(b.village);
   if (!v) return send(res, 404, { error: 'no_village' });
+  // the app asks this once when a village opens (warm() in index.html): starts this server and unlocks the village's
+  // list into memory, so the person's first search doesn't wait for that. Nothing is read from Redis or sent back.
+  if (b.warm) { load(v.data); return send(res, 200, { ok: true }); }
   const user = await whoIs(b.token, v.slug);
   if (!user) return send(res, 401, { error: 'login' });
   if (user.status !== 'ok') return send(res, 403, { error: user.status });   // retired, opened on another phone, other village
@@ -155,6 +158,9 @@ module.exports = route(async (req, res, b) => {
     more = rest.length > page.length && (open || hits.length - rest.length + page.length < FREE_WARD);
     locked = !open && rest.length > page.length && !more;
   }
-  send(res, 200, { total, more, ...(locked ? { locked: true, rs: WARD_RS } : {}), results: await withMarks(v.slug, page, user.cand, user.survey), wards: load(v.data).wards, perms: user.perms, survey: user.survey,
-    wp: wfree || (await wardsPaid(user, v.slug)), wz: wfree || (await wardsAz(user, v.slug)), ...left });
+  // marks and the wards paid for, read at the same time (wfree is known already, so not asked again)
+  const [results, wp, wz] = await Promise.all([withMarks(v.slug, page, user.cand, user.survey),
+    wfree || wardsPaid(user, v.slug, false), wfree || wardsAz(user, v.slug, false)]);
+  send(res, 200, { total, more, ...(locked ? { locked: true, rs: WARD_RS } : {}), results, wards: load(v.data).wards, perms: user.perms, survey: user.survey,
+    wp, wz, ...left });
 });

@@ -994,6 +994,14 @@ const SESSION_ERRORS = ['retired', 'login', 'logged_out', 'other_device', 'other
 // What this login may do besides searching by name (admins: everything); the server checks these on every request.
 let IS_ADMIN = false, PERMS = [];
 const can = (p) => PERMS.includes(p) || (DEMO && p === 'mark');   // demo marks stay on the phone; an admin's perms come from the superadmin too
+// once per village opened: starts the search server and unlocks that village's list there (api/_routes/search.js
+// "warm"), while the login is checked, so the first search answers sooner. Sends nothing but the village; not tracked.
+const warmed = new Set();
+function warm() {
+  if (!SLUG || warmed.has(SLUG)) return;
+  warmed.add(SLUG);
+  try { fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ village: SLUG, warm: 1 }) }).catch(() => {}); } catch (e) {}
+}
 async function api(path, payload) {
   let r;
   try {
@@ -1072,6 +1080,7 @@ function logoutAll() {
 }
 let MY_NAME = '', MY_PHONE = '', ADMIN_PHONE = '';   // this login's name and mobile number, and its admin's (WhatsApp for more searches)
 function showApp(name, admin, villages, perms, cand, role) {
+  warm();   // a fresh login too (once per village)
   PERMS = perms || []; MY_NAME = name || ''; MY_VILLAGES = villages || [];
   $('who').textContent = (name ? `${L('उपयोगकर्ता', 'User')}: ${who(name)}` : '') + (cand ? ` · ${L('उम्मीदवार', 'Candidate')}: ${cand}` : '');
   $('adminBtn').classList.toggle('hidden', !admin);
@@ -3079,8 +3088,9 @@ $('phoneBack').addEventListener('click', () => { $('pw').value = ''; showLock(''
 async function openVillage(v) {
   setVillage(v);
   const tok = token();
-  if (DEMO && !tok) return demoLogin();
+  if (DEMO && !tok) { warm(); return demoLogin(); }
   if (!tok) return showLock('');
+  warm();   // at the same time as the login check below
   showLoading(L('जाँच रहे हैं…', 'Checking…'));
   const r = await api('check', { token: tok });
   if (r.error) return showLock(MSG[r.error] || MSG.server);
