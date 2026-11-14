@@ -2900,7 +2900,7 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
   let ch = null;
   try {
     if (navigator.bluetooth) {
-      note.textContent = L('प्रिंटर चुनें (नाम अक्सर POS80 / Printer)…', 'Pick the printer (often named POS80 / Printer)…');
+      note.textContent = L('Rajelection मशीन खोज रहे हैं… सूची में मशीन (POS80 / Printer) चुनें', 'Searching for the Rajelection machine… pick it in the list (POS80 / Printer)');
       try { ch = await thermalConnect(); } catch (e) { ch = null; }
     }
     note.textContent = rs.length > 1 ? L(`${rs.length} पर्चियाँ बन रही हैं…`, `Making ${rs.length} slips…`) : L('पर्ची बन रही है…', 'Making the slip…');
