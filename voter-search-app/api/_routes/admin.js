@@ -210,6 +210,9 @@ module.exports = route(async (req, res, b) => {
   const now = new Date().toISOString();
   // a new login made by this admin: fields = role and village(s) [and more]; → {id, password}
   const newLogin = (fields, name, phone) => makeLogin(fields, name, phone, me.id, me.name);
+  // does this number already have a live login of this role (for a person: in one of these villages)?
+  const phoneTaken = async (phone, role, vils, notId = '') => phone && (await phoneLogins(phone)).some((x) =>
+    x.id !== notId && x.retired !== '1' && (x.role || 'user') === (role || 'user') && (role === 'admin' || x.villages.some((v) => vils.includes(v))));
   // a person's extra villages from the request (b.more, b.areas) besides their own village home: → {more, areas, all} or
   // {error}. Only the superadmin gives them (a village admin's request may carry none).
   const extraVillages = (home) => {
@@ -574,6 +577,8 @@ module.exports = route(async (req, res, b) => {
       if (!ownVillages(vs) || !ownSamitis(ss)) return send(res, 403, { error: 'not_your_village' });
       fields = ['role', 'admin', 'villages', vs.join(','), 'samitis', ss.join(','), 'aperms', grantable(Array.isArray(b.aperms) ? b.aperms : OLD_ADMIN_PERMS).join(',')];
     }
+    // one number, one live login per village (and one admin login): a second one only confuses who is who
+    if (await phoneTaken(phone, fields[1], b.action === 'add' ? [b.village] : [])) return send(res, 409, { error: 'exists' });
     if (typedPw()) {   // the superadmin's own password for this login
       const bad = await badTypedPw(phone);
       if (bad) return send(res, bad === 'super_only' ? 403 : 400, { error: bad });
@@ -731,6 +736,7 @@ module.exports = route(async (req, res, b) => {
     const phone = normPhone(b.phone);
     if (phone === null || (user.role === 'user' && !phone)) return send(res, 400, { error: 'phone' });   // see 'add'
     if (phone === (user.phone || '')) return send(res, 200, { user: view(user) });
+    if (await phoneTaken(phone, user.role, user.villages || [], user.id)) return send(res, 409, { error: 'exists' });
     await buildIndexes();
     let password;   // a password the person chose is kept with the old number: a new made-up one instead
     if (hasOwnPassword(user)) {
