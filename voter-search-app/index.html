@@ -1970,7 +1970,7 @@ function posterCard() {
   const c = $('posterCard'); c.classList.toggle('hidden', !posterOk());
   if (!posterOk()) return;
   c.innerHTML = '';
-  const go = el('div', 'go'); go.append(el('span', null, POSTER.top ? L('पर्ची पोस्टर बदलें', 'Change the slip poster') : L('अपना पोस्टर लगाएँ', 'Put up your poster')), el('span', null, '›'));
+  const go = el('div', 'go'); go.append(el('span', null, POSTER.top ? L('पोस्टर बनाएँ या बदलें', 'Make or change your poster') : L('अपना पोस्टर बनाएँ या लगाएँ', 'Make or put up your poster')), el('span', null, '›'));
   c.append(posterPic('top'));
   const row = ballotRow(POSTER.ballot);
   if (row) c.append(row);
