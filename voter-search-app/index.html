@@ -2190,8 +2190,9 @@ function pmRibbon(g, t, s, cx, y, size, padX, h, maxW) {
   g.fillStyle = t.ribTx; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s, cx, y + size * 0.06);
 }
 function pmStripe(g, W, H, h, t) { g.fillStyle = t.stripe; g.fillRect(0, H - h, W, h); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(0, H - h - 3, W, 3); }
-const pmSub = () => [PM.post.trim(), PM.gp.trim()].filter(Boolean).join(' • ');
-const pmName = () => PM.name.trim() || L('आपका नाम', 'Your name');
+// an empty box shows its placeholder on the poster too, so the preview is never blank
+const pmSub = () => [PM.post.trim(), PM.gp.trim() || 'ग्राम पंचायत फुलेरा'].filter(Boolean).join(' • ');
+const pmName = () => PM.name.trim() || 'मंजू देवी';
 function pmDrawTop(c) {
   const W = 1200, H = 240, g = c.getContext('2d'), t = pmTheme(); c.width = W; c.height = H;
   pmBg(g, W, H, t, 720, 110);
@@ -2229,7 +2230,6 @@ function pmForm(body) {
   }
   pmFont();
   if (!PM.name && POSTER.ballot.name) PM.name = POSTER.ballot.name;
-  if (!PM.gp && VILLAGE && !EN) PM.gp = `ग्राम पंचायत ${vn(VILLAGE)}`;
   const h = el('div', 'ph', L('🎨 पोस्टर बनाएँ', '🎨 Make a poster')); h.style.marginTop = '0';
   const top = el('canvas'), big = el('canvas');
   top.setAttribute('aria-label', L('पर्ची पोस्टर', 'Slip poster')); big.setAttribute('aria-label', L('PDF पोस्टर', 'PDF poster'));
@@ -2247,9 +2247,9 @@ function pmForm(body) {
   pick.addEventListener('click', () => { $('pmFile').value = ''; $('pmFile').click(); });
   photo.append(pick);
   const dl = el('datalist'); dl.id = 'pmPosts'; PM_POSTS.forEach((p) => { const o = el('option'); o.value = p; dl.append(o); });
-  f.append(photo, field(L('नाम', 'Name'), 'name', 'रामनिवास तर्ड'), field(L('पद', 'Post'), 'post', PM_POSTS[0], 'pmPosts'), dl,
-    field(L('ग्राम पंचायत / वार्ड', 'Panchayat / ward'), 'gp', 'ग्राम पंचायत जसरासर'),
-    field(L('ऊपर का नारा (PDF पोस्टर में, चाहें तो)', 'Slogan on top (PDF poster, optional)'), 'tag', 'आपका एक वोट, गाँव का विकास'),
+  f.append(photo, field(L('नाम', 'Name'), 'name', 'मंजू देवी'), field(L('पद', 'Post'), 'post', PM_POSTS[0], 'pmPosts'), dl,
+    field(L('ग्राम पंचायत / वार्ड', 'Panchayat / ward'), 'gp', 'ग्राम पंचायत फुलेरा'),
+    field(L('ऊपर का नारा (PDF पोस्टर में, चाहें तो)', 'Slogan on top (PDF poster, optional)'), 'tag', 'आपका एक वोट, फुलेरा का विकास'),
     field(L('नीचे की अपील (PDF पोस्टर में, चाहें तो)', 'Appeal below (PDF poster, optional)'), 'call', '🙏 भारी मतों से विजयी बनाएँ 🙏'));
   // the colours
   const sw = el('div', 'pmsw');
