@@ -462,6 +462,8 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   html.big .slip, html.big .family .fh, html.big .hint { zoom: 1.2; }
   html.big .fields input, html.big .fields select { font-size: 20px; }
   html.big #count { font-size: 15px; }
+  .tnote { font-size: 13px; color: var(--muted); padding: 6px 8px 8px; }
+  .tnote:empty { display: none; }
   .pbtn { justify-self: start; align-self: start; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
 
@@ -1558,8 +1560,13 @@ function slip(r, forPrint, inFamily) {
   const head = el('div', 'head');
   const tools = el('div', 'tools');
   if (!forPrint && can('print') && !r.del) {
-    const pb = el('button', 'pbtn', L('प्रिंट / PDF', 'Print / PDF')); pb.type = 'button';
-    pb.addEventListener('click', () => printSlips([r], L(`पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`, `Slip ${vn(VILLAGE)} ward ${r.ward} box ${r.box}`)));
+    // the card's button prints on the thermal printer; Print / PDF stays in the slip popup
+    const pb = el('button', 'pbtn', L('🧾 थर्मल प्रिंट', '🧾 Thermal print')); pb.type = 'button';
+    pb.addEventListener('click', () => {
+      let note = d.querySelector('.tnote');
+      if (!note) { note = el('div', 'tnote'); d.append(note); }
+      thermalPrint(r, pb, note);
+    });
     tools.append(pb);
   }
   if (!forPrint && !inFamily && String(r.house || '').trim()) {
@@ -1650,7 +1657,10 @@ async function toggleFamily(r, d, btn) {
     const fp = el('button', 'tbtn', L('पूरे परिवार की पर्चियाँ · प्रिंट / PDF', "Whole family's slips · Print / PDF")); fp.type = 'button';
     fp.addEventListener('click', () => printSlips(x.results.filter((v) => !v.del),
       L(`परिवार ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`)));
-    fh.append(fp);
+    const ft = el('button', 'tbtn', L('🧾 पूरे परिवार की पर्चियाँ · थर्मल प्रिंट', "🧾 Whole family's slips · Thermal print")); ft.type = 'button';
+    const fn = el('div', 'tnote');
+    ft.addEventListener('click', () => thermalPrint(x.results.filter((v) => !v.del), ft, fn));
+    fh.append(fp, ft, fn);
   }
   d.after(box);
   btn.classList.add('on'); btn.textContent = L('परिवार छुपाएं', 'Hide family');
@@ -2565,7 +2575,7 @@ function slipPopShow() {
   if (can('print')) {
     btn('wa', L('व्हाट्सऐप भेजें', 'Send on WhatsApp'), (e) => slipPhoto(r, true, e.currentTarget));
     btn(null, L('⬇ फ़ोटो सेव', '⬇ Save photo'), (e) => slipPhoto(r, false, e.currentTarget));
-    btn(null, L('प्रिंट / PDF', 'Print / PDF'), () => d.querySelector('.pbtn').click());
+    btn(null, L('प्रिंट / PDF', 'Print / PDF'), () => printSlips([r], L(`पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`, `Slip ${vn(VILLAGE)} ward ${r.ward} box ${r.box}`)));
     btn(null, L('🧾 थर्मल प्रिंट', '🧾 Thermal print'), (e) => thermalPrint(r, e.currentTarget));
   }
   const fam = d.querySelector('.fam');
@@ -2884,8 +2894,8 @@ async function thermalSend(ch, bytes) {
   }
 }
 const thermalB64 = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192)); return btoa(s); };
-async function thermalPrint(r, b) {
-  const note = $('spNote');
+async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or several (a whole family), one after another
+  rs = [].concat(rs);
   b.disabled = true;
   let ch = null;
   try {
@@ -2893,13 +2903,16 @@ async function thermalPrint(r, b) {
       note.textContent = L('प्रिंटर चुनें (नाम अक्सर POS80 / Printer)…', 'Pick the printer (often named POS80 / Printer)…');
       try { ch = await thermalConnect(); } catch (e) { ch = null; }
     }
-    note.textContent = L('पर्ची बन रही है…', 'Making the slip…');
-    const bytes = thermalBytes(await thermalCanvas(r));
+    note.textContent = rs.length > 1 ? L(`${rs.length} पर्चियाँ बन रही हैं…`, `Making ${rs.length} slips…`) : L('पर्ची बन रही है…', 'Making the slip…');
+    const parts = [];
+    for (const r of rs) parts.push(thermalBytes(await thermalCanvas(r)));
+    const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    parts.reduce((at, p) => (bytes.set(p, at), at + p.length), 0);
     if (ch) {
       try {
         note.textContent = L('प्रिंट हो रही है…', 'Printing…');
         await thermalSend(ch, bytes);
-        note.textContent = L('✓ पर्ची प्रिंटर को भेज दी।', '✓ The slip went to the printer.');
+        note.textContent = rs.length > 1 ? L(`✓ ${rs.length} पर्चियाँ प्रिंटर को भेज दीं।`, `✓ ${rs.length} slips went to the printer.`) : L('✓ पर्ची प्रिंटर को भेज दी।', '✓ The slip went to the printer.');
         return;
       } catch (e) { TP.ch = null; }
     }
