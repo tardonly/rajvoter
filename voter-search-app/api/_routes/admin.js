@@ -85,7 +85,7 @@
 //                                         free (false) (wardFree in _lib.js); "settings" gives wardPay and wardPayAreas
 //   action "ward_pay_area", kind ('d' | 's'), key (district | "<district>|<samiti>"), mode ('pay' | 'free' | '')
 //                                      → {wardPayAreas}   superadmin: the same for one ज़िला / पंचायत समिति ('' = as above)
-//   action "ward_pay_user", id, mode ('free' | 'pay' | '') → {user}   superadmin: that person's own setting (user field
+//   action "ward_pay_user", id, mode ('free' | 'pay' | '') → {user}   superadmin, or an admin with 'wardpay' on a user they look after: that person's own setting (user field
 //                                         wardpay; '' = as for everyone); view's wardpay
 //   action "ref_rule", on, pct, joiner, bonusAt, bonus, apct → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
@@ -672,8 +672,8 @@ module.exports = route(async (req, res, b) => {
     return send(res, 200, { user: view(await getUser(user.id)) });
   }
 
-  if (b.action === 'ward_pay_user') {   // superadmin: this person pays for ward slips or not, whatever the switch for everyone says
-    if (!isSuper) return send(res, 403, { error: 'super_only' });
+  if (b.action === 'ward_pay_user') {   // superadmin / 'wardpay': this person pays for ward slips or not, whatever the switch for everyone says
+    if (!isSuper && !(may('wardpay') && mine(user))) return send(res, 403, { error: 'no_perm' });   // an admin's: superadmin only
     if (user.role !== 'user' && user.role !== 'admin') return send(res, 400, { error: 'not_user' });   // only the superadmin never pays
     const mode = ['free', 'pay'].includes(b.mode) ? b.mode : '';
     await redis('HSET', `user:${user.id}`, 'wardpay', mode);

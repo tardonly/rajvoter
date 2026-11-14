@@ -895,10 +895,11 @@ $('wpOn').addEventListener('change', async () => {
   showWardPay(r.wardPay);
   $('wpMsg').textContent = L('✓ सेव हो गया — अगली सर्च से लागू', '✓ Saved — applies from the next search');
 });
-// superadmin, on a person's card: ward slips as for everyone, always free, or always paid
+// superadmin (or an admin with 'wardpay', on their users), on a person's card: ward slips as for everyone, always free, or always paid
 function wardPayBox(u) {
   const box = el('div', 'limit'), sel = el('select');
-  const all = WARD_PAY == null ? '' : WARD_PAY ? L(' (अभी ₹50)', ' (now ₹50)') : L(' (अभी मुफ़्त)', ' (now free)');
+  // a self sign-up pays even where wards are free (wardFree in api/_lib.js) unless set to free here
+  const all = u.self ? L(' (खुद बनाया: ₹50)', ' (signed up: ₹50)') : WARD_PAY == null ? '' : WARD_PAY ? L(' (अभी ₹50)', ' (now ₹50)') : L(' (अभी मुफ़्त)', ' (now free)');
   for (const [v, t] of [['', L(`सबके जैसा${all}`, `As for everyone${all}`)], ['free', L('मुफ़्त', 'Free')], ['pay', L('₹50 प्रति वार्ड', '₹50 a ward')]]) sel.add(new Option(t, v));
   sel.value = u.wardpay || '';
   sel.addEventListener('change', async () => {
@@ -1627,13 +1628,15 @@ function permBoxes(u, msg = 'listMsg', saved) {
 }
 
 // superadmin: what a village admin may do here (ADMIN_PERMS in api/_lib.js)
-// (the last four: powers the superadmin hands to a trusted admin; a non-super admin sees and gives only the ones they have)
+// (the last five: powers the superadmin hands to a trusted admin; a non-super admin sees and gives only the ones they have)
 const APERM_NAME = EN ? { add: 'Can make new users', own: 'Sees the users they made', all: 'Sees every user of their villages',
   admins: 'Can make admins (own villages) and look after them', arights: 'Can set these boxes on admins they made',
-  asearch: 'Can give searches to admins they made', gift: 'Can give free searches to signed-up users' }
+  asearch: 'Can give searches to admins they made', gift: 'Can give free searches to signed-up users',
+  wardpay: 'Can make ward slips free or paid for their users' }
   : { add: 'नए यूज़र बना सकते हैं', own: 'अपने बनाए यूज़र देख सकते हैं', all: 'अपने गाँवों के सभी यूज़र देख सकते हैं',
     admins: 'एडमिन बना सकते हैं (अपने गाँवों में) और उन्हें संभाल सकते हैं', arights: 'अपने बनाए एडमिन के ये अधिकार बदल सकते हैं',
-    asearch: 'अपने बनाए एडमिन को सर्च दे सकते हैं', gift: 'खुद बने यूज़र को मुफ़्त सर्च दे सकते हैं' };
+    asearch: 'अपने बनाए एडमिन को सर्च दे सकते हैं', gift: 'खुद बने यूज़र को मुफ़्त सर्च दे सकते हैं',
+    wardpay: 'अपने यूज़र की वार्ड पर्चियाँ मुफ़्त या ₹50 कर सकते हैं' };
 function adminPermBoxes(u, msg = 'listMsg') {
   const box = el('div', 'perms'), keys = Object.keys(APERM_NAME).filter((p) => mayDo(p));   // only powers this admin has
   for (const p of keys) {
@@ -2230,7 +2233,7 @@ function person(u) {
     if (mayDo('asearch')) row.append(limitBox(u, 'listMsg', refresh));
   }
   if (!isAdmin && !u.retired && u.prepaid && mayDo('gift')) row.append(giftBox(u));
-  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]), ...(me.role === 'super' ? [wardPayBox(u)] : []),
+  if (!isAdmin && !u.retired) row.append(permBoxes(u), ...(u.prepaid ? [] : [limitBox(u, 'listMsg', meter.update)]), ...(mayDo('wardpay') ? [wardPayBox(u)] : []),
     ...(me.villages.filter((x) => villages[x]).length > 1 ? [villageBox(u)] : []), ...(me.role === 'super' ? [moreBox(u, row)] : []), ...(cands.some((c) => c.village === u.village) ? [candBox(u)] : []));
 
   const actions = el('div', 'actions');
