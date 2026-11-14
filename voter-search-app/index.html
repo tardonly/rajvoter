@@ -1012,6 +1012,12 @@ async function api(path, payload) {
   if (typeof r.survey === 'boolean') setMode(r.survey);   // the superadmin's choice: survey or polling-day marks
   return r;
 }
+// no analytics for this login (server answer noga: an admin-made login, an admin, or a signed-up one that has bought or
+// been gifted searches): ga.js stops now and, kept on the phone, on later visits; only signed-up logins not yet buying are tracked
+function noGa(v) {
+  try { if (v) localStorage.setItem('noga', '1'); else localStorage.removeItem('noga'); } catch (e) {}
+  if (window.gaOff) window.gaOff(v);
+}
 // every request as an analytics event (ga.js): what was done, in which village, and how it went — nothing personal
 function apiTrack(path, p, r) {
   if (path === 'marks' || !window.track) return;   // marks: the slips' own refresh, not something the user did
@@ -1304,6 +1310,7 @@ $('lockForm').addEventListener('submit', async (e) => {
   const keep = $('remember').checked;
   tokKey = r.admin ? 'tok:admin' : `tok:${HOME ? r.villages[0] : SLUG}`;
   store.set(tokKey, r.token, keep);
+  noGa(!!r.noga);
   $('pw').value = '';
   if (HOME) { store.set('villages', JSON.stringify(r.list), keep); return myVillages(r.list); }
   MY_REF = r.ref || null; WALLET = r.wallet != null ? r.wallet : null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; if (r.left != null) searchesLeft = r.left; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
@@ -3053,7 +3060,7 @@ async function lockSignup() {
   // the village it was made for, with a way to fix a wrong pick before going in
   const vNow = (r.list || [])[0], wrong = el('button', 'buyback', L('गलत गाँव? बदलें', 'Wrong village? Change it'));
   wrong.type = 'button';
-  MOVES_LEFT = r.movesLeft || 0;
+  MOVES_LEFT = r.movesLeft || 0; noGa(false);   // a new signed-up login: tracked until it buys
   wrong.addEventListener('click', () => {
     moveBack = () => { $('buyTitle').textContent = L('आपका खाता', 'Your login'); $('buyBody').replaceChildren(box); };
     moveOpen(slug, r.token);
@@ -3114,6 +3121,7 @@ async function openVillage(v) {
   if (!r.active && tokKey !== `tok:${SLUG}` && tokKey !== 'tok:admin') { tokKey = `tok:${SLUG}`; return showLock(''); }
   if (!r.active) return signOut(MSG[r.reason] || MSG.login);
   if (r.left != null) searchesLeft = r.left;
+  noGa(!!r.noga);
   MY_REF = r.ref || null; WALLET = r.wallet != null ? r.wallet : null; PREPAID = !!r.prepaid; CAN_BUY = !!r.canBuy; ONLINE = !!r.online; BOUGHT = r.bought != null ? r.bought : null; MY_PHONE = r.phone || ''; ADMIN_PHONE = r.adminPhone || '';
   MOVES_LEFT = r.movesLeft || 0;
   showApp(r.name, r.admin, r.villages, r.perms, r.cand, r.role);
@@ -3151,6 +3159,7 @@ async function payReturn(id, resp = null, tries = 0) {
   }
   if (r.status === 'done') {
     const now = r.left != null ? r.left : r.bought;
+    noGa(true);   // bought searches: no analytics from here on (this payment's own event has gone already)
     box.replaceChildren(el('div', 'amt', '🎉'),
       el('b', null, L(`भुगतान हो गया — आपको ${r.got} सर्च मिलीं!`, `Payment done — you got ${r.got} searches!`)),
       ...(r.bonus ? [el('div', 'k', L(`${r.n} खरीदी + ${r.bonus} मुफ़्त`, `${r.n} bought + ${r.bonus} free`))] : []),

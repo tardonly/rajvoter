@@ -630,6 +630,9 @@ const adminLimited = (u) => u.role === 'admin';
 // buy searches too (canBuy): theirs are used once the day's limit is used up, and counted the same way.
 const credits = (u) => Number(u && u.credits) || 0;
 const isPrepaid = (u) => !!u && u.role === 'user' && !u.demo && u.self === '1';
+// no analytics (ga.js) for this login: anyone an admin made (users, admins, the superadmin), and a signed-up login once it
+// has bought searches or been gifted some; only signed-up logins that have not yet bought are tracked. Not the demo.
+const noAnalytics = (u) => !!u && !u.demo && (u.role !== 'user' || u.self !== '1' || u.bought === '1' || Number(u.gifted) > 0);
 const canBuy = (u) => !!u && (u.role === 'user' || u.role === 'admin') && !u.demo;   // not the superadmin
 // the village a login's pack request is filed under: a person's own village; a village admin's, the one they are in
 // (slug) when it is theirs, else their first
@@ -1283,6 +1286,6 @@ async function candReach(id, slugs) {
 }
 
 module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
-  FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
+  FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, noAnalytics, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

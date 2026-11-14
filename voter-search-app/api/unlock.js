@@ -1,4 +1,4 @@
-// POST {village, password} → {name, token, admin, role, villages} for an active password of that village,
+// POST {village, password} → {name, token, admin, role, villages, noga (no analytics for this login, noAnalytics in _lib.js)} for an active password of that village,
 //   a village admin of that village, or the superadmin password.
 // POST {password} (no village, from the admin page) → the same, but only for the superadmin or a village admin.
 // POST {password, home: true} (the start page) → the same for any active password; list = the villages it opens.
@@ -9,7 +9,7 @@
 // A password of another village → 403 {error: 'other_village', village, villageName} so the app can point there.
 // Each login starts a new session; a phone still using an older session of the same password is logged out
 // on its next request. The token is sent with every search; an admin token also opens the admin page.
-const { walletOf, hasWallet, refFor, markModeOf, isPrepaid, movesLeft, canBuy, payOnline, adminPhone, creditsLeft, getCand, DEMO, demoSlugs, isDevice, demoId, village, villageList, PERMS, appPerms, redis, pwHash, ownPwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
+const { walletOf, hasWallet, refFor, markModeOf, isPrepaid, noAnalytics, movesLeft, canBuy, payOnline, adminPhone, creditsLeft, getCand, DEMO, demoSlugs, isDevice, demoId, village, villageList, PERMS, appPerms, redis, pwHash, ownPwHash, newSession, makeToken, isAdminPassword, adminToken, getUser, clientIp,
   deviceName, normPhone, blocked, failed, send, route } = require('./_lib.js');
 
 const STILL_IN_USE_MS = 30 * 60 * 1000;   // previous phone used within 30 min → counts as "two phones at once"
@@ -28,7 +28,7 @@ module.exports = route(async (req, res, { password, phone, village: slug, home, 
   if (await blocked(req, 'unlock')) return send(res, 429, { error: 'too_many' });
   if (isAdminPassword(password)) {
     const list = villageList();
-    return send(res, 200, { name: 'सुपर एडमिन', token: adminToken(), admin: true, role: 'super', villages: list.map((x) => x.slug), list, perms: PERMS.slice(), survey: await markModeOf(null) });
+    return send(res, 200, { name: 'सुपर एडमिन', token: adminToken(), admin: true, role: 'super', villages: list.map((x) => x.slug), list, perms: PERMS.slice(), noga: true, survey: await markModeOf(null) });
   }
   // a password the person chose is kept with their number (ownPwHash in _lib.js), a made-up one on its own
   const own = password && normPhone(phone) ? await redis('GET', `pw:${ownPwHash(normPhone(phone), password)}`) : null;
@@ -56,7 +56,7 @@ module.exports = route(async (req, res, { password, phone, village: slug, home, 
   const prepaid = isPrepaid(user), buys = canBuy(user);   // signed-up / bought searches: how many are left
   send(res, 200, { name: user.name, phone: user.phone || '', token: makeToken(id, sid), admin: user.role === 'admin', role: user.role, villages: user.villages,
     prepaid, left: prepaid ? await creditsLeft(user) : undefined, canBuy: buys, online: buys && payOnline(), bought: buys && !prepaid ? await creditsLeft(user) : undefined,
-    adminPhone: buys ? await adminPhone(user) : '',
+    adminPhone: buys ? await adminPhone(user) : '', noga: noAnalytics(user),
     list: villageList(user.villages), perms: appPerms(user), survey: await markModeOf(user), ref: await refFor(user), wallet: hasWallet(user) ? walletOf(user) : null,
     cand: cand && cand.village === user.village ? cand.name : '', movesLeft: movesLeft(user) });
 });

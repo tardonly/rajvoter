@@ -2,11 +2,11 @@
 //   left (demo searches remaining, or bought searches remaining with prepaid: true), bought (a login with a daily limit:
 //   its bought searches remaining), canBuy, online (canBuy and UPI payment through Razorpay is set up), adminPhone (canBuy: whom to ask for more searches on WhatsApp, '' → the
 //   app's number), movesLeft (a signed-up login: how many more times it may change its own village, api/signup.js "move"),
-//   survey (which marks this login uses, markModeOf in _lib.js)}.
+//   survey (which marks this login uses, markModeOf in _lib.js), noga (no analytics for this login, noAnalytics in _lib.js)}.
 //   The app calls this when it opens.
 // POST {token} (the start page) → the same, with list = the villages this login opens.
 // reason when not active: 'login' (unknown/old token) | 'retired' | 'logged_out' | 'other_device' | 'other_village'
-const { walletOf, hasWallet, refFor, DEMO, village, villageList, movesLeft, isPrepaid, canBuy, payOnline, adminPhone, creditsLeft, redis, whoIs, send, route } = require('./_lib.js');
+const { walletOf, hasWallet, refFor, DEMO, village, villageList, movesLeft, isPrepaid, noAnalytics, canBuy, payOnline, adminPhone, creditsLeft, redis, whoIs, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, { token, village: slug }) => {
   const v = slug ? village(slug) : null;
@@ -20,5 +20,5 @@ module.exports = route(async (req, res, { token, village: slug }) => {
     : prepaid ? await creditsLeft(user) : undefined;
   send(res, 200, { active: true, demo: !!user.demo, ref: user.demo ? null : await refFor(user), wallet: hasWallet(user) ? walletOf(user) : null, prepaid, left, canBuy: buys, online: buys && payOnline(), bought: buys && !prepaid ? await creditsLeft(user) : undefined,
     name: user.name, phone: user.phone || '', adminPhone: buys ? await adminPhone(user) : '', admin: !!user.admin, role: user.role, villages: user.villages,
-    list: villageList(user.villages), perms: user.perms, cand: user.candName || '', movesLeft: movesLeft(user), survey: !!user.survey });
+    list: villageList(user.villages), perms: user.perms, cand: user.candName || '', noga: noAnalytics(user), movesLeft: movesLeft(user), survey: !!user.survey });
 });
