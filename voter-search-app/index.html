@@ -2964,10 +2964,10 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
       note.textContent = L('वोटर प्रिंट केवल Rajelection की मशीन पर ही चलता है।', 'Voter print works only on the Rajelection machine.');
       return;
     }
-    const go = el('button', null, L('🧾 RawBT से प्रिंट करें', '🧾 Print with RawBT')); go.type = 'button';
+    const go = el('button', null, L('🧾 Rajelection से प्रिंट करें', '🧾 Print with Rajelection')); go.type = 'button';
     go.style.cssText = 'display:block;width:100%;margin:8px 0;padding:10px;border-radius:10px;border:0;background:#111;color:#fff;font:inherit;font-weight:700';
     go.addEventListener('click', () => { location.href = `intent:base64,${thermalB64(bytes)}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`; });
-    const get = el('a', null, L('RawBT ऐप नहीं है? Play Store से लें', 'No RawBT app? Get it from the Play Store'));
+    const get = el('a', null, L('Rajelection प्रिंट ऐप नहीं है? Play Store से लें', 'No Rajelection print app? Get it from the Play Store'));
     get.href = 'https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter'; get.target = '_blank'; get.rel = 'noopener';
     note.replaceChildren(el('div', null, L('प्रिंटर सीधे नहीं जुड़ा। प्रिंटर को फ़ोन की Bluetooth सेटिंग में जोड़ें (PIN 0000), फिर:', 'The printer did not connect directly. Pair it in the phone\'s Bluetooth settings (PIN 0000), then:')), go, get);
   } catch (e) {
