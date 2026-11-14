@@ -607,6 +607,25 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   .pballot .pbb button { border: 1px solid #cbd5e1; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 700; background: #fff; color: #1d4ed8; }
   .pballot .pbb button.del { color: var(--bad); }
   .pballot .pbb button.save { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+  /* पोस्टर बनाएँ: both posters drawn on the phone from a photo, a name and a colour */
+  .pmake { border: 1px solid #fcd34d; background: #fffbeb; border-radius: 14px; padding: 12px; margin-top: 10px; }
+  .posterpop .pok { display: block; width: 100%; margin-top: 12px; border: 0; border-radius: 12px; padding: 12px; font: inherit; font-size: 17px; font-weight: 700;
+    background: #1d4ed8; color: #fff; }
+  .pmake .pmopen { width: 100%; border: 0; border-radius: 12px; padding: 12px; font: inherit; font-size: 16px; font-weight: 700; color: #fff;
+    background: linear-gradient(90deg, #f97316, #db2777); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .pmake .pmf { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .pmake label { font-size: 13px; font-weight: 700; color: #78350f; display: grid; gap: 4px; }
+  .pmake input[type=text] { min-width: 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; font-size: 16px; background: #fff; }
+  .pmake .pmrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pmake .pmrow button { border: 1px solid #cbd5e1; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 700; background: #fff; color: #1d4ed8; }
+  .pmake .pmrow button.save { background: #16a34a; color: #fff; border-color: #16a34a; }
+  .pmake .pmrow button.del { color: var(--bad); }
+  .pmake .pmsw { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+  .pmake .pmsw button { height: 46px; border-radius: 10px; border: 3px solid transparent; font: inherit; font-size: 11.5px; font-weight: 700; padding: 0 2px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .pmake .pmsw button.on { border-color: #111; outline: 2px solid #fff; outline-offset: -5px; }
+  .pmake canvas { display: block; width: 100%; height: auto; border-radius: 8px; touch-action: none; cursor: grab; background: #ddd; }
+  .pmake input[type=range] { flex: 1; min-width: 120px; }
 
   /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page.
      The sizes sit outside @media print so printSlips() can lay the slips out off screen (#printArea.measure) and
@@ -817,8 +836,10 @@ electionBanner();
     <div class="head"><h2>पर्ची सेटिंग</h2><span><button id="posterClose" type="button" aria-label="बंद करें">✕</button></span></div>
     <div id="posterBody"></div>
     <div class="note" id="posterNote"></div>
+    <button id="posterOk" class="pok" type="button">ठीक है</button>
   </div>
   <input id="posterFile" type="file" accept="image/*" hidden>
+  <input id="pmFile" type="file" accept="image/*" hidden>
 </div>
 
 <div id="slipsPop" class="progpop hidden" role="dialog" aria-label="वार्ड पर्चियाँ">
@@ -952,7 +973,7 @@ const STATIC_EN = {
   'दूसरे ऐप में शेयर करें': 'Share in another app', 'लिंक कॉपी करें': 'Copy link', 'वीडियो पेज का लिंक कॉपी करें': 'Copy the videos page link',
   '⬇ वीडियो (फ़ोन)': '⬇ Video (phone)', '⬇ वीडियो (लैपटॉप)': '⬇ Video (laptop)',
   'आइकन से यही पेज खुलेगा, ब्राउज़र के बिना। इंटरनेट फिर भी चाहिए।': 'The icon opens this page without the browser. Internet is still needed.',
-  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'वार्ड पर्चियाँ': 'Ward slips', 'वार्ड पर्चियाँ (PDF)': 'Ward slips (PDF)', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
+  'वोटर रिपोर्ट': 'Voter report', '🖼 पर्ची पोस्टर': '🖼 Slip poster', 'पर्ची सेटिंग': 'Slip settings', 'ठीक है': 'OK', '↻ रिफ्रेश': '↻ Refresh', 'वोटर लिस्ट': 'Voter list', 'वार्ड पर्चियाँ': 'Ward slips', 'वार्ड पर्चियाँ (PDF)': 'Ward slips (PDF)', 'वार्ड': 'Ward', 'सभी वार्ड': 'All wards',
   'वोट दिया': 'Voted', 'आ रहे हैं': 'Coming', 'वोटर नहीं है': 'Not a voter', 'बाकी': 'Remaining', 'और दिखाएं': 'Show more',
   'एडमिन': 'Admin', 'लॉग आउट': 'Log out', 'अपना गाँव चुनें': 'Choose your village', '🔍 गाँव सर्च करें / Village': '🔍 Search village / गाँव',
   'पंचायत समिति': 'Panchayat samiti', 'ज़िला': 'District', 'नाम से (अ–ज्ञ)': 'By name (A–Z)', 'ज़्यादा वोटर पहले': 'Most voters first', 'कम वोटर पहले': 'Fewest voters first', 'क्रम': 'Order', 'गाँव बदलें': 'Change village', '← वापस': '← Back', 'अ+': 'A+', 'बड़े अक्षर': 'Bigger text',
@@ -2002,13 +2023,16 @@ async function posterSave(slot, img, more) {
 }
 function posterDraw() {
   const body = $('posterBody'); body.innerHTML = '';
+  pmForm(body);
   const slotBox = (slot, title, tip) => {
     const h = el('div', 'ph', title); h.append(el('small', null, tip));
     const box = el('div', `pslot${POSTER[slot] ? '' : ' empty'}`); box.dataset.slot = slot;
     const btns = el('div', 'pbtns');
-    const add = el('button', null, POSTER[slot] ? L('📷 बदलें', '📷 Change') : L('📷 पोस्टर जोड़ें', '📷 Add a poster')); add.type = 'button';
+    const add = el('button', null, L('📷 अपलोड', '📷 Upload')); add.type = 'button';
     add.addEventListener('click', () => { posterSlot = slot; $('posterFile').value = ''; $('posterFile').click(); });
-    btns.append(add);
+    const make = el('button', null, L('🎨 बनाएँ', '🎨 Make')); make.type = 'button';
+    make.addEventListener('click', () => { PM.open = true; posterDraw(); $('pmake').scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+    btns.append(make, add);
     box.append(posterPic(slot));
     if (POSTER[slot]) {
       const del = el('button', 'del', L('हटाएं', 'Remove')); del.type = 'button';
@@ -2078,12 +2102,250 @@ $('posterFile').addEventListener('change', async () => {
   }
   posterSave(slot, img);
 });
+// ---------- पोस्टर बनाएँ: both posters drawn on the phone (a photo, a name, a colour) at the exact sizes, then saved
+// through the same upload as a poster made elsewhere: top 1200×240 (5 : 1, over every slip), big 1600×534 (3 : 1, the PDF)
+const PM_FONT = '"Noto Sans Devanagari", "Kohinoor Devanagari", "Mangal", sans-serif';
+// c: the background from its middle out; name, nameSh: the name and its drop; sub: the line under it; rib, ribTx: the
+// slogan ribbons; ring: round the photo; stripe: along the bottom; glow: round the photo; tx: the soft shade under text
+const PM_THEMES = [
+  ['saffron', 'केसरिया', { c: ['#ffa526', '#f06a0c', '#a8340a'], name: '#ffffff', nameSh: '#6b1a00', sub: '#fff6d0', rib: '#ffffff', ribTx: '#c2410c', ring: '#ffffff', stripe: '#1f8a3b' }],
+  ['green', 'हरा', { c: ['#45b33f', '#17751f', '#0a4012'], name: '#ffd21f', nameSh: '#2e2200', sub: '#ffffff', rib: '#ffd21f', ribTx: '#6b1a00', ring: '#ffd21f', stripe: '#ff8a00' }],
+  ['blue', 'नीला', { c: ['#3468cf', '#183c8f', '#09194a'], name: '#ffd54a', nameSh: '#000000', sub: '#ffffff', rib: '#ffd54a', ribTx: '#0a1c4d', ring: '#ffd54a', stripe: '#ff7a00' }],
+  ['tri', 'तिरंगा', { tri: true, c: ['#ff9933', '#ffffff', '#138808'], name: '#0b2f80', nameSh: '#ffffff', sub: '#111111', rib: '#0b2f80', ribTx: '#ffffff', ring: '#0b2f80', stripe: '#0b2f80', tx: 'rgba(255,255,255,.7)' }],
+  ['red', 'लाल', { c: ['#f04a4a', '#c41818', '#6e0606'], name: '#ffffff', nameSh: '#4a0000', sub: '#ffe9a8', rib: '#ffd54a', ribTx: '#7a0a0a', ring: '#ffd54a', stripe: '#ffcc00' }],
+  ['maroon', 'मैरून', { c: ['#b23a5c', '#6e0f2c', '#3a0514'], name: '#ffd54a', nameSh: '#1a0008', sub: '#ffffff', rib: '#ffd54a', ribTx: '#5a0a22', ring: '#ffd54a', stripe: '#ffb300' }],
+  ['purple', 'बैंगनी', { c: ['#a06cf0', '#5b21b6', '#2a0b5e'], name: '#ffe066', nameSh: '#12002e', sub: '#ffffff', rib: '#ffe066', ribTx: '#3b0a7a', ring: '#ffe066', stripe: '#ff8a00' }],
+  ['pink', 'गुलाबी', { c: ['#ff6fae', '#d6246e', '#7a0a3a'], name: '#ffffff', nameSh: '#4a0022', sub: '#fff3b0', rib: '#ffffff', ribTx: '#b0105a', ring: '#ffffff', stripe: '#ffd21f' }],
+  ['teal', 'फ़िरोज़ी', { c: ['#2ec4b6', '#0f7c74', '#05403b'], name: '#fff3b0', nameSh: '#002622', sub: '#ffffff', rib: '#fff3b0', ribTx: '#0b5a54', ring: '#fff3b0', stripe: '#ff7a00' }],
+  ['sky', 'आसमानी', { c: ['#8fdcff', '#0ea5e9', '#075985'], name: '#ffffff', nameSh: '#0c3a5a', sub: '#fffbe0', rib: '#ffffff', ribTx: '#0369a1', ring: '#ffffff', stripe: '#f97316' }],
+  ['yellow', 'पीला', { c: ['#fff06a', '#ffc400', '#d98200'], name: '#8a1200', nameSh: '#fff6c8', sub: '#4a1500', rib: '#b91c1c', ribTx: '#ffffff', ring: '#b91c1c', stripe: '#b91c1c', tx: 'rgba(255,255,255,.55)' }],
+  ['brown', 'भूरा', { c: ['#d6954f', '#9a5a1e', '#4d2a0a'], name: '#ffffff', nameSh: '#2a1400', sub: '#ffefc2', rib: '#ffefc2', ribTx: '#6b3a0a', ring: '#ffefc2', stripe: '#1f8a3b' }],
+  ['black', 'काला-सुनहरा', { c: ['#4a4a4a', '#1f1f1f', '#000000'], name: '#ffd54a', nameSh: '#000000', sub: '#ffffff', rib: '#ffd54a', ribTx: '#111111', ring: '#ffd54a', stripe: '#ffd54a' }],
+];
+const PM_POSTS = ['सरपंच प्रत्याशी', 'वार्ड पंच प्रत्याशी', 'पंचायत समिति सदस्य प्रत्याशी', 'जिला परिषद सदस्य प्रत्याशी', 'प्रधान प्रत्याशी', 'पार्षद प्रत्याशी'];
+// what was typed stays while पर्ची सेटिंग is redrawn; the photo stays until the page is closed
+const PM = { open: false, img: null, zoom: 1, ox: 0, oy: 0, theme: 'saffron', name: '', post: PM_POSTS[0], gp: '', tag: '', call: '🙏 भारी मतों से विजयी बनाएँ 🙏' };
+let pmFontAsk = null;
+function pmFont() {   // Android has no Hindi font of its own good enough for a poster: fetch Noto Sans Devanagari once
+  if (!pmFontAsk) {
+    const l = document.createElement('link'); l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@600;700;800&display=swap';
+    pmFontAsk = new Promise((ok) => { l.onload = l.onerror = ok; document.head.append(l); })
+      .then(() => Promise.all(['600', '800'].map((w) => document.fonts.load(`${w} 40px "Noto Sans Devanagari"`, 'राम').catch(() => {}))));
+  }
+  return pmFontAsk;
+}
+const pmTheme = () => (PM_THEMES.find((t) => t[0] === PM.theme) || PM_THEMES[0])[2];
+function pmBg(g, W, H, t, cx, cy) {
+  if (t.tri) {   // three soft bands, as on the flag
+    const l = g.createLinearGradient(0, 0, 0, H);
+    l.addColorStop(0, t.c[0]); l.addColorStop(0.28, t.c[0]); l.addColorStop(0.45, t.c[1]); l.addColorStop(0.62, t.c[1]); l.addColorStop(0.82, t.c[2]); l.addColorStop(1, t.c[2]);
+    g.fillStyle = l; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(0, 0, W, H);
+    return;
+  }
+  const r = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
+  r.addColorStop(0, t.c[0]); r.addColorStop(0.45, t.c[1]); r.addColorStop(1, t.c[2]);
+  g.fillStyle = r; g.fillRect(0, 0, W, H);
+  g.save(); g.fillStyle = 'rgba(255,255,255,.07)';   // sun rays
+  for (let a = 0; a < 360; a += 14) {
+    const R = W * 1.2, a1 = a * Math.PI / 180, a2 = (a + 6) * Math.PI / 180;
+    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + R * Math.cos(a1), cy + R * Math.sin(a1)); g.lineTo(cx + R * Math.cos(a2), cy + R * Math.sin(a2)); g.fill();
+  }
+  g.restore();
+}
+// the square of the photo to show: as big as fits at zoom 1, moved by PM.ox / PM.oy (fractions of the picture)
+function pmCrop(img) {
+  const w = img.naturalWidth, h = img.naturalHeight, s = Math.min(w, h) / PM.zoom;
+  const x = Math.min(Math.max(w / 2 + PM.ox * w - s / 2, 0), w - s), y = Math.min(Math.max(h / 2 + PM.oy * h - s / 2, 0), h - s);
+  return [x, y, s];
+}
+function pmFace(g, t, x, y, d, ring) {
+  g.save(); g.shadowColor = 'rgba(255,240,170,.9)'; g.shadowBlur = d * 0.18;
+  g.beginPath(); g.arc(x + d / 2, y + d / 2, d / 2, 0, 7); g.fillStyle = t.ring; g.fill(); g.restore();
+  g.save(); g.beginPath(); g.arc(x + d / 2, y + d / 2, d / 2 - ring, 0, 7); g.clip();
+  if (PM.img) { const [sx, sy, s] = pmCrop(PM.img); g.drawImage(PM.img, sx, sy, s, s, x + ring, y + ring, d - 2 * ring, d - 2 * ring); }
+  else {
+    g.fillStyle = '#cbd5e1'; g.fillRect(x, y, d, d); g.fillStyle = '#94a3b8';   // a plain figure until a photo is picked
+    g.beginPath(); g.arc(x + d / 2, y + d * 0.4, d * 0.18, 0, 7); g.fill();
+    g.beginPath(); g.arc(x + d / 2, y + d * 0.98, d * 0.36, Math.PI, 0); g.fill();
+  }
+  g.restore();
+}
+function pmText(g, t, s, cx, y, size, maxW, color, weight, sh, shOff) {
+  if (!s) return;
+  g.font = `${weight} ${size}px ${PM_FONT}`;
+  while (g.measureText(s).width > maxW && size > 10) g.font = `${weight} ${--size}px ${PM_FONT}`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (sh) { g.fillStyle = sh; g.fillText(s, cx, y + shOff); }
+  g.save(); g.shadowColor = t.tx || 'rgba(0,0,0,.45)'; g.shadowBlur = size * 0.15; g.fillStyle = color; g.fillText(s, cx, y); g.restore();
+}
+function pmRibbon(g, t, s, cx, y, size, padX, h, maxW) {
+  if (!s) return;
+  g.font = `700 ${size}px ${PM_FONT}`;
+  while (g.measureText(s).width + padX * 2 > maxW && size > 10) g.font = `700 ${--size}px ${PM_FONT}`;
+  const w = g.measureText(s).width + padX * 2, x = cx - w / 2, n = h * 0.35;
+  g.save(); g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = 10; g.shadowOffsetY = 3; g.fillStyle = t.rib;
+  g.beginPath(); g.moveTo(x + n, y - h / 2); g.lineTo(x + w - n, y - h / 2); g.lineTo(x + w, y); g.lineTo(x + w - n, y + h / 2); g.lineTo(x + n, y + h / 2); g.lineTo(x, y); g.closePath(); g.fill(); g.restore();
+  g.fillStyle = t.ribTx; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s, cx, y + size * 0.06);
+}
+function pmStripe(g, W, H, h, t) { g.fillStyle = t.stripe; g.fillRect(0, H - h, W, h); g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(0, H - h - 3, W, 3); }
+const pmSub = () => [PM.post.trim(), PM.gp.trim()].filter(Boolean).join(' • ');
+const pmName = () => PM.name.trim() || L('आपका नाम', 'Your name');
+function pmDrawTop(c) {
+  const W = 1200, H = 240, g = c.getContext('2d'), t = pmTheme(); c.width = W; c.height = H;
+  pmBg(g, W, H, t, 720, 110);
+  pmFace(g, t, 24, 14, 204, 7);
+  const cx = 250 + (W - 20 - 250) / 2, mw = W - 20 - 250 - 20, sub = pmSub();
+  pmText(g, t, pmName(), cx, sub ? 92 : 115, 96, mw, t.name, 800, t.nameSh, 5);
+  pmText(g, t, sub, cx, 180, 38, mw, t.sub, 600);
+  pmStripe(g, W, H, 10, t);
+}
+function pmDrawBig(c) {
+  const W = 1600, H = 534, g = c.getContext('2d'), t = pmTheme(); c.width = W; c.height = H;
+  pmBg(g, W, H, t, 1000, 230);
+  pmFace(g, t, 40, 40, 436, 11);
+  const cx = 500 + (W - 40 - 500) / 2, mw = W - 40 - 500 - 20, tag = PM.tag.trim(), call = PM.call.trim(), sub = pmSub();
+  // the lines share the height: name and the line under it in the middle, the slogans above and below when given
+  const ny = tag && call ? 210 : tag ? 250 : call ? 175 : 215;
+  pmRibbon(g, t, tag, cx, 72, 40, 70, 64, mw);
+  pmText(g, t, pmName(), cx, ny, 156, mw, t.name, 800, t.nameSh, 7);
+  pmText(g, t, sub, cx, ny + 130, 56, mw, t.sub, 600);
+  pmRibbon(g, t, call, cx, 440, 46, 80, 74, mw);
+  pmStripe(g, W, H, 18, t);
+}
+// a canvas as a JPEG data URL small enough for the poster store (450 KB of text)
+function pmJpeg(c) {
+  for (let q = 0.9; ; q -= 0.08) { const d = c.toDataURL('image/jpeg', q); if (d.length < 420 * 1024 || q < 0.5) return d; }
+}
+function pmForm(body) {
+  const box = el('div', 'pmake'); box.id = 'pmake';
+  body.append(box);
+  if (!PM.open) {
+    const b = el('button', 'pmopen', L('🎨 पोस्टर बनाएँ — फोटो, नाम और रंग चुनें', '🎨 Make a poster — photo, name and colour')); b.type = 'button';
+    b.addEventListener('click', () => { PM.open = true; posterDraw(); $('pmake').scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+    box.append(b, el('div', 'pk', L('दोनों पोस्टर सही नाप में अपने आप बन जाएँगे। अपना बना हुआ पोस्टर हो तो नीचे "📷 अपलोड" करें।', 'Both posters come out at the right size. Have one made already? Use "📷 Upload" below.')));
+    return;
+  }
+  pmFont();
+  if (!PM.name && POSTER.ballot.name) PM.name = POSTER.ballot.name;
+  if (!PM.gp && VILLAGE && !EN) PM.gp = `ग्राम पंचायत ${vn(VILLAGE)}`;
+  const h = el('div', 'ph', L('🎨 पोस्टर बनाएँ', '🎨 Make a poster')); h.style.marginTop = '0';
+  const top = el('canvas'), big = el('canvas');
+  top.setAttribute('aria-label', L('पर्ची पोस्टर', 'Slip poster')); big.setAttribute('aria-label', L('PDF पोस्टर', 'PDF poster'));
+  let queued = false;
+  const draw = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; pmDrawTop(top); pmDrawBig(big); }); };
+  const f = el('div', 'pmf');
+  const field = (label, key, ph, list) => {
+    const lb = el('label', null, label), i = el('input'); i.type = 'text'; i.maxLength = 60; i.value = PM[key]; i.placeholder = ph;
+    if (list) i.setAttribute('list', list);
+    i.addEventListener('input', () => { PM[key] = i.value; draw(); });
+    lb.append(i); return lb;
+  };
+  const photo = el('div', 'pmrow');
+  const pick = el('button', null, PM.img ? L('📷 फोटो बदलें', '📷 Change photo') : L('📷 उम्मीदवार की फोटो चुनें', '📷 Pick the candidate\'s photo')); pick.type = 'button';
+  pick.addEventListener('click', () => { $('pmFile').value = ''; $('pmFile').click(); });
+  photo.append(pick);
+  const dl = el('datalist'); dl.id = 'pmPosts'; PM_POSTS.forEach((p) => { const o = el('option'); o.value = p; dl.append(o); });
+  f.append(photo, field(L('नाम', 'Name'), 'name', 'रामनिवास तर्ड'), field(L('पद', 'Post'), 'post', PM_POSTS[0], 'pmPosts'), dl,
+    field(L('ग्राम पंचायत / वार्ड', 'Panchayat / ward'), 'gp', 'ग्राम पंचायत जसरासर'),
+    field(L('ऊपर का नारा (PDF पोस्टर में, चाहें तो)', 'Slogan on top (PDF poster, optional)'), 'tag', 'आपका एक वोट, गाँव का विकास'),
+    field(L('नीचे की अपील (PDF पोस्टर में, चाहें तो)', 'Appeal below (PDF poster, optional)'), 'call', '🙏 भारी मतों से विजयी बनाएँ 🙏'));
+  // the colours
+  const sw = el('div', 'pmsw');
+  PM_THEMES.forEach(([k, name, t]) => {
+    const b = el('button', PM.theme === k ? 'on' : null, name); b.type = 'button';
+    b.style.background = t.tri ? `linear-gradient(${t.c[0]} 33%, #fff 33% 66%, ${t.c[2]} 66%)` : `radial-gradient(circle at 50% 40%, ${t.c[0]}, ${t.c[1]} 55%, ${t.c[2]})`;
+    b.style.color = t.name; b.style.textShadow = `0 1px 2px ${t.nameSh}`;
+    b.setAttribute('aria-pressed', PM.theme === k);
+    b.addEventListener('click', () => { PM.theme = k; sw.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); draw(); });
+    sw.append(b);
+  });
+  // move the face: drag either poster, zoom with the slider
+  const zoom = el('input'); zoom.type = 'range'; zoom.min = '1'; zoom.max = '4'; zoom.step = '0.05'; zoom.value = PM.zoom;
+  zoom.setAttribute('aria-label', L('फोटो छोटी-बड़ी', 'Photo zoom'));
+  zoom.addEventListener('input', () => { PM.zoom = +zoom.value; draw(); });
+  const zrow = el('div', 'pmrow'); zrow.append(el('span', 'pk', L('🔍 फोटो', '🔍 Photo')), zoom);
+  const drag = (c, faceD) => {
+    let last = null;
+    c.addEventListener('pointerdown', (e) => { if (!PM.img) return; last = [e.clientX, e.clientY]; c.setPointerCapture(e.pointerId); });
+    c.addEventListener('pointermove', (e) => {
+      if (!last || !PM.img) return;
+      const k = c.width / c.getBoundingClientRect().width, [, , s] = pmCrop(PM.img), per = s / faceD;   // photo pixels per poster pixel
+      PM.ox -= (e.clientX - last[0]) * k * per / PM.img.naturalWidth; PM.oy -= (e.clientY - last[1]) * k * per / PM.img.naturalHeight;
+      const [x, y] = pmCrop(PM.img), w = PM.img.naturalWidth, hh = PM.img.naturalHeight;   // keep the offset where the crop actually is
+      PM.ox = (x + s / 2 - w / 2) / w; PM.oy = (y + s / 2 - hh / 2) / hh;
+      last = [e.clientX, e.clientY]; draw();
+    });
+    const up = () => { last = null; };
+    c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+  };
+  drag(top, 190); drag(big, 414);
+  const acts = el('div', 'pmrow');
+  const save = el('button', 'save', L('✓ दोनों पोस्टर लगाएँ', '✓ Use both posters')); save.type = 'button';
+  save.addEventListener('click', () => pmSave(top, big, save));
+  const down = el('button', null, L('⬇ डाउनलोड', '⬇ Download')); down.type = 'button';
+  down.addEventListener('click', () => {
+    const nm = (PM.name.trim() || 'poster').replace(/[\\/:*?"<>|\s]+/g, '-');
+    [[top, 'slip'], [big, 'pdf']].forEach(([c, s]) => c.toBlob((b) => {
+      const a = el('a'); a.href = URL.createObjectURL(b); a.download = `${nm}-${s}-poster.jpg`; document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }, 'image/jpeg', 0.92));
+  });
+  const shut = el('button', 'del', L('बंद करें', 'Close')); shut.type = 'button';
+  shut.addEventListener('click', () => { PM.open = false; posterDraw(); });
+  acts.append(save, down, shut);
+  box.append(h, f, el('div', 'ph', L('रंग चुनें', 'Pick a colour')), sw,
+    el('div', 'ph', L('पर्ची पोस्टर (1200 × 240)', 'Slip poster (1200 × 240)')), top,
+    el('div', 'ph', L('PDF पोस्टर (1600 × 534)', 'PDF poster (1600 × 534)')), big,
+    PM.img ? zrow : '', el('div', 'pk', PM.img ? L('चेहरा बीच में लाने के लिए पोस्टर पर फोटो को खिसकाएँ', 'Drag on a poster to centre the face') : ''), acts);
+  pmDrawTop(top); pmDrawBig(big);
+  pmFontAsk.then(draw);   // again once the Hindi font has come
+}
+async function pmSave(top, big, btn) {
+  if (!PM.img) { $('posterNote').textContent = L('पहले उम्मीदवार की फोटो चुनें', 'Pick the candidate\'s photo first'); return; }
+  if (!PM.name.trim()) { $('posterNote').textContent = L('नाम लिखें', 'Enter the name'); return; }
+  await pmFont(); pmDrawTop(top); pmDrawBig(big);
+  btn.disabled = true; $('posterNote').textContent = L('सेव हो रहा है…', 'Saving…');
+  let r = await api('poster', { token: token(), set: 'top', img: pmJpeg(top) });
+  if (!r.error) r = await api('poster', { token: token(), set: 'big', img: pmJpeg(big) });
+  btn.disabled = false;
+  if (r.error) {
+    $('posterNote').textContent = r.error === 'too_big' ? L('पोस्टर बहुत बड़ा बना — फिर से कोशिश करें', 'The poster came out too big — try again')
+      : r.error === 'offline' ? MSG.offline || L('इंटरनेट नहीं है', 'No internet') : MSG[r.error] || MSG.server;
+    return;
+  }
+  POSTER = posterFrom(r); PM.open = false;
+  posterDraw(); posterCard();
+  $('posterNote').textContent = L('✓ दोनों पोस्टर लग गए — अब हर पर्ची और PDF पर यही छपेंगे', '✓ Both posters saved — every slip and PDF now prints with them');
+  $('posterBody').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+$('pmFile').addEventListener('change', () => {
+  const file = $('pmFile').files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {   // a phone photo can be 4000 px across: keep a 1000 px copy, plenty for a 436 px circle
+    const k = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    const small = new Image();
+    small.onload = () => {
+      // a tall photo (a person standing) has the face near the top: start the circle there
+      PM.img = small; PM.zoom = 1; PM.ox = 0; PM.oy = small.naturalHeight > small.naturalWidth * 1.15 ? -0.5 : 0;
+      posterDraw(); $('pmake').scrollIntoView({ block: 'start' });
+    };
+    small.src = c.toDataURL('image/jpeg', 0.92);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); $('posterNote').textContent = L('यह फोटो नहीं खुल रही — दूसरी चुनें', 'This picture would not open — pick another'); };
+  img.src = url;
+});
 function posterClose() { $('posterPop').classList.add('hidden'); }
 $('posterCard').addEventListener('click', async () => {
   $('posterPop').classList.remove('hidden'); $('posterNote').textContent = '';
   posterDraw(); await posterLoad(); posterDraw();
 });
 $('posterClose').addEventListener('click', posterClose);
+$('posterOk').addEventListener('click', posterClose);
 $('posterPop').addEventListener('click', (e) => { if (e.target === $('posterPop')) posterClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') posterClose(); });
 
