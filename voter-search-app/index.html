@@ -446,6 +446,13 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   /* a tap on a slip opens it big (slipPopOpen), as it will print, to send on WhatsApp or save as a photo */
   .slip.tap { cursor: pointer; }
   #slipPop .card { max-width: 480px; }
+  /* the slips side by side on a track: the next one peeks in at the right edge, and a swipe drags the track */
+  #spBody { overflow: hidden; touch-action: pan-y; margin: 0 -14px; padding: 0 14px; }
+  #spBody .sptrack { display: flex; align-items: flex-start; gap: 14px; will-change: transform; }
+  #spBody .sptrack.anim { transition: transform .28s ease-out; }
+  #spBody .spcell { flex: 0 0 calc(100% - 22px); min-width: 0; transition: opacity .28s; }
+  #spBody .spcell.side { opacity: .55; cursor: pointer; }
+  #spBody .spcell:only-child { flex-basis: 100%; }
   #spBody .slip { margin: 0; font-size: 16px; }
   #spBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
   #spBtns:empty { display: none; }
@@ -2568,7 +2575,17 @@ async function slipPopOpen(d) {
 function slipPopShow() {
   const d = spList[spAt], r = d.slipRow;
   $('spTitle').textContent = `${L('पर्ची', 'Slip')} · ${spAt + 1} / ${spList.length}`;
-  $('spBody').replaceChildren(slip(r, true));
+  const track = el('div', 'sptrack'), cells = [];
+  for (const i of [spAt - 1, spAt, spAt + 1]) {
+    if (i < 0 || i >= spList.length) continue;
+    const c = el('div', i === spAt ? 'spcell' : 'spcell side'); c.append(slip(spList[i].slipRow, true));
+    if (i !== spAt) c.addEventListener('click', () => slipPopStep(i - spAt));
+    cells.push(c);
+  }
+  if (spList.length === 1) cells[0].className = 'spcell';
+  track.append(...cells);
+  $('spBody').replaceChildren(track);
+  spMove(0, false);
   $('spNote').textContent = '';
   const btns = [];
   const btn = (cls, text, go) => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', go); btns.push(b); return b; };
@@ -2587,10 +2604,28 @@ function slipPopShow() {
   $('spPrev').disabled = spAt === 0; $('spNext').disabled = spAt >= spList.length - 1;
   $('spSwipe').textContent = spList.length > 1 ? L('स्वाइप करें', 'Swipe') : '';
 }
+// the track's place: the current slip at the left edge (the one before it off screen), moved dx pixels by a drag
+function spStep() { const c = $('spBody').querySelector('.spcell'); return c ? c.getBoundingClientRect().width + 14 : 0; }
+addEventListener('resize', () => { if (!$('slipPop').classList.contains('hidden')) spMove(0, false); });
+function spMove(dx, anim) {
+  const t = $('spBody').querySelector('.sptrack'); if (!t) return;
+  t.classList.toggle('anim', anim);
+  t.style.transform = `translateX(${(spAt > 0 ? -spStep() : 0) + dx}px)`;
+}
+let spBusy = false;
 function slipPopStep(by) {
   const to = spAt + by;
-  if (to < 0 || to >= spList.length) return;
-  spAt = to; slipPopShow();
+  if (spBusy || to < 0 || to >= spList.length) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { spAt = to; slipPopShow(); return; }
+  spBusy = true;
+  const t = $('spBody').querySelector('.sptrack');
+  [...t.children].forEach((c) => c.classList.add('side'));
+  t.children[spAt > 0 ? 1 + by : by].classList.remove('side');   // the slip coming in lights up as it slides
+  spMove(-by * spStep(), true);
+  let done = false;
+  const end = () => { if (done) return; done = true; spBusy = false; spAt = to; slipPopShow(); };
+  t.addEventListener('transitionend', (e) => { if (e.target === t) end(); }, { once: false });
+  setTimeout(end, 400);   // in case transitionend never comes
 }
 function slipPopClose() {
   if ($('slipPop').classList.contains('hidden')) return;
@@ -2610,14 +2645,27 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight') slipPopStep(1);
 });
 {
-  let x0 = null, y0 = 0;
-  $('spBody').addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
-  $('spBody').addEventListener('touchend', (e) => {
+  // the track follows the finger, then slides on to the next slip (or back) when it is let go
+  let x0 = null, y0 = 0, side = null;
+  const pull = (dx) => ((dx > 0 && spAt === 0) || (dx < 0 && spAt >= spList.length - 1) ? dx / 3 : dx);   // stiff at the ends
+  $('spBody').addEventListener('touchstart', (e) => { if (spBusy) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; side = null; }, { passive: true });
+  $('spBody').addEventListener('touchmove', (e) => {
     if (x0 === null) return;
-    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+    if (side === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) side = Math.abs(dx) > Math.abs(dy);
+    if (side) spMove(pull(dx), false);
+  }, { passive: true });
+  const up = (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
     x0 = null;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) slipPopStep(dx < 0 ? 1 : -1);
-  });
+    if (!side) return;
+    const by = dx < 0 ? 1 : -1, to = spAt + by;
+    if (Math.abs(dx) > 50 && to >= 0 && to < spList.length) slipPopStep(by);
+    else spMove(0, true);
+  };
+  $('spBody').addEventListener('touchend', up);
+  $('spBody').addEventListener('touchcancel', up);
 }
 
 // the slip as a picture: the share sheet with WhatsApp (phones), else a PNG download to send from WhatsApp by hand
