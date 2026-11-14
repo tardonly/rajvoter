@@ -2355,19 +2355,48 @@ async function slipPhoto(r, share, b) {
   } finally { b.disabled = false; }
 }
 // draw the printed slip (slip(r, true): the poster, the cut line, the slip) on a canvas, 600 px wide at twice the pixels
+// the EVM row (ballot number, name, symbol, red light, blue button) drawn on a canvas, matching .evm on the printed slip
+function evmDraw(x, b, sym, X, Y, w, h, font) {
+  const red = '#d1302b', line = '#9aa3ad', nW = Math.round(h * 1.05), ledW = Math.round(h * 0.68), btW = Math.round(h * 1.6);
+  const round = (l, t, rw, rh, rad) => { x.beginPath(); x.roundRect ? x.roundRect(l, t, rw, rh, rad) : x.rect(l, t, rw, rh); };
+  x.save();
+  round(X, Y, w, h, 9); x.fillStyle = '#fff'; x.fill(); x.clip();
+  x.fillStyle = '#eaf0f9'; x.fillRect(X + w - btW, Y, btW, h);
+  x.strokeStyle = line; x.lineWidth = 3;
+  for (const cx of [X + nW, X + w - btW - ledW, X + w - btW]) { x.beginPath(); x.moveTo(cx, Y); x.lineTo(cx, Y + h); x.stroke(); }
+  x.fillStyle = red; x.textBaseline = 'middle'; x.textAlign = 'center';
+  x.font = `800 ${Math.round(h * 0.56)}px ${font}`; x.fillText(String(b.no), X + nW / 2, Y + h / 2 + 1, nW - 6);
+  const nmL = X + nW + 12, nmR = X + w - btW - ledW - 10;
+  let sw = 0;
+  if (sym && sym.naturalWidth) {
+    const sh = h - 10; sw = Math.min(h * 1.4, sh * sym.naturalWidth / sym.naturalHeight);
+    const dh = sw * sym.naturalHeight / sym.naturalWidth;
+    x.drawImage(sym, nmR - sw, Y + (h - dh) / 2, sw, dh); sw += 8;
+  }
+  if (b.name) { x.textAlign = 'left'; x.font = `700 ${Math.round(h * 0.4)}px ${font}`; x.fillText(b.name, nmL, Y + h / 2 + 1, Math.max(20, nmR - nmL - sw)); }
+  x.beginPath(); x.arc(X + w - btW - ledW / 2, Y + h / 2, h * 0.17, 0, 2 * Math.PI); x.fill();
+  x.fillStyle = '#3a6fd0'; round(X + w - btW + btW * 0.14, Y + h * 0.22, btW * 0.72, h * 0.56, h * 0.28); x.fill();
+  x.font = `${Math.round(h * 0.42)}px ${font}`; x.textAlign = 'right'; x.textBaseline = 'alphabetic'; x.fillText('👆', X + w - 2, Y + h + 2);
+  x.restore();
+  x.strokeStyle = line; x.lineWidth = 3; round(X, Y, w, h, 9); x.stroke();
+  x.strokeStyle = '#111'; x.fillStyle = '#111'; x.textBaseline = 'middle';
+}
 async function slipCanvas(r) {
   const f = slipFields(r), W = 600, P = 12, S = 2;
   const font = getComputedStyle(document.body).fontFamily;
   const pink = getComputedStyle(document.documentElement).getPropertyValue('--pink').trim() || '#e0245e';
   const fnt = (px, bold, fam) => `${bold ? '700 ' : ''}${px}px ${fam || font}`;
-  let poster = null;
-  if (POSTER.top) {
-    poster = new Image();
-    const ready = new Promise((ok, no) => { poster.onload = ok; poster.onerror = no; });
-    poster.src = POSTER.top;
-    await Promise.race([ready, new Promise((ok, no) => setTimeout(no, 8000))]).catch(() => { poster = null; });
-  }
+  // a picture (the poster, the election symbol), or null if it does not load within 8 s
+  const pic = (src) => {
+    if (!src) return null;
+    const i = new Image(), ready = new Promise((ok, no) => { i.onload = ok; i.onerror = no; });
+    i.src = src;
+    return Promise.race([ready, new Promise((ok, no) => setTimeout(no, 8000))]).then(() => i, () => null);
+  };
+  const ballot = POSTER.ballot && POSTER.ballot.no ? POSTER.ballot : null;
+  const [poster, sym] = await Promise.all([pic(POSTER.top), pic(ballot && ballot.sym)]);
   const ph = poster ? Math.min(Math.round(W * poster.naturalHeight / poster.naturalWidth), Math.round(W * 52 / 94)) : 0;
+  const evmH = ballot ? 72 : 0;   // the EVM row under the poster, as on the printed slip (80 of the slip's 94 mm wide)
   const m = document.createElement('canvas').getContext('2d');
   // the polling station may need two or three lines
   const wrap = (text, px, width) => {
@@ -2380,8 +2409,8 @@ async function slipCanvas(r) {
     return lines;
   };
   const kLines = wrap(`${L('मतदान केन्द्र : ', 'Polling station: ')}${f.booth} - ${f.kendra}`, 17, W - 2 * P);
-  const cutH = poster ? 40 : 0, headH = 52, idH = 54, lineH = 40, kH = kLines.length * 24 + 12, tH = 30;
-  const H = ph + cutH + headH + idH + 2 * lineH + kH + tH;
+  const cutH = poster || ballot ? 40 : 0, headH = 52, idH = 54, lineH = 40, kH = kLines.length * 24 + 12, tH = 30;
+  const H = ph + evmH + cutH + headH + idH + 2 * lineH + kH + tH;
   const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
   const x = c.getContext('2d'); x.scale(S, S);
   x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
@@ -2390,6 +2419,9 @@ async function slipCanvas(r) {
   if (poster) {
     const pw = Math.min(W, Math.round(ph * poster.naturalWidth / poster.naturalHeight));
     x.drawImage(poster, (W - pw) / 2, 0, pw, ph); y = ph;
+  }
+  if (ballot) { evmDraw(x, ballot, sym, (W - 510) / 2, y + 8, 510, evmH - 16, font); y += evmH; }
+  if (cutH) {
     x.font = fnt(14); const cut = `✂ ${L('यहाँ से काटें · पोस्टर बूथ में ले जाना मना है', 'Cut here · no posters inside the booth')}`;
     const tw = x.measureText(cut).width, mid = y + cutH / 2;
     x.setLineDash([7, 5]); x.lineWidth = 2;
