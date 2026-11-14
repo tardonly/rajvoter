@@ -1561,7 +1561,7 @@ function slip(r, forPrint, inFamily) {
   const tools = el('div', 'tools');
   if (!forPrint && can('print') && !r.del) {
     // the card's button prints on the thermal printer; Print / PDF stays in the slip popup
-    const pb = el('button', 'pbtn', L('🧾 थर्मल प्रिंट', '🧾 Thermal print')); pb.type = 'button';
+    const pb = el('button', 'pbtn', L('🧾 वोटर प्रिंट', '🧾 Voter print')); pb.type = 'button';
     pb.addEventListener('click', () => {
       let note = d.querySelector('.tnote');
       if (!note) { note = el('div', 'tnote'); d.append(note); }
@@ -1657,7 +1657,7 @@ async function toggleFamily(r, d, btn) {
     const fp = el('button', 'tbtn', L('पूरे परिवार की पर्चियाँ · प्रिंट / PDF', "Whole family's slips · Print / PDF")); fp.type = 'button';
     fp.addEventListener('click', () => printSlips(x.results.filter((v) => !v.del),
       L(`परिवार ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`)));
-    const ft = el('button', 'tbtn', L('🧾 पूरे परिवार की पर्चियाँ · थर्मल प्रिंट', "🧾 Whole family's slips · Thermal print")); ft.type = 'button';
+    const ft = el('button', 'tbtn', L('🧾 पूरे परिवार की पर्चियाँ · वोटर प्रिंट', "🧾 Whole family's slips · Voter print")); ft.type = 'button';
     const fn = el('div', 'tnote');
     ft.addEventListener('click', () => thermalPrint(x.results.filter((v) => !v.del), ft, fn));
     fh.append(fp, ft, fn);
@@ -2576,7 +2576,7 @@ function slipPopShow() {
     btn('wa', L('व्हाट्सऐप भेजें', 'Send on WhatsApp'), (e) => slipPhoto(r, true, e.currentTarget));
     btn(null, L('⬇ फ़ोटो सेव', '⬇ Save photo'), (e) => slipPhoto(r, false, e.currentTarget));
     btn(null, L('प्रिंट / PDF', 'Print / PDF'), () => printSlips([r], L(`पर्ची ${VILLAGE.name} वार्ड ${r.ward} बॉक्स ${r.box}`, `Slip ${vn(VILLAGE)} ward ${r.ward} box ${r.box}`)));
-    btn(null, L('🧾 थर्मल प्रिंट', '🧾 Thermal print'), (e) => thermalPrint(r, e.currentTarget));
+    btn(null, L('🧾 वोटर प्रिंट', '🧾 Voter print'), (e) => thermalPrint(r, e.currentTarget));
   }
   const fam = d.querySelector('.fam');
   if (fam) btn(null, fam.classList.contains('on') ? L('परिवार छुपाएं', 'Hide family') : L('परिवार खोलें', 'Open family'), () => {
@@ -2918,7 +2918,7 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
     }
     // not reached directly: hand it to RawBT (a fresh tap, since opening another app needs one)
     if (!/Android/i.test(navigator.userAgent)) {
-      note.textContent = L('थर्मल प्रिंट Android फ़ोन पर Chrome में चलता है। iPhone पर यह प्रिंटर नहीं चलता।', 'Thermal printing works in Chrome on an Android phone. This printer does not work with an iPhone.');
+      note.textContent = L('वोटर प्रिंट Android फ़ोन पर Chrome में चलता है। iPhone पर यह प्रिंटर नहीं चलता।', 'Voter print works in Chrome on an Android phone. This printer does not work with an iPhone.');
       return;
     }
     const go = el('button', null, L('🧾 RawBT से प्रिंट करें', '🧾 Print with RawBT')); go.type = 'button';
