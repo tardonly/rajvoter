@@ -441,6 +441,8 @@
         <label class="fr num"><span id="wcRsText"></span><input id="wcRs" type="number" min="1" max="10000" inputmode="numeric"></label>
         <label class="fr"><input type="checkbox" id="wcAz"> <span id="wcAzText"></span></label>
         <label class="fr num"><span id="wcAzRsText"></span><input id="wcAzRs" type="number" min="1" max="10000" inputmode="numeric"></label>
+        <label class="fr"><input type="checkbox" id="wcHn"> <span id="wcHnText"></span></label>
+        <label class="fr num"><span id="wcHnRsText"></span><input id="wcHnRs" type="number" min="1" max="10000" inputmode="numeric"></label>
         <button class="btn" id="wcSave" type="button"></button>
         <div class="sub" id="wcMsg" style="margin:0"></div>
         <!-- per ज़िला / पंचायत समिति (api/_routes/admin.js "ward_pay_area") -->
@@ -835,22 +837,26 @@ $('freeSave').addEventListener('click', async () => {
 });
 // ward slips (wardFree in api/_lib.js): ₹WCFG.rs a ward for everyone, or free; a person's own choice (on their card) wins
 let WARD_PAY = null;
-// the superadmin's prices and whether name order (अ–ज्ञ) is sold (wardCfg in api/_lib.js; "ward_cfg")
-let WCFG = { rs: 50, azRs: 50, az: true };
+// the superadmin's prices and whether name order (अ–ज्ञ) and house-number order are sold (wardCfg in api/_lib.js; "ward_cfg")
+let WCFG = { rs: 50, azRs: 50, az: true, hnRs: 50, hn: true };
 const wrs = () => `₹${WCFG.rs}`;
 function showWardCfg(c) {
   if (c) WCFG = c;
   $('wcRsText').textContent = L('एक वार्ड की सभी पर्चियों का दाम (₹)', 'Price of one ward\'s slips (₹)');
-  $('wcAzText').textContent = L('नाम क्रम (अ–ज्ञ) वाली पर्चियाँ भी बेचें — बंद करें तो सिर्फ़ बॉक्स क्रम (जिन्होंने पहले खरीदा, उनका चलता रहेगा)', 'Also sell slips in name order (A–Z) — off = box order only (wards already bought in it keep it)');
+  $('wcAzText').textContent = L('नाम क्रम (अ–ज्ञ) वाली पर्चियाँ भी बेचें — बंद करें तो नहीं मिलेंगी (जिन्होंने पहले खरीदा, उनका चलता रहेगा)', 'Also sell slips in name order (A–Z) — off = not offered (wards already bought in it keep it)');
   $('wcAzRsText').textContent = L('नाम क्रम का अलग से दाम (₹)', 'Extra price for name order (₹)');
+  $('wcHnText').textContent = L('मकान नंबर क्रम वाली पर्चियाँ भी बेचें — बंद करें तो नहीं मिलेंगी (जिन्होंने पहले खरीदा, उनका चलता रहेगा)', 'Also sell slips in house-number order — off = not offered (wards already bought in it keep it)');
+  $('wcHnRsText').textContent = L('मकान नंबर क्रम का अलग से दाम (₹)', 'Extra price for house-number order (₹)');
   $('wcSave').textContent = L('दाम सेव करें', 'Save prices');
   $('wcRs').value = WCFG.rs; $('wcAzRs').value = WCFG.azRs; $('wcAz').checked = WCFG.az; $('wcAzRs').disabled = !WCFG.az;
+  $('wcHnRs').value = WCFG.hnRs; $('wcHn').checked = WCFG.hn; $('wcHnRs').disabled = !WCFG.hn;
   if (WARD_PAY != null) showWardPay(WARD_PAY);
 }
 $('wcAz').addEventListener('change', () => { $('wcAzRs').disabled = !$('wcAz').checked; });
+$('wcHn').addEventListener('change', () => { $('wcHnRs').disabled = !$('wcHn').checked; });
 $('wcSave').addEventListener('click', async () => {
   $('wcSave').disabled = true; $('wcMsg').textContent = '';
-  const r = await api({ action: 'ward_cfg', rs: $('wcRs').value, azRs: $('wcAzRs').value, az: $('wcAz').checked });
+  const r = await api({ action: 'ward_cfg', rs: $('wcRs').value, azRs: $('wcAzRs').value, az: $('wcAz').checked, hnRs: $('wcHnRs').value, hn: $('wcHn').checked });
   $('wcSave').disabled = false;
   if (r.error) { $('wcMsg').textContent = errText(r); return; }
   showWardCfg(r.wardCfg);

@@ -922,15 +922,19 @@ const wardKey = (uid, slug) => `wardpaid:${uid}:${slug}`;
 // the ward (₹WARD_RS + ₹WARD_AZ_RS) or later on its own; req field az '1'. Free exactly when the ward is (wardFree).
 const WARD_AZ_RS = 50;
 const wardAzKey = (uid, slug) => `wardaz:${uid}:${slug}`;
+// and in house-number order (मकान नंबर क्रम; search.js "all" with sort 'hn'): the same way, ₹WARD_HN_RS; req field hn '1'
+const WARD_HN_RS = 50;
+const wardHnKey = (uid, slug) => `wardhn:${uid}:${slug}`;
 // The superadmin's ward slip prices and the name-order switch (admin page; api/_routes/admin.js "ward_cfg"): hash "wardcfg",
 // fields rs (₹ a ward, else WARD_RS), azrs (₹ for name order, else WARD_AZ_RS), az ('0' = name order not sold or given:
-// only wards someone already bought it for keep it). A purchase keeps the price it was started at (req field rs).
+// only wards someone already bought it for keep it), hnrs and hn (the same for house-number order). A purchase keeps the
+// price it was started at (req field rs).
 const WARD_RS_MAX = 10000;
 async function wardCfg() {
   const a = (await redis('HGETALL', 'wardcfg')) || [], o = {};
   for (let i = 0; i < a.length; i += 2) o[a[i]] = a[i + 1];
   const n = (x, d) => { const v = parseInt(x, 10); return v >= 1 && v <= WARD_RS_MAX ? v : d; };
-  return { rs: n(o.rs, WARD_RS), azRs: n(o.azrs, WARD_AZ_RS), az: o.az !== '0' };
+  return { rs: n(o.rs, WARD_RS), azRs: n(o.azrs, WARD_AZ_RS), az: o.az !== '0', hnRs: n(o.hnrs, WARD_HN_RS), hn: o.hn !== '0' };
 }
 // Whether people pay for wards, set by the superadmin on the admin page (api/_routes/admin.js "ward_pay"): key
 // "wardpay" '1' = they pay, '0' = every ward free; not set yet → env WARD_PAY=1 to pay, else free. Per person, the
@@ -967,10 +971,12 @@ async function wardFree(u, slug) {
 // free: whether wardFree is already known (false = known not free, so it isn't asked again)
 const wardsPaid = async (u, slug, free) => (!u || (free ?? (await wardFree(u, slug))) ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
 const wardsAz = async (u, slug, free) => (!u || (free ?? (await wardFree(u, slug))) ? [] : ((await redis('SMEMBERS', wardAzKey(u.id, slug))) || []).map(String));
+const wardsHn = async (u, slug, free) => (!u || (free ?? (await wardFree(u, slug))) ? [] : ((await redis('SMEMBERS', wardHnKey(u.id, slug))) || []).map(String));
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
   await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
   if (r.az === '1') await redis('SADD', wardAzKey(u.id, r.wv), String(r.ward));
+  if (r.hn === '1') await redis('SADD', wardHnKey(u.id, r.wv), String(r.ward));
   await refReward(u.id, rs, r.ref);
   await redis('HSET', `req:${r.id}`, 'status', 'done', 'doneAt', new Date().toISOString(), 'doneN', 0, 'doneRs', rs, 'doneBy', by.id, 'doneByName', by.name);
   await redis('HINCRBY', 'pay:rs', by.id, rs);
@@ -1295,7 +1301,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, wardCfg, WARD_RS_MAX, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, wardCfg, WARD_RS_MAX, WARD_HN_RS, wardHnKey, wardsHn, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, noAnalytics, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };
