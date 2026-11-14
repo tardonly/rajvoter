@@ -116,7 +116,7 @@
       ]
     },
     {
-      "source": "/api/(.*)",
+      "source": "/api/((?!places$).*)",
       "headers": [
         {
           "key": "Cache-Control",
