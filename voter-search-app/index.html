@@ -2918,7 +2918,7 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
     }
     // not reached directly: hand it to RawBT (a fresh tap, since opening another app needs one)
     if (!/Android/i.test(navigator.userAgent)) {
-      note.textContent = L('वोटर प्रिंट Android फ़ोन पर Chrome में चलता है। iPhone पर यह प्रिंटर नहीं चलता।', 'Voter print works in Chrome on an Android phone. This printer does not work with an iPhone.');
+      note.textContent = L('वोटर प्रिंट केवल Rajelection की मशीन पर ही चलता है।', 'Voter print works only on the Rajelection machine.');
       return;
     }
     const go = el('button', null, L('🧾 RawBT से प्रिंट करें', '🧾 Print with RawBT')); go.type = 'button';
