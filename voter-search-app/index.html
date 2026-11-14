@@ -613,8 +613,6 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
     #printArea { display: block; }
   }
 </style>
-<!-- OpenAI (ChatGPT) ads pixel: page views only, no personal data -->
-<script>!function(w,d,s,u){if(w.oaiq)return;var q=function(){q.q.push(arguments)};q.q=[];w.oaiq=q;var j=d.createElement(s);j.async=1;j.src=u;var f=d.getElementsByTagName(s)[0];f.parentNode.insertBefore(j,f)}(window,document,"script","https://bzrcdn.openai.com/sdk/oaiq.min.js");oaiq("init",{pixelId:"HhxuaE8BetBWxFoME4bgep",debug:true});</script>
 </head>
 <body>
 <script>
@@ -3299,8 +3297,6 @@ async function lockSignup() {
   if (r.error) return showLock(SIGN_ERR[r.error] || MSG[r.error] || MSG.server);
   showLock('');
   store.set(`tok:${slug}`, r.token, true);
-  // ChatGPT ads: a new login made (the event name only, no number or name)
-  try { window.oaiq && oaiq('measure', 'registration_completed', { type: 'customer_action' }); } catch {}
   // the new password, to write down; closing this goes into the village
   // A form with the number and the new password, so the phone's password manager offers to save them: Continue submits
   // it (Chrome / Safari ask "Save password?"), and where the browser allows it a button asks straight away.
