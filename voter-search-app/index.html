@@ -986,6 +986,7 @@ const MSG = {
   no_mark: L('निशान लगाने की अनुमति नहीं है — एडमिन से पूछें', 'You may not set marks — ask your admin'),
   no_progress: L('वोटर रिपोर्ट देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter report — ask your admin'),
   no_list: L('वोटर लिस्ट देखने की अनुमति नहीं है — एडमिन से पूछें', 'You may not see the voter list — ask your admin'),
+  az_off: L('नाम क्रम (अ–ज्ञ) वाली पर्चियाँ अभी नहीं मिल रहीं — बॉक्स क्रम में डाउनलोड करें', 'Name-order (A–Z) slips are not available now — download in box order'),
   no_pdf: L('पूरे वार्ड की पर्चियों की अनुमति नहीं है — एडमिन से पूछें', 'You may not print a whole ward\'s slips — ask your admin'),
   no_ward_list: L('पूरा वार्ड देखने की अनुमति नहीं है — नाम लिखकर सर्च करें', 'You may not list a whole ward — search by name'),
   credits: L('आपकी सभी सर्च इस्तेमाल हो गईं — और सर्च खरीदें', 'All your searches are used — buy more'),
@@ -1386,6 +1387,7 @@ async function search(more = false, force = false) {
   if (r.error === 'credits' && PREPAID && !DEMO) buyOpen();   // a self-made login with no searches left: the buying window (an admin-made one: talk to the admin)
   if (r.error) { $('count').textContent = MSG[r.error] || MSG.server; $('count').classList.add('bad'); return; }
   if (r.perms) updatePerms(r.perms);
+  if (r.wc) { WARD_RS = r.wc.rs; WARD_AZ_RS = r.wc.azRs; AZ_ON = r.wc.az; }   // the superadmin's prices and name-order switch
   if (r.wz != null) WARD_AZ = r.wz;
   if (r.wp != null) { WARD_PAID = r.wp; WP_KNOWN = true; wardButton(); }
   total = r.total;
@@ -2067,8 +2069,9 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') listClose(
 // A whole ward's slips cost WARD_RS once per ward (api/pay.js wardStart): the button says the price until this login has
 // paid for that ward (WARD_PAID: the wards paid for in this village, from every search answer; true = admins, who don't pay)
 // Name order (नाम क्रम, अ–ज्ञ) is WARD_AZ_RS more: with the ward (₹WARD_RS + ₹WARD_AZ_RS) or later on its own (WARD_AZ:
-// the wards bought in name order too, answer field wz; true = this login doesn't pay)
-const WARD_RS = 50, WARD_AZ_RS = 50;
+// the wards bought in name order too, answer field wz; true = this login doesn't pay). Prices and AZ_ON (name order sold
+// at all) are the superadmin's (wardCfg in api/_lib.js), from every search answer (field wc)
+let WARD_RS = 50, WARD_AZ_RS = 50, AZ_ON = true;
 let WARD_PAID = [], WARD_AZ = [], WP_KNOWN = false;   // WP_KNOWN: a search has said which wards are paid
 const inList = (list, w) => list === true || (Array.isArray(list) && list.map(String).includes(String(w)));
 const wardPaid = (w) => inList(WARD_PAID, w);
@@ -2080,7 +2083,7 @@ function wardButton() {
   $('wardPrint').classList.toggle('hidden', DEMO || !w || !(wardPaid(w) || (CAN_BUY && ONLINE)));
   $('wardPrint').textContent = wardPaid(w) ? L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें (PDF)`, `⬇ Download ward ${w} slips (PDF)`)
     : L(`⬇ वार्ड ${w} की पर्चियाँ डाउनलोड करें · ₹${WARD_RS}`, `⬇ Download ward ${w} slips · ₹${WARD_RS}`);
-  $('wardAzBtn').classList.toggle('hidden', DEMO || !w || !wardPaid(w) || wardAz(w) || !(CAN_BUY && ONLINE));
+  $('wardAzBtn').classList.toggle('hidden', DEMO || !AZ_ON || !w || !wardPaid(w) || wardAz(w) || !(CAN_BUY && ONLINE));
   $('wardAzBtn').textContent = L(`🔤 नाम क्रम (अ–ज्ञ) भी लें · ₹${WARD_AZ_RS} और`, `🔤 Get name order (A–Z) too · ₹${WARD_AZ_RS} more`);
   if ($('wardPanel').dataset.w !== String(w)) $('wardPanel').classList.add('hidden');
 }
@@ -2126,7 +2129,9 @@ function wardChoice(w, mode, rs = WARD_RS) {
   const pick = () => (d.querySelector(`input[name="${name}"]:checked`) || {}).value || '';
   const label = () => { btn.textContent = mode === 'get' ? L('⬇ डाउनलोड करें (PDF)', '⬇ Download (PDF)')
     : pick() ? L(`🔓 ₹${rs + WARD_AZ_RS} में खरीदें`, `🔓 Buy for ₹${rs + WARD_AZ_RS}`) : L(`🔓 ₹${rs} में पूरा वार्ड खोलें`, `🔓 Unlock the ward for ₹${rs}`); };
-  for (const [v, t, h] of opts) {
+  for (const o of opts) {
+    if (mode === 'buy' && o[0] === 'az' && !AZ_ON) continue;   // name order switched off by the superadmin
+    const [v, t, h] = o;
     const lb = el('label'), inp = el('input'); inp.type = 'radio'; inp.name = name; inp.value = v;
     inp.checked = mode === 'get' ? v === 'az' : v === '';
     inp.addEventListener('change', label);
@@ -2174,7 +2179,8 @@ async function wardPay(w, from = null, az = false, dl = false) {   // from: the 
     return;
   }
   reset();
-  $('count').textContent = r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
+  if (r.error === 'az_off') { AZ_ON = false; WARD_AZ = []; wardButton(); }   // switched off since this page loaded
+  $('count').textContent = r.error === 'az_off' ? MSG.az_off : r.error === 'too_many' ? L('आज बहुत अनुरोध हो गए — कल कोशिश करें', 'Too many requests today — try tomorrow')
     : L('⚠ अभी ऑनलाइन भुगतान नहीं हो पा रहा — थोड़ी देर बाद फिर कोशिश करें।', '⚠ Online payment is not working right now — please try again a little later.');
   $('count').classList.add('bad');
 }
