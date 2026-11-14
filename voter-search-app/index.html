@@ -613,6 +613,8 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
     background: #1d4ed8; color: #fff; }
   .pmake .pmopen { width: 100%; border: 0; border-radius: 12px; padding: 12px; font: inherit; font-size: 16px; font-weight: 700; color: #fff;
     background: linear-gradient(90deg, #f97316, #db2777); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .pmake .pmhead { display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; background: none; padding: 2px 0 8px;
+    font: inherit; font-size: 16px; font-weight: 700; color: #78350f; cursor: pointer; text-align: left; }
   .pmake .pmf { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .pmake label { font-size: 13px; font-weight: 700; color: #78350f; display: grid; gap: 4px; }
   .pmake input[type=text] { min-width: 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; font-size: 16px; background: #fff; }
@@ -2223,14 +2225,17 @@ function pmForm(body) {
   const box = el('div', 'pmake'); box.id = 'pmake';
   body.append(box);
   if (!PM.open) {
-    const b = el('button', 'pmopen', L('🎨 पोस्टर बनाएँ — फोटो, नाम और रंग चुनें', '🎨 Make a poster — photo, name and colour')); b.type = 'button';
+    const b = el('button', 'pmopen', L('🎨 पोस्टर बनाएँ — फोटो, नाम और रंग चुनें  ▾', '🎨 Make a poster — photo, name and colour  ▾')); b.type = 'button'; b.setAttribute('aria-expanded', 'false');
     b.addEventListener('click', () => { PM.open = true; posterDraw(); $('pmake').scrollIntoView({ block: 'start', behavior: 'smooth' }); });
     box.append(b, el('div', 'pk', L('पर्ची और PDF का पोस्टर सही नाप में अपने आप बनेगा — जो चाहें वही लगाएँ। अपना बना हुआ पोस्टर हो तो नीचे "📷 अपलोड" करें।', 'The slip and PDF posters come out at the right size — use either or both. Have one made already? Use "📷 Upload" below.')));
     return;
   }
   pmFont();
   if (!PM.name && POSTER.ballot.name) PM.name = POSTER.ballot.name;
-  const h = el('div', 'ph', L('🎨 पोस्टर बनाएँ', '🎨 Make a poster')); h.style.marginTop = '0';
+  // the heading folds it away again (what was typed stays)
+  const h = el('button', 'pmhead', L('🎨 पोस्टर बनाएँ', '🎨 Make a poster')); h.type = 'button'; h.setAttribute('aria-expanded', 'true');
+  h.append(el('span', null, '▴'));
+  h.addEventListener('click', () => { PM.open = false; posterDraw(); $('pmake').scrollIntoView({ block: 'nearest' }); });
   const top = el('canvas'), big = el('canvas');
   top.setAttribute('aria-label', L('पर्ची पोस्टर', 'Slip poster')); big.setAttribute('aria-label', L('PDF पोस्टर', 'PDF poster'));
   let queued = false;
@@ -2294,8 +2299,8 @@ function pmForm(body) {
     }, 'image/jpeg', 0.92));
     row.append(save, down); return row;
   };
-  const shut = el('button', 'del', L('बंद करें', 'Close')); shut.type = 'button';
-  shut.addEventListener('click', () => { PM.open = false; posterDraw(); });
+  const shut = el('button', 'del', L('▴ समेटें', '▴ Fold away')); shut.type = 'button';
+  shut.addEventListener('click', () => { PM.open = false; posterDraw(); $('pmake').scrollIntoView({ block: 'nearest' }); });
   const end = el('div', 'pmrow'); end.append(shut);
   box.append(h, f, el('div', 'ph', L('रंग चुनें', 'Pick a colour')), sw,
     PM.img ? zrow : '', el('div', 'pk', PM.img ? L('चेहरा बीच में लाने के लिए पोस्टर पर फोटो को खिसकाएँ', 'Drag on a poster to centre the face') : ''),
@@ -2344,6 +2349,7 @@ $('pmFile').addEventListener('change', () => {
 function posterClose() { $('posterPop').classList.add('hidden'); }
 $('posterCard').addEventListener('click', async () => {
   $('posterPop').classList.remove('hidden'); $('posterNote').textContent = '';
+  PM.open = false;   // the poster maker starts folded each time
   posterDraw(); await posterLoad(); posterDraw();
 });
 $('posterClose').addEventListener('click', posterClose);
