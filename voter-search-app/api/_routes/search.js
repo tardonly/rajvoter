@@ -25,7 +25,7 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, WARD_RS, WARD_AZ_RS, wardKey, wardAzKey, wardFree, wardsPaid, wardsAz, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
+const { DEMO, village, whoIs, wardCfg, wardKey, wardAzKey, wardFree, wardsPaid, wardsAz, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
 const { load, search, family, publicFields } = require('../_search.js');
 const HI = new Intl.Collator('hi').compare;   // Hindi dictionary order, अ to ज्ञ (a ward's slips in name order)
 
@@ -109,14 +109,15 @@ module.exports = route(async (req, res, b) => {
 
   const named = !!(String(b.name || '').trim() || String(b.rel || '').trim());
   if (!named && !b.family && b.ward && !b.all && user.demo) return send(res, 403, { error: 'no_ward_list' });
-  const wfree = await wardFree(user, v.slug);   // this login doesn't pay for wards (wardFree in _lib.js)
+  // this login doesn't pay for wards (wardFree in _lib.js); the superadmin's prices and name-order switch (wardCfg)
+  const [wfree, wc] = await Promise.all([wardFree(user, v.slug), wardCfg()]);
   if (b.all && !user.demo && !wfree && Number(await redis('SISMEMBER', wardKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
-    return send(res, 402, { error: 'pay_ward', rs: WARD_RS });
+    return send(res, 402, { error: 'pay_ward', rs: wc.rs });
   }
-  // name order (अ–ज्ञ) is bought on its own (WARD_AZ_RS, api/pay.js wardStart with az)
+  // name order (अ–ज्ञ) is bought on its own (wc.azRs, api/pay.js wardStart with az); switched off: only wards already bought in it
   const az = b.all && b.sort === 'az';
-  if (az && !user.demo && !wfree && Number(await redis('SISMEMBER', wardAzKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
-    return send(res, 402, { error: 'pay_az', rs: WARD_AZ_RS });
+  if (az && !user.demo && !(wfree && wc.az) && Number(await redis('SISMEMBER', wardAzKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
+    return wc.az ? send(res, 402, { error: 'pay_az', rs: wc.azRs }) : send(res, 403, { error: 'az_off' });
   }
   if (b.all && user.demo) return send(res, 403, { error: 'no_pdf' });
   const use = await countSearch(req, user, b, named);
@@ -160,7 +161,7 @@ module.exports = route(async (req, res, b) => {
   }
   // marks and the wards paid for, read at the same time (wfree is known already, so not asked again)
   const [results, wp, wz] = await Promise.all([withMarks(v.slug, page, user.cand, user.survey),
-    wfree || wardsPaid(user, v.slug, false), wfree || wardsAz(user, v.slug, false)]);
-  send(res, 200, { total, more, ...(locked ? { locked: true, rs: WARD_RS } : {}), results, wards: load(v.data).wards, perms: user.perms, survey: user.survey,
+    wfree || wardsPaid(user, v.slug, false), wfree && wc.az ? true : wardsAz(user, v.slug, false)]);
+  send(res, 200, { total, more, ...(locked ? { locked: true, rs: wc.rs } : {}), wc, results, wards: load(v.data).wards, perms: user.perms, survey: user.survey,
     wp, wz, ...left });
 });

@@ -83,6 +83,8 @@
 //   action "agent_check", rid      → {sale}   asks Razorpay how it stands (settleOnline): paid → searches added, ₹ to the admin
 //   action "ward_pay", on            → {wardPay}   superadmin: people pay ₹WARD_RS per ward's slips (true) or every ward is
 //                                         free (false) (wardFree in _lib.js); "settings" gives wardPay and wardPayAreas
+//   action "ward_cfg", rs, azRs, az  → {wardCfg}   superadmin: ₹ a ward's slips, ₹ for name order (1–WARD_RS_MAX) and
+//                                         whether name order is sold (wardCfg in _lib.js); "settings" gives wardCfg
 //   action "ward_pay_area", kind ('d' | 's'), key (district | "<district>|<samiti>"), mode ('pay' | 'free' | '')
 //                                      → {wardPayAreas}   superadmin: the same for one ज़िला / पंचायत समिति ('' = as above)
 //   action "ward_pay_user", id, mode ('free' | 'pay' | '') → {user}   superadmin, or an admin with 'wardpay' on a user they look after: that person's own setting (user field
@@ -112,7 +114,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { wardPayOn, wardPayAreas, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, setOwnPassword, badOwnPassword, ownPwHash, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { wardPayOn, wardPayAreas, wardCfg, WARD_RS_MAX, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, setOwnPassword, badOwnPassword, ownPwHash, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // parties (पार्टी): hash "parties", id → JSON {name, icon, created}; icon a small PNG/JPEG data URL made by the admin page
@@ -271,6 +273,13 @@ module.exports = route(async (req, res, b) => {
     await redis('SET', 'wardpay', b.on ? '1' : '0');
     return send(res, 200, { wardPay: await wardPayOn() });
   }
+  if (b.action === 'ward_cfg') {   // superadmin: ward slip prices and whether name order is sold (wardCfg in _lib.js)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const rs = parseInt(b.rs, 10), azRs = parseInt(b.azRs, 10), ok = (n) => n >= 1 && n <= WARD_RS_MAX;
+    if (!ok(rs) || !ok(azRs)) return send(res, 400, { error: 'bad_price' });
+    await redis('HSET', 'wardcfg', 'rs', String(rs), 'azrs', String(azRs), 'az', b.az ? '1' : '0');
+    return send(res, 200, { wardCfg: await wardCfg() });
+  }
   if (b.action === 'ward_pay_area') {   // superadmin: ward slips paid or free in one ज़िला or पंचायत समिति (wardFree in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const ok = b.kind === 'd' ? villageList().some((v) => v.district === b.key) : b.kind === 's' && samitiKeys().includes(b.key);
@@ -396,7 +405,7 @@ module.exports = route(async (req, res, b) => {
     const ws = await Promise.all(all.map(wdSettle));
     const who = new Map((await getUsers([...new Set(ws.map((w) => w.user))])).map((u) => [u.id, u]));
     const wds = ws.map((w) => ({ ...wdView(w), user: w.user, name: (who.get(w.user) || {}).name || '', phone: (who.get(w.user) || {}).phone || '' }));
-    return send(res, 200, { freeRule: free, refRule: ref, coupons, wds, wardPay: await wardPayOn(), wardPayAreas: await wardPayAreas() });
+    return send(res, 200, { freeRule: free, refRule: ref, coupons, wds, wardPay: await wardPayOn(), wardPayAreas: await wardPayAreas(), wardCfg: await wardCfg() });
   }
   if (b.action === 'wd_paid' || b.action === 'wd_back') {   // superadmin: a UPI withdrawal sent by hand, or not sent
     if (!isSuper) return send(res, 403, { error: 'super_only' });

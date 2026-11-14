@@ -12,8 +12,8 @@
 //     → {status: 'open' | 'done' | 'rejected', n, got, bonus, left | bought}   after the checkout (with what it handed
 //     back) or on coming back to the page: the server asks Razorpay (settleOnline in _lib.js). got: searches added
 //     (n + bonus, a coupon's free ones); left / bought: what the person now has.
-//   POST {action: 'start', token, village, ward[, az]} → the same, for ₹WARD_RS: all of that ward's slips (wardStart below;
-//     az: in name order too, ₹WARD_AZ_RS more, or only that for a ward already bought;
+//   POST {action: 'start', token, village, ward[, az]} → the same, for ₹wardCfg().rs (the superadmin's price, else WARD_RS): all of that ward's slips (wardStart below;
+//     az: in name order too, ₹wardCfg().azRs more (403 az_off while the superadmin has name order off), or only that for a ward already bought;
 //     {paid: true} when this login already has them, or doesn't pay); its 'check' answers {status, kind: 'ward', ward}.
 //   POST <Razorpay's webhook: {event: 'order.paid' | 'payment.captured' | 'payment.authorized' | 'qr_code.credited', payload: …}> → {ok}
 //     (qr_code.credited: a UPI QR a village admin made for someone, api/_routes/admin.js "agent_start")
@@ -29,7 +29,7 @@
 //   POST {action: 'wallet_searches', token, village, rs} → {wallet, got, left | bought}   ₹rs of it → rs searches
 //   POST {action: 'wallet_upi', token, village, rs, upi} → {wallet, wd}   ₹rs of it to that UPI ID (from ₹WALLET_MIN,
 //     one open withdrawal at a time, 3 a day); errors: wallet_min, wallet_low, bad_upi, wd_open, too_many, no_wallet
-const { refFor, refBuyer, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, WARD_RS, WARD_AZ_RS, wardKey, wardAzKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isTxnId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
+const { refFor, refBuyer, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdStart, wdSettle, wdsOf, wardCfg, wardKey, wardAzKey, wardFree, village, buyVillage, couponHold, couponFor, couponPrice, PACKS, GATEWAY, payOnline, isTxnId, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, newReqId, getReq, whoIs, canBuy, isPrepaid, creditsLeft, getUser, today, redis, send, route } = require('./_lib.js');
 
 module.exports = route(async (req, res, b) => {
   if (!b.action && typeof b.event === 'string') {   // Razorpay's webhook
@@ -106,12 +106,15 @@ module.exports = route(async (req, res, b) => {
 async function wardStart(req, res, b, me, via) {
   const v = village(b.village), w = parseInt(b.ward, 10), az = !!b.az;
   if (!v || !(w > 0) || !(v.wards || []).map(Number).includes(w)) return send(res, 400, { error: 'no_ward' });
-  if (await wardFree(me, v.slug)) return send(res, 200, { paid: true, az: true });
-  const has = Number(await redis('SISMEMBER', wardKey(me.id, v.slug), String(w))) === 1;
-  const hasAz = has && Number(await redis('SISMEMBER', wardAzKey(me.id, v.slug), String(w))) === 1;
+  const [free, wc] = await Promise.all([wardFree(me, v.slug), wardCfg()]);   // the superadmin's prices and name-order switch
+  const [h, hz] = await Promise.all([redis('SISMEMBER', wardKey(me.id, v.slug), String(w)), redis('SISMEMBER', wardAzKey(me.id, v.slug), String(w))]);
+  const has = Number(h) === 1, boughtAz = Number(hz) === 1;
+  if (az && !wc.az && !boughtAz) return send(res, 403, { error: 'az_off' });   // name order switched off (only wards bought in it keep it)
+  if (free) return send(res, 200, { paid: true, az: wc.az || boughtAz });
+  const hasAz = has && boughtAz;
   if (has && (!az || hasAz)) return send(res, 200, { paid: true, az: hasAz });
   // az: the ward in name order too, ₹WARD_AZ_RS more (only that, for a ward bought before in box order)
-  const rs = (has ? 0 : WARD_RS) + (az ? WARD_AZ_RS : 0);
+  const rs = (has ? 0 : wc.rs) + (az ? wc.azRs : 0);
   const k = `reqs:${me.id}:${today()}`;
   if (await redis('INCR', k) > 20) return send(res, 429, { error: 'too_many' });
   await redis('EXPIRE', k, 86400);
