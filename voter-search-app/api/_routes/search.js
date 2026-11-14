@@ -25,9 +25,12 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, wardCfg, wardKey, wardAzKey, wardFree, wardsPaid, wardsAz, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
+const { DEMO, village, whoIs, wardCfg, wardKey, wardAzKey, wardHnKey, wardFree, wardsPaid, wardsAz, wardsHn, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
 const { load, search, family, publicFields } = require('../_search.js');
 const HI = new Intl.Collator('hi').compare;   // Hindi dictionary order, अ to ज्ञ (a ward's slips in name order)
+// house numbers as numbers (2 before 10, "12" before "12A"); voters with no house number last
+const HOUSE = new Intl.Collator('hi', { numeric: true }).compare;
+const byHouse = (x, y) => { const a = String(x.house || '').trim(), c = String(y.house || '').trim(); return (!a - !c) || HOUSE(a, c); };
 
 const FREE_WARD = 20;   // slips of a ward anyone may list before paying for it
 const PAGE = 10, MAX_NAMED = 250, MAX_FAMILY = 60, PER_MINUTE = 60;   // 10 slips at a time
@@ -119,6 +122,11 @@ module.exports = route(async (req, res, b) => {
   if (az && !user.demo && !(wfree && wc.az) && Number(await redis('SISMEMBER', wardAzKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
     return wc.az ? send(res, 402, { error: 'pay_az', rs: wc.azRs }) : send(res, 403, { error: 'az_off' });
   }
+  // house-number order (मकान नंबर क्रम): the same, wc.hnRs / wc.hn
+  const hn = b.all && b.sort === 'hn';
+  if (hn && !user.demo && !(wfree && wc.hn) && Number(await redis('SISMEMBER', wardHnKey(user.id, v.slug), String(parseInt(b.ward, 10)))) !== 1) {
+    return wc.hn ? send(res, 402, { error: 'pay_hn', rs: wc.hnRs }) : send(res, 403, { error: 'hn_off' });
+  }
   if (b.all && user.demo) return send(res, 403, { error: 'no_pdf' });
   const use = await countSearch(req, user, b, named);
   if (use.error) return send(res, 429, use);
@@ -127,7 +135,8 @@ module.exports = route(async (req, res, b) => {
   // every voter of one ward, in box order, to print or save that ward's slips
   if (b.all) {
     const rows = load(v.data).rows.filter((r) => String(r.ward) === String(b.ward) && !r.del)
-      .sort(az ? (x, y) => HI(x.hname || x.name || '', y.hname || y.name || '') || HI(x.hrel || x.relname || '', y.hrel || y.relname || '') || x.box - y.box : (x, y) => x.box - y.box);
+      .sort(az ? (x, y) => HI(x.hname || x.name || '', y.hname || y.name || '') || HI(x.hrel || x.relname || '', y.hrel || y.relname || '') || x.box - y.box
+        : hn ? (x, y) => byHouse(x, y) || x.box - y.box : (x, y) => x.box - y.box);
     if (!rows.length) return send(res, 404, { error: 'no_ward' });
     return send(res, 200, { total: rows.length, results: rows.map(publicFields), ...left });
   }
@@ -160,8 +169,9 @@ module.exports = route(async (req, res, b) => {
     locked = !open && rest.length > page.length && !more;
   }
   // marks and the wards paid for, read at the same time (wfree is known already, so not asked again)
-  const [results, wp, wz] = await Promise.all([withMarks(v.slug, page, user.cand, user.survey),
-    wfree || wardsPaid(user, v.slug, false), wfree && wc.az ? true : wardsAz(user, v.slug, false)]);
+  const [results, wp, wz, wh] = await Promise.all([withMarks(v.slug, page, user.cand, user.survey),
+    wfree || wardsPaid(user, v.slug, false), wfree && wc.az ? true : wardsAz(user, v.slug, false),
+    wfree && wc.hn ? true : wardsHn(user, v.slug, false)]);
   send(res, 200, { total, more, ...(locked ? { locked: true, rs: wc.rs } : {}), wc, results, wards: load(v.data).wards, perms: user.perms, survey: user.survey,
-    wp, wz, ...left });
+    wp, wz, wh, ...left });
 });

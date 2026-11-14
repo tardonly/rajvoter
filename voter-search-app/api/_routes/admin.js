@@ -83,8 +83,8 @@
 //   action "agent_check", rid      → {sale}   asks Razorpay how it stands (settleOnline): paid → searches added, ₹ to the admin
 //   action "ward_pay", on            → {wardPay}   superadmin: people pay ₹WARD_RS per ward's slips (true) or every ward is
 //                                         free (false) (wardFree in _lib.js); "settings" gives wardPay and wardPayAreas
-//   action "ward_cfg", rs, azRs, az  → {wardCfg}   superadmin: ₹ a ward's slips, ₹ for name order (1–WARD_RS_MAX) and
-//                                         whether name order is sold (wardCfg in _lib.js); "settings" gives wardCfg
+//   action "ward_cfg", rs, azRs, az, hnRs, hn → {wardCfg}   superadmin: ₹ a ward's slips, ₹ for name order and for
+//                                         house-number order (1–WARD_RS_MAX), and whether each order is sold (wardCfg in _lib.js); "settings" gives wardCfg
 //   action "ward_pay_area", kind ('d' | 's'), key (district | "<district>|<samiti>"), mode ('pay' | 'free' | '')
 //                                      → {wardPayAreas}   superadmin: the same for one ज़िला / पंचायत समिति ('' = as above)
 //   action "ward_pay_user", id, mode ('free' | 'pay' | '') → {user}   superadmin, or an admin with 'wardpay' on a user they look after: that person's own setting (user field
@@ -273,11 +273,11 @@ module.exports = route(async (req, res, b) => {
     await redis('SET', 'wardpay', b.on ? '1' : '0');
     return send(res, 200, { wardPay: await wardPayOn() });
   }
-  if (b.action === 'ward_cfg') {   // superadmin: ward slip prices and whether name order is sold (wardCfg in _lib.js)
+  if (b.action === 'ward_cfg') {   // superadmin: ward slip prices and whether name / house-number order is sold (wardCfg in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
-    const rs = parseInt(b.rs, 10), azRs = parseInt(b.azRs, 10), ok = (n) => n >= 1 && n <= WARD_RS_MAX;
-    if (!ok(rs) || !ok(azRs)) return send(res, 400, { error: 'bad_price' });
-    await redis('HSET', 'wardcfg', 'rs', String(rs), 'azrs', String(azRs), 'az', b.az ? '1' : '0');
+    const rs = parseInt(b.rs, 10), azRs = parseInt(b.azRs, 10), hnRs = parseInt(b.hnRs, 10), ok = (n) => n >= 1 && n <= WARD_RS_MAX;
+    if (!ok(rs) || !ok(azRs) || !ok(hnRs)) return send(res, 400, { error: 'bad_price' });
+    await redis('HSET', 'wardcfg', 'rs', String(rs), 'azrs', String(azRs), 'az', b.az ? '1' : '0', 'hnrs', String(hnRs), 'hn', b.hn ? '1' : '0');
     return send(res, 200, { wardCfg: await wardCfg() });
   }
   if (b.action === 'ward_pay_area') {   // superadmin: ward slips paid or free in one ज़िला or पंचायत समिति (wardFree in _lib.js)
