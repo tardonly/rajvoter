@@ -443,6 +443,18 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   .ftree .eq { color: #be185d; font-weight: 700; }
   .ftree .falone { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line); font-size: 14px; }
   .ftree .fnote { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  /* a tap on a slip opens it big (slipPopOpen), as it will print, to send on WhatsApp or save as a photo */
+  .slip.tap { cursor: pointer; }
+  #slipPop .card { max-width: 480px; }
+  #spBody .slip { margin: 0; font-size: 16px; }
+  #spBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  #spBtns:empty { display: none; }
+  #spBtns button { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 6px; font-size: 15px; font-weight: 600; color: var(--ink); }
+  #spBtns .wa { background: #1fa855; border-color: #1fa855; color: #fff; }
+  #spBtns button:disabled { opacity: .5; }
+  .spnav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .spnav button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 12px; font-size: 14px; color: var(--ink); }
+  .spnav button:disabled { visibility: hidden; }
   .slip.flash { animation: flash 1.4s ease-out; }
   @keyframes flash { 0% { box-shadow: 0 0 0 4px #22c55e; } 100% { box-shadow: 0 0 0 4px transparent; } }
   .slip .bar small { font-weight: 400; font-size: 12px; margin-left: 8px; opacity: .9; }
@@ -782,6 +794,16 @@ electionBanner();
   <div class="card">
     <div class="head"><h2>वार्ड पर्चियाँ (PDF)</h2><button id="slipsClose" type="button" aria-label="बंद करें">✕</button></div>
     <div id="slipsBody"></div>
+  </div>
+</div>
+
+<div id="slipPop" class="progpop hidden" role="dialog" aria-label="पर्ची">
+  <div class="card">
+    <div class="head"><h2 id="spTitle"></h2><button id="spClose" type="button" aria-label="बंद करें">✕</button></div>
+    <div id="spBody"></div>
+    <div id="spBtns"></div>
+    <div id="spNote" class="note"></div>
+    <div class="spnav"><button id="spPrev" type="button"></button><span id="spSwipe"></span><button id="spNext" type="button"></button></div>
   </div>
 </div>
 
@@ -1458,8 +1480,18 @@ function kv(label, value) { const f = document.createDocumentFragment(); f.appen
 const DELETED = EN ? { E: 'death', S: 'shifted', R: 'repeated', O: 'other reason' } : { E: 'मृत्यु', S: 'स्थानांतरित', R: 'दोहराव', O: 'अन्य कारण' };   // O is not in the list's legend; X: no reason known
 
 // One slip. forPrint leaves out the buttons and the mark; inFamily leaves out the परिवार button.
-function slip(r, forPrint, inFamily) {
+// what a slip says, worked out once for the slip on screen and for its picture (slipCanvas)
+function slipFields(r) {
   const [bhag, ...rest] = String(r.kendra || '').split('-');
+  const [ps, zp] = (VILLAGE.seats || {})[r.ward] || [VILLAGE.ps, VILLAGE.zp];   // some wards have other numbers
+  // in English the English spelling comes first and the Hindi one beside it (each falls back on the other)
+  const [nm1, nm2] = EN ? [r.name || r.hname, r.name ? r.hname : ''] : [r.hname, r.name];
+  const [rl1, rl2] = EN ? [r.relname || r.hrel, r.relname ? r.hrel : ''] : [r.hrel, r.relname];
+  return { ps, zp, booth: bhag.trim(), kendra: rest.join('-').trim(), nm1, nm2, rl1, rl2,
+    relKey: L(`${r.rel} का नाम: `, `${relWord(r.rel)}'s name: `) };
+}
+function slip(r, forPrint, inFamily) {
+  const f = slipFields(r);
   const d = el('div', 'slip');
   if (!forPrint && !r.del) d.dataset.key = `${r.ward}:${r.box}`;
   const head = el('div', 'head');
@@ -1476,28 +1508,24 @@ function slip(r, forPrint, inFamily) {
   }
   head.append(tools);
   const meta = el('div', 'meta');
-  const [ps, zp] = (VILLAGE.seats || {})[r.ward] || [VILLAGE.ps, VILLAGE.zp];   // some wards have other numbers
-  const m1 = el('div'); m1.append(el('span', null, `${L('पं.सं.', 'P.S.')} ${ps}`), el('span', null, `${L('जि.प.', 'Z.P.')} ${zp}`));
-  const m2 = el('div'); m2.append(el('span', null, `${L('वार्ड नं. :', 'Ward no.:')} ${r.ward}`), el('span', null, `${L('बूथ सं.', 'Booth no.')} ${bhag.trim()}`));
+  const m1 = el('div'); m1.append(el('span', null, `${L('पं.सं.', 'P.S.')} ${f.ps}`), el('span', null, `${L('जि.प.', 'Z.P.')} ${f.zp}`));
+  const m2 = el('div'); m2.append(el('span', null, `${L('वार्ड नं. :', 'Ward no.:')} ${r.ward}`), el('span', null, `${L('बूथ सं.', 'Booth no.')} ${f.booth}`));
   meta.append(m1, m2); head.append(meta);
 
   const idl = el('div', 'idline');
   idl.append(el('div', 'boxno', r.box), r.epic ? el('div', 'epic', r.epic) : el('div', 'epic none', L('Voter ID नहीं', 'No Voter ID')));
 
   const l1 = el('div', 'line');
-  // in English the English spelling comes first and the Hindi one beside it (each falls back on the other)
-  const [nm1, nm2] = EN ? [r.name || r.hname, r.name ? r.hname : ''] : [r.hname, r.name];
-  const [rl1, rl2] = EN ? [r.relname || r.hrel, r.relname ? r.hrel : ''] : [r.hrel, r.relname];
-  const n = el('div'); n.append(el('span', 'k', L('नाम: ', 'Name: ')), el('b', null, nm1), el('span', 'en', nm2));
+  const n = el('div'); n.append(el('span', 'k', L('नाम: ', 'Name: ')), el('b', null, f.nm1), el('span', 'en', f.nm2));
   const h = el('div', 'r'); h.append(kv(L('मकान संख्या:', 'House no.:'), r.house || '—'));
   l1.append(n, h);
 
   const l2 = el('div', 'line');
-  const p = el('div'); p.append(el('span', 'k', L(`${r.rel} का नाम: `, `${relWord(r.rel)}'s name: `)), el('b', null, rl1), el('span', 'en', rl2));
+  const p = el('div'); p.append(el('span', 'k', f.relKey), el('b', null, f.rl1), el('span', 'en', f.rl2));
   const ag = el('div', 'r'); ag.append(kv(L('आयु:', 'Age:'), r.age)); const g = el('span', 'g'); g.append(kv(L('लिंग:', 'Gender:'), sexWord(r.sex))); ag.append(g);
   l2.append(p, ag);
 
-  const k = el('div', 'kendra'); k.append(L('मतदान केन्द्र : ', 'Polling station: '), el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
+  const k = el('div', 'kendra'); k.append(L('मतदान केन्द्र : ', 'Polling station: '), el('b', null, f.booth), ` - ${f.kendra}`);
   d.append(head, idl, l1, l2, k, el('div', 'time', pollTime()));
   if (forPrint) { if (POSTER.top) d.prepend(posterImg(POSTER.top, 'ptop'), posterCut()); return d; }
   if (r.del) {
@@ -1507,6 +1535,8 @@ function slip(r, forPrint, inFamily) {
   }
 
   d.prepend(el('div', 'bar'));
+  d.slipRow = r; d.classList.add('tap');   // a tap on the slip (not on its buttons) opens it big: slipPopOpen
+  d.addEventListener('click', (e) => { if (!e.target.closest('button, a, input, select') && !getSelection().toString()) slipPopOpen(d); });
   if (can('mark')) {   // admins, and users their admin allowed to mark; everyone sees the bar
     const row = el('div', 'marks');
     for (const m of Object.keys(MARKS)) {
@@ -2150,6 +2180,180 @@ function slipsOpen() {
 }
 $('slipsBtn').addEventListener('click', slipsOpen);
 $('slipsClose').addEventListener('click', () => $('slipsPop').classList.add('hidden'));
+
+// ---------- one slip big: a tap on a slip in the results (or in a family) shows it as it will print, with buttons to send
+// it on WhatsApp or save it as a photo (both a PNG drawn by slipCanvas), print it, open the family, and ‹ › / a swipe
+// through the slips around it. The phone's back button closes it.
+let spList = [], spAt = 0, spBack = false;
+async function slipPopOpen(d) {
+  spList = [...d.parentElement.children].filter((x) => x.slipRow);   // the results, or the family, it was opened from
+  spAt = Math.max(0, spList.indexOf(d));
+  $('slipPop').classList.remove('hidden');
+  if (!spBack) { history.scrollRestoration = 'manual'; history.pushState({ slipPop: 1 }, ''); spBack = true; }   // closing must not scroll the page back
+  slipPopShow();
+  if (posterOk() && !POSTER.top) { await posterLoad(); if (POSTER.top && spList.length) slipPopShow(); }   // the poster on top once it is here
+}
+function slipPopShow() {
+  const d = spList[spAt], r = d.slipRow;
+  $('spTitle').textContent = `${L('पर्ची', 'Slip')} · ${spAt + 1} / ${spList.length}`;
+  $('spBody').replaceChildren(slip(r, true));
+  $('spNote').textContent = '';
+  const btns = [];
+  const btn = (cls, text, go) => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', go); btns.push(b); return b; };
+  if (can('print')) {
+    btn('wa', L('व्हाट्सऐप भेजें', 'Send on WhatsApp'), (e) => slipPhoto(r, true, e.currentTarget));
+    btn(null, L('⬇ फ़ोटो सेव', '⬇ Save photo'), (e) => slipPhoto(r, false, e.currentTarget));
+    btn(null, L('प्रिंट / PDF', 'Print / PDF'), () => d.querySelector('.pbtn').click());
+  }
+  const fam = d.querySelector('.fam');
+  if (fam) btn(null, fam.classList.contains('on') ? L('परिवार छुपाएं', 'Hide family') : L('परिवार खोलें', 'Open family'), () => {
+    slipPopClose(); fam.click(); d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('spBtns').replaceChildren(...btns);
+  $('spPrev').textContent = L('‹ पिछली', '‹ Previous'); $('spNext').textContent = L('अगली ›', 'Next ›');
+  $('spPrev').disabled = spAt === 0; $('spNext').disabled = spAt >= spList.length - 1;
+  $('spSwipe').textContent = spList.length > 1 ? L('स्वाइप करें', 'Swipe') : '';
+}
+function slipPopStep(by) {
+  const to = spAt + by;
+  if (to < 0 || to >= spList.length) return;
+  spAt = to; slipPopShow();
+}
+function slipPopClose() {
+  if ($('slipPop').classList.contains('hidden')) return;
+  $('slipPop').classList.add('hidden');
+  spList = [];
+  if (spBack) { spBack = false; history.back(); }
+}
+window.addEventListener('popstate', () => { if (spBack) { spBack = false; slipPopClose(); } });
+$('spClose').addEventListener('click', slipPopClose);
+$('spPrev').addEventListener('click', () => slipPopStep(-1));
+$('spNext').addEventListener('click', () => slipPopStep(1));
+$('slipPop').addEventListener('click', (e) => { if (e.target === $('slipPop')) slipPopClose(); });
+document.addEventListener('keydown', (e) => {
+  if ($('slipPop').classList.contains('hidden')) return;
+  if (e.key === 'Escape') slipPopClose();
+  else if (e.key === 'ArrowLeft') slipPopStep(-1);
+  else if (e.key === 'ArrowRight') slipPopStep(1);
+});
+{
+  let x0 = null, y0 = 0;
+  $('spBody').addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  $('spBody').addEventListener('touchend', (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) slipPopStep(dx < 0 ? 1 : -1);
+  });
+}
+
+// the slip as a picture: the share sheet with WhatsApp (phones), else a PNG download to send from WhatsApp by hand
+async function slipPhoto(r, share, b) {
+  b.disabled = true;
+  try {
+    const c = await slipCanvas(r);
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+    if (!blob) throw new Error('no picture');
+    const file = new File([blob], `parchi-ward-${r.ward}-box-${r.box}.png`, { type: 'image/png' });
+    if (share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return; } catch (e) {
+        if (e.name === 'AbortError') return;
+        if (e.name === 'NotAllowedError') { $('spNote').textContent = L('फ़ोटो तैयार है — बटन एक बार फिर दबाएं।', 'The photo is ready — press the button once more.'); return; }
+      }
+    }
+    const a = el('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    $('spNote').textContent = share ? L('फ़ोटो डाउनलोड हो गई — WhatsApp में 📎 से भेजें।', 'The photo is downloaded — send it from WhatsApp with 📎.')
+      : L('फ़ोटो डाउनलोड हो गई।', 'The photo is downloaded.');
+  } catch (e) {
+    $('spNote').textContent = L('फ़ोटो नहीं बन पाई — प्रिंट / PDF से भेजें।', 'Could not make the photo — use Print / PDF.');
+  } finally { b.disabled = false; }
+}
+// draw the printed slip (slip(r, true): the poster, the cut line, the slip) on a canvas, 600 px wide at twice the pixels
+async function slipCanvas(r) {
+  const f = slipFields(r), W = 600, P = 12, S = 2;
+  const font = getComputedStyle(document.body).fontFamily;
+  const pink = getComputedStyle(document.documentElement).getPropertyValue('--pink').trim() || '#e0245e';
+  const fnt = (px, bold, fam) => `${bold ? '700 ' : ''}${px}px ${fam || font}`;
+  let poster = null;
+  if (POSTER.top) {
+    poster = new Image();
+    const ready = new Promise((ok, no) => { poster.onload = ok; poster.onerror = no; });
+    poster.src = POSTER.top;
+    await Promise.race([ready, new Promise((ok, no) => setTimeout(no, 8000))]).catch(() => { poster = null; });
+  }
+  const ph = poster ? Math.min(Math.round(W * poster.naturalHeight / poster.naturalWidth), Math.round(W * 52 / 94)) : 0;
+  const m = document.createElement('canvas').getContext('2d');
+  // the polling station may need two or three lines
+  const wrap = (text, px, width) => {
+    m.font = fnt(px); const lines = []; let line = '';
+    for (const w of text.split(' ')) {
+      const t = line ? `${line} ${w}` : w;
+      if (line && m.measureText(t).width > width) { lines.push(line); line = w; } else line = t;
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const kLines = wrap(`${L('मतदान केन्द्र : ', 'Polling station: ')}${f.booth} - ${f.kendra}`, 17, W - 2 * P);
+  const cutH = poster ? 40 : 0, headH = 52, idH = 54, lineH = 40, kH = kLines.length * 24 + 12, tH = 30;
+  const H = ph + cutH + headH + idH + 2 * lineH + kH + tH;
+  const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+  const x = c.getContext('2d'); x.scale(S, S);
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#111'; x.textBaseline = 'middle';
+  let y = 0;
+  if (poster) {
+    const pw = Math.min(W, Math.round(ph * poster.naturalWidth / poster.naturalHeight));
+    x.drawImage(poster, (W - pw) / 2, 0, pw, ph); y = ph;
+    x.font = fnt(14); const cut = `✂ ${L('यहाँ से काटें · पोस्टर बूथ में ले जाना मना है', 'Cut here · no posters inside the booth')}`;
+    const tw = x.measureText(cut).width, mid = y + cutH / 2;
+    x.setLineDash([7, 5]); x.lineWidth = 2;
+    x.beginPath(); x.moveTo(P, mid); x.lineTo((W - tw) / 2 - 8, mid); x.moveTo((W + tw) / 2 + 8, mid); x.lineTo(W - P, mid); x.stroke();
+    x.setLineDash([]); x.textAlign = 'center'; x.fillText(cut, W / 2, mid);
+    y += cutH;
+  }
+  const top = y;
+  // right: पं.सं. / जि.प., वार्ड / बूथ
+  x.textAlign = 'right'; x.font = fnt(15);
+  x.fillText(`${L('पं.सं.', 'P.S.')} ${f.ps}    ${L('जि.प.', 'Z.P.')} ${f.zp}`, W - P, y + 15);
+  x.fillText(`${L('वार्ड नं. :', 'Ward no.:')} ${r.ward}    ${L('बूथ सं.', 'Booth no.')} ${f.booth}`, W - P, y + 37);
+  y += headH;
+  // the box number in its square, then the Voter ID
+  x.textAlign = 'left'; x.font = fnt(24, true);
+  const bw = Math.max(56, x.measureText(String(r.box)).width + 16);
+  x.lineWidth = 2; x.strokeRect(P, y + 6, bw, idH - 12);
+  x.textAlign = 'center'; x.fillText(String(r.box), P + bw / 2, y + idH / 2);
+  x.textAlign = 'left';
+  if (r.epic) { x.font = fnt(30, true, 'Arial, Helvetica, sans-serif'); x.fillText(r.epic, P + bw + 14, y + idH / 2, W - 2 * P - bw - 14); }
+  else { x.fillStyle = '#666'; x.font = fnt(16); x.fillText(L('Voter ID नहीं', 'No Voter ID'), P + bw + 14, y + idH / 2); x.fillStyle = '#111'; }
+  y += idH;
+  // a line: key, name in bold, the other spelling small, and on the right its numbers; a long name is squeezed to fit
+  const line = (key, b1, b2, right) => {
+    const mid = y + lineH / 2;
+    x.textAlign = 'right'; x.font = fnt(16); const rw = x.measureText(right).width;
+    x.fillText(right, W - P, mid);
+    x.textAlign = 'left'; x.font = fnt(16, true); const kw = x.measureText(key).width;
+    x.fillText(key, P, mid);
+    const room = W - 2 * P - rw - kw - 14;
+    x.font = fnt(21, true); const nw = Math.min(room, x.measureText(b1).width);
+    x.fillText(b1, P + kw, mid, room);
+    if (b2 && room - nw > 40) { x.fillStyle = '#666'; x.font = fnt(14); x.fillText(b2, P + kw + nw + 6, mid, room - nw - 6); x.fillStyle = '#111'; }
+    y += lineH;
+  };
+  line(L('नाम: ', 'Name: '), f.nm1 || '', f.nm2 || '', `${L('मकान संख्या:', 'House no.:')} ${r.house || '—'}`);
+  line(f.relKey, f.rl1 || '', f.rl2 || '', `${L('आयु:', 'Age:')} ${r.age}   ${L('लिंग:', 'Gender:')} ${sexWord(r.sex)}`);
+  // the polling station under a rule, then the pink polling-time bar
+  x.lineWidth = 1.5; x.beginPath(); x.moveTo(P / 2, y + 4); x.lineTo(W - P / 2, y + 4); x.stroke();
+  x.textAlign = 'center'; x.font = fnt(17);
+  kLines.forEach((t, i) => x.fillText(t, W / 2, y + 18 + i * 24));
+  y += kH;
+  x.fillStyle = pink; x.fillRect(0, y, W, tH);
+  x.fillStyle = '#fff'; x.font = fnt(15); x.fillText(pollTime() || '', W / 2, y + tH / 2);
+  // the slip's border, as on paper
+  x.strokeStyle = '#222'; x.lineWidth = 3; x.strokeRect(1.5, top + 1.5, W - 3, H - top - 3);
+  return c;
+}
 $('slipsPop').addEventListener('click', (e) => { if (e.target === $('slipsPop')) $('slipsPop').classList.add('hidden'); });
 // the choice of order: 'buy' → box order ₹WARD_RS, with name order and / or house-number order on top (each its own
 // price, offered while the superadmin has it on), then the payment; 'get' (an extra order bought) → which order to download in
