@@ -459,9 +459,8 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   #spBtns button { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 6px; font-size: 15px; font-weight: 600; color: var(--ink); }
   #spBtns .wa { background: #1fa855; border-color: #1fa855; color: #fff; }
   #spBtns button:disabled { opacity: .5; }
-  .spnav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
-  .spnav button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 12px; font-size: 14px; color: var(--ink); }
-  .spnav button:disabled { visibility: hidden; }
+  .spnav { text-align: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .spnav:empty { display: none; }
   .slip.flash { animation: flash 1.4s ease-out; }
   @keyframes flash { 0% { box-shadow: 0 0 0 4px #22c55e; } 100% { box-shadow: 0 0 0 4px transparent; } }
   .slip .bar small { font-weight: 400; font-size: 12px; margin-left: 8px; opacity: .9; }
@@ -873,7 +872,7 @@ electionBanner();
     <div id="spBody"></div>
     <div id="spBtns"></div>
     <div id="spNote" class="note"></div>
-    <div class="spnav"><button id="spPrev" type="button"></button><span id="spSwipe"></span><button id="spNext" type="button"></button></div>
+    <div id="spSwipe" class="spnav"></div>
   </div>
 </div>
 
@@ -2600,9 +2599,7 @@ function slipPopShow() {
     slipPopClose(); fam.click(); d.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   $('spBtns').replaceChildren(...btns);
-  $('spPrev').textContent = L('‹ पिछली', '‹ Previous'); $('spNext').textContent = L('अगली ›', 'Next ›');
-  $('spPrev').disabled = spAt === 0; $('spNext').disabled = spAt >= spList.length - 1;
-  $('spSwipe').textContent = spList.length > 1 ? L('स्वाइप करें', 'Swipe') : '';
+  $('spSwipe').textContent = spList.length > 1 ? L('‹ स्वाइप करें ›', '‹ Swipe ›') : '';
 }
 // the track's place: the current slip at the left edge (the one before it off screen), moved dx pixels by a drag
 function spStep() { const c = $('spBody').querySelector('.spcell'); return c ? c.getBoundingClientRect().width + 14 : 0; }
@@ -2635,8 +2632,6 @@ function slipPopClose() {
 }
 window.addEventListener('popstate', () => { if (spBack) { spBack = false; slipPopClose(); } });
 $('spClose').addEventListener('click', slipPopClose);
-$('spPrev').addEventListener('click', () => slipPopStep(-1));
-$('spNext').addEventListener('click', () => slipPopStep(1));
 $('slipPop').addEventListener('click', (e) => { if (e.target === $('slipPop')) slipPopClose(); });
 document.addEventListener('keydown', (e) => {
   if ($('slipPop').classList.contains('hidden')) return;
