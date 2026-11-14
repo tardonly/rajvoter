@@ -628,6 +628,13 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   .pmake .pmsw button.on { border-color: #111; outline: 2px solid #fff; outline-offset: -5px; }
   .pmake canvas { display: block; width: 100%; height: auto; border-radius: 8px; touch-action: none; cursor: grab; background: #ddd; }
   .pmake input[type=range] { flex: 1; min-width: 120px; }
+  .pmake .pmzoom { margin-top: 10px; padding-top: 14px; border-top: 2px dashed #fcd34d; display: grid; gap: 8px; }
+  .pmake .pmzoom .pmrow { flex-wrap: nowrap; gap: 12px; }
+  .pmake .pmzoom .zl { font-size: 18px; font-weight: 800; color: #78350f; white-space: nowrap; }
+  .pmake .pmzoom input[type=range] { -webkit-appearance: none; appearance: none; height: 12px; border-radius: 999px; background: #fed7aa; margin: 14px 0; }
+  .pmake .pmzoom input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 34px; height: 34px; border-radius: 50%; background: #ea580c; border: 4px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .pmake .pmzoom input[type=range]::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #ea580c; border: 4px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .pmake .pmzoom .zh { font-size: 15px; font-weight: 700; color: #92400e; }
 
   /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page.
      The sizes sit outside @media print so printSlips() can lay the slips out off screen (#printArea.measure) and
@@ -2270,7 +2277,8 @@ function pmForm(body) {
   const zoom = el('input'); zoom.type = 'range'; zoom.min = '1'; zoom.max = '4'; zoom.step = '0.05'; zoom.value = PM.zoom;
   zoom.setAttribute('aria-label', L('फोटो छोटी-बड़ी', 'Photo zoom'));
   zoom.addEventListener('input', () => { PM.zoom = +zoom.value; draw(); });
-  const zrow = el('div', 'pmrow'); zrow.append(el('span', 'pk', L('🔍 फोटो', '🔍 Photo')), zoom);
+  const zrow = el('div', 'pmzoom'), zr = el('div', 'pmrow'); zr.append(el('span', 'zl', L('🔍 फोटो', '🔍 Photo')), zoom);
+  zrow.append(zr, el('div', 'zh', L('चेहरा बीच में लाने के लिए पोस्टर पर फोटो को खिसकाएँ', 'Drag on a poster to centre the face')));
   const drag = (c, faceD) => {
     let last = null;
     c.addEventListener('pointerdown', (e) => { if (!PM.img) return; last = [e.clientX, e.clientY]; c.setPointerCapture(e.pointerId); });
@@ -2303,7 +2311,7 @@ function pmForm(body) {
   shut.addEventListener('click', () => { PM.open = false; posterDraw(); $('pmake').scrollIntoView({ block: 'nearest' }); });
   const end = el('div', 'pmrow'); end.append(shut);
   box.append(h, f, el('div', 'ph', L('रंग चुनें', 'Pick a colour')), sw,
-    PM.img ? zrow : '', el('div', 'pk', PM.img ? L('चेहरा बीच में लाने के लिए पोस्टर पर फोटो को खिसकाएँ', 'Drag on a poster to centre the face') : ''),
+    PM.img ? zrow : '',
     el('div', 'ph', L('पर्ची पोस्टर (1200 × 240)', 'Slip poster (1200 × 240)')), top, acts(top, 'top'),
     el('div', 'ph', L('PDF पोस्टर (1600 × 534)', 'PDF poster (1600 × 534)')), big, acts(big, 'big'), end);
   pmDrawTop(top); pmDrawBig(big);
