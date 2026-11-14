@@ -2880,22 +2880,37 @@ function freeSteps(rule) {
     `The first ${people} people of each village get ${searches} free searches` + (rest.length ? `, the next ${people} get ${rest[0]}` + rest.slice(1).map((s) => `, then ${s}`).join('') : ''));
 }
 // The start page asks for the पंचायत समिति first, then the village in it; a village page is that village.
-let signList = null;
 const samitiOf = (v) => `${v.district || ''}|${v.panchayatSamiti || ''}`;
-async function allVillages() {
-  if (!signList) { const info = await api('signup', { action: 'info' }); if (info.villages) signList = info.villages; }
-  return signList || [];
+// the district names, and one district's villages (with their samitis), from api/places.js: plain GETs that Vercel's CDN
+// and the phone keep (half an hour on the phone), so the picker opens without waiting on the server. Asked once per page.
+const placesAsked = {};
+function places(d = '') {
+  if (!placesAsked[d]) {
+    placesAsked[d] = fetch(`/api/places${d ? `?d=${encodeURIComponent(d)}` : ''}`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    placesAsked[d].then((r) => { if (!r.districts && !r.villages) delete placesAsked[d]; });   // failed: ask again next time
+  }
+  return placesAsked[d];
 }
-// three selects: the ज़िला, then the पंचायत समितियाँ of that district, then the villages of that samiti
-function villagePicker(ds, ps, sel, list) {
-  const dist = (v) => v.district || '-';
+// three selects: the ज़िला, then the पंचायत समितियाँ of that district, then the villages of that samiti (skip: a village
+// to leave out, the one a login moves away from)
+async function villagePicker(ds, ps, sel, skip = '') {
+  let list = [];
   ds.replaceChildren(new Option(L('अपना ज़िला चुनें', 'Choose your district'), ''));
-  for (const d of [...new Set(list.map(dist))].sort((a, b) => a.localeCompare(b, LOCALE))) ds.add(new Option(d === '-' ? L('अन्य', 'Other') : d, d));
-  const distPicked = () => {
+  const { districts } = await places();
+  if (!districts) ds.options[0].text = L('ज़िले नहीं खुले — इंटरनेट देखकर फिर खोलें', 'Could not load the districts — check the internet and open again');
+  for (const d of [...(districts || [])].sort((a, b) => a.localeCompare(b, LOCALE))) ds.add(new Option(d === '-' ? L('अन्य', 'Other') : d, d));
+  const distPicked = async () => {
     const d = ds.value, samitis = new Map();
-    for (const v of d ? list.filter((v) => dist(v) === d) : []) if (!samitis.has(samitiOf(v))) samitis.set(samitiOf(v), v);
-    ps.replaceChildren(new Option(d ? L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti') : L('पहले ज़िला चुनें', 'First choose the district'), ''));
-    ps.disabled = !d;
+    ps.replaceChildren(new Option(d ? L('पंचायत समितियाँ खुल रही हैं…', 'Loading the panchayat samitis…') : L('पहले ज़िला चुनें', 'First choose the district'), ''));
+    ps.disabled = true; list = [];
+    picked(true);
+    if (!d) return;
+    const r = await places(d);
+    if (ds.value !== d) return;   // another district was chosen meanwhile
+    list = (r.villages || []).filter((v) => v.slug !== skip);
+    for (const v of list) if (!samitis.has(samitiOf(v))) samitis.set(samitiOf(v), v);
+    ps.replaceChildren(new Option(r.villages ? L('अपनी पंचायत समिति चुनें', 'Choose your panchayat samiti') : L('नहीं खुलीं — ज़िला फिर से चुनें', 'Could not load — choose the district again'), ''));
+    ps.disabled = !r.villages;
     for (const [k, v] of [...samitis].sort((a, b) => String(a[1].panchayatSamiti || '').localeCompare(String(b[1].panchayatSamiti || ''), LOCALE))) {
       ps.add(new Option(v.panchayatSamiti || L('अन्य', 'Other'), k));
     }
@@ -2917,7 +2932,8 @@ async function signVillages() {   // the start page asks which village; a villag
   const ps = $('signSamiti');
   for (const id of ['signDistrict', 'signSamiti', 'signVillage']) $(id).classList.toggle('hidden', !HOME);
   if (!HOME || ps.options.length) return;
-  villagePicker($('signDistrict'), ps, $('signVillage'), await allVillages());
+  ps.add(new Option(L('पहले ज़िला चुनें', 'First choose the district'), ''));   // filled: not set up twice
+  villagePicker($('signDistrict'), ps, $('signVillage'));
 }
 
 // A signed-up login that picked the wrong village moves itself to another one (api/signup.js 'move'): its password and
@@ -2927,7 +2943,7 @@ async function moveOpen(from, tok) {
   const msg = el('div', 'k'), back = el('button', 'buyback', L('← रहने दें', '← Never mind'));
   go.type = back.type = 'button';
   ds.setAttribute('aria-label', L('ज़िला', 'District')); ps.setAttribute('aria-label', L('पंचायत समिति', 'Panchayat samiti')); sel.setAttribute('aria-label', L('गाँव', 'Village'));
-  const now = (signList || []).find((v) => v.slug === from);
+  const now = VILLAGE && VILLAGE.slug === from ? VILLAGE : null;
   box.append(el('b', null, L(`अभी आपका गाँव: ${now ? vn(now) : from}`, `Your village now: ${now ? vn(now) : from}`)), ds, ps, sel, go, msg,
     el('div', 'k', L(`आपका पासवर्ड और सर्च साथ जाएंगी। गाँव ${MOVES_LEFT} बार और बदल सकते हैं, उसके बाद अपने एडमिन से कहें।`,
       `Your password and searches go along. You can change the village ${MOVES_LEFT} more time${MOVES_LEFT === 1 ? '' : 's'}; after that ask your admin.`)), back);
@@ -2949,7 +2965,7 @@ async function moveOpen(from, tok) {
   $('buyNote').textContent = '';
   $('buyBody').replaceChildren(box);
   $('buyPop').classList.remove('hidden');
-  villagePicker(ds, ps, sel, (await allVillages()).filter((v) => v.slug !== from));
+  villagePicker(ds, ps, sel, from);
 }
 let moveBack = null;   // after signing up: ← रहने दें goes back to the new password
 // 🔑 पासवर्ड बदलें: the person chooses a new password (api/signup.js 'password'); this phone stays logged in
