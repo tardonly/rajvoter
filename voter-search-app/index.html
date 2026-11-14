@@ -672,7 +672,7 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   @media print {
     @page { size: A4; margin: 8mm; }
     html, body { background: #fff; }
-    body > section, .footer, .fabinstall, .topelec { display: none !important; }
+    body > :not(#printArea) { display: none !important; }   /* an open popup (पर्ची, ward slips) must not print over the slips */
     #printArea { display: block; }
   }
 </style>
