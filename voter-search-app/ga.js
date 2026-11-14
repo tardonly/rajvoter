@@ -1,7 +1,7 @@
 // Google Analytics (GA4) and Google Tag Manager, on every page. index.html, promo and the landing page load this with
 // "defer" (it never holds up the first paint); admin.html does not load it (admins are not tracked).
 // Page views: one per page load, sent by gtag's config. The address goes without its ?query (a ?ref= holds a user id).
-// App actions: the pages call track(name, params) for every request to the server (search, signup, pay, mark…), with
+// App actions: the pages call track(name, params) for the requests that matter (search, signup, pay, mark…; NO_TRACK in index.html), with
 // only the action, the village and the result — never a name, phone number, password or what was searched for.
 // Each action goes to GA4 directly (when GA_ID is set) and to the dataLayer as event "app_action", so a Tag Manager
 // trigger on that event can use them too.

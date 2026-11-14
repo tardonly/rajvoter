@@ -1018,11 +1018,16 @@ function noGa(v) {
   try { if (v) localStorage.setItem('noga', '1'); else localStorage.removeItem('noga'); } catch (e) {}
   if (window.gaOff) window.gaOff(v);
 }
+// requests not sent to analytics: background loads and refreshes the app makes by itself (marks, check, info, coupons,
+// poster, wallet, invite-code check), the report and list loads, further pages of a search, and account housekeeping
+const NO_TRACK = new Set(['marks', 'check', 'info', 'signup_coupons', 'poster', 'progress', 'search_more', 'logout',
+  'signup_password', 'signup_move', 'signup_otp', 'signup_reset', 'pay_wallet', 'pay_ref_check']);
 // every request as an analytics event (ga.js): what was done, in which village, and how it went — nothing personal
 function apiTrack(path, p, r) {
-  if (path === 'marks' || !window.track) return;   // marks: the slips' own refresh, not something the user did
+  if (!window.track) return;
   const name = path === 'search' ? (p.family ? 'family' : p.all ? 'ward_slips' : p.offset ? 'search_more' : 'search')
     : p.action ? `${path}_${p.action}` : path;
+  if (NO_TRACK.has(name)) return;
   const params = { village: SLUG || 'home', result: r.error || 'ok', demo: DEMO ? 'yes' : 'no' };
   if (p.mark !== undefined) params.mark = p.mark || 'clear';
   if (p.n) params.pack = p.n;
