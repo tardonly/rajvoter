@@ -53,6 +53,9 @@
   .anote textarea { width: 100%; min-height: 44px; box-sizing: border-box; font: inherit; font-size: 13.5px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fffbe6; resize: vertical; }
   .anote .notemsg { font-size: 12px; color: var(--muted); min-height: 14px; }
   .phone button { margin-left: 8px; padding: 2px 8px; font-size: 12.5px; border-radius: 6px; border: 1px solid var(--line); background: #fff; color: var(--accent); }
+  .pherr { color: #b91c1c; font-size: 13px; line-height: 1.35; }
+  .pherr:empty { display: none; }
+  input.phbad { border-color: #dc2626 !important; background: #fef2f2; }
   .msg { min-height: 20px; margin-top: 8px; font-size: 14px; color: var(--bad); }
   .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .bar button { padding: 6px 12px; font-size: 14px; }
@@ -644,6 +647,7 @@ const MSG = EN ? {
   logged_out: 'You have been logged out — please log in again',
   other_device: 'This password was opened on another phone — please log in again',
   offline: 'No internet', server: 'Server problem', name: 'Type a name', not_found: 'Person not found',
+  exists: 'This mobile number already has a login here — use that one (or switch it off first)',
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
   no_perm: 'You are not allowed to do this — ask the super admin', pw_short: 'Password: 6 to 40 characters', pw_taken: 'This number\'s other login has this password — choose another', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', bad_price: 'Enter prices from ₹1 to ₹10000', free_rule: 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
@@ -657,6 +661,7 @@ const MSG = EN ? {
   logged_out: 'आपको लॉग आउट कर दिया गया है — दोबारा लॉगिन करें',
   other_device: 'यह पासवर्ड किसी दूसरे फ़ोन पर खोला गया है — दोबारा लॉगिन करें',
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह यूज़र नहीं मिला',
+  exists: 'इस मोबाइल नंबर का यहाँ पहले से खाता है — वही इस्तेमाल करें (या पहले उसे बंद करें)',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
   no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', pw_short: 'पासवर्ड 6 से 40 अक्षर का रखें', pw_taken: 'इस नंबर के दूसरे खाते का यही पासवर्ड है — कोई और पासवर्ड चुनें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', bad_price: '₹1 से ₹10000 तक का दाम डालें', free_rule: 'लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
@@ -697,6 +702,29 @@ const api = (payload) => post('admin', { token, ...payload });
 const errText = (r) => MSG[r.error] || (r.detail ? `${MSG.server}: ${r.detail}` : MSG.server);
 const fmt = (iso) => iso ? new Date(iso).toLocaleString(L('hi-IN', 'en-IN'), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+// a mobile number typed or pasted any way ("+91 78473 92837", "7823329df9j31"): the digits only, the last 10 of them
+// → '' (nothing typed), those 10 digits, or null when they are not an Indian mobile (10 digits starting 6–9)
+const mob10 = (s) => { const d = String(s || '').replace(/\D/g, '').slice(-10); return !d ? '' : /^[6-9]\d{9}$/.test(d) ? d : null; };
+const MOB_BAD = L('यह मोबाइल नंबर सही नहीं — 10 अंकों का नंबर 6, 7, 8 या 9 से शुरू होता है', 'Not a correct mobile number — 10 digits starting with 6, 7, 8 or 9');
+// keeps a number box to digits as the person types or pastes, and says at once when the number cannot be right
+function phoneBox(inp, after = inp) {
+  const err = el('div', 'pherr'); err.setAttribute('role', 'alert'); after.after(err);
+  inp.removeAttribute('maxlength');   // a pasted "+91 …" must not be cut before it is cleaned
+  const show = (bad) => { err.textContent = bad ? MOB_BAD : ''; inp.classList.toggle('phbad', !!bad); };
+  const clean = (v) => { const d = String(v).replace(/\D/g, '').slice(-10); if (inp.value !== d) inp.value = d; return d; };
+  inp.addEventListener('paste', (e) => {
+    const t = (e.clipboardData || window.clipboardData)?.getData('text');
+    if (t == null) return;
+    e.preventDefault();
+    clean(t); show(mob10(t) === null);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  inp.addEventListener('input', () => { const d = clean(inp.value); show(d.length === 10 && mob10(d) === null); });
+  inp.addEventListener('blur', () => { show(mob10(inp.value) === null); });
+  return { check: () => { const v = mob10(inp.value); show(v === null); return v; }, show };
+}
+const PH = {};   // the number boxes, kept to digits
+for (const id of ['adminPhone', 'sellPhone', 'admPhone', 'newPhone']) PH[id] = phoneBox($(id), id === 'sellPhone' ? $(id).closest('.row') : $(id));
 
 // ---------- login ----------
 function showLogin(msg) {
@@ -1051,7 +1079,9 @@ function sellReset() {
 $('sellPhone').addEventListener('input', () => { sellWho = null; $('sellWho').textContent = ''; $('sellPacks').classList.add('hidden'); $('sellGo').classList.add('hidden'); $('sellMsg').textContent = ''; });
 $('sellPhone').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('sellFind').click(); });
 $('sellFind').addEventListener('click', async () => {
-  $('sellMsg').textContent = ''; $('sellFind').disabled = true;
+  $('sellMsg').textContent = '';
+  if (!PH.sellPhone.check()) { $('sellPhone').focus(); return; }
+  $('sellFind').disabled = true;
   const r = await api({ action: 'agent_find', phone: $('sellPhone').value });
   $('sellFind').disabled = false;
   if (r.error) { $('sellWho').textContent = ''; $('sellMsg').textContent = r.error === 'not_found' ? MSG.no_user : errText(r); return; }
@@ -1321,9 +1351,11 @@ function reqView(req) {
 }
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const phone = PH.adminPhone.check();
+  if (phone === null) { $('adminPhone').focus(); return; }
   $('loginBtn').disabled = true; $('loginMsg').textContent = '';
   // a password the admin chose themself opens only with their number (ownPwHash in api/_lib.js)
-  const r = await post('unlock', { password: $('adminPw').value, phone: $('adminPhone').value.replace(/\D/g, '') });
+  const r = await post('unlock', { password: $('adminPw').value, phone });
   $('loginBtn').disabled = false;
   if (r.error) { $('loginMsg').textContent = errText(r); return; }
   $('adminPw').value = '';
@@ -1881,8 +1913,10 @@ $('addForm').addEventListener('submit', async (e) => {
   const name = $('newName').value.trim(), village = $('newVillage').value;
   if (!village) { $('addMsg').textContent = MSG.no_village; return; }
   if (!name) return;
+  const phone = PH.newPhone.check();
+  if (!phone) { if (phone === '') { PH.newPhone.show(false); $('addMsg').textContent = MSG.phone; } $('newPhone').focus(); return; }
   $('addBtn').disabled = true; $('addMsg').textContent = '';
-  const r = await api({ action: 'add', village, name, phone: $('newPhone').value, cand: $('newCand').value, areas: areasIn($('newAreas')), password: $('newUserPw').value.trim() });
+  const r = await api({ action: 'add', village, name, phone, cand: $('newCand').value, areas: areasIn($('newAreas')), password: $('newUserPw').value.trim() });
   $('addBtn').disabled = false;
   if (r.error) { $('addMsg').textContent = errText(r); if (r.password) { showPassword(r.user, r.password); refresh(); } return; }
   $('newName').value = ''; $('newPhone').value = ''; $('newUserPw').value = '';
@@ -1894,8 +1928,10 @@ $('addAdminForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const vs = checkedIn($('admVillages')), ss = samitisIn($('admVillages'));
   if (!vs.length && !ss.length) { $('addAdminMsg').textContent = L('कम से कम एक गाँव चुनें', 'Choose at least one village'); return; }
+  const phone = PH.admPhone.check();
+  if (phone === null) { $('admPhone').focus(); return; }
   $('addAdminBtn').disabled = true; $('addAdminMsg').textContent = '';
-  const r = await api({ action: 'add_admin', name: $('admName').value.trim(), phone: $('admPhone').value, villages: vs, samitis: ss, password: $('admPw').value.trim() });
+  const r = await api({ action: 'add_admin', name: $('admName').value.trim(), phone, villages: vs, samitis: ss, password: $('admPw').value.trim() });
   $('addAdminBtn').disabled = false;
   if (r.error) { $('addAdminMsg').textContent = errText(r); if (r.password) { showPassword(r.user, r.password); refresh(); } return; }
   $('admName').value = ''; $('admPhone').value = ''; $('admPw').value = ''; $('admVillages').replaceChildren(villageChecks([]));
@@ -2230,8 +2266,10 @@ function person(u) {
   edit.addEventListener('click', () => {
     const v = prompt(L(`${u.name} का WhatsApp मोबाइल नंबर:`, `${u.name}'s WhatsApp mobile number:`), u.phone ? showPhone(u.phone) : '');
     if (v === null) return;
+    const phone = mob10(v);
+    if (phone === null) { alert(MOB_BAD); return; }
     // a password the person chose works only with their old number: the server then makes a new one, shown here once
-    act({ action: 'phone', id: u.id, phone: v }).then((r) => { if (r && r.password) showPassword(r.user, r.password); });
+    act({ action: 'phone', id: u.id, phone }).then((r) => { if (r && r.password) showPassword(r.user, r.password); });
   });
   ph.append(edit);
   if (u.phone) {   // straight into a WhatsApp chat with this number
