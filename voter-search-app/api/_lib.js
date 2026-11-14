@@ -572,9 +572,9 @@ async function whoIs(token, slug) {
     return { id: t.id, name: 'डेमो', role: 'user', demo: true, admin: false, villages: demoSlugs(), perms: [], sid: t.sid,
       status: slug != null && slug !== DEMO.slug && !demoOf(slug) ? 'other_village' : 'ok', survey: await markModeOf(null) };
   }
-  const user = t && t.id !== 'admin' ? await getUser(t.id) : null;
+  const [user, survey] = t && t.id !== 'admin' ? await Promise.all([getUser(t.id), markModeOf(null)]) : [null];   // both at once
   if (!user) return null;
-  user.survey = await markModeOf(user);
+  user.survey = survey;
   user.admin = user.role === 'admin';
   user.perms = appPerms(user);
   user.aperms = adminPermsOf(user);
@@ -944,14 +944,16 @@ async function wardFree(u, slug) {
   // samiti or the district; only their own setting above (the superadmin, or an admin with 'wardpay') makes them free
   if (u.self === '1') return false;
   const v = slug && VILLAGES[slug];
+  const [areas, on] = await Promise.all([v ? wardPayAreas() : {}, wardPayOn()]);   // both at once
   if (v) {
-    const areas = await wardPayAreas(), set = areas[`s:${samitiKey(v)}`] ?? areas[`d:${v.district || ''}`];
+    const set = areas[`s:${samitiKey(v)}`] ?? areas[`d:${v.district || ''}`];
     if (set === '1' || set === '0') return set === '0';
   }
-  return !(await wardPayOn());
+  return !on;
 }
-const wardsPaid = async (u, slug) => (!u || (await wardFree(u, slug)) ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
-const wardsAz = async (u, slug) => (!u || (await wardFree(u, slug)) ? [] : ((await redis('SMEMBERS', wardAzKey(u.id, slug))) || []).map(String));
+// free: whether wardFree is already known (false = known not free, so it isn't asked again)
+const wardsPaid = async (u, slug, free) => (!u || (free ?? (await wardFree(u, slug))) ? [] : ((await redis('SMEMBERS', wardKey(u.id, slug))) || []).map(String));
+const wardsAz = async (u, slug, free) => (!u || (free ?? (await wardFree(u, slug))) ? [] : ((await redis('SMEMBERS', wardAzKey(u.id, slug))) || []).map(String));
 async function wardDone(u, r, by) {
   const rs = Number(r.rs) || WARD_RS;
   await redis('SADD', wardKey(u.id, r.wv), String(r.ward));
