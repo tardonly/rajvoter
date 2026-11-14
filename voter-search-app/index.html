@@ -2225,7 +2225,7 @@ function pmForm(body) {
   if (!PM.open) {
     const b = el('button', 'pmopen', L('🎨 पोस्टर बनाएँ — फोटो, नाम और रंग चुनें', '🎨 Make a poster — photo, name and colour')); b.type = 'button';
     b.addEventListener('click', () => { PM.open = true; posterDraw(); $('pmake').scrollIntoView({ block: 'start', behavior: 'smooth' }); });
-    box.append(b, el('div', 'pk', L('दोनों पोस्टर सही नाप में अपने आप बन जाएँगे। अपना बना हुआ पोस्टर हो तो नीचे "📷 अपलोड" करें।', 'Both posters come out at the right size. Have one made already? Use "📷 Upload" below.')));
+    box.append(b, el('div', 'pk', L('पर्ची और PDF का पोस्टर सही नाप में अपने आप बनेगा — जो चाहें वही लगाएँ। अपना बना हुआ पोस्टर हो तो नीचे "📷 अपलोड" करें।', 'The slip and PDF posters come out at the right size — use either or both. Have one made already? Use "📷 Upload" below.')));
     return;
   }
   pmFont();
@@ -2281,44 +2281,46 @@ function pmForm(body) {
     c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
   };
   drag(top, 190); drag(big, 414);
-  const acts = el('div', 'pmrow');
-  const save = el('button', 'save', L('✓ दोनों पोस्टर लगाएँ', '✓ Use both posters')); save.type = 'button';
-  save.addEventListener('click', () => pmSave(top, big, save));
-  const down = el('button', null, L('⬇ डाउनलोड', '⬇ Download')); down.type = 'button';
-  down.addEventListener('click', () => {
-    const nm = (PM.name.trim() || 'poster').replace(/[\\/:*?"<>|\s]+/g, '-');
-    [[top, 'slip'], [big, 'pdf']].forEach(([c, s]) => c.toBlob((b) => {
-      const a = el('a'); a.href = URL.createObjectURL(b); a.download = `${nm}-${s}-poster.jpg`; document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  // each poster on its own: put it up, or save the picture to the phone
+  const nm = () => (PM.name.trim() || 'poster').replace(/[\\/:*?"<>|\s]+/g, '-');
+  const acts = (c, slot) => {
+    const row = el('div', 'pmrow');
+    const save = el('button', 'save', slot === 'top' ? L('✓ पर्ची पर लगाएँ', '✓ Use on slips') : L('✓ PDF पर लगाएँ', '✓ Use on PDFs')); save.type = 'button';
+    save.addEventListener('click', () => pmSave(slot, c, save));
+    const down = el('button', null, L('⬇ डाउनलोड', '⬇ Download')); down.type = 'button';
+    down.addEventListener('click', () => c.toBlob((b) => {
+      const a = el('a'); a.href = URL.createObjectURL(b); a.download = `${nm()}-${slot === 'top' ? 'slip' : 'pdf'}-poster.jpg`;
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     }, 'image/jpeg', 0.92));
-  });
+    row.append(save, down); return row;
+  };
   const shut = el('button', 'del', L('बंद करें', 'Close')); shut.type = 'button';
   shut.addEventListener('click', () => { PM.open = false; posterDraw(); });
-  acts.append(save, down, shut);
+  const end = el('div', 'pmrow'); end.append(shut);
   box.append(h, f, el('div', 'ph', L('रंग चुनें', 'Pick a colour')), sw,
-    el('div', 'ph', L('पर्ची पोस्टर (1200 × 240)', 'Slip poster (1200 × 240)')), top,
-    el('div', 'ph', L('PDF पोस्टर (1600 × 534)', 'PDF poster (1600 × 534)')), big,
-    PM.img ? zrow : '', el('div', 'pk', PM.img ? L('चेहरा बीच में लाने के लिए पोस्टर पर फोटो को खिसकाएँ', 'Drag on a poster to centre the face') : ''), acts);
+    PM.img ? zrow : '', el('div', 'pk', PM.img ? L('चेहरा बीच में लाने के लिए पोस्टर पर फोटो को खिसकाएँ', 'Drag on a poster to centre the face') : ''),
+    el('div', 'ph', L('पर्ची पोस्टर (1200 × 240)', 'Slip poster (1200 × 240)')), top, acts(top, 'top'),
+    el('div', 'ph', L('PDF पोस्टर (1600 × 534)', 'PDF poster (1600 × 534)')), big, acts(big, 'big'), end);
   pmDrawTop(top); pmDrawBig(big);
   pmFontAsk.then(draw);   // again once the Hindi font has come
 }
-async function pmSave(top, big, btn) {
+// put one made poster up: slot 'top' (every slip) or 'big' (every PDF page); the maker stays open for the other one
+async function pmSave(slot, c, btn) {
   if (!PM.img) { $('posterNote').textContent = L('पहले उम्मीदवार की फोटो चुनें', 'Pick the candidate\'s photo first'); return; }
   if (!PM.name.trim()) { $('posterNote').textContent = L('नाम लिखें', 'Enter the name'); return; }
-  await pmFont(); pmDrawTop(top); pmDrawBig(big);
+  await pmFont(); (slot === 'top' ? pmDrawTop : pmDrawBig)(c);
   btn.disabled = true; $('posterNote').textContent = L('सेव हो रहा है…', 'Saving…');
-  let r = await api('poster', { token: token(), set: 'top', img: pmJpeg(top) });
-  if (!r.error) r = await api('poster', { token: token(), set: 'big', img: pmJpeg(big) });
+  const r = await api('poster', { token: token(), set: slot, img: pmJpeg(c) });
   btn.disabled = false;
   if (r.error) {
     $('posterNote').textContent = r.error === 'too_big' ? L('पोस्टर बहुत बड़ा बना — फिर से कोशिश करें', 'The poster came out too big — try again')
       : r.error === 'offline' ? MSG.offline || L('इंटरनेट नहीं है', 'No internet') : MSG[r.error] || MSG.server;
     return;
   }
-  POSTER = posterFrom(r); PM.open = false;
+  POSTER = posterFrom(r);
   posterDraw(); posterCard();
-  $('posterNote').textContent = L('✓ दोनों पोस्टर लग गए — अब हर पर्ची और PDF पर यही छपेंगे', '✓ Both posters saved — every slip and PDF now prints with them');
-  $('posterBody').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  $('posterNote').textContent = slot === 'top' ? L('✓ पर्ची पोस्टर लग गया — अब हर पर्ची पर यही छपेगा', '✓ Slip poster saved — every slip now prints with it')
+    : L('✓ PDF पोस्टर लग गया — अब हर PDF पेज पर यही छपेगा', '✓ PDF poster saved — every PDF page now prints with it');
 }
 $('pmFile').addEventListener('change', () => {
   const file = $('pmFile').files[0];
