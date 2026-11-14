@@ -573,6 +573,25 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   .slip .pcut::before, .slip .pcut::after { content: ""; flex: 1; min-width: 12px; border-top: 2px dashed #222; }
   .slip .pcut b { font-size: 18px; line-height: 1; }
   .pbig { border-radius: 6px; }
+  /* the EVM row under the posters: ballot number, name, symbol, the red light and the blue button, as on the machine */
+  .evm { display: flex; align-items: stretch; width: min(100%, 380px); height: 42px; margin: 6px auto; background: #fff; border: 2px solid #9aa3ad;
+    border-radius: 7px; overflow: hidden; color: #d1302b; -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+  .evm .n { flex: none; width: 46px; display: flex; align-items: center; justify-content: center; font-size: 25px; font-weight: 800; border-right: 2px solid #9aa3ad; }
+  .evm .nm { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px; font-size: 18px;
+    font-weight: 700; border-right: 2px solid #9aa3ad; white-space: nowrap; overflow: hidden; }
+  .evm .nm span { overflow: hidden; text-overflow: ellipsis; }
+  .evm .nm img { flex: none; height: 32px; width: auto; max-width: 48px; object-fit: contain; }
+  .evm .led { flex: none; width: 30px; display: flex; align-items: center; justify-content: center; }
+  .evm .led::after { content: ""; width: 14px; height: 14px; border-radius: 50%; background: #d1302b; }
+  .evm .bt { flex: none; width: 64px; position: relative; display: flex; align-items: center; justify-content: center; background: #eaf0f9; }
+  .evm .bt::before { content: ""; width: 46px; height: 24px; border-radius: 12px; background: #3a6fd0; }
+  .evm .bt::after { content: "👆"; position: absolute; right: 1px; bottom: -4px; font-size: 18px; }
+  .pballot { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; }
+  .pballot input { min-width: 0; padding: 10px; font-size: 16px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; }
+  .pballot .pbb { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pballot .pbb button { border: 1px solid #cbd5e1; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 700; background: #fff; color: #1d4ed8; }
+  .pballot .pbb button.del { color: var(--bad); }
+  .pballot .pbb button.save { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
 
   /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page.
      The sizes sit outside @media print so printSlips() can lay the slips out off screen (#printArea.measure) and
@@ -589,6 +608,20 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   #printArea .pbig { width: 190mm; max-height: 134mm; object-fit: contain; margin: 0 0 3mm; border-radius: 0; break-after: avoid; }
   #printArea .slip .ptop { max-height: 52mm; object-fit: contain; }
   #printArea .slip .pcut { font-size: 8.5pt; padding: 1.5mm 2mm; }
+  #printArea .slip .evm { width: 80mm; height: 9mm; margin: 1.5mm auto; border-width: 0.5mm; }
+  #printArea .slip .evm .n { width: 9mm; font-size: 15pt; border-width: 0.5mm; }
+  #printArea .slip .evm .nm { font-size: 12pt; padding: 0 2mm; border-width: 0.5mm; }
+  #printArea .slip .evm .nm img { height: 7mm; max-width: 10mm; }
+  #printArea .slip .evm .led { width: 6mm; } #printArea .slip .evm .led::after { width: 3mm; height: 3mm; }
+  #printArea .slip .evm .bt { width: 14mm; } #printArea .slip .evm .bt::before { width: 10mm; height: 5mm; }
+  #printArea .slip .evm .bt::after { font-size: 11pt; bottom: -1mm; }
+  #printArea .pbigw .evm { width: 130mm; height: 13mm; margin: -1mm auto 3mm; border-width: 0.6mm; }
+  #printArea .pbigw .evm .n { width: 14mm; font-size: 22pt; border-width: 0.6mm; }
+  #printArea .pbigw .evm .nm { font-size: 17pt; padding: 0 3mm; border-width: 0.6mm; }
+  #printArea .pbigw .evm .nm img { height: 10mm; max-width: 14mm; }
+  #printArea .pbigw .evm .led { width: 9mm; } #printArea .pbigw .evm .led::after { width: 4.5mm; height: 4.5mm; }
+  #printArea .pbigw .evm .bt { width: 20mm; } #printArea .pbigw .evm .bt::before { width: 15mm; height: 7.5mm; }
+  #printArea .pbigw .evm .bt::after { font-size: 16pt; bottom: -1.5mm; }
   #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
   #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @media print {
@@ -1474,7 +1507,11 @@ function slip(r, forPrint, inFamily) {
 
   const k = el('div', 'kendra'); k.append(L('मतदान केन्द्र : ', 'Polling station: '), el('b', null, bhag.trim()), ` - ${rest.join('-').trim()}`);
   d.append(head, idl, l1, l2, k, el('div', 'time', pollTime()));
-  if (forPrint) { if (POSTER.top) d.prepend(posterImg(POSTER.top, 'ptop'), posterCut()); return d; }
+  if (forPrint) {
+    const row = ballotRow(POSTER.ballot);
+    if (POSTER.top || row) d.prepend(...[POSTER.top && posterImg(POSTER.top, 'ptop'), row, posterCut()].filter(Boolean));
+    return d;
+  }
   if (r.del) {
     d.classList.add('gone');
     d.prepend(el('div', 'gonebar', `✕ ${L('सूची से हटाया गया', 'Struck off the list')}${r.del === 'X' ? '' : ` (${r.del}${DELETED[r.del] ? ` – ${DELETED[r.del]}` : ''})`}`));
@@ -1774,10 +1811,13 @@ async function printSlips(rows, title) {
 // cut the slips into A4 pages with the big poster at the top of each: lay them out off screen at print size, take
 // them a line (two slips side by side) at a time, and start a new page when the next line would not fit under the poster
 async function posterPages(area) {
-  const big = posterImg(POSTER.big, 'pbig');
+  const big = el('div', 'pbigw'), row = ballotRow(POSTER.ballot);
+  big.append(posterImg(POSTER.big, 'pbig'));
+  if (row) big.append(row);
   area.classList.add('measure');
   area.prepend(big);
-  if (big.decode) await big.decode().catch(() => null);
+  const bi = big.querySelector('img');
+  if (bi.decode) await bi.decode().catch(() => null);
   const mm = 96 / 25.4;
   const room = (297 - 16 - 5) * mm;   // A4 less the 8 mm margins and a little slack for the phone's own rounding
   const top = big.getBoundingClientRect().height + 3 * mm;
@@ -1794,7 +1834,7 @@ async function posterPages(area) {
   for (const l of lines) {
     const h = l.h + 2 * mm;
     if (!page || (used + h > room - top && page.childElementCount > 1)) {
-      page = el('div', 'ppage'); page.append(pages.length ? big.cloneNode() : big); pages.push(page); used = 0;
+      page = el('div', 'ppage'); page.append(pages.length ? big.cloneNode(true) : big); pages.push(page); used = 0;
     }
     page.append(...l.slips); used += h;
   }
@@ -1804,7 +1844,18 @@ async function posterPages(area) {
 
 // ---------- पर्ची सेटिंग: this login's posters (api/_routes/poster.js), kept on the server so they follow the login ----------
 // top: a banner over every printed slip; big: a poster over every page of a ward's or family's PDF
-let POSTER = { top: '', big: '' }, posterFor = null, posterAsk = null;
+const NO_BALLOT = { no: '', name: '', sym: '' };
+let POSTER = { top: '', big: '', ballot: NO_BALLOT }, posterFor = null, posterAsk = null;
+const posterFrom = (r) => ({ top: r.top || '', big: r.big || '', ballot: { ...NO_BALLOT, ...(r.ballot || {}) } });
+// the EVM row printed under the posters (a ballot number set in पर्ची सेटिंग), or null when there is none
+function ballotRow(b) {
+  if (!b || !b.no) return null;
+  const r = el('div', 'evm'), nm = el('div', 'nm');
+  nm.append(el('span', null, b.name || ''));
+  if (b.sym) { const i = el('img'); i.src = b.sym; i.alt = ''; nm.append(i); }
+  r.append(el('div', 'n', b.no), nm, el('div', 'led'), el('div', 'bt'));
+  return r;
+}
 // the most each poster may take on paper, in mm: the PDF poster no more than an A5 sheet laid sideways (the 190 mm page
 // width by 134 mm, so 10 : 7), the slip poster no more than the slip itself (94 × 52 mm); a taller picture is turned away
 const POSTER_MAX = { big: { w: 190, h: 134, px: 1600 }, top: { w: 94, h: 52, px: 1200 } };
@@ -1837,16 +1888,19 @@ function posterCard() {
   if (!posterOk()) return;
   c.innerHTML = '';
   const go = el('div', 'go'); go.append(el('span', null, POSTER.top ? L('पर्ची पोस्टर बदलें', 'Change the slip poster') : L('अपना पोस्टर लगाएँ', 'Put up your poster')), el('span', null, '›'));
-  c.append(posterPic('top'), go);
+  c.append(posterPic('top'));
+  const row = ballotRow(POSTER.ballot);
+  if (row) c.append(row);
+  c.append(go);
 }
 function posterButton() { posterCard(); if (posterOk()) posterLoad().then(posterCard); }
 function posterLoad() {   // once per login; a failed load is tried again next time
-  if (!posterOk()) { POSTER = { top: '', big: '' }; return Promise.resolve(); }
+  if (!posterOk()) { POSTER = posterFrom({}); return Promise.resolve(); }
   if (posterFor === token() && posterAsk) return posterAsk;
   posterFor = token();
   posterAsk = api('poster', { token: token() }).then((r) => {
     if (r.error) { posterAsk = null; return; }
-    POSTER = { top: r.top || '', big: r.big || '' };
+    POSTER = posterFrom(r);
   });
   return posterAsk;
 }
@@ -1873,19 +1927,23 @@ function posterShrink(file, w, maxRatio) {
   });
 }
 let posterSlot = '';
-async function posterSave(slot, img) {
+async function posterSave(slot, img, more) {
   const box = document.querySelector(`.pslot[data-slot=${slot}]`);
   if (box) box.classList.add('busy');
   $('posterNote').textContent = L('सेव हो रहा है…', 'Saving…');
-  const r = await api('poster', { token: token(), set: slot, img });
+  const r = await api('poster', { token: token(), set: slot, img, ...more });
   if (box) box.classList.remove('busy');
   if (r.error) {
     $('posterNote').textContent = r.error === 'too_big' ? L('फोटो बहुत बड़ी है — छोटी फोटो चुनें', 'The picture is too big — pick a smaller one')
       : r.error === 'offline' ? MSG.offline || L('इंटरनेट नहीं है', 'No internet') : MSG[r.error] || MSG.server;
     return;
   }
-  POSTER = { top: r.top || '', big: r.big || '' };
-  $('posterNote').textContent = img ? L('✓ सेव हो गया — अब हर पर्ची और PDF पर यही पोस्टर छपेगा', '✓ Saved — every slip and PDF now prints with it')
+  POSTER = posterFrom(r);
+  $('posterNote').textContent = slot === 'ballot'
+    ? (more.no ? L('✓ सेव हो गया — पोस्टर के नीचे यह बैलेट नंबर छपेगा', '✓ Saved — this ballot number prints under the posters')
+      : L('बैलेट नंबर हटा दिया', 'Ballot number removed'))
+    : slot === 'sym' ? (img ? L('✓ चुनाव चिन्ह सेव हो गया', '✓ Symbol saved') : L('चुनाव चिन्ह हटा दिया', 'Symbol removed'))
+    : img ? L('✓ सेव हो गया — अब हर पर्ची और PDF पर यही पोस्टर छपेगा', '✓ Saved — every slip and PDF now prints with it')
     : L('पोस्टर हटा दिया', 'Poster removed');
   posterDraw(); posterCard();
 }
@@ -1910,6 +1968,7 @@ function posterDraw() {
   };
   slotBox('top', L('हर पर्ची के ऊपर पोस्टर', 'Poster over every slip'), L('पतली, चौड़ी फोटो', 'a thin, wide picture'));
   slotBox('big', L('PDF के हर पेज पर ऊपर बड़ा पोस्टर', 'Big poster at the top of every PDF page'), L('वार्ड / परिवार की PDF में', 'in a ward\'s or family\'s PDF'));
+  ballotForm(body);
   // a made-up voter, printed as the real slips will be
   body.append(el('div', 'ph', L('पर्ची ऐसी दिखेगी', 'The slip will look like this')));
   const prev = el('div'); prev.id = 'posterPrev';
@@ -1917,9 +1976,36 @@ function posterDraw() {
   const w = (VILLAGE.wards || [])[0] || 1;
   const one = slip({ ward: w, box: 1, epic: 'RJ/00/000/000001', hname: 'किशन सिंह', name: 'Kishan Singh', rel: 'पिता', hrel: 'भंवर सिंह',
     relname: 'Bhanwar Singh', house: '1', age: 45, sex: 'पुरुष', kendra: '1 - राजकीय उच्च माध्यमिक विद्यालय' }, true);
-  if (!POSTER.top) one.prepend(posterPic('top', 'ptop'), posterCut());
+  if (!POSTER.top) { one.prepend(posterPic('top', 'ptop')); if (!one.querySelector('.pcut')) one.firstChild.after(posterCut()); }
   prev.append(one);
   body.append(prev);
+}
+// बैलेट नंबर: the EVM row (number, name, symbol, light, button) printed under both posters, so voters see which button
+function ballotForm(body) {
+  const b = POSTER.ballot;
+  const h = el('div', 'ph', L('बैलेट नंबर (EVM बटन)', 'Ballot number (EVM button)'));
+  h.append(el('small', null, L('पोस्टर के नीचे छपेगा', 'prints under the posters')));
+  const f = el('div', 'pballot');
+  const no = el('input'); no.inputMode = 'numeric'; no.maxLength = 3; no.placeholder = '2'; no.value = b.no; no.setAttribute('aria-label', L('बैलेट नंबर', 'Ballot number'));
+  const nm = el('input'); nm.maxLength = 40; nm.placeholder = L('मंजू देवी', 'Manju Devi'); nm.value = b.name; nm.setAttribute('aria-label', L('उम्मीदवार का नाम', 'Candidate name'));
+  const prev = el('div');
+  const show = () => { prev.replaceChildren(ballotRow({ no: no.value.trim() || '?', name: nm.value.trim(), sym: b.sym }) || ''); };
+  no.addEventListener('input', () => { no.value = no.value.replace(/\D/g, '').replace(/^0+/, ''); show(); });
+  nm.addEventListener('input', show);
+  const btns = el('div', 'pbb');
+  const save = el('button', 'save', L('सेव करें', 'Save')); save.type = 'button';
+  save.addEventListener('click', () => {
+    if (!no.value.trim()) { $('posterNote').textContent = L('बैलेट नंबर लिखें', 'Enter the ballot number'); no.focus(); return; }
+    posterSave('ballot', '', { no: no.value.trim(), name: nm.value.trim() });
+  });
+  const sym = el('button', null, b.sym ? L('📷 चिन्ह बदलें', '📷 Change symbol') : L('📷 चुनाव चिन्ह जोड़ें', '📷 Add the symbol')); sym.type = 'button';
+  sym.addEventListener('click', () => { posterSlot = 'sym'; $('posterFile').value = ''; $('posterFile').click(); });
+  btns.append(save, sym);
+  if (b.sym) { const d = el('button', 'del', L('चिन्ह हटाएं', 'Remove symbol')); d.type = 'button'; d.addEventListener('click', () => posterSave('sym', '')); btns.append(d); }
+  if (b.no) { const d = el('button', 'del', L('बैलेट नंबर हटाएं', 'Remove ballot number')); d.type = 'button'; d.addEventListener('click', () => posterSave('ballot', '', { no: '' })); btns.append(d); }
+  f.append(no, nm, btns);
+  body.append(h, f, prev, el('div', 'pk', L('खाली छोड़ें तो पोस्टर के नीचे कुछ नहीं छपेगा', 'Leave it empty and nothing prints under the posters')));
+  show();
 }
 $('posterFile').addEventListener('change', async () => {
   const f = $('posterFile').files[0], slot = posterSlot;
@@ -1927,7 +2013,7 @@ $('posterFile').addEventListener('change', async () => {
   const box = document.querySelector(`.pslot[data-slot=${slot}]`);
   if (box) box.classList.add('busy');
   let img;
-  const m = POSTER_MAX[slot];
+  const m = slot === 'sym' ? { px: 240, w: 1, h: 2 } : POSTER_MAX[slot];
   try { img = await posterShrink(f, m.px, m.h / m.w); }
   catch (e) {
     if (box) box.classList.remove('busy');
