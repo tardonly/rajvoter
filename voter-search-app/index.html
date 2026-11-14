@@ -447,7 +447,8 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   .slip.tap { cursor: pointer; }
   #slipPop .card { max-width: 480px; }
   /* the slips side by side on a track: the next one peeks in at the right edge, and a swipe drags the track */
-  #spBody { overflow: hidden; touch-action: pan-y; margin: 0 -14px; padding: 0 14px; }
+  #slipPop { touch-action: pan-y; }
+  #spBody { overflow: hidden; margin: 0 -14px; padding: 0 14px; }
   #spBody .sptrack { display: flex; align-items: flex-start; gap: 14px; will-change: transform; }
   #spBody .sptrack.anim { transition: transform .28s ease-out; }
   #spBody .spcell { flex: 0 0 calc(100% - 22px); min-width: 0; transition: opacity .28s; }
@@ -2640,11 +2641,11 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight') slipPopStep(1);
 });
 {
-  // the track follows the finger, then slides on to the next slip (or back) when it is let go
+  // a swipe anywhere on the popup (slip, buttons, edges) drags the track: it follows the finger, then slides on to the next slip (or back) when it is let go
   let x0 = null, y0 = 0, side = null;
   const pull = (dx) => ((dx > 0 && spAt === 0) || (dx < 0 && spAt >= spList.length - 1) ? dx / 3 : dx);   // stiff at the ends
-  $('spBody').addEventListener('touchstart', (e) => { if (spBusy) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; side = null; }, { passive: true });
-  $('spBody').addEventListener('touchmove', (e) => {
+  $('slipPop').addEventListener('touchstart', (e) => { if (spBusy) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; side = null; }, { passive: true });
+  $('slipPop').addEventListener('touchmove', (e) => {
     if (x0 === null) return;
     const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
     if (side === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) side = Math.abs(dx) > Math.abs(dy);
@@ -2659,8 +2660,8 @@ document.addEventListener('keydown', (e) => {
     if (Math.abs(dx) > 50 && to >= 0 && to < spList.length) slipPopStep(by);
     else spMove(0, true);
   };
-  $('spBody').addEventListener('touchend', up);
-  $('spBody').addEventListener('touchcancel', up);
+  $('slipPop').addEventListener('touchend', up);
+  $('slipPop').addEventListener('touchcancel', up);
 }
 
 // the slip as a picture: the share sheet with WhatsApp (phones), else a PNG download to send from WhatsApp by hand
