@@ -185,6 +185,7 @@
   .bell { position: relative; padding: 9px 12px; }
   .bell .bn { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
     background: #dc2626; color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+  #apBody .filter { flex-wrap: wrap; align-items: center; margin: 4px 0 0; }
   #apBody .reqs { display: grid; gap: 8px; max-height: 70vh; overflow-y: auto; }
   #apBody .req { display: grid; gap: 2px; text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
     background: #fff; color: var(--ink); font: inherit; cursor: pointer; }
@@ -1321,16 +1322,45 @@ function showBell() {
   $('bellN').textContent = open > 99 ? '99+' : open;
   $('bellN').classList.toggle('hidden', !open);
 }
-function reqList() {
+// the list's filters: paid / not paid (awaiting payment or closed) / all, and which days; each time the 🔔 is
+// opened they start at today's paid ones
+const REQ_ST = [['done', '✓ पूरे', '✓ Paid'], ['fail', '✕ फेल / बाकी', '✕ Failed / pending'], ['all', 'सभी', 'All']];
+const REQ_DAYS = [['today', 'आज', 'Today'], ['yday', 'कल', 'Yesterday'], ['7', 'पिछले 7 दिन', 'Last 7 days'], ['30', 'पिछले 30 दिन', 'Last 30 days']];
+let reqSt = 'done', reqDays = 'today';
+const istDay = (t) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });   // YYYY-MM-DD in India
+const reqAt = (r) => (r.status === 'open' ? r.created : r.doneAt || r.created);
+function reqShown() {
+  const now = Date.now(), today = istDay(now), yday = istDay(now - 864e5);
+  return reqs.filter((r) => {
+    if (reqSt === 'done' ? r.status !== 'done' : reqSt === 'fail' ? r.status === 'done' : false) return false;
+    const d = istDay(reqAt(r));
+    return reqDays === 'today' ? d === today : reqDays === 'yday' ? d === yday : d > istDay(now - Number(reqDays) * 864e5);
+  }).sort((a, b) => (reqAt(a) < reqAt(b) ? 1 : -1));
+}
+function reqList(fresh) {
   apAgain = reqList;
+  if (fresh === true) { reqSt = 'done'; reqDays = 'today'; }
   const body = $('apBody');
   $('apTitle').textContent = L('🔔 ऑनलाइन खरीद', '🔔 Online purchases');
   $('apModal').classList.remove('hidden');
-  const open = reqs.filter((r) => r.status === 'open').length, paid = reqs.filter((r) => r.status === 'done');
-  const head = el('div', 'sub', reqs.length ? L(`${open} भुगतान बाकी · ${paid.length} भुगतान मिले, ₹${paid.reduce((t, r) => t + r.doneRs, 0)} (पिछले 30 दिन)`,
-    `${open} awaiting payment · ${paid.length} paid, ₹${paid.reduce((t, r) => t + r.doneRs, 0)} (last 30 days)`) : L('अभी कोई खरीद नहीं।', 'No purchases yet.'));
+  const f = el('div', 'filter');
+  for (const [k, hi, en] of REQ_ST) {
+    const b = el('button', reqSt === k ? 'on' : null, L(hi, en)); b.type = 'button'; b.setAttribute('aria-pressed', reqSt === k);
+    b.addEventListener('click', () => { reqSt = k; reqList(); });
+    f.append(b);
+  }
+  const days = el('select'); days.setAttribute('aria-label', L('दिन', 'Days'));
+  for (const [k, hi, en] of REQ_DAYS) { const o = el('option', null, L(hi, en)); o.value = k; days.append(o); }
+  days.value = reqDays;
+  days.addEventListener('change', () => { reqDays = days.value; reqList(); });
+  f.append(days);
+  const shown = reqShown(), open = shown.filter((r) => r.status === 'open').length, shut = shown.filter((r) => r.status === 'rejected').length;
+  const paid = shown.filter((r) => r.status === 'done'), rs = paid.reduce((t, r) => t + r.doneRs, 0);
+  const head = el('div', 'sub', !shown.length ? L('इन दिनों में ऐसी कोई खरीद नहीं।', 'No such purchases in these days.')
+    : [paid.length && L(`${paid.length} भुगतान मिले, ₹${rs}`, `${paid.length} paid, ₹${rs}`), open && L(`${open} भुगतान बाकी`, `${open} awaiting payment`),
+      shut && L(`${shut} बंद`, `${shut} closed`)].filter(Boolean).join(' · '));
   const list = el('div', 'reqs');
-  paged(list, reqs, (r) => {
+  paged(list, shown, (r) => {
     const b = el('button', `req ${r.status === 'open' ? 'open' : r.status === 'rejected' ? 'rej' : 'fin'}`); b.type = 'button';
     const t = el('div', 't'); t.append(el('span', null, r.name),
       el('span', 'st', r.status === 'open' ? L('⏳ भुगतान बाकी', '⏳ Awaiting payment') : r.status === 'rejected' ? L('✕ बंद', '✕ Closed')
@@ -1341,16 +1371,16 @@ function reqList() {
     b.addEventListener('click', () => reqView(r));
     return b;
   }, 'reqs');
-  body.replaceChildren(head, list);
+  body.replaceChildren(f, head, list);
 }
-$('bell').addEventListener('click', reqList);
+$('bell').addEventListener('click', () => reqList(true));
 // one purchase: who, what, how it stands; an open one: ask Razorpay again (req_get settles it) or close it
 function reqView(req) {
   const body = $('apBody'), u = users.find((x) => x.id === req.user) || { name: req.name, phone: req.phone };
   apAgain = async () => { const r = await api({ action: 'req_get', rid: req.id }); reqView(r.req ? { ...req, ...r.req } : req); };
   $('apTitle').textContent = L('🔔 ऑनलाइन खरीद', '🔔 Online purchase');
   const back = el('button', 'btn ghost', L('← सभी खरीद', '← All purchases')); back.type = 'button';
-  back.addEventListener('click', reqList);
+  back.addEventListener('click', () => reqList());
   const contact = el('div', 'row');
   if (u.phone) {
     const call = el('a', 'btn ghost', L('📞 कॉल करें', '📞 Call')), chat = el('a', 'btn ghost', L('💬 WhatsApp', '💬 WhatsApp'));
