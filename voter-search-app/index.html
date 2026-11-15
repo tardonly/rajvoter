@@ -2255,7 +2255,6 @@ function pmBg(g, W, H, t, cx, cy) {
   const r = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
   r.addColorStop(0, t.c[0]); r.addColorStop(0.45, t.c[1]); r.addColorStop(1, t.c[2]);
   g.fillStyle = r; g.fillRect(0, 0, W, H);
-  if (!PM.sym || PM.symOff) return;   // without a symbol the poster stays a plain colour
   g.save(); g.fillStyle = 'rgba(255,255,255,.07)';   // sun rays
   for (let a = 0; a < 360; a += 14) {
     const R = W * 1.2, a1 = a * Math.PI / 180, a2 = (a + 6) * Math.PI / 180;
