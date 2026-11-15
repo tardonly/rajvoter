@@ -2255,6 +2255,7 @@ function pmBg(g, W, H, t, cx, cy) {
   const r = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
   r.addColorStop(0, t.c[0]); r.addColorStop(0.45, t.c[1]); r.addColorStop(1, t.c[2]);
   g.fillStyle = r; g.fillRect(0, 0, W, H);
+  if (!PM.sym || PM.symOff) return;   // without a symbol the poster stays a plain colour
   g.save(); g.fillStyle = 'rgba(255,255,255,.07)';   // sun rays
   for (let a = 0; a < 360; a += 14) {
     const R = W * 1.2, a1 = a * Math.PI / 180, a2 = (a + 6) * Math.PI / 180;
@@ -2354,7 +2355,7 @@ function pmForm(body) {
   // the symbol saved with the ballot number comes in on its own, unless one was picked here
   if (POSTER.ballot.sym && PM.symFrom !== 'pick' && PM.symFrom !== POSTER.ballot.sym) {
     const i = new Image(); PM.symFrom = POSTER.ballot.sym;
-    i.onload = () => { PM.sym = i; if ($('pmake')) posterDraw(); }; i.src = POSTER.ballot.sym;
+    i.onload = () => pmSymSet(i, 1, () => { if ($('pmake')) posterDraw(); }); i.src = POSTER.ballot.sym;
   }
   // the heading folds it away again (what was typed stays)
   const h = el('button', 'pmhead', L('🎨 पोस्टर बनाएँ', '🎨 Make a poster')); h.type = 'button'; h.setAttribute('aria-expanded', 'true');
@@ -2478,18 +2479,36 @@ $('pmFile').addEventListener('change', () => {
   img.onerror = () => { URL.revokeObjectURL(url); $('posterNote').textContent = L('यह फोटो नहीं खुल रही — दूसरी चुनें', 'This picture would not open — pick another'); };
   img.src = url;
 });
-// the election symbol for the posters: kept as a 600 px copy on this phone (not saved until a poster is put up)
+// the election symbol for the posters, at most 600 px, with the paper or wall it was photographed on turned white:
+// the colour along its edges is taken as the background, and every pixel near that colour (holes inside the symbol
+// too) fades to white, so only the symbol shows in the poster's white box
+function pmSymSet(img, k, done) {
+  const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+  const W = c.width, H = c.height, d = g.getImageData(0, 0, W, H), p = d.data;
+  let r = 0, gr = 0, b = 0, n = 0;
+  const acc = (i) => { r += p[i]; gr += p[i + 1]; b += p[i + 2]; n++; };
+  for (let x = 0; x < W; x++) { acc(x * 4); acc(((H - 1) * W + x) * 4); }
+  for (let y = 0; y < H; y++) { acc(y * W * 4); acc((y * W + W - 1) * 4); }
+  r /= n; gr /= n; b /= n;
+  for (let i = 0; i < p.length; i += 4) {
+    const a = Math.min(1, Math.max(0, (Math.hypot(p[i] - r, p[i + 1] - gr, p[i + 2] - b) - 40) / 50));   // 0 = background, 1 = symbol
+    for (let q = 0; q < 3; q++) p[i + q] = 255 * (1 - a) + p[i + q] * a;
+  }
+  g.putImageData(d, 0, 0);
+  const out = new Image();
+  out.onload = () => { PM.sym = out; done(); };
+  out.src = c.toDataURL('image/png');
+}
+// a symbol picked here stays on this phone (not saved until a poster is put up)
 $('pmSymFile').addEventListener('change', () => {
   const file = $('pmSymFile').files[0];
   if (!file) return;
   const url = URL.createObjectURL(file), img = new Image();
   img.onload = () => {
-    const k = Math.min(1, 600 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
-    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-    const small = new Image();
-    small.onload = () => { PM.sym = small; PM.symFrom = 'pick'; PM.symOff = false; posterDraw(); $('pmake').scrollIntoView({ block: 'start' }); };
-    small.src = c.toDataURL('image/png');
+    URL.revokeObjectURL(url);
+    PM.symFrom = 'pick'; PM.symOff = false;
+    pmSymSet(img, Math.min(1, 600 / Math.max(img.naturalWidth, img.naturalHeight)), () => { posterDraw(); $('pmake').scrollIntoView({ block: 'start' }); });
   };
   img.onerror = () => { URL.revokeObjectURL(url); $('posterNote').textContent = L('यह फोटो नहीं खुल रही — दूसरी चुनें', 'This picture would not open — pick another'); };
   img.src = url;
