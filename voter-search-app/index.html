@@ -914,6 +914,7 @@ electionBanner();
   </div>
   <input id="posterFile" type="file" accept="image/*" hidden>
   <input id="pmFile" type="file" accept="image/*" hidden>
+  <input id="pmSymFile" type="file" accept="image/*" hidden>
 </div>
 
 <div id="slipsPop" class="progpop hidden" role="dialog" aria-label="वार्ड पर्चियाँ">
@@ -2230,7 +2231,8 @@ const PM_THEMES = [
 ];
 const PM_POSTS = ['सरपंच प्रत्याशी', 'वार्ड पंच प्रत्याशी', 'पंचायत समिति सदस्य प्रत्याशी', 'जिला परिषद सदस्य प्रत्याशी', 'प्रधान प्रत्याशी', 'पार्षद प्रत्याशी'];
 // what was typed stays while पर्ची सेटिंग is redrawn; the photo stays until the page is closed
-const PM = { open: false, img: null, zoom: 1, ox: 0, oy: 0, theme: 'saffron', name: '', post: PM_POSTS[0], gp: '', tag: '', call: '🙏 भारी मतों से विजयी बनाएँ 🙏' };
+// sym: the election symbol's picture (the one saved with the ballot number, or one picked here), symOff: taken off the posters
+const PM = { open: false, img: null, sym: null, symFrom: '', symOff: false, zoom: 1, ox: 0, oy: 0, theme: 'saffron', name: '', post: PM_POSTS[0], gp: '', tag: '', call: '🙏 भारी मतों से विजयी बनाएँ 🙏' };
 let pmFontAsk = null;
 function pmFont() {   // Android has no Hindi font of its own good enough for a poster: fetch Noto Sans Devanagari once
   if (!pmFontAsk) {
@@ -2278,6 +2280,16 @@ function pmFace(g, t, x, y, d, ring) {
   }
   g.restore();
 }
+// the election symbol in a white box with the photo's ring colour round it, the picture fitted inside
+function pmSign(g, t, x, y, d, ring) {
+  if (!PM.sym || PM.symOff) return false;
+  const r = d * 0.14, box = (o) => { g.beginPath(); if (g.roundRect) g.roundRect(x + o, y + o, d - 2 * o, d - 2 * o, Math.max(r - o, 2)); else g.rect(x + o, y + o, d - 2 * o, d - 2 * o); };   // older phones have no roundRect
+  g.save(); g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = d * 0.08; g.shadowOffsetY = d * 0.02; g.fillStyle = t.ring; box(0); g.fill(); g.restore();
+  g.fillStyle = '#fff'; box(ring); g.fill();
+  const w = PM.sym.naturalWidth, h = PM.sym.naturalHeight, room = d - 2 * ring - d * 0.12, k = Math.min(room / w, room / h);
+  g.drawImage(PM.sym, x + (d - w * k) / 2, y + (d - h * k) / 2, w * k, h * k);
+  return true;
+}
 function pmText(g, t, s, cx, y, size, maxW, color, weight, sh, shOff) {
   if (!s) return;
   g.font = `${weight} ${size}px ${PM_FONT}`;
@@ -2303,7 +2315,8 @@ function pmDrawTop(c) {
   const W = 1200, H = 240, g = c.getContext('2d'), t = pmTheme(); c.width = W; c.height = H;
   pmBg(g, W, H, t, 720, 110);
   pmFace(g, t, 24, 14, 204, 7);
-  const cx = 250 + (W - 20 - 250) / 2, mw = W - 20 - 250 - 20, sub = pmSub();
+  const right = pmSign(g, t, W - 20 - 180, 25, 180, 7) ? W - 20 - 180 - 20 : W - 20;   // the symbol on the right, if there is one
+  const cx = 250 + (right - 250) / 2, mw = right - 250 - 20, sub = pmSub();
   pmText(g, t, pmName(), cx, sub ? 92 : 115, 96, mw, t.name, 800, t.nameSh, 5);
   pmText(g, t, sub, cx, 180, 38, mw, t.sub, 600);
   pmStripe(g, W, H, 10, t);
@@ -2312,7 +2325,9 @@ function pmDrawBig(c) {
   const W = 1600, H = 534, g = c.getContext('2d'), t = pmTheme(); c.width = W; c.height = H;
   pmBg(g, W, H, t, 1000, 230);
   pmFace(g, t, 40, 40, 436, 11);
-  const cx = 500 + (W - 40 - 500) / 2, mw = W - 40 - 500 - 20, tag = PM.tag.trim(), call = PM.call.trim(), sub = pmSub();
+  const sign = pmSign(g, t, W - 40 - 300, 70, 300, 10), right = sign ? W - 40 - 300 - 30 : W - 40;
+  if (sign) pmText(g, t, 'चुनाव चिन्ह', W - 40 - 150, 412, 40, 300, t.sub, 700);
+  const cx = 500 + (right - 500) / 2, mw = right - 500 - 20, tag = PM.tag.trim(), call = PM.call.trim(), sub = pmSub();
   // the lines share the height: name and the line under it in the middle, the slogans above and below when given
   const ny = tag && call ? 210 : tag ? 250 : call ? 175 : 215;
   pmRibbon(g, t, tag, cx, 72, 40, 70, 64, mw);
@@ -2336,6 +2351,11 @@ function pmForm(body) {
   }
   pmFont();
   if (!PM.name && POSTER.ballot.name) PM.name = POSTER.ballot.name;
+  // the symbol saved with the ballot number comes in on its own, unless one was picked here
+  if (POSTER.ballot.sym && PM.symFrom !== 'pick' && PM.symFrom !== POSTER.ballot.sym) {
+    const i = new Image(); PM.symFrom = POSTER.ballot.sym;
+    i.onload = () => { PM.sym = i; if ($('pmake')) posterDraw(); }; i.src = POSTER.ballot.sym;
+  }
   // the heading folds it away again (what was typed stays)
   const h = el('button', 'pmhead', L('🎨 पोस्टर बनाएँ', '🎨 Make a poster')); h.type = 'button'; h.setAttribute('aria-expanded', 'true');
   h.append(el('span', null, '▴'));
@@ -2354,7 +2374,14 @@ function pmForm(body) {
   const photo = el('div', 'pmrow');
   const pick = el('button', null, PM.img ? L('📷 फोटो बदलें', '📷 Change photo') : L('📷 उम्मीदवार की फोटो चुनें', '📷 Pick the candidate\'s photo')); pick.type = 'button';
   pick.addEventListener('click', () => { $('pmFile').value = ''; $('pmFile').click(); });
-  photo.append(pick);
+  const sym = el('button', null, PM.sym && !PM.symOff ? L('🔣 चुनाव चिन्ह बदलें', '🔣 Change the symbol') : L('🔣 चुनाव चिन्ह जोड़ें', '🔣 Add the election symbol')); sym.type = 'button';
+  sym.addEventListener('click', () => { $('pmSymFile').value = ''; $('pmSymFile').click(); });
+  photo.append(pick, sym);
+  if (PM.sym && !PM.symOff) {
+    const off = el('button', 'del', L('चिन्ह हटाएं', 'Remove symbol')); off.type = 'button';
+    off.addEventListener('click', () => { PM.symOff = true; posterDraw(); });
+    photo.append(off);
+  }
   const dl = el('datalist'); dl.id = 'pmPosts'; PM_POSTS.forEach((p) => { const o = el('option'); o.value = p; dl.append(o); });
   f.append(photo, field(L('नाम', 'Name'), 'name', 'मंजू देवी'), field(L('पद', 'Post'), 'post', PM_POSTS[0], 'pmPosts'), dl,
     field(L('ग्राम पंचायत / वार्ड', 'Panchayat / ward'), 'gp', 'ग्राम पंचायत फुलेरा'),
@@ -2447,6 +2474,22 @@ $('pmFile').addEventListener('change', () => {
       posterDraw(); $('pmake').scrollIntoView({ block: 'start' });
     };
     small.src = c.toDataURL('image/jpeg', 0.92);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); $('posterNote').textContent = L('यह फोटो नहीं खुल रही — दूसरी चुनें', 'This picture would not open — pick another'); };
+  img.src = url;
+});
+// the election symbol for the posters: kept as a 600 px copy on this phone (not saved until a poster is put up)
+$('pmSymFile').addEventListener('change', () => {
+  const file = $('pmSymFile').files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 600 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    const small = new Image();
+    small.onload = () => { PM.sym = small; PM.symFrom = 'pick'; PM.symOff = false; posterDraw(); $('pmake').scrollIntoView({ block: 'start' }); };
+    small.src = c.toDataURL('image/png');
   };
   img.onerror = () => { URL.revokeObjectURL(url); $('posterNote').textContent = L('यह फोटो नहीं खुल रही — दूसरी चुनें', 'This picture would not open — pick another'); };
   img.src = url;
