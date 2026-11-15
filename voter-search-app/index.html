@@ -647,7 +647,8 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
 
   /* printing / saving as PDF: only the slips in #printArea, each 94 mm wide, from the top-left corner of the page.
      The sizes sit outside @media print so printSlips() can lay the slips out off screen (#printArea.measure) and
-     cut them into A4 pages itself: a ward's or family's PDF then has the big poster at the top of every page. */
+     cut them into A4 pages itself: a ward's or family's PDF then has the big poster at the top of every page.
+     Smaller slips (more on a page): the sz-m / sz-s rules below. */
   #printArea { display: none; font-size: 0; }
   #printArea.measure { display: block; position: absolute; left: -10000px; top: 0; width: 194mm; visibility: hidden; }
   #printArea .ppage:not(:last-child) { break-after: page; page-break-after: always; }
@@ -674,6 +675,48 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   #printArea .pbigw .evm .led { width: 9mm; } #printArea .pbigw .evm .led::after { width: 4.5mm; height: 4.5mm; }
   #printArea .pbigw .evm .bt { width: 20mm; } #printArea .pbigw .evm .bt::before { width: 15mm; height: 7.5mm; }
   #printArea .pbigw .evm .bt::after { font-size: 16pt; bottom: -1.5mm; }
+  /* smaller slips, more on a page (slipSize): m = 2 across × 7 down (14 an A4 page), s = 3 across × 9 down (27; the
+     English spelling of names is left out so a name stays on one line). l (10 a page) is the size above. */
+  #printArea.sz-m .slip { font-size: 11.5px; }
+  #printArea.sz-m .slip .head { padding: 2px 6px 0; }
+  #printArea.sz-m .slip .meta { font-size: 10.5px; line-height: 1.15; }
+  #printArea.sz-m .slip .idline { padding: 1px 6px 2px; gap: 6px; }
+  #printArea.sz-m .slip .boxno { min-width: 34px; font-size: 16px; line-height: 21px; }
+  #printArea.sz-m .slip .epic { font-size: 16px; }
+  #printArea.sz-m .slip .line { padding: 1px 6px; }
+  #printArea.sz-m .slip .line b { font-size: 13px; }
+  #printArea.sz-m .slip .kendra { font-size: 10px; line-height: 1.2; margin: 2px 4px 0; padding: 1px 2px; }
+  #printArea.sz-m .slip .time { font-size: 10px; padding: 1px 4px; }
+  #printArea.sz-s .slip { width: 61.5mm; margin: 0 1.5mm 1.5mm 0; font-size: 9.5px; border-width: 1px; }
+  #printArea.sz-s .slip .head { padding: 0 4px; }
+  #printArea.sz-s .slip .meta { font-size: 8.5px; line-height: 1.1; }
+  #printArea.sz-s .slip .meta span + span { margin-left: 6px; }
+  #printArea.sz-s .slip .idline { padding: 1px 4px; gap: 4px; }
+  #printArea.sz-s .slip .boxno { min-width: 26px; padding: 0 3px; font-size: 13px; line-height: 17px; border-width: 1px; }
+  #printArea.sz-s .slip .epic { font-size: 13px; }
+  #printArea.sz-s .slip .line { padding: 0 4px; gap: 4px; }
+  #printArea.sz-s .slip .line b { font-size: 11px; }
+  #printArea.sz-s .slip .line .r .g { margin-left: 5px; }
+  #printArea.sz-s .slip .en { display: none; }
+  #printArea.sz-s .slip .kendra { font-size: 8.5px; line-height: 1.15; margin: 0 3px; padding: 1px 2px; }
+  #printArea.sz-s .slip .time { font-size: 8.5px; padding: 1px 3px; }
+  #printArea.sz-s .slip .pcut { font-size: 7pt; }
+  #printArea.sz-s .slip .evm { width: 56mm; }
+  /* with posters (पर्ची सेटिंग): the slip's poster, its ballot row and the ✂ line, and the page's big poster, smaller too */
+  #printArea.sz-m .slip .ptop { max-height: 15mm; }
+  #printArea.sz-m .slip .evm { height: 7.5mm; margin: 0.8mm auto; }
+  #printArea.sz-m .slip .pcut { font-size: 7pt; padding: 0.6mm 2mm; }
+  #printArea.sz-m .pbig { max-height: 45mm; margin-bottom: 2mm; }
+  #printArea.sz-s .slip .ptop { max-height: 10mm; }
+  #printArea.sz-s .slip .evm { height: 6mm; margin: 0.6mm auto; }
+  #printArea.sz-s .slip .evm .n { width: 7mm; font-size: 11pt; } #printArea.sz-s .slip .evm .nm { font-size: 9pt; }
+  #printArea.sz-s .slip .pcut { padding: 0.4mm 1.5mm; }
+  #printArea.sz-s .pbig { max-height: 35mm; margin-bottom: 2mm; }
+  #printArea.sz-s .pbigw .evm { width: 100mm; height: 10mm; margin: -1mm auto 2mm; }
+  #printArea.sz-s .pbigw .evm .n { width: 11mm; font-size: 17pt; } #printArea.sz-s .pbigw .evm .nm { font-size: 13pt; }
+  .szpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 10px; font-size: 14px; font-weight: 600; }
+  .szpick button { border: 1.5px solid #be185d; border-radius: 8px; padding: 5px 10px; background: #fff; color: #be185d; font-weight: 600; font-size: 13.5px; }
+  .szpick button.on { background: #be185d; color: #fff; }
   #printArea .ftree { font-size: 14px; border: 0; padding: 0; overflow: visible; }
   #printArea .ftree ul ul { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @media print {
@@ -1894,9 +1937,31 @@ setInterval(refreshMarks, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshMarks(); });
 
 // ---------- printing / saving slips as PDF (the phone's print screen also offers "Save as PDF") ----------
+// how many slips an A4 page of the PDF takes (the #printArea.sz-* sizes above), chosen in पर्ची सेटिंग or वार्ड पर्चियाँ
+// and kept on this phone: l 10 big, m 14 (the default), s 27 small
+const SLIP_SIZES = [['l', 10, 'बड़ी', 'big'], ['m', 14, 'मध्यम', 'medium'], ['s', 27, 'छोटी', 'small']];
+function slipSize() {
+  try { const v = localStorage.getItem('slipSize'); if (SLIP_SIZES.some(([k]) => k === v)) return v; } catch (e) { /* default */ }
+  return 'm';
+}
+// the size buttons: "एक पेज पर पर्चियाँ: [10 बड़ी] [14 मध्यम] [27 छोटी]"
+function sizePick() {
+  const box = el('div', 'szpick');
+  box.append(L('एक पेज पर पर्चियाँ:', 'Slips per page:'));
+  for (const [k, n, hi, en] of SLIP_SIZES) {
+    const b = el('button', k === slipSize() ? 'on' : null, `${n} ${L(hi, en)}`); b.type = 'button';
+    b.addEventListener('click', () => {
+      try { localStorage.setItem('slipSize', k); } catch (e) { /* only this time */ }
+      for (const x of box.querySelectorAll('button')) x.classList.toggle('on', x === b);
+    });
+    box.append(b);
+  }
+  return box;
+}
 async function printSlips(rows, title) {
   await posterLoad();
   const area = $('printArea'); area.innerHTML = '';
+  area.className = `sz-${slipSize()}`;
   const frag = document.createDocumentFragment();
   for (const r of rows) frag.append(slip(r, true));
   area.append(frag);
@@ -2049,6 +2114,7 @@ async function posterSave(slot, img, more) {
 }
 function posterDraw() {
   const body = $('posterBody'); body.innerHTML = '';
+  body.append(sizePick());
   pmForm(body);
   const slotBox = (slot, title, tip) => {
     const h = el('div', 'ph', title); h.append(el('small', null, tip));
@@ -2540,7 +2606,7 @@ function slipsButton() {
   $('slipsBtn').classList.toggle('hidden', DEMO || !VILLAGE || !(VILLAGE.wards || []).length || none);
 }
 function slipsOpen() {
-  $('slipsBody').replaceChildren(...VILLAGE.wards.map((w) => {
+  $('slipsBody').replaceChildren(sizePick(), ...VILLAGE.wards.map((w) => {
     const open = !WP_KNOWN || wardPaid(w);   // before the first search: shown as a download, the search below then decides
     const row = el('div', 'srow'), b = el('button', open ? 'paid' : null); b.type = 'button';
     b.textContent = open ? L('⬇ डाउनलोड', '⬇ Download') : `🔓 ₹${WARD_RS}`;
