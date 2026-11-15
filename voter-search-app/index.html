@@ -702,7 +702,12 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   #printArea.sz-s .slip .time { font-size: 8.5px; padding: 1px 3px; }
   #printArea.sz-s .slip .pcut { font-size: 7pt; }
   #printArea.sz-s .slip .evm { width: 56mm; }
-  /* with posters (पर्ची सेटिंग): the slip's poster, its ballot row and the ✂ line, and the page's big poster, smaller too */
+  /* with posters (पर्ची सेटिंग): the slip's poster, its ballot row and the ✂ line, and the page's big poster, smaller too
+     (capped by height, so a taller poster than usual doesn't take more room either) */
+  /* big (l): a poster taller than the usual shape (slip poster 1200 × 240, PDF poster 1600 × 534) is shrunk to that
+     height, so a page holds the same number of slips whatever poster was uploaded */
+  #printArea.sz-l .slip .ptop { max-height: 19mm; }
+  #printArea.sz-l .pbig { max-height: 64mm; }
   #printArea.sz-m .slip .ptop { max-height: 15mm; }
   #printArea.sz-m .slip .evm { height: 7.5mm; margin: 0.8mm auto; }
   #printArea.sz-m .slip .pcut { font-size: 7pt; padding: 0.6mm 2mm; }
