@@ -25,7 +25,7 @@
 // instead of a daily limit: the answer is then 'credits' once they are used up. A login with a daily limit that bought
 // searches uses them once the day's are used up ({bought} = how many of those are left); 'limit' when both are gone.
 const crypto = require('crypto');
-const { DEMO, village, whoIs, wardCfg, wardKey, wardAzKey, wardHnKey, wardFree, wardsPaid, wardsAz, wardsHn, MARKS, markKey, marksFor, allMarks, today, dailyLimit, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
+const { DEMO, village, whoIs, wardCfg, wardKey, wardAzKey, wardHnKey, wardFree, wardsPaid, wardsAz, wardsHn, MARKS, markKey, marksFor, allMarks, today, dailyLimit, dayDefault, adminLimited, credits, isPrepaid, paidKey, clientIp, redis, pipeline, send, route } = require('../_lib.js');
 const { load, search, family, publicFields } = require('../_search.js');
 const HI = new Intl.Collator('hi').compare;   // Hindi dictionary order, अ to ज्ञ (a ward's slips in name order)
 // house numbers as numbers (2 before 10, "12" before "12A"); voters with no house number last
@@ -57,15 +57,15 @@ async function countSearch(req, user, b, named) {
   const ipKey = `demo-ip:${clientIp(req)}:${today()}`;
   // a daily limit plus bought searches, used after the day's (village admins too; the superadmin has no limit)
   const extra = !user.demo && !prepaid && user.role !== 'super' && credits(user) > 0;
-  const [, perMinute, curRaw, usedRaw, ipRaw, paidRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
-    ['GET', findKey], ['GET', dayKey], ['GET', ipKey], ['GET', paidKey(user.id)]]);
+  const [, perMinute, curRaw, usedRaw, ipRaw, paidRaw, defRaw] = await pipeline([['SET', minuteKey, 0, 'EX', 120, 'NX'], ['INCR', minuteKey],
+    ['GET', findKey], ['GET', dayKey], ['GET', ipKey], ['GET', paidKey(user.id)], ['GET', 'dailydefault']]);
   if (perMinute > PER_MINUTE) return { error: 'slow_down' };
   if (user.admin && !adminLimited(user)) return {};   // the superadmin
 
   let cur = null;
   try { cur = curRaw && JSON.parse(curRaw); } catch (e) { /* start a new search */ }
   const q = { name: fold(b.name), rel: fold(b.rel), ward: String(b.ward || '') };
-  const now = Date.now(), limit = user.demo ? DEMO.searches : prepaid ? credits(user) : dailyLimit(user);
+  const now = Date.now(), limit = user.demo ? DEMO.searches : prepaid ? credits(user) : dailyLimit(user, dayDefault(defRaw));   // defRaw: the superadmin's default (dailyDefault in _lib.js)
   let used = Number(usedRaw) || 0, paidUsed = Number(paidRaw) || 0;
   const goesOn = !b.all && cur && b.searchId && b.searchId === cur.id && cur.n < SEARCH_STEPS
     && now - cur.start < SEARCH_MINUTES * 60e3

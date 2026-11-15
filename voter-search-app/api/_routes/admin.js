@@ -34,12 +34,16 @@
 //   action "aperms", id, aperms → {user}             what a village admin may do here (ADMIN_PERMS): the superadmin, or
 //                                                       an admin with 'arights' on the admins they made (only powers they have)
 //   action "gift", id, n        → {user}             n free searches for good to a signed-up user ('gift' or superadmin)
+//   action "ungift", id, n      → {user, taken}      takes back up to n unused searches of a signed-up user ('gift' or
+//                                                       superadmin; from someone who bought searches: superadmin only)
 //   (an admin with 'admins' may also "add_admin" (their villages only), "promote", "villages" (within theirs), and
 //    reset / retire / logout / phone the admins they made; with 'asearch', "limit" / "extra" on those admins)
 //   action "promote", id        → {user}             superadmin: a user becomes a village admin of their village, same
 //                                                       login and password, with PROMOTED_PERMS
 //   ("limit" / "extra" on an admin: superadmin only; a village admin has no daily limit until one is set)
 //   action "limit",  id, limit  → {user}             (searches a user may start per day; 0 or '' = the default)
+//   action "daily_default", n   → {dailyDefault, dailyBase}   superadmin: the default for everyone ('' = dailyBase);
+//                                                       "settings" gives both
 //   action "extra",  id [, n]   → {user}             (n more searches, default 100, for today only)
 //   action "clearMarks", village [, cand], status → {progress, …as "stats"}   (removes every 'done' | 'coming' | 'absent' mark of the
 //                                         village (of that candidate's group), or 'all' of them; kept as a backup first)
@@ -114,7 +118,7 @@
 // Phone numbers are stored as digits with the country code, e.g. 919876543210, ready for a wa.me link.
 const crypto = require('crypto');
 const { markSummary, markedList, candsOf, groupsOf } = require('../_progress.js');
-const { wardPayOn, wardPayAreas, wardCfg, WARD_RS_MAX, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, setOwnPassword, badOwnPassword, ownPwHash, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
+const { wardPayOn, wardPayAreas, wardCfg, WARD_RS_MAX, PACKS, payOnline, razorpayQr, QR_MIN, getWd, wdView, wdOpen, wdBack, wdPaid, wdSettle, walletOf, candReach, areaSize, areaKeyOf, areaVillages, userVillages, COUPON_RE, couponCode, getCoupon, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, freeRule, buildIndexes, afterMove, hasOwnPassword, FREE_MAX, setOwnPassword, badOwnPassword, ownPwHash, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, village, villageList, samitiKeys, MARKS, PERMS, permsOf, allMarks, markHash, getCand, today, DAILY_SEARCHES, extraToday, dailyLimit, dailyDefault, DAILY_MAX, creditsLeft, credits, isPrepaid, canBuy, packPrice, newReqId, getReq, addPaid, settleOnline, paidKey, normPhone, canMoveUserData, moveUserData, COPY_DONE, usesMongo, phoneLogins, redis, pipeline, pwHash, whoIs, freshPassword, newLogin: makeLogin, getUser, getUsers, marksFrom, blocked, failed,
   send, route } = require('../_lib.js');
 
 // parties (पार्टी): hash "parties", id → JSON {name, icon, created}; icon a small PNG/JPEG data URL made by the admin page
@@ -145,11 +149,13 @@ const areaSizes = (slugs) => Object.fromEntries(slugs.map(village).filter(Boolea
 // whole ZP / PS wards from the request (areaKeyOf in _lib.js) → only those with villages, no repeats
 const areaList = (list) => [...new Set((Array.isArray(list) ? list : []).map(String).filter((k) => /^(zp|ps):/.test(k) && areaVillages(k).length))];
 
+// the default daily limit for everyone (dailyDefault in _lib.js), read when a request starts
+let defLimit = DAILY_SEARCHES;
 const view = (u) => ({
   perms: appPerms(u), aperms: adminPermsOf(u), cand: u.role === 'user' ? u.cand || '' : '',
   // an admin without a limit from the superadmin: null (no limit)
-  limit: u.role === 'user' || adminLimited(u) ? dailyLimit(u) : null, ownLimit: Number(u.limit) || '', extraToday: extraToday(u),
-  defaultLimit: DAILY_SEARCHES,
+  limit: u.role === 'user' || adminLimited(u) ? dailyLimit(u, defLimit) : null, ownLimit: Number(u.limit) || '', extraToday: extraToday(u),
+  defaultLimit: defLimit,   // the default now (the superadmin's, admin action "daily_default")
   id: u.id, role: u.role, village: u.role === 'user' ? u.village || '' : '', villages: u.villages, name: u.name,
   ownVillages: u.ownVillages || [], samitis: u.samitis || [],   // an admin's: given one by one, and whole samitis
   more: u.more || [], areas: u.areas || [],   // a person's extra villages: one by one, and whole ZP / PS wards
@@ -184,6 +190,7 @@ module.exports = route(async (req, res, b) => {
   }
   if (me.status !== 'ok') return send(res, 403, { error: me.status });   // village admin retired or logged out
   const isSuper = me.role === 'super';
+  defLimit = await dailyDefault();
   const mayUse = (slug) => me.villages.includes(slug);
   // what this admin may do (ADMIN_PERMS in _lib.js; the superadmin everything), and whose users they see and look after:
   // 'all' every user of their villages, 'own' those they made
@@ -333,6 +340,13 @@ module.exports = route(async (req, res, b) => {
     await pipeline([['SET', 'markmode', b.mode], ['SET', 'markmodeat', now]]);
     return send(res, 200, { survey: b.mode === 'survey' });
   }
+  if (b.action === 'daily_default') {   // superadmin: searches per day for everyone without their own limit ('' = DAILY_SEARCHES)
+    if (!isSuper) return send(res, 403, { error: 'super_only' });
+    const n = b.n === '' || b.n == null ? 0 : Math.floor(Number(b.n));
+    if (!(n >= 0 && n <= DAILY_MAX)) return send(res, 400, { error: 'bad_limit' });
+    await redis('SET', 'dailydefault', n ? String(n) : '');
+    return send(res, 200, { dailyDefault: await dailyDefault(), dailyBase: DAILY_SEARCHES });
+  }
   if (b.action === 'free_rule') {   // superadmin: free searches for sign-ups (freeRule in _lib.js)
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const n = (v, max) => { const x = Math.floor(Number(v)); return x >= 1 && x <= max ? x : 0; };
@@ -408,7 +422,7 @@ module.exports = route(async (req, res, b) => {
     const ws = await Promise.all(all.map(wdSettle));
     const who = new Map((await getUsers([...new Set(ws.map((w) => w.user))])).map((u) => [u.id, u]));
     const wds = ws.map((w) => ({ ...wdView(w), user: w.user, name: (who.get(w.user) || {}).name || '', phone: (who.get(w.user) || {}).phone || '' }));
-    return send(res, 200, { freeRule: free, refRule: ref, coupons, wds, wardPay: await wardPayOn(), wardPayAreas: await wardPayAreas(), wardCfg: await wardCfg() });
+    return send(res, 200, { freeRule: free, refRule: ref, dailyDefault: defLimit, dailyBase: DAILY_SEARCHES, coupons, wds, wardPay: await wardPayOn(), wardPayAreas: await wardPayAreas(), wardCfg: await wardCfg() });
   }
   if (b.action === 'wd_paid' || b.action === 'wd_back') {   // superadmin: a UPI withdrawal sent by hand, or not sent
     if (!isSuper) return send(res, 403, { error: 'super_only' });
@@ -697,7 +711,7 @@ module.exports = route(async (req, res, b) => {
     if (user.role !== 'user' && !may('asearch')) return send(res, 403, { error: 'no_perm' });   // an admin's: superadmin or 'asearch'
     if (b.action === 'limit') {
       const n = b.limit === '' || b.limit == null ? 0 : parseInt(b.limit, 10);
-      if (!(n >= 0 && n <= 5000)) return send(res, 400, { error: 'bad_limit' });
+      if (!(n >= 0 && n <= DAILY_MAX)) return send(res, 400, { error: 'bad_limit' });
       await redis('HSET', `user:${user.id}`, 'limit', n ? String(n) : '');
     } else {
       const n = parseInt(b.n, 10) || 100;
@@ -714,6 +728,18 @@ module.exports = route(async (req, res, b) => {
     if (!(n > 0 && n <= GIFT_MAX)) return send(res, 400, { error: 'bad_limit' });
     await pipeline([['HINCRBY', `user:${user.id}`, 'credits', n], ['HINCRBY', `user:${user.id}`, 'gifted', n]]);
     return send(res, 200, { user: view(await getUser(user.id)) });
+  }
+
+  if (b.action === 'ungift') {   // takes back up to n of a signed-up user's unused searches (never below 0 left)
+    if (!may('gift')) return send(res, 403, { error: 'no_perm' });
+    if (!isPrepaid(user)) return send(res, 400, { error: 'not_prepaid' });
+    // searches they paid for are theirs: only the superadmin may take from someone who bought some
+    if (!isSuper && (user.bought === '1' || Number(user.walletSearches) > 0)) return send(res, 403, { error: 'has_bought' });
+    const n = parseInt(b.n, 10);
+    if (!(n > 0 && n <= GIFT_MAX)) return send(res, 400, { error: 'bad_limit' });
+    const take = Math.min(n, await creditsLeft(user));
+    if (take) await pipeline([['HINCRBY', `user:${user.id}`, 'credits', -take], ['HINCRBY', `user:${user.id}`, 'taken', take]]);
+    return send(res, 200, { user: view(await getUser(user.id)), taken: take });
   }
 
   if (b.action === 'reset' && typedPw()) {   // the superadmin's own choice of password
