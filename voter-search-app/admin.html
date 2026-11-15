@@ -435,6 +435,13 @@
         <button class="btn" id="freeSave" type="button">सेव करें</button>
         <div class="sub" id="freeMsg" style="margin:0"></div>
       </div>
+      <!-- superadmin: searches per day for everyone who has no limit of their own (api/_routes/admin.js "daily_default") -->
+      <div class="phead" style="margin-top:18px"><b>रोज़ की सर्च सीमा (सबके लिए)</b> · <span id="dayNow"></span></div>
+      <div class="stack" style="margin-top:8px">
+        <label class="fr num"><span>एडमिन के बनाए हर व्यक्ति की रोज़ की सर्च, जब तक उसकी अपनी सीमा न हो (खाली = 500)</span><input id="dayDefault" type="number" min="1" max="5000" inputmode="numeric"></label>
+        <button class="btn" id="daySave" type="button">सेव करें</button>
+        <div class="sub" id="dayMsg" style="margin:0"></div>
+      </div>
       <!-- ward slips: paid (₹WCFG.rs a ward) or free, for everyone (api/_routes/admin.js "ward_pay"); each person's own choice is on their card -->
       <div class="phead" style="margin-top:18px"><b id="wpTitle"></b> · <span id="wpNow"></span></div>
       <div class="stack" style="margin-top:8px">
@@ -477,7 +484,15 @@
         <button type="button" data-f="on" class="on">चालू</button>
         <button type="button" data-f="off">बंद</button>
         <button type="button" data-f="all">सभी</button>
+        <select id="fDistrict" aria-label="ज़िला"></select>
+        <select id="fSamiti" aria-label="पंचायत समिति"></select>
         <select id="fVillage" aria-label="गाँव"><option value="">सभी गाँव</option></select>
+        <select id="fSort" aria-label="क्रम">
+          <option value="">क्रम: जैसे बने</option>
+          <option value="most">ज़्यादा सर्च पहले</option>
+          <option value="least">कम सर्च पहले</option>
+          <option value="left">कम बची सर्च पहले</option>
+        </select>
       </div>
       <input id="qUsers" class="qbox" type="search" placeholder="🔍 नाम, मोबाइल या गाँव से खोजें" autocomplete="off">
       <div id="list"></div>
@@ -588,7 +603,8 @@ const $ = (id) => document.getElementById(id);
 const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch (e) { return false; } })();
 const L = (hi, en) => (EN ? en : hi);
 const STATIC_EN = {
-  'साइन-अप पर मुफ़्त सर्च': 'Free searches on sign-up', 'सीधे: हर गाँव के पहले X लोगों को Y सर्च': 'Direct: the first X people of each village get Y searches',
+  'साइन-अप पर मुफ़्त सर्च': 'Free searches on sign-up', 'क्रम: जैसे बने': 'Order: as made', 'ज़्यादा सर्च पहले': 'Most searches first', 'कम सर्च पहले': 'Fewest searches first', 'कम बची सर्च पहले': 'Fewest left first', 'रोज़ की सर्च सीमा (सबके लिए)': 'Searches per day (everyone)',
+  'एडमिन के बनाए हर व्यक्ति की रोज़ की सर्च, जब तक उसकी अपनी सीमा न हो (खाली = 500)': 'Searches per day for each person an admin made, unless they have their own limit (empty = 500)', 'सीधे: हर गाँव के पहले X लोगों को Y सर्च': 'Direct: the first X people of each village get Y searches',
   'घटते हुए: Y → Y/2 → … → 1, हर बार X लोगों को': 'Halving: Y → Y/2 → … → 1, X people at each step', 'लोग (X)': 'People (X)', 'सर्च (Y)': 'Searches (Y)',
   'सेव करें': 'Save',
   'एडमिन लॉगिन': 'Admin login', 'Voter Search · पासवर्ड बनाएं और बंद करें': 'Voter Search · make and switch off passwords',
@@ -649,6 +665,7 @@ const MSG = EN ? {
   offline: 'No internet', server: 'Server problem', name: 'Type a name', not_found: 'Person not found',
   exists: 'This mobile number already has a login here — use that one (or switch it off first)',
   phone: 'Mobile number missing or not right — type a 10-digit number (a person logs in with it and the password)',
+  has_bought: 'This person bought searches — only the super admin can take any back',
   no_perm: 'You are not allowed to do this — ask the super admin', pw_short: 'Password: 6 to 40 characters', pw_taken: 'This number\'s other login has this password — choose another', no_village: 'Choose a village', not_your_village: 'This village is not given to you', super_only: 'Only the super admin can do this', bad_price: 'Enter prices from ₹1 to ₹10000', free_rule: 'Enter people 1–100000, searches 1–1000 and a cap of 0–10000000',
   no_backup: 'Nothing to bring back', bad_limit: 'Type a search limit between 1 and 5000',
   no_user: 'None of your people has this mobile number — add the person first (यूज़र tab)', no_online: 'Online payment is not set up', gateway: 'Razorpay problem',
@@ -663,6 +680,7 @@ const MSG = EN ? {
   offline: 'इंटरनेट नहीं है', server: 'सर्वर में दिक्कत', name: 'नाम लिखें', not_found: 'यह यूज़र नहीं मिला',
   exists: 'इस मोबाइल नंबर का यहाँ पहले से खाता है — वही इस्तेमाल करें (या पहले उसे बंद करें)',
   phone: 'मोबाइल नंबर नहीं डाला या सही नहीं — 10 अंकों का नंबर लिखें (इसी नंबर और पासवर्ड से लॉगिन होगा)',
+  has_bought: 'इस व्यक्ति ने सर्च खरीदी हैं — वापस सिर्फ़ सुपर एडमिन ले सकते हैं',
   no_perm: 'आपको इसकी अनुमति नहीं है — सुपर एडमिन से कहें', pw_short: 'पासवर्ड 6 से 40 अक्षर का रखें', pw_taken: 'इस नंबर के दूसरे खाते का यही पासवर्ड है — कोई और पासवर्ड चुनें', no_village: 'गाँव चुनें', not_your_village: 'यह गाँव आपको नहीं दिया गया है', super_only: 'यह सिर्फ़ सुपर एडमिन कर सकता है', bad_price: '₹1 से ₹10000 तक का दाम डालें', free_rule: 'लोग 1–100000, सर्च 1–1000 और कुल सीमा 0–10000000 डालें',
   no_backup: 'वापस लाने के लिए कुछ नहीं है', bad_limit: 'सर्च सीमा 1 से 5000 के बीच लिखें',
   no_user: 'आपके यूज़र्स में यह मोबाइल नंबर नहीं है — पहले यूज़र tab में जोड़ें', no_online: 'ऑनलाइन भुगतान चालू नहीं है', gateway: 'Razorpay में दिक्कत',
@@ -776,7 +794,7 @@ function loadSettings() {   // superadmin: free searches, referrals and coupons 
     const r = await api({ action: 'settings' });
     if (r.error) { for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = errText(r); return; }
     settingsIn = true;
-    WARD_AREAS = r.wardPayAreas || {}; WCFG = r.wardCfg || WCFG; showWardPay(r.wardPay); showWardCfg(); showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
+    WARD_AREAS = r.wardPayAreas || {}; WCFG = r.wardCfg || WCFG; showWardPay(r.wardPay); showWardCfg(); showDaily(r.dailyDefault, r.dailyBase); showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
     loadCouponUses();
   })();
   return settingsBusy.finally(() => { settingsBusy = null; });
@@ -863,6 +881,23 @@ $('freeSave').addEventListener('click', async () => {
   showFreeRule(r.freeRule);
   $('freeMsg').textContent = L('✓ सेव हो गया — अब से नए साइन-अप पर लागू', '✓ Saved — applies to new sign-ups from now');
 });
+// the default searches per day (dailyDefault in api/_lib.js): for everyone without a limit of their own
+function showDaily(n, base) {
+  if (!n) return;
+  $('dayDefault').value = n === base ? '' : n; $('dayDefault').placeholder = String(base);
+  $('dayNow').textContent = L(`अभी ${n} रोज़`, `now ${n} a day`);
+}
+$('daySave').addEventListener('click', async () => {
+  const v = $('dayDefault').value.trim();
+  if (v && !(Number(v) >= 1 && Number(v) <= 5000)) { $('dayMsg').textContent = L('1 से 5000 के बीच संख्या लिखें', 'Type a number from 1 to 5000'); return; }
+  $('daySave').disabled = true; $('dayMsg').textContent = '';
+  const r = await api({ action: 'daily_default', n: v });
+  $('daySave').disabled = false;
+  if (r.error) { $('dayMsg').textContent = errText(r); return; }
+  showDaily(r.dailyDefault, r.dailyBase);
+  $('dayMsg').textContent = L('✓ सेव हो गया — अपनी सीमा वाले लोगों पर लागू नहीं', '✓ Saved — people with their own limit keep it');
+});
+$('dayDefault').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('daySave').click(); } });
 // ward slips (wardFree in api/_lib.js): ₹WCFG.rs a ward for everyone, or free; a person's own choice (on their card) wins
 let WARD_PAY = null;
 // the superadmin's prices and whether name order (अ–ज्ञ) and house-number order are sold (wardCfg in api/_lib.js; "ward_cfg")
@@ -1389,10 +1424,7 @@ function setup() {
   const pick = mine.length === 1 ? mine[0] : '';
   for (const id of ['mkVillage', 'vsVillage']) groupOptions($(id), `${pick || mine[0] || ''}|`);
   newSamitiOptions(mine, pick);
-  const fv = $('fVillage');
-  fv.length = 1;
-  for (const s of mine) fv.add(new Option(vName(s), s));
-  fv.value = pick;
+  fMine = mine; filterDistricts(pick);
   districtOptions($('candDistrict'), $('candSamiti'), mine, pick); candVillageOptions(pick);
   $('candVillage').classList.toggle('hidden', mine.length < 2);
   // back to search: the village list when this admin has several villages, else straight to the one village
@@ -1753,7 +1785,23 @@ function giftBox(u, msg = 'listMsg') {
     $(msg).textContent = L(`✓ ${u.name} को ${n} सर्च दी गईं`, `✓ Gave ${u.name} ${n} searches`); inp.value = '';
     refresh();
   });
-  box.append(L('मुफ़्त सर्च:', 'Free searches:'), inp, give);
+  // take back (action "ungift"): never more than they have left; from someone who bought searches only the superadmin
+  const take = el('button', 'btn ghost', L('➖ सर्च वापस लें', '➖ Take back searches'));
+  take.type = 'button';
+  take.addEventListener('click', async () => {
+    const n = parseInt(inp.value, 10);
+    if (!(n > 0 && n <= 1000)) { $(msg).textContent = L('1 से 1000 के बीच संख्या लिखें', 'Type a number from 1 to 1000'); return; }
+    if (!confirm(L(`${u.name} की ${n} सर्च वापस लें? (जितनी बची हैं उससे ज़्यादा नहीं)`, `Take back ${n} of ${u.name}'s searches? (never more than they have left)`))) return;
+    take.disabled = true;
+    const r = await api({ action: 'ungift', id: u.id, n });
+    take.disabled = false;
+    if (r.error) { $(msg).textContent = errText(r); return; }
+    $(msg).textContent = r.taken ? L(`✓ ${u.name} की ${r.taken} सर्च वापस ली गईं`, `✓ Took back ${r.taken} of ${u.name}'s searches`)
+      : L(`${u.name} के पास कोई सर्च नहीं बची`, `${u.name} has no searches left`);
+    inp.value = '';
+    refresh();
+  });
+  box.append(L('मुफ़्त सर्च:', 'Free searches:'), inp, give, take);
   return box;
 }
 
@@ -1944,7 +1992,54 @@ document.querySelectorAll('.filter button[data-f]').forEach((b) => b.addEventLis
   document.querySelectorAll('.filter button[data-f]').forEach((x) => x.classList.toggle('on', x === b));
   render();
 }));
+// the list's village filter, ज़िला → पंचायत समिति → गाँव (thousands of villages: one long list is too slow to pick
+// from); each can stay at "सभी". A village is listed only once its samiti is chosen, or when only a few are left.
+let fMine = [];
+const FILTER_FEW = 60;
+function filterDistricts(pick) {
+  const ds = [...new Set(fMine.map(distOf))].sort((a, b) => a.localeCompare(b)), d = $('fDistrict');
+  d.length = 0; d.add(new Option(L('सभी ज़िले', 'All districts'), ''));
+  for (const x of ds) d.add(new Option(`${x || L('अन्य', 'Other')} · ${fMine.filter((s) => distOf(s) === x).length}`, x));
+  d.value = pick ? distOf(pick) : ds.length === 1 ? ds[0] : '';
+  d.classList.toggle('hidden', ds.length < 2);
+  filterSamitis(pick);
+}
+function filterSamitis(pick) {
+  const dv = $('fDistrict').value, all = $('fDistrict').selectedIndex <= 0 && $('fDistrict').length > 2;
+  const inD = all ? fMine : fMine.filter((s) => distOf(s) === dv);
+  const keys = [...new Set(inD.map((s) => samitiOf(villages[s])))].sort((a, b) => (!a) - (!b) || samOnly(a).localeCompare(samOnly(b)));
+  const sel = $('fSamiti');
+  sel.length = 0; sel.add(new Option(L('सभी पंचायत समितियाँ', 'All panchayat samitis'), ''));
+  if (!all) for (const k of keys) sel.add(new Option(`${k ? samOnly(k) : L('अन्य', 'Other')} · ${inD.filter((s) => samitiOf(villages[s]) === k).length}`, k || '-'));
+  const pk = pick ? samitiOf(villages[pick]) || '-' : keys.length === 1 ? keys[0] || '-' : '';
+  sel.value = [...sel.options].some((o) => o.value === pk) ? pk : '';
+  sel.disabled = all; sel.classList.toggle('hidden', keys.length < 2);
+  filterVillages(pick);
+}
+function filterVillages(pick) {
+  const list = filterArea(), sel = $('fVillage'), sv = $('fSamiti').value;
+  sel.length = 0;
+  const few = sv || list.length <= FILTER_FEW;
+  sel.add(new Option(few ? L('सभी गाँव', 'All villages') : L('गाँव: पहले पंचायत समिति चुनें', 'Village: choose the samiti first'), ''));
+  if (few) for (const s of list.slice().sort((a, b) => vName(a).localeCompare(vName(b)))) sel.add(new Option(vName(s), s));
+  sel.value = few && list.includes(pick) ? pick : '';
+  sel.disabled = !few; sel.classList.toggle('hidden', fMine.length < 2);
+}
+// the villages the chosen ज़िला / पंचायत समिति cover
+function filterArea() {
+  const dv = $('fDistrict').value, sv = $('fSamiti').value, anyD = !dv && $('fDistrict').length > 2;
+  return fMine.filter((s) => (anyD || distOf(s) === dv) && (!sv || (samitiOf(villages[s]) || '-') === sv));
+}
+$('fDistrict').addEventListener('change', () => { filterSamitis(''); render(); });
+$('fSamiti').addEventListener('change', () => { filterVillages(''); render(); });
 $('fVillage').addEventListener('change', render);
+// sort the lists by searches (as on each card's meter: signed-up logins all their searches, others today's)
+const usedOf = (u) => (u.prepaid ? u.paidUsed : u.searchesToday) || 0;
+const leftOf = (u) => { const lim = u.prepaid ? u.credits : u.limit; return lim == null ? Infinity : Math.max(0, lim - usedOf(u)); };
+const SORTS = { most: (a, b) => usedOf(b) - usedOf(a), least: (a, b) => usedOf(a) - usedOf(b), left: (a, b) => leftOf(a) - leftOf(b) };
+const sorted = (list) => { const f = SORTS[$('fSort').value]; return f ? list.slice().sort(f) : list; };
+try { const v = localStorage.getItem('userSort'); if (v && SORTS[v]) $('fSort').value = v; } catch (e) { /* default order */ }
+$('fSort').addEventListener('change', () => { try { localStorage.setItem('userSort', $('fSort').value); } catch (e) { /* not kept */ } render(); });
 for (const id of ['qUsers', 'qAdmins']) $(id).addEventListener('input', render);
 
 // ---------- lists ----------
@@ -1972,17 +2067,18 @@ function matches(u, q) {
 function render() {
   if (!me) return;
   const fv = $('fVillage').value, q = $('qUsers').value, qa = $('qAdmins').value;
-  const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv) && matches(u, q));
+  const area = fv || !fMine.length || ($('fDistrict').selectedIndex <= 0 && !$('fSamiti').value) ? null : new Set(filterArea());   // a ज़िला / समिति chosen
+  const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv) && (!area || area.has(u.village)) && matches(u, q));
   const list = $('list'); list.innerHTML = '';
   if (!shown.length && q.trim()) list.append(el('div', 'empty', L('इस खोज से कोई यूज़र नहीं मिला', 'No user matches this search')));
   else if (!shown.length) list.append(el('div', 'empty', filter === 'off' ? L('कोई बंद पासवर्ड नहीं', 'No switched-off passwords') : L('अभी कोई यूज़र नहीं — "+ नया यूज़र" से जोड़ें', 'Nobody yet — add someone with "+ New person"')));
-  paged(list, shown, person, `people:${filter}:${fv}:${q}`);
+  paged(list, sorted(shown), person, `people:${filter}:${fv}:${$('fDistrict').value}:${$('fSamiti').value}:${q}`);
   renderCands();
   const al = $('adminList'); al.innerHTML = '';
   if (mayDo('admins')) {
     const ad = admins.filter((u) => matches(u, qa));
     if (!ad.length) al.append(el('div', 'empty', admins.length ? L('इस खोज से कोई एडमिन नहीं मिला', 'No admin matches this search') : L('अभी कोई एडमिन नहीं', 'No admins yet')));
-    paged(al, ad, person, `admins:${qa}`);
+    paged(al, sorted(ad), person, `admins:${qa}`);
   }
 }
 

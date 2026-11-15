@@ -610,7 +610,7 @@ const appPerms = (u) => (u.role === 'admin' && u.perms === undefined ? PERMS.sli
 //   wardpay: ward slips free / paid for a user they look after (wardFree; admin.js "ward_pay_user")
 const ADMIN_PERMS = ['add', 'own', 'all', 'admins', 'arights', 'asearch', 'gift', 'wardpay'];
 const OLD_ADMIN_PERMS = ['add', 'own', 'all'];   // an admin made before these could be set
-const GIFT_MAX = 1000;   // free searches one "gift" may add
+const GIFT_MAX = 1000;   // free searches one "gift" may add (or "ungift" take back)
 const PROMOTED_PERMS = ['add', 'own'];   // a user made admin (api/_routes/admin.js "promote")
 const adminPermsOf = (u) => (u.role !== 'admin' ? [] : u.aperms === undefined ? OLD_ADMIN_PERMS.slice()
   : String(u.aperms).split(',').filter((p) => ADMIN_PERMS.includes(p)));
@@ -620,9 +620,14 @@ const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 1
 // (user field "limit"), else DAILY_SEARCHES, plus any extra the admin gave for today (field "extra" = "<day>:<n>").
 // A village admin has the same daily limit (adminLimited; the superadmin may change it) and may buy more searches, or
 // ask the superadmin for them on WhatsApp (adminFor). The superadmin has no limit.
+// The superadmin may change that default for everyone (key "dailydefault", admin.js "daily_default"); callers read it
+// once per request (dailyDefault) and pass it to dailyLimit.
 const DAILY_SEARCHES = 500;
+const DAILY_MAX = 5000;   // highest daily limit, own or default
+const dayDefault = (v) => { const n = Math.floor(Number(v)); return n >= 1 && n <= DAILY_MAX ? n : DAILY_SEARCHES; };   // the stored value → the default
+const dailyDefault = async () => dayDefault(await redis('GET', 'dailydefault'));
 const extraToday = (u) => { const [d, n] = String(u.extra || '').split(':'); return d === today() ? Number(n) || 0 : 0; };
-const dailyLimit = (u) => (Number(u.limit) || DAILY_SEARCHES) + extraToday(u);
+const dailyLimit = (u, def = DAILY_SEARCHES) => (Number(u.limit) || def) + extraToday(u);
 const adminLimited = (u) => u.role === 'admin';
 // Prepaid searches (api/signup.js): a user who signed up by themselves (field "self") may start "credits" searches in all
 // (free ones from signing up, invites and coupons, plus ones bought online, api/pay.js) instead of a daily limit; they
@@ -1301,7 +1306,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, wardCfg, WARD_RS_MAX, WARD_HN_RS, wardHnKey, wardsHn, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, extraToday, dailyLimit,
+module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, wardCfg, WARD_RS_MAX, WARD_HN_RS, wardHnKey, wardsHn, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, DAILY_MAX, dayDefault, dailyDefault, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, noAnalytics, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };
