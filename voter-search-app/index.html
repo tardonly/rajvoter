@@ -655,6 +655,15 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   #printArea .slip { display: inline-block; vertical-align: top; width: 94mm; margin: 0 2mm 2mm 0; font-size: 13px;
     break-inside: avoid; page-break-inside: avoid; }
   #printArea .slip .epic { font-size: 19px; }
+  /* on paper: only the Hindi names (no English spelling), and the पं.सं. / वार्ड line beside the EPIC number instead of
+     a row of its own above it (the head's left side, the on-screen buttons, is empty on paper) */
+  #printArea .slip .en { display: none; }
+  #printArea .slip .head { float: right; padding-top: 4px; }
+  #printArea .slip .head .tools { display: none; }
+  #printArea .slip .meta { line-height: 1.25; }
+  #printArea .slip .idline { padding-top: 4px; }
+  #printArea .slip .epic { white-space: nowrap; word-break: normal; }
+  #printArea .slip .line { clear: right; }
   #printArea .slip .line b { font-size: 15px; }
   #printArea .slip .kendra { font-size: 11px; }
   #printArea .slip .time { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -675,7 +684,7 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   #printArea .pbigw .evm .led { width: 9mm; } #printArea .pbigw .evm .led::after { width: 4.5mm; height: 4.5mm; }
   #printArea .pbigw .evm .bt { width: 20mm; } #printArea .pbigw .evm .bt::before { width: 15mm; height: 7.5mm; }
   #printArea .pbigw .evm .bt::after { font-size: 16pt; bottom: -1.5mm; }
-  /* smaller slips, more on a page (slipSize): m = 2 across × 7 down (14 an A4 page), s = 3 across × 9 down (27; the
+  /* smaller slips, more on a page (slipSize): m = 2 across × 9 down (18 an A4 page), s = 3 across × 10 down (30; the
      English spelling of names is left out so a name stays on one line). l (10 a page) is the size above. */
   #printArea.sz-m .slip { font-size: 11.5px; }
   #printArea.sz-m .slip .head { padding: 2px 6px 0; }
@@ -697,7 +706,6 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   #printArea.sz-s .slip .line { padding: 0 4px; gap: 4px; }
   #printArea.sz-s .slip .line b { font-size: 11px; }
   #printArea.sz-s .slip .line .r .g { margin-left: 5px; }
-  #printArea.sz-s .slip .en { display: none; }
   #printArea.sz-s .slip .kendra { font-size: 8.5px; line-height: 1.15; margin: 0 3px; padding: 1px 2px; }
   #printArea.sz-s .slip .time { font-size: 8.5px; padding: 1px 3px; }
   #printArea.sz-s .slip .pcut { font-size: 7pt; }
@@ -1943,8 +1951,9 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) refr
 
 // ---------- printing / saving slips as PDF (the phone's print screen also offers "Save as PDF") ----------
 // how many slips an A4 page of the PDF takes (the #printArea.sz-* sizes above), chosen in पर्ची सेटिंग or वार्ड पर्चियाँ
-// and kept on this phone: l 10 big, m 14 (the default), s 27 small
-const SLIP_SIZES = [['l', 10, 'बड़ी', 'big'], ['m', 14, 'मध्यम', 'medium'], ['s', 27, 'छोटी', 'small']];
+// and kept on this phone: l 12 big, m 18 (the default), s 30 small, a page without posters (fewer with them). Nobody has
+// to choose: medium is used until someone does.
+const SLIP_SIZES = [['l', 12, 'बड़ी', 'big'], ['m', 18, 'मध्यम', 'medium'], ['s', 30, 'छोटी', 'small']];
 function slipSize() {
   try { const v = localStorage.getItem('slipSize'); if (SLIP_SIZES.some(([k]) => k === v)) return v; } catch (e) { /* default */ }
   return 'm';
