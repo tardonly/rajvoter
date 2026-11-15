@@ -466,8 +466,8 @@ module.exports = route(async (req, res, b) => {
     const reqs = rows.map((r) => {
       const u = who.get(r.user);
       return u ? { ...reqView(r), name: u.name, phone: u.phone || '' } : null;
-    }).filter(Boolean).sort((a, b) => ((a.status === 'open') !== (b.status === 'open') ? (a.status === 'open' ? -1 : 1)
-      : (a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1)).slice(0, 300);
+    }).filter(Boolean).sort((a, b) => ((a.status === 'open' ? a.created : a.doneAt) < (b.status === 'open' ? b.created : b.doneAt) ? 1 : -1))
+      .slice(0, 1000);   // newest first: the page filters them by paid / not paid and by day
     return send(res, 200, { reqs });
   }
 
