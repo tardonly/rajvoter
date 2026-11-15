@@ -2231,8 +2231,9 @@ const PM_THEMES = [
 ];
 const PM_POSTS = ['सरपंच प्रत्याशी', 'वार्ड पंच प्रत्याशी', 'पंचायत समिति सदस्य प्रत्याशी', 'जिला परिषद सदस्य प्रत्याशी', 'प्रधान प्रत्याशी', 'पार्षद प्रत्याशी'];
 // what was typed stays while पर्ची सेटिंग is redrawn; the photo stays until the page is closed
-// sym: the election symbol's picture (the one saved with the ballot number, or one picked here), symOff: taken off the posters
-const PM = { open: false, img: null, sym: null, symFrom: '', symOff: false, zoom: 1, ox: 0, oy: 0, theme: 'saffron', name: '', post: PM_POSTS[0], gp: '', tag: '', call: '🙏 भारी मतों से विजयी बनाएँ 🙏' };
+// sym: the election symbol's picture (the one saved with the ballot number, or one picked here), symOff: taken off the
+// posters; sz, sx, sy: its zoom and how far it is moved in its box (fractions of the box)
+const PM = { open: false, img: null, sym: null, symFrom: '', symOff: false, sz: 1, sx: 0, sy: 0, zoom: 1, ox: 0, oy: 0, theme: 'saffron', name: '', post: PM_POSTS[0], gp: '', tag: '', call: '🙏 भारी मतों से विजयी बनाएँ 🙏' };
 let pmFontAsk = null;
 function pmFont() {   // Android has no Hindi font of its own good enough for a poster: fetch Noto Sans Devanagari once
   if (!pmFontAsk) {
@@ -2281,13 +2282,18 @@ function pmFace(g, t, x, y, d, ring) {
   g.restore();
 }
 // the election symbol in a white box with the photo's ring colour round it, the picture fitted inside
+// where the symbol's box sits on each poster: x, y, size
+const PM_SIGN = { top: [1200 - 20 - 180, 25, 180], big: [1600 - 40 - 300, 70, 300] };
 function pmSign(g, t, x, y, d, ring) {
   if (!PM.sym || PM.symOff) return false;
   const r = d * 0.14, box = (o) => { g.beginPath(); if (g.roundRect) g.roundRect(x + o, y + o, d - 2 * o, d - 2 * o, Math.max(r - o, 2)); else g.rect(x + o, y + o, d - 2 * o, d - 2 * o); };   // older phones have no roundRect
   g.save(); g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = d * 0.08; g.shadowOffsetY = d * 0.02; g.fillStyle = t.ring; box(0); g.fill(); g.restore();
   g.fillStyle = '#fff'; box(ring); g.fill();
-  const w = PM.sym.naturalWidth, h = PM.sym.naturalHeight, room = d - 2 * ring - d * 0.12, k = Math.min(room / w, room / h);
-  g.drawImage(PM.sym, x + (d - w * k) / 2, y + (d - h * k) / 2, w * k, h * k);
+  // fitted inside at zoom 1, then zoomed and moved as set (what spills over the box is cut off)
+  const w = PM.sym.naturalWidth, h = PM.sym.naturalHeight, room = d - 2 * ring - d * 0.12, k = Math.min(room / w, room / h) * PM.sz;
+  g.save(); box(ring); g.clip();
+  g.drawImage(PM.sym, x + (d - w * k) / 2 + PM.sx * room, y + (d - h * k) / 2 + PM.sy * room, w * k, h * k);
+  g.restore();
   return true;
 }
 function pmText(g, t, s, cx, y, size, maxW, color, weight, sh, shOff) {
@@ -2315,7 +2321,7 @@ function pmDrawTop(c) {
   const W = 1200, H = 240, g = c.getContext('2d'), t = pmTheme(); c.width = W; c.height = H;
   pmBg(g, W, H, t, 720, 110);
   pmFace(g, t, 24, 14, 204, 7);
-  const right = pmSign(g, t, W - 20 - 180, 25, 180, 7) ? W - 20 - 180 - 20 : W - 20;   // the symbol on the right, if there is one
+  const right = pmSign(g, t, ...PM_SIGN.top, 7) ? W - 20 - 180 - 20 : W - 20;   // the symbol on the right, if there is one
   const cx = 250 + (right - 250) / 2, mw = right - 250 - 20, sub = pmSub();
   pmText(g, t, pmName(), cx, sub ? 92 : 115, 96, mw, t.name, 800, t.nameSh, 5);
   pmText(g, t, sub, cx, 180, 38, mw, t.sub, 600);
@@ -2325,7 +2331,7 @@ function pmDrawBig(c) {
   const W = 1600, H = 534, g = c.getContext('2d'), t = pmTheme(); c.width = W; c.height = H;
   pmBg(g, W, H, t, 1000, 230);
   pmFace(g, t, 40, 40, 436, 11);
-  const sign = pmSign(g, t, W - 40 - 300, 70, 300, 10), right = sign ? W - 40 - 300 - 30 : W - 40;
+  const sign = pmSign(g, t, ...PM_SIGN.big, 10), right = sign ? W - 40 - 300 - 30 : W - 40;
   if (sign) pmText(g, t, 'चुनाव चिन्ह', W - 40 - 150, 412, 40, 300, t.sub, 700);
   const cx = 500 + (right - 500) / 2, mw = right - 500 - 20, tag = PM.tag.trim(), call = PM.call.trim(), sub = pmSub();
   // the lines share the height: name and the line under it in the middle, the slogans above and below when given
@@ -2403,11 +2409,30 @@ function pmForm(body) {
   zoom.addEventListener('input', () => { PM.zoom = +zoom.value; draw(); });
   const zrow = el('div', 'pmzoom'), zr = el('div', 'pmrow'); zr.append(el('span', 'zl', L('🔍 फोटो', '🔍 Photo')), zoom);
   zrow.append(zr, el('div', 'zh', L('चेहरा बीच में लाने के लिए पोस्टर पर फोटो को खिसकाएँ', 'Drag on a poster to centre the face')));
-  const drag = (c, faceD) => {
-    let last = null;
-    c.addEventListener('pointerdown', (e) => { if (!PM.img) return; last = [e.clientX, e.clientY]; c.setPointerCapture(e.pointerId); });
+  // drag on a poster: on the symbol's box it moves the symbol, anywhere else the face
+  const szoom = el('input'); szoom.type = 'range'; szoom.min = '0.5'; szoom.max = '4'; szoom.step = '0.05'; szoom.value = PM.sz;
+  szoom.setAttribute('aria-label', L('चिन्ह छोटा-बड़ा', 'Symbol zoom'));
+  szoom.addEventListener('input', () => { PM.sz = +szoom.value; draw(); });
+  const sreset = el('button', null, L('↺ फिर से फिट करें', '↺ Fit again')); sreset.type = 'button';
+  sreset.addEventListener('click', () => { PM.sz = 1; PM.sx = 0; PM.sy = 0; szoom.value = 1; draw(); });
+  const srow = el('div', 'pmzoom'), sr = el('div', 'pmrow'); sr.append(el('span', 'zl', L('🔍 चिन्ह', '🔍 Symbol')), szoom, sreset);
+  srow.append(sr, el('div', 'zh', L('चिन्ह को उसके सफ़ेद डिब्बे में खिसकाएँ, बड़ा करके किनारे का फालतू हिस्सा बाहर करें', 'Drag the symbol inside its white box; zoom in to push stray edges out')));
+  const drag = (c, faceD, sb) => {
+    let last = null, onSym = false;
+    c.addEventListener('pointerdown', (e) => {
+      const rc = c.getBoundingClientRect(), k = c.width / rc.width, px = (e.clientX - rc.left) * k, py = (e.clientY - rc.top) * k;
+      onSym = !!PM.sym && !PM.symOff && px >= sb[0] && px <= sb[0] + sb[2] && py >= sb[1] && py <= sb[1] + sb[2];
+      if (!onSym && !PM.img) return;
+      last = [e.clientX, e.clientY]; c.setPointerCapture(e.pointerId);
+    });
     c.addEventListener('pointermove', (e) => {
-      if (!last || !PM.img) return;
+      if (!last) return;
+      if (onSym) {
+        const k = c.width / c.getBoundingClientRect().width, room = sb[2] * 0.8;
+        PM.sx = Math.max(-1, Math.min(1, PM.sx + (e.clientX - last[0]) * k / room)); PM.sy = Math.max(-1, Math.min(1, PM.sy + (e.clientY - last[1]) * k / room));
+        last = [e.clientX, e.clientY]; draw(); return;
+      }
+      if (!PM.img) return;
       const k = c.width / c.getBoundingClientRect().width, [, , s] = pmCrop(PM.img), per = s / faceD;   // photo pixels per poster pixel
       PM.ox -= (e.clientX - last[0]) * k * per / PM.img.naturalWidth; PM.oy -= (e.clientY - last[1]) * k * per / PM.img.naturalHeight;
       const [x, y] = pmCrop(PM.img), w = PM.img.naturalWidth, hh = PM.img.naturalHeight;   // keep the offset where the crop actually is
@@ -2417,7 +2442,7 @@ function pmForm(body) {
     const up = () => { last = null; };
     c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
   };
-  drag(top, 190); drag(big, 414);
+  drag(top, 190, PM_SIGN.top); drag(big, 414, PM_SIGN.big);
   // each poster on its own: put it up, or save the picture to the phone
   const nm = () => (PM.name.trim() || 'poster').replace(/[\\/:*?"<>|\s]+/g, '-');
   const acts = (c, slot) => {
@@ -2435,7 +2460,7 @@ function pmForm(body) {
   shut.addEventListener('click', () => { PM.open = false; posterDraw(); $('pmake').scrollIntoView({ block: 'nearest' }); });
   const end = el('div', 'pmrow'); end.append(shut);
   box.append(h, f, el('div', 'ph', L('रंग चुनें', 'Pick a colour')), sw,
-    PM.img ? zrow : '',
+    PM.img ? zrow : '', PM.sym && !PM.symOff ? srow : '',
     el('div', 'ph', L('पर्ची पोस्टर (1200 × 240)', 'Slip poster (1200 × 240)')), top, acts(top, 'top'),
     el('div', 'ph', L('PDF पोस्टर (1600 × 534)', 'PDF poster (1600 × 534)')), big, acts(big, 'big'), end);
   pmDrawTop(top); pmDrawBig(big);
@@ -2485,18 +2510,22 @@ function pmSymSet(img, k, done) {
   const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
   const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
   const W = c.width, H = c.height, d = g.getImageData(0, 0, W, H), p = d.data;
-  let r = 0, gr = 0, b = 0, n = 0;
-  const acc = (i) => { r += p[i]; gr += p[i + 1]; b += p[i + 2]; n++; };
-  for (let x = 0; x < W; x++) { acc(x * 4); acc(((H - 1) * W + x) * 4); }
-  for (let y = 0; y < H; y++) { acc(y * W * 4); acc((y * W + W - 1) * 4); }
-  r /= n; gr /= n; b /= n;
+  // the background: the commonest colour in a band round the edge (a mix of colours there, like a border or a bit of
+  // the page next to it, would otherwise average out to a colour that is nowhere in the picture)
+  const band = Math.max(2, Math.round(Math.min(W, H) * 0.04)), buckets = new Map();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (x >= band && x < W - band && y >= band && y < H - band) { x = W - band - 1; continue; }
+    const i = (y * W + x) * 4, key = (p[i] >> 5) * 64 + (p[i + 1] >> 5) * 8 + (p[i + 2] >> 5), o = buckets.get(key) || [0, 0, 0, 0];
+    o[0] += p[i]; o[1] += p[i + 1]; o[2] += p[i + 2]; o[3]++; buckets.set(key, o);
+  }
+  const top = [...buckets.values()].sort((a, c) => c[3] - a[3])[0], r = top[0] / top[3], gr = top[1] / top[3], b = top[2] / top[3];
   for (let i = 0; i < p.length; i += 4) {
     const a = Math.min(1, Math.max(0, (Math.hypot(p[i] - r, p[i + 1] - gr, p[i + 2] - b) - 40) / 50));   // 0 = background, 1 = symbol
     for (let q = 0; q < 3; q++) p[i + q] = 255 * (1 - a) + p[i + q] * a;
   }
   g.putImageData(d, 0, 0);
   const out = new Image();
-  out.onload = () => { PM.sym = out; done(); };
+  out.onload = () => { PM.sym = out; PM.sz = 1; PM.sx = 0; PM.sy = 0; done(); };
   out.src = c.toDataURL('image/png');
 }
 // a symbol picked here stays on this phone (not saved until a poster is put up)
