@@ -29,7 +29,7 @@
 //     (सर्वे / मतदान दिवस, markModeOf in _lib.js), until the superadmin next switches everyone
 // 10 lookups / sign-ups per internet address in 15 minutes, and 3 sign-ups a day.
 // Keys: set "free" (signed-up logins not yet given paid searches), "signups:<ip>:<day>" → sign-ups today from there.
-const { buyVillage, getCoupon, couponHold, selfCount, afterMove, couponFor, couponPrice, couponView, refRule, refFor, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, freeLeft, takeFree, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
+const { buyVillage, getCoupon, couponHold, selfCount, afterMove, couponFor, couponPrice, couponView, refRule, refFor, refSlots, refInviter, PACKS, adminFor, newReqId, getReq, whoIs, canBuy, payOnline, freeRule, freeFor, freeLeft, takeFree, pipeline, phoneLogins, adminPhone, village, villageList, normPhone, OTP, otpOn, newOtp, checkOtp, badOwnPassword, ownPwHash, setOwnPassword, getUser, newLogin, today, clientIp, redis, newSession, makeToken,
   deviceName, permsOf, movesLeft, blocked, failed, send, route } = require('./_lib.js');
 
 const SIGNUPS_PER_DAY = 3;   // per internet address
@@ -39,11 +39,20 @@ const SIGNUPS_PER_DAY = 3;   // per internet address
 // too: selfcount in _lib.js), none if this number signed up before; plus the referral bonus (refRule in _lib.js) when it
 // came through a friend's link (ref: the inviter). The village's cap (rule.cap) can make it less; take: this is the
 // sign-up itself, so the searches are counted against the cap (takeFree), otherwise only looked at (lookup).
+// Once the village gives no free searches any more, the referral bonus needs one of the inviter's slots (refSlots in
+// _lib.js: per friend of theirs who bought); the sign-up uses it up (refJoined; HINCRBY, so two at once can't share one).
 async function freeSearches(phone, slug, rule, ref, take) {
   if ((await phoneLogins(phone)).some((u) => u.self === '1')) return 0;
   rule = rule || await freeRule();
   const rr = ref ? await refRule() : null, want = freeFor(rule, await selfCount(slug));
-  return (take ? await takeFree(slug, rule, want) : await freeLeft(slug, rule, want)) + (rr && rr.on ? rr.joiner : 0);
+  const got = take ? await takeFree(slug, rule, want) : await freeLeft(slug, rule, want);
+  if (!rr || !rr.on || !rr.joiner) return got;
+  if (got > 0 || !rr.per) return got + rr.joiner;
+  if (!take) return refSlots(ref, rr) > 0 ? rr.joiner : 0;
+  const used = Number(await redis('HINCRBY', `user:${ref.id}`, 'refJoined', 1));
+  if (used <= (Number(ref.refBought) || 0) * rr.per) return rr.joiner;
+  await redis('HINCRBY', `user:${ref.id}`, 'refJoined', -1);
+  return 0;
 }
 const realVillage = (s) => { const v = village(s); return v && !v.demo ? v : null; };
 // the login a password reset is for: this number's active login of that village; without a village (the start page) an
@@ -114,7 +123,7 @@ module.exports = route(async (req, res, b) => {
       'lastSeen', now, 'logins', 1);
     return send(res, 200, { password, token: makeToken(id, sid), name, phone, role: 'user', admin: false, villages: [v.slug],
       list: villageList([v.slug]), perms: permsOf({}), prepaid: true, canBuy: true, online: payOnline(), left: free, movesLeft: movesLeft({ role: 'user', self: '1' }),
-      adminPhone: await adminPhone({ village: v.slug }), ref: await refFor({ id, role: 'user' }) });
+      adminPhone: await adminPhone({ village: v.slug }), ref: await refFor({ id, role: 'user', village: v.slug }) });
   }
   if (b.action === 'reset') {   // forgotten password: the code sent to the number, then the new password
     if (!otpOn()) return send(res, 400, { error: 'no_otp' });

@@ -93,7 +93,7 @@
 //                                      → {wardPayAreas}   superadmin: the same for one ज़िला / पंचायत समिति ('' = as above)
 //   action "ward_pay_user", id, mode ('free' | 'pay' | '') → {user}   superadmin, or an admin with 'wardpay' on a user they look after: that person's own setting (user field
 //                                         wardpay; '' = as for everyone); view's wardpay
-//   action "ref_rule", on, pct, joiner, bonusAt, bonus, apct → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
+//   action "ref_rule", on, pct, joiner, per, bonusAt, bonus, apct → {refRule}   superadmin: referral cashback (refRule in _lib.js); "list" gives
 //                                         refRule to the superadmin
 //   action "mark_mode", mode ('survey' | 'poll') → {survey}   the superadmin: which set of marks everyone uses from now on
 //                                         (each person may switch back for themself); a village admin: their own choice
@@ -303,9 +303,9 @@ module.exports = route(async (req, res, b) => {
     if (!isSuper) return send(res, 403, { error: 'super_only' });
     const n = (v, max) => { const x = Math.floor(Number(v)); return v !== '' && v != null && x >= 0 && x <= max ? x : -1; };
     const apct = b.apct === undefined ? (await refRule()).apct : n(b.apct, REF_PCT_MAX);
-    const pct = n(b.pct, REF_PCT_MAX), joiner = n(b.joiner, REF_MAX), bonusAt = n(b.bonusAt, REF_AT_MAX), bonus = n(b.bonus, REF_MAX);
-    if (pct < 0 || joiner < 0 || bonusAt < 0 || bonus < 0 || apct < 0) return send(res, 400, { error: 'ref_rule' });
-    await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'pct', pct, 'apct', apct, 'joiner', joiner, 'bonusAt', bonusAt, 'bonus', bonus, 'at', now, 'by', me.id);
+    const pct = n(b.pct, REF_PCT_MAX), joiner = n(b.joiner, REF_MAX), per = b.per === undefined ? (await refRule()).per : n(b.per, REF_AT_MAX), bonusAt = n(b.bonusAt, REF_AT_MAX), bonus = n(b.bonus, REF_MAX);
+    if (pct < 0 || joiner < 0 || per < 0 || bonusAt < 0 || bonus < 0 || apct < 0) return send(res, 400, { error: 'ref_rule' });
+    await redis('HSET', 'refrule', 'on', b.on ? '1' : '0', 'pct', pct, 'apct', apct, 'joiner', joiner, 'per', per, 'bonusAt', bonusAt, 'bonus', bonus, 'at', now, 'by', me.id);
     return send(res, 200, { refRule: await refRule() });
   }
   if (b.action === 'coupon_set') {   // superadmin: make or change a coupon (getCoupon in _lib.js)
