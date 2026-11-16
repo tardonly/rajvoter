@@ -696,7 +696,11 @@ async function takeFree(slug, rule, want) {
 // (refReward; field refPaid on the new login marks its first purchase; the inviter counts refBought, refCash, refBonus;
 // refEarned is the searches older rewards gave). The superadmin sets it on the admin page (key "refrule",
 // api/_routes/admin.js "ref_rule"), REF until then.
-const REF = { on: true, pct: 5, joiner: 5, bonusAt: 5, bonus: 100, apct: 10 };   // apct: a village admin's % on a sale by QR (agentReward)
+// Once the village's free sign-up searches have run out, a friend gets `joiner` only on a slot the inviter has earned:
+// every friend of theirs who buys (refBought) opens `per` more slots, refJoined counts the slots used (refSlots,
+// api/signup.js freeSearches). per 0 = no limit (every friend gets them). While the village still gives free searches
+// the friend gets joiner on top without using a slot.
+const REF = { on: true, pct: 5, joiner: 5, per: 3, bonusAt: 5, bonus: 100, apct: 10 };   // apct: a village admin's % on a sale by QR (agentReward)
 const REF_PCT_MAX = 50, REF_AT_MAX = 100;
 const REF_MAX = 1000;
 async function refRule() {
@@ -705,14 +709,25 @@ async function refRule() {
   const num = (v, d) => { const n = Math.floor(Number(v)); return n >= 0 && n <= REF_MAX && v !== undefined && v !== '' ? n : d; };
   const pct = num(o.pct, REF.pct), at = num(o.bonusAt, REF.bonusAt);
   return { on: o.on === undefined ? REF.on : o.on === '1', pct: Math.min(pct, REF_PCT_MAX), joiner: num(o.joiner, REF.joiner),
-    bonusAt: Math.min(at, REF_AT_MAX), bonus: num(o.bonus, REF.bonus), apct: Math.min(num(o.apct, REF.apct), REF_PCT_MAX) };
+    per: Math.min(num(o.per, REF.per), REF_AT_MAX), bonusAt: Math.min(at, REF_AT_MAX), bonus: num(o.bonus, REF.bonus), apct: Math.min(num(o.apct, REF.apct), REF_PCT_MAX) };
+}
+// friends this inviter may still bring who get the joiner searches after the free ones have run out (REF above)
+const refSlots = (u, rule) => Math.max(0, (Number(u.refBought) || 0) * rule.per - (Number(u.refJoined) || 0));
+// free searches a sign-up in this village would get now (before the referral bonus)
+async function freeNow(slug) {
+  if (!slug) return 0;
+  const rule = await freeRule();
+  return freeLeft(slug, rule, freeFor(rule, await selfCount(slug)));
 }
 // what the app needs for the invite button: this login's code, what the inviter gets and how many of their friends have
-// bought (count, toward the next bonus); null for those who can't invite
+// bought (count, toward the next bonus); per and slots (REF above), open: a friend joining now gets the joiner searches;
+// null for those who can't invite
 async function refFor(u) {
   if (!canBuy(u) || u.role !== 'user') return null;   // admins don't invite
   const rule = await refRule();
-  return rule.on ? { code: u.id, pct: rule.pct, joiner: rule.joiner, bonusAt: rule.bonusAt, bonus: rule.bonus, count: Number(u.refBought) || 0 } : null;
+  if (!rule.on) return null;
+  const slots = refSlots(u, rule), open = !rule.per || slots > 0 || (await freeNow(buyVillage(u))) > 0;
+  return { code: u.id, pct: rule.pct, joiner: rule.joiner, per: rule.per, slots, open, bonusAt: rule.bonusAt, bonus: rule.bonus, count: Number(u.refBought) || 0 };
 }
 // the inviter for a new number: the ?ref= code of an invite link, or the code or mobile number typed at sign-up →
 // an active user login with another number, or null
@@ -1306,7 +1321,7 @@ async function candReach(id, slugs) {
   if (add.length) await redis('HSET', `cand:${id}`, 'more', [...c.villages.slice(1), ...add].join(','));
 }
 
-module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, wardCfg, WARD_RS_MAX, WARD_HN_RS, wardHnKey, wardsHn, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, DAILY_MAX, dayDefault, dailyDefault, extraToday, dailyLimit,
+module.exports = { SEARCH_PER_RS, WALLET_MIN, UPI_RE, walletOf, hasWallet, payoutsOn, walletToSearches, getWd, wdView, wdOpen, wdBack, wdPaid, wdStart, wdSettle, wdsOf, WARD_RS, wardKey, wardFree, wardPayOn, wardPayAreas, wardsPaid, wardCfg, WARD_RS_MAX, WARD_HN_RS, wardHnKey, wardsHn, WARD_AZ_RS, wardAzKey, wardsAz, buyVillage, candReach, areaSize, areaKeyOf, areaVillages, userVillages, buildIndexes, selfCount, afterMove, hasOwnPassword, couponHold, REF, REF_MAX, REF_PCT_MAX, REF_AT_MAX, refRule, refFor, refSlots, refInviter, refBuyer, MARKS, markModeOf, markKey, markHash, parseMark, marksFor, allMarks, getCand, PERMS, DEFAULT_PERMS, permsOf, appPerms, ADMIN_PERMS, OLD_ADMIN_PERMS, GIFT_MAX, PROMOTED_PERMS, adminPermsOf, adminLimited, PW_MIN, ownPwHash, badOwnPassword, setOwnPassword, today, DAILY_SEARCHES, DAILY_MAX, dayDefault, dailyDefault, extraToday, dailyLimit,
   FREE, FREE_MAX, freeRule, freeFor, freeLeft, takeFree, credits, isPrepaid, noAnalytics, canBuy, phoneLogins, adminFor, adminPhone, PACKS, packPrice, COUPON_RE, couponCode, getCoupon, couponPrice, couponFor, couponView, newReqId, isReqId, getReq, paidKey, creditsLeft, addPaid, GATEWAY, payOnline, isOrderId, isQrId, isTxnId, QR_MIN, razorpayQr, razorpayCreate, razorpaySigned, razorpayHook, settleOnline, normPhone,
   OTP, otpOn, newOtp, checkOtp, canMoveUserData, moveUserData, COPY_DONE, usesMongo: !!MONGO_DB, MOVES, movesLeft, DEMO, demoOf, demoSlugs, isDevice, demoId, village, villageList, samitiKey, samitiKeys, redis, pipeline, dataKey, pwHash, newSession, makeToken, parseToken, sameText, isAdminPassword, adminToken, isAdminToken,
   whoIs, newPassword, freshPassword, newLogin, getUser, getUsers, marksFrom, clientIp, deviceName, blocked, failed, send, route };

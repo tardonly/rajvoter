@@ -1489,7 +1489,7 @@ let searchId = '', searchesLeft = null, PREPAID = false;   // PREPAID: a signed-
 // ONLINE: packs can also be paid here online through Razorpay: UPI, card, net banking, wallet (api/pay.js)
 let CAN_BUY = false, BOUGHT = null, ONLINE = false;
 let WALLET = null;   // ₹ cashback in this login's wallet (walletOf in api/_lib.js), null: no wallet
-let MY_REF = null;   // this login's invite code and reward ({code, pct, joiner, bonusAt, bonus, count}; refFor in api/_lib.js), null: no invites
+let MY_REF = null;   // this login's invite code and reward ({code, pct, joiner, per, slots, open, bonusAt, bonus, count}; refFor in api/_lib.js), null: no invites
 function counted(r) {
   if (r.searchId) searchId = r.searchId;
   if (r.left != null) searchesLeft = r.left;
@@ -3777,9 +3777,10 @@ async function cpnBanners() {
 // 🎁 दोस्तों को रेफ़र करें: this login's invite link on WhatsApp; the inviter gets ₹ cashback in their wallet when the friend first buys
 $('invite').addEventListener('click', () => {
   if (!MY_REF) return;
-  const pct = MY_REF.pct, gets = MY_REF.joiner, bon = refBonusOn();
-  if (!confirm(L(`🤑 दोस्तों को रेफ़र करें, पैसे कमाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} वो जब भी सर्च ख़रीदे, ${pct}% कैशबैक आपके वॉलेट में! 💰${bon ? `\n🎉 ${refBonusText()} — बस ${refToBonus()} दोस्त और!` : ''}\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतनी ज़्यादा कमाई।`,
-    `🤑 Refer friends, earn cash!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} every time they buy, ${pct}% comes to your wallet as cashback! 💰${bon ? `\n🎉 ${refBonusText()} — just ${refToBonus()} more friends!` : ''}\nTake the wallet money to UPI or turn it into searches. The more friends, the more you earn.`))) return;
+  // open: a friend joining now gets the joiner searches; else they come back once a friend of this login buys (refSlots in api/_lib.js)
+  const pct = MY_REF.pct, gets = MY_REF.open === false ? 0 : MY_REF.joiner, bon = refBonusOn(), shut = !gets && MY_REF.joiner && MY_REF.per;
+  if (!confirm(L(`🤑 दोस्तों को रेफ़र करें, पैसे कमाओ!\n\nअपना लिंक WhatsApp पर भेजें —${gets ? ` दोस्त को जुड़ते ही ${gets} सर्च का बोनस, और` : ''} वो जब भी सर्च ख़रीदे, ${pct}% कैशबैक आपके वॉलेट में! 💰${bon ? `\n🎉 ${refBonusText()} — बस ${refToBonus()} दोस्त और!` : ''}${shut ? `\n🔓 आपका 1 दोस्त सर्च ख़रीदे तो आपके अगले ${MY_REF.per} दोस्तों को ${MY_REF.joiner}-${MY_REF.joiner} सर्च का बोनस मिलेगा।` : ''}\nवॉलेट के पैसे UPI में निकालें या सर्च में बदलें। जितने ज़्यादा दोस्त, उतनी ज़्यादा कमाई।`,
+    `🤑 Refer friends, earn cash!\n\nSend your link on WhatsApp —${gets ? ` your friend gets a ${gets}-search bonus on joining, and` : ''} every time they buy, ${pct}% comes to your wallet as cashback! 💰${bon ? `\n🎉 ${refBonusText()} — just ${refToBonus()} more friends!` : ''}${shut ? `\n🔓 Once 1 friend of yours buys searches, your next ${MY_REF.per} friends get a ${MY_REF.joiner}-search bonus each.` : ''}\nTake the wallet money to UPI or turn it into searches. The more friends, the more you earn.`))) return;
   const link = `${location.origin}/${SLUG}?ref=${MY_REF.code}`;
   const text = L(`🗳️ ${VILLAGE ? VILLAGE.name : ''} की पूरी वोटर लिस्ट अब फ़ोन पर! नाम लिखते ही पर्ची, परिवार और बूथ — सेकंडों में।${gets ? `\n🎁 मेरे लिंक से जुड़ें और पाएं ${gets} सर्च बोनस:` : '\n👉 मेरे लिंक से जुड़ें:'}\n${link}`,
     `Voter Search — find names, slips and families in the ${VILLAGE ? vn(VILLAGE) : ''} voter list.${gets ? ` Join through my link for ${gets} extra searches:` : ' Join through my link:'}\n${link}`);
