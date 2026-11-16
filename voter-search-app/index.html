@@ -172,6 +172,8 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
     display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 40px 12px 14px;
     border-radius: 14px; background: linear-gradient(120deg, #7c3aed, #db2777); color: #fff; box-shadow: 0 3px 10px rgba(124, 58, 237, .3); }
   .cpnbanner:only-child { flex-basis: 100%; max-width: none; }
+  .cpnbanner.thankbanner { cursor: default; padding-right: 40px; background: linear-gradient(120deg, #ea580c, #16a34a) !important; }
+  .cpnbanner.thankbanner b { align-self: flex-start; padding: 0; background: none; color: #fff; font-size: 18px; }
   .cpnbanners.inpop { padding: 4px 0 6px; margin: 4px 0 0; background: none; scroll-padding: 0; }
   .cpnbanners.inpop .cpnbanner { min-height: 80px; padding-right: 14px; }
   .cpnbanner.on { box-shadow: 0 0 0 3px #fff inset, 0 0 0 3px #16a34a; }
@@ -373,6 +375,8 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   .elecbar .left { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: #1d4ed8; color: #fff; font-weight: 700; white-space: nowrap; }
   .elecbar div { width: 100%; }
   #lock .elecbar { margin: 4px 0 12px; }
+  .elecbar.thanks { background: linear-gradient(120deg, #fff7ed, #f0fdf4); border-color: #fdba74; color: #7c2d12; font-size: 14px; }
+  .elecbar.thanks b { font-size: 16px; }
   .demobar { margin: 0 auto 8px; padding: 8px 10px; border-radius: 10px; background: #fff7ed; border: 1px solid #fed7aa;
     color: #9a3412; font-size: 13.5px; line-height: 1.5; }
   .demobar b { color: #7c2d12; }
@@ -761,11 +765,13 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
 <script>
 // drawn here, before the first paint, so the login card below never moves down (PageSpeed: layout shift)
 // ---------- चुनाव की तारीखें: a banner on the login page (hidden once logged in), with the days left to the सरपंच vote ----------
-// Each election drops off the day after it; the banner goes once all are past. Dates are India dates (YYYY-MM-DD).
+// Each election drops off the day after it. From the last one's day on, the banner says thank you instead (THANKS).
+// Dates are India dates (YYYY-MM-DD).
 const ELECTIONS = [
   { date: '2026-11-14', hi: 'जिला परिषद सदस्य व पंचायत समिति सदस्य', en: 'Zila Parishad & Panchayat Samiti members' },
   { date: '2026-11-16', hi: 'सरपंच', en: 'Sarpanch', count: true },
 ];
+const THANKS = { hi: 'पंचायत चुनाव सफलतापूर्वक संपन्न कराने में साथ देने और सब्सक्रिप्शन लेने के लिए आप सबका हार्दिक आभार।', en: 'Heartfelt thanks for helping the panchayat elections run successfully, and for your subscription.' };
 function electionBanner() {
   const EN = (() => { try { return localStorage.getItem('lang') === 'en'; } catch (e) { return false; } })();
   const L = (hi, en) => (EN ? en : hi), LOCALE = L('hi-IN', 'en-IN');
@@ -774,6 +780,13 @@ function electionBanner() {
   const days = (d) => Math.round((Date.parse(d) - Date.parse(today)) / 86400e3);
   const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString(LOCALE, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
   const next = ELECTIONS.filter((e) => days(e.date) >= 0);
+  if (days(ELECTIONS[ELECTIONS.length - 1].date) <= 0) {
+    for (const bar of document.querySelectorAll('.elecbar')) {
+      bar.classList.remove('hidden'); bar.classList.add('thanks');
+      bar.replaceChildren(el('b', null, L('🙏 धन्यवाद!', '🙏 Thank you!')), el('div', null, L(THANKS.hi, THANKS.en)));
+    }
+    return;
+  }
   for (const bar of document.querySelectorAll('.elecbar')) {
     bar.classList.toggle('hidden', !next.length);
     bar.replaceChildren();
@@ -3745,7 +3758,13 @@ const refBonusOn = () => !!(MY_REF && MY_REF.bonusAt && MY_REF.bonus);
 const refBonusText = () => L(`हर ${MY_REF.bonusAt}वें दोस्त पर ₹${MY_REF.bonus} एक्स्ट्रा`, `₹${MY_REF.bonus} extra on every ${MY_REF.bonusAt}th friend`);
 // friends still to bring for the next bonus (count: friends who have bought)
 const refToBonus = () => MY_REF.bonusAt - ((MY_REF.count || 0) % MY_REF.bonusAt);
-// the invite banner: 🤑 दोस्तों को रेफ़र करें, पैसे कमाओ — tapping it sends the invite link (the 🎁 button's)
+// the thank-you card at the top of the app once the elections are over (THANKS, in place of the invite card)
+function thankBanner() {
+  const b = el('div', 'cpnbanner thankbanner');
+  b.append(el('b', null, L('🙏 धन्यवाद!', '🙏 Thank you!')), el('span', null, L(THANKS.hi, THANKS.en)));
+  return b;
+}
+// the invite banner: 🤑 दोस्तों को रेफ़र करें, पैसे कमाओ — tapping it sends the invite link (the 🎁 button's); not shown now
 function refBanner() {
   const b = el('div', 'cpnbanner refbanner'); b.setAttribute('role', 'button'); b.tabIndex = 0;
   const pct = MY_REF.pct, bon = refBonusOn();
@@ -3763,7 +3782,7 @@ async function cpnBanners() {
   if (!CAN_BUY || DEMO || cpnBannersShut) return;
   const r = await api('signup', { action: 'coupons', token: token() });
   const list = (r.coupons || []).filter((c) => c.banner);
-  const cards = [...list.map((c) => cpnCard(c, () => buyOpen(c.code))), ...(MY_REF ? [refBanner()] : [])];
+  const cards = [...list.map((c) => cpnCard(c, () => buyOpen(c.code))), thankBanner()];
   if (!cards.length || cpnBannersShut) return;
   for (const b of cards) {
     const x = el('button', 'cpnbannerx', '✕'); x.type = 'button'; x.setAttribute('aria-label', L('बंद करें', 'Close'));
