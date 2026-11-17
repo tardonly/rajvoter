@@ -499,6 +499,18 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
     font-weight: 700; font-size: 15px; text-align: center; min-height: 22px; box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
     font-size: 14px; font-weight: 700; box-shadow: 0 2px 0 #0b0c0e; }
   .posov.out { opacity: 0; transition: opacity .4s; }
+  .fpov { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .fpbox { background: #fff; border-radius: 16px; padding: 16px; width: 100%; max-width: 380px; max-height: 85vh; display: flex; flex-direction: column; gap: 10px; }
+  .fpbox h3 { margin: 0; font-size: 18px; }
+  .fpbox > button { align-self: flex-start; border: 1px solid #cbd5e1; border-radius: 999px; padding: 6px 14px; background: #fff; font: inherit; font-size: 14px; font-weight: 700; color: #1d4ed8; }
+  .fplist { overflow: auto; display: grid; gap: 6px; }
+  .fplist label { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 15px; }
+  .fplist input { width: 20px; height: 20px; flex: none; }
+  .fplist b { min-width: 34px; }
+  .fprow { display: flex; gap: 8px; }
+  .fprow button { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; font: inherit; font-weight: 700; }
+  .fprow .go { background: #111; color: #fff; border-color: #111; }
+  .fprow .go:disabled { opacity: .4; }
   .posbrand { margin-top: 12px; text-align: center; color: #9aa3ad; font-size: 12px; letter-spacing: 2px; font-weight: 700; }
   .pbtn { justify-self: start; align-self: start; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
@@ -1761,15 +1773,44 @@ async function toggleFamily(r, d, btn) {
   }
   if (can('print') && x.results.some((v) => !v.del)) {   // every slip of the house in one PDF
     const fp = el('button', 'tbtn', L('पूरे परिवार की पर्चियाँ · प्रिंट / PDF', "Whole family's slips · Print / PDF")); fp.type = 'button';
-    fp.addEventListener('click', () => printSlips(x.results.filter((v) => !v.del),
-      L(`परिवार ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`)));
+    const live = x.results.filter((v) => !v.del);
+    fp.addEventListener('click', () => famPick(live, (rs) => printSlips(rs,
+      L(`परिवार ${VILLAGE.name} वार्ड ${r.ward} मकान ${r.house}`, `Family ${vn(VILLAGE)} ward ${r.ward} house ${r.house}`))));
     const ft = el('button', 'tbtn', L('🧾 पूरे परिवार की पर्चियाँ · वोटर प्रिंट', "🧾 Whole family's slips · Voter print")); ft.type = 'button';
     const fn = el('div', 'tnote');
-    ft.addEventListener('click', () => thermalPrint(x.results.filter((v) => !v.del), ft, fn));
+    ft.addEventListener('click', () => famPick(live, (rs) => thermalPrint(rs, ft, fn)));
     fh.append(fp, ft, fn);
   }
   d.after(box);
   btn.classList.add('on'); btn.textContent = L('परिवार छुपाएं', 'Hide family');
+}
+
+// before a family print: every slip of the house ticked, untick the ones already given out
+function famPick(rs, go) {
+  if (rs.length < 2) return go(rs);
+  const ov = el('div', 'fpov'), box = el('div', 'fpbox'), list = el('div', 'fplist');
+  const ticks = rs.map((v) => {
+    const lab = el('label'), cb = el('input'); cb.type = 'checkbox'; cb.checked = true;
+    lab.append(cb, el('b', null, v.box), el('span', null, `${EN ? v.name || v.hname : v.hname || v.name} · ${v.age}`));
+    list.append(lab); return cb;
+  });
+  const all = el('button', null, L('सब हटाएँ', 'Untick all')); all.type = 'button';
+  const ok = el('button', 'go'); ok.type = 'button';
+  const no = el('button', null, L('रद्द करें', 'Cancel')); no.type = 'button';
+  const sync = () => {
+    const n = ticks.filter((c) => c.checked).length;
+    ok.textContent = L(`${n} पर्चियाँ प्रिंट करें`, `Print ${n} slip${n === 1 ? '' : 's'}`); ok.disabled = !n;
+    all.textContent = n === rs.length ? L('सब हटाएँ', 'Untick all') : L('सब चुनें', 'Tick all');
+  };
+  list.addEventListener('change', sync);
+  all.addEventListener('click', () => { const on = ticks.some((c) => !c.checked); ticks.forEach((c) => { c.checked = on; }); sync(); });
+  const shut = () => ov.remove();
+  no.addEventListener('click', shut);
+  ov.addEventListener('click', (e) => { if (e.target === ov) shut(); });
+  ok.addEventListener('click', () => { const pick = rs.filter((_, i) => ticks[i].checked); shut(); go(pick); });
+  const row = el('div', 'fprow'); row.append(no, ok);
+  box.append(el('h3', null, L('किन की पर्ची प्रिंट करें?', 'Print whose slips?')), all, list, row);
+  ov.append(box); document.body.append(ov); sync();
 }
 
 // ---------- वंशावली: who is whose father / husband inside one house, from the names on the slips ----------
