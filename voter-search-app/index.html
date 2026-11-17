@@ -3040,7 +3040,7 @@ function thermalDots(c) {
   return dots;
 }
 // ESC @, then GS v 0 raster bands of 64 rows (small printer buffers), then feed 4 lines to tear off
-function thermalBytes(c, dots = thermalDots(c)) {
+function thermalBytes(c, dots = thermalDots(c), feed = 4) {   // feed: blank lines after the slip (4 to reach the tear bar)
   const W = c.width, H = c.height, bw = W >> 3, out = [0x1b, 0x40];
   for (let y0 = 0; y0 < H; y0 += 64) {
     const h = Math.min(64, H - y0);
@@ -3051,7 +3051,7 @@ function thermalBytes(c, dots = thermalDots(c)) {
       out.push(v);
     }
   }
-  out.push(0x1b, 0x64, 0x04);
+  out.push(0x1b, 0x64, feed);
   return new Uint8Array(out);
 }
 // the services these printers' Bluetooth LE side is known to use
@@ -3093,7 +3093,7 @@ function printPhases(c) {
 }
 // the print as a card machine shows it: the paper (the very dots sent to the printer) comes out of the slot phase by phase
 function posShow(cs, ds) {
-  const GAP = 32, FEED = 40, k = Math.min(230, innerWidth - 60) / 384;   // FEED: the blank paper fed out after the last slip
+  const GAP = 12, FEED = 40, k = Math.min(230, innerWidth - 60) / 384;   // FEED: the blank paper fed out after the last slip
   const H = cs.reduce((n, c) => n + c.height, 0) + GAP * (cs.length - 1) + FEED;
   const pv = document.createElement('canvas'); pv.width = 384; pv.height = H;
   const px = pv.getContext('2d'); px.fillStyle = '#fff'; px.fillRect(0, 0, 384, H);
@@ -3158,7 +3158,7 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
     note.textContent = rs.length > 1 ? L(`${rs.length} पर्चियाँ बन रही हैं…`, `Making ${rs.length} slips…`) : L('पर्ची बन रही है…', 'Making the slip…');
     const cs = [];
     for (const r of rs) cs.push(await thermalCanvas(r));
-    const ds = cs.map(thermalDots), parts = cs.map((c, i) => thermalBytes(c, ds[i]));
+    const ds = cs.map(thermalDots), parts = cs.map((c, i) => thermalBytes(c, ds[i], i < cs.length - 1 ? 1 : 4));   // slips of a family close together, a full feed after the last
     const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
     parts.reduce((at, p) => (bytes.set(p, at), at + p.length), 0);
     if (ch) {
