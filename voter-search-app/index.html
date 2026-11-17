@@ -497,14 +497,9 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   @keyframes poshum { from { transform: translateY(0); } to { transform: translateY(.6px); } }
   .posscr { margin: 10px 0 14px; padding: 14px 10px; border-radius: 8px; background: linear-gradient(#bfe3c8, #9fcfac); color: #10301a;
     font-weight: 700; font-size: 15px; text-align: center; min-height: 22px; box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
-  .poskeys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .poskeys span { background: linear-gradient(#4a505a, #30343b); color: #e8eaed; border-radius: 8px; text-align: center; padding: 7px 0;
     font-size: 14px; font-weight: 700; box-shadow: 0 2px 0 #0b0c0e; }
-  .poskeys span:nth-child(10) { background: #b3261e; } .poskeys span:nth-child(12) { background: #1e7d32; }
+  .posov.out { opacity: 0; transition: opacity .4s; }
   .posbrand { margin-top: 12px; text-align: center; color: #9aa3ad; font-size: 12px; letter-spacing: 2px; font-weight: 700; }
-  .posfoot { color: #fff; text-align: center; margin-top: 10px; font-size: 15px; }
-  .posfoot:empty { display: none; }
-  .posfoot button { margin-top: 8px; padding: 10px 34px; border: 0; border-radius: 10px; background: #fff; color: #111; font: inherit; font-weight: 700; }
   .pbtn { justify-self: start; align-self: start; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
 
@@ -3119,11 +3114,8 @@ function posShow(cs, ds) {
   pv.style.width = '100%';
   paper.style.width = `${384 * k}px`;
   paper.append(pv);
-  const keys = el('div', 'poskeys');
-  for (const t of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '✕', '0', '✓']) keys.append(el('span', null, t));
-  m.append(el('div', 'posslot'), el('div', 'posled'), scr, keys, el('div', 'posbrand', 'Rajelection'));
-  const foot = el('div', 'posfoot');
-  ov.append(paper, m, foot);
+  m.append(el('div', 'posslot'), el('div', 'posled'), scr, el('div', 'posbrand', 'Rajelection'));
+  ov.append(paper, m);
   document.body.append(ov);
   let gone = false;
   const close = () => { gone = true; ov.remove(); };
@@ -3143,12 +3135,13 @@ function posShow(cs, ds) {
         await pause(2000);
       }
     },
-    end(text) {
+    async end() {   // say done for a moment, then fade the machine away
       if (gone) return;
       scr.textContent = '✓ ' + L('पूरा हुआ', 'Done');
-      const ok = el('button', null, L('ठीक है', 'OK')); ok.type = 'button';
-      ok.addEventListener('click', close);
-      foot.replaceChildren(el('div', null, text), ok);
+      await pause(1200);
+      ov.classList.add('out');
+      await pause(400);
+      close();
     },
   };
 }
@@ -3174,7 +3167,7 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
         note.textContent = L('प्रिंट हो रही है…', 'Printing…');
         await Promise.all([thermalSend(ch, bytes), show.run()]);
         note.textContent = rs.length > 1 ? L(`✓ ${rs.length} पर्चियाँ प्रिंटर को भेज दीं।`, `✓ ${rs.length} slips went to the printer.`) : L('✓ पर्ची प्रिंटर को भेज दी।', '✓ The slip went to the printer.');
-        show.end(note.textContent);
+        show.end();
         return;
       } catch (e) { show.close(); TP.ch = null; }
     }
@@ -3187,7 +3180,7 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
     go.style.cssText = 'display:block;width:100%;margin:8px 0;padding:10px;border-radius:10px;border:0;background:#111;color:#fff;font:inherit;font-weight:700';
     go.addEventListener('click', () => {
       const show = posShow(cs, ds);
-      show.run().then(() => show.end(L('✓ पर्ची प्रिंट ऐप को भेज दी।', '✓ The slip went to the print app.')));
+      show.run().then(() => show.end());
       location.href = `intent:base64,${thermalB64(bytes)}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
     });
     const get = el('a', null, L('Rajelection प्रिंट ऐप नहीं है? Play Store से लें', 'No Rajelection print app? Get it from the Play Store'));
