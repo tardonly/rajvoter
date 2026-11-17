@@ -480,6 +480,31 @@ if (/^\/demo\/?$/i.test(location.pathname)) {
   html.big #count { font-size: 15px; }
   .tnote { font-size: 13px; color: var(--muted); padding: 6px 8px 8px; }
   .tnote:empty { display: none; }
+  /* the thermal print as a card machine: paper rising out of the slot (posShow) */
+  .posov { position: fixed; inset: 0; z-index: 9999; background: rgba(10,14,20,.82); display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end; overflow: hidden; padding-bottom: 16px; }
+  .pospaper { height: 0; overflow: hidden; position: relative; background: #fff; box-shadow: 0 0 14px rgba(0,0,0,.5);
+    margin-bottom: -10px; z-index: 1; display: flex; flex-direction: column; justify-content: flex-start; }
+  .pospaper canvas { display: block; flex: none; }
+  .posm { position: relative; z-index: 2; width: min(290px, calc(100vw - 32px)); padding: 26px 22px 18px; border-radius: 28px 28px 40px 40px;
+    background: linear-gradient(180deg, #3a3f48, #1d2026 60%, #15171b); box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.15); }
+  .posslot { position: absolute; top: 6px; left: 18px; right: 18px; height: 10px; border-radius: 6px; background: #050607;
+    box-shadow: inset 0 3px 4px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.12); }
+  .posled { position: absolute; top: 22px; right: 22px; width: 8px; height: 8px; border-radius: 50%; background: #2a4; }
+  .posm.run .posled { animation: posblink .35s infinite alternate; }
+  .posm.run { animation: poshum .12s infinite alternate; }
+  @keyframes posblink { from { background: #2a4; box-shadow: none; } to { background: #6f6; box-shadow: 0 0 8px #6f6; } }
+  @keyframes poshum { from { transform: translateY(0); } to { transform: translateY(.6px); } }
+  .posscr { margin: 10px 0 14px; padding: 14px 10px; border-radius: 8px; background: linear-gradient(#bfe3c8, #9fcfac); color: #10301a;
+    font-weight: 700; font-size: 15px; text-align: center; min-height: 22px; box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
+  .poskeys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .poskeys span { background: linear-gradient(#4a505a, #30343b); color: #e8eaed; border-radius: 8px; text-align: center; padding: 7px 0;
+    font-size: 14px; font-weight: 700; box-shadow: 0 2px 0 #0b0c0e; }
+  .poskeys span:nth-child(10) { background: #b3261e; } .poskeys span:nth-child(12) { background: #1e7d32; }
+  .posbrand { margin-top: 12px; text-align: center; color: #9aa3ad; font-size: 12px; letter-spacing: 2px; font-weight: 700; }
+  .posfoot { color: #fff; text-align: center; margin-top: 10px; font-size: 15px; }
+  .posfoot:empty { display: none; }
+  .posfoot button { margin-top: 8px; padding: 10px 34px; border: 0; border-radius: 10px; background: #fff; color: #111; font: inherit; font-weight: 700; }
   .pbtn { justify-self: start; align-self: start; border: 1px solid var(--line); background: #fff; border-radius: 8px;
     padding: 3px 9px; font-size: 13px; color: var(--accent); font-weight: 600; }
 
@@ -2906,8 +2931,8 @@ function evmDraw(x, b, sym, X, Y, w, h, font) {
   x.strokeStyle = line; x.lineWidth = 3; round(X, Y, w, h, 9); x.stroke();
   x.strokeStyle = '#111'; x.fillStyle = '#111'; x.textBaseline = 'middle';
 }
-async function slipCanvas(r) {
-  const f = slipFields(r), W = 600, P = 12, S = 2;
+async function slipCanvas(r, o = {}) {   // o.w: width to lay out in, o.s: pixels per unit (the thermal print uses its own)
+  const f = slipFields(r), W = o.w || 600, P = 12, S = o.s || 2;
   const font = getComputedStyle(document.body).fontFamily;
   const pink = getComputedStyle(document.documentElement).getPropertyValue('--pink').trim() || '#e0245e';
   const fnt = (px, bold, fam) => `${bold ? '700 ' : ''}${px}px ${fam || font}`;
@@ -2936,7 +2961,7 @@ async function slipCanvas(r) {
   const kLines = wrap(`${L('मतदान केन्द्र : ', 'Polling station: ')}${f.booth} - ${f.kendra}`, 17, W - 2 * P);
   const cutH = poster || ballot ? 40 : 0, headH = 52, idH = 54, lineH = 40, kH = kLines.length * 24 + 12, tH = 30;
   const H = ph + evmH + cutH + headH + idH + 2 * lineH + kH + tH;
-  const c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+  const c = document.createElement('canvas'); c.width = Math.round(W * S); c.height = Math.round(H * S);
   const x = c.getContext('2d'); x.scale(S, S);
   x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
   x.fillStyle = '#111'; x.textBaseline = 'middle';
@@ -2945,7 +2970,7 @@ async function slipCanvas(r) {
     const pw = Math.min(W, Math.round(ph * poster.naturalWidth / poster.naturalHeight));
     x.drawImage(poster, (W - pw) / 2, 0, pw, ph); y = ph;
   }
-  if (ballot) { evmDraw(x, ballot, sym, (W - 510) / 2, y + 8, 510, evmH - 16, font); y += evmH; }
+  if (ballot) { const ew = Math.min(510, W - 2 * P); evmDraw(x, ballot, sym, (W - ew) / 2, y + 8, ew, evmH - 16, font); y += evmH; }
   if (cutH) {
     x.font = fnt(14); const cut = `✂ ${L('यहाँ से काटें · पोस्टर बूथ में ले जाना मना है', 'Cut here · no posters inside the booth')}`;
     const tw = x.measureText(cut).width, mid = y + cutH / 2;
@@ -2993,78 +3018,14 @@ async function slipCanvas(r) {
   x.fillStyle = '#fff'; x.font = fnt(15); x.fillText(pollTime() || '', W / 2, y + tH / 2);
   // the slip's border, as on paper
   x.strokeStyle = '#222'; x.lineWidth = 3; x.strokeRect(1.5, top + 1.5, W - 3, H - top - 3);
+  c.photoH = Math.round(ph * S);    // the poster: dithered on the thermal printer
+  c.slipTop = Math.round(top * S);  // where the slip starts under the poster, EVM row and cut line
   return c;
 }
-// the slip on a 58 mm thermal printer: 384 dots wide, black and white, sent as ESC/POS raster lines. Hindi goes as a
-// picture, since these printers have no Devanagari font. Over Bluetooth LE from Chrome when the printer offers it,
+// the slip on a 58 mm thermal printer: the picture slipCanvas draws, 384 dots wide, black and white, sent as ESC/POS
+// raster lines. Hindi goes as a picture, since these printers have no Devanagari font. Over Bluetooth LE from Chrome when the printer offers it,
 // else handed to the RawBT app (Android), which reaches any Bluetooth receipt printer.
-async function thermalCanvas(r) {
-  const f = slipFields(r), W = 384, P = 6;
-  const font = getComputedStyle(document.body).fontFamily;
-  const fnt = (px, bold, fam) => `${bold ? '700 ' : ''}${px}px ${fam || font}`;
-  const pic = (src) => {
-    if (!src) return null;
-    const i = new Image(), ready = new Promise((ok, no) => { i.onload = ok; i.onerror = no; });
-    i.src = src;
-    return Promise.race([ready, new Promise((ok, no) => setTimeout(no, 8000))]).then(() => i, () => null);
-  };
-  const ballot = POSTER.ballot && POSTER.ballot.no ? POSTER.ballot : null;
-  const [poster, sym] = await Promise.all([pic(POSTER.top), pic(ballot && ballot.sym)]);
-  const c = document.createElement('canvas'); c.width = W; c.height = 1600;
-  const x = c.getContext('2d');
-  x.fillStyle = '#fff'; x.fillRect(0, 0, W, c.height);
-  x.fillStyle = '#000'; x.strokeStyle = '#000'; x.textBaseline = 'middle';
-  let y = 0, photoH = 0;
-  if (poster) { const ph = Math.round(W * poster.naturalHeight / poster.naturalWidth); x.drawImage(poster, 0, 0, W, ph); y = photoH = ph; }
-  // the poster is dithered, everything below (EVM row and text) is sharp
-  if (ballot) { evmDraw(x, ballot, sym, 4, y + 6, W - 8, 54, font); x.fillStyle = '#000'; y += 66; }
-  if (poster || ballot) {
-    x.font = fnt(15); const cut = `✂ ${L('यहाँ से काटें', 'Cut here')}`, tw = x.measureText(cut).width, mid = y + 16;
-    x.setLineDash([6, 4]); x.lineWidth = 2;
-    x.beginPath(); x.moveTo(0, mid); x.lineTo((W - tw) / 2 - 6, mid); x.moveTo((W + tw) / 2 + 6, mid); x.lineTo(W, mid); x.stroke();
-    x.setLineDash([]); x.textAlign = 'center'; x.fillText(cut, W / 2, mid); y += 34;
-  }
-  const text = (s, px, bold, align = 'center', h = px + 10, fam) => {
-    x.font = fnt(px, bold, fam); x.textAlign = align;
-    x.fillText(s, align === 'center' ? W / 2 : align === 'left' ? P : W - P, y + h / 2, W - 2 * P); y += h;
-  };
-  text(`${L('वार्ड नं.', 'Ward no.')} ${r.ward}   ${L('बूथ सं.', 'Booth no.')} ${f.booth}`, 22, true);
-  text(`${L('पं.सं.', 'P.S.')} ${f.ps}   ${L('जि.प.', 'Z.P.')} ${f.zp}`, 16, false);
-  y += 4;
-  // the box number in its square, then the Voter ID
-  x.font = fnt(26, true); const bw = Math.max(56, x.measureText(String(r.box)).width + 16), bh = 46;
-  x.lineWidth = 3; x.strokeRect(P, y, bw, bh);
-  x.textAlign = 'center'; x.fillText(String(r.box), P + bw / 2, y + bh / 2);
-  x.textAlign = 'left';
-  if (r.epic) { x.font = fnt(28, true, 'Arial, Helvetica, sans-serif'); x.fillText(r.epic, P + bw + 10, y + bh / 2, W - 2 * P - bw - 10); }
-  else { x.font = fnt(18); x.fillText(L('Voter ID नहीं', 'No Voter ID'), P + bw + 10, y + bh / 2); }
-  y += bh + 8;
-  // name and relative: the key small, the name large, the other spelling under it
-  const who = (key, b1, b2) => {
-    x.textAlign = 'left'; x.font = fnt(17, true); const kw = x.measureText(key).width;
-    x.fillText(key, P, y + 17);
-    x.font = fnt(26, true); x.fillText(b1 || '—', P + kw, y + 17, W - 2 * P - kw); y += 36;
-    if (b2) text(b2, 17, false, 'left', 24);
-  };
-  who(L('नाम: ', 'Name: '), f.nm1, f.nm2);
-  who(f.relKey, f.rl1, f.rl2);
-  text(`${L('मकान:', 'House:')} ${r.house || '—'}   ${L('आयु:', 'Age:')} ${r.age}   ${L('लिंग:', 'Gender:')} ${sexWord(r.sex)}`, 18, true, 'left', 30);
-  x.lineWidth = 2; x.beginPath(); x.moveTo(0, y + 4); x.lineTo(W, y + 4); x.stroke(); y += 10;
-  // the polling station, wrapped
-  x.font = fnt(18); let line = '';
-  for (const w of `${L('मतदान केन्द्र : ', 'Polling station: ')}${f.booth} - ${f.kendra}`.split(' ')) {
-    const t = line ? `${line} ${w}` : w;
-    if (line && x.measureText(t).width > W - 2 * P) { text(line, 18, false, 'center', 26); x.font = fnt(18); line = w; } else line = t;
-  }
-  if (line) text(line, 18, false, 'center', 26);
-  const pt = pollTime();
-  if (pt) { y += 4; x.fillRect(0, y, W, 32); x.fillStyle = '#fff'; text(pt, 16, true, 'center', 32); x.fillStyle = '#000'; }
-  y += 8;
-  const out = document.createElement('canvas'); out.width = W; out.height = y;
-  out.getContext('2d').drawImage(c, 0, 0);
-  out.photoH = photoH;
-  return out;
-}
+const thermalCanvas = (r) => slipCanvas(r, { w: 420, s: 384 / 420 });   // 384 dots wide, the same slip as on screen and in the PDF
 // black (1) or white (0) per dot: Floyd–Steinberg over the pictures, a plain cut-off for the text
 function thermalDots(c) {
   const W = c.width, H = c.height, d = c.getContext('2d').getImageData(0, 0, W, H).data;
@@ -3084,8 +3045,8 @@ function thermalDots(c) {
   return dots;
 }
 // ESC @, then GS v 0 raster bands of 64 rows (small printer buffers), then feed 4 lines to tear off
-function thermalBytes(c) {
-  const W = c.width, H = c.height, bw = W >> 3, dots = thermalDots(c), out = [0x1b, 0x40];
+function thermalBytes(c, dots = thermalDots(c)) {
+  const W = c.width, H = c.height, bw = W >> 3, out = [0x1b, 0x40];
   for (let y0 = 0; y0 < H; y0 += 64) {
     const h = Math.min(64, H - y0);
     out.push(0x1d, 0x76, 0x30, 0x00, bw & 255, bw >> 8, h & 255, h >> 8);
@@ -3129,6 +3090,68 @@ async function thermalSend(ch, bytes) {
     if (slow) await new Promise((ok) => setTimeout(ok, 25));
   }
 }
+// where the machine stops: it prints a slip in two goes, three with a poster (the poster, then the slip in two halves),
+// and pauses about 2 s after each
+function printPhases(c) {
+  const t = c.slipTop || 0, mid = Math.round(t + (c.height - t) / 2);
+  return t ? [t, mid, c.height] : [mid, c.height];
+}
+// the print as a card machine shows it: the paper (the very dots sent to the printer) comes out of the slot phase by phase
+function posShow(cs, ds) {
+  const GAP = 32, FEED = 40, k = Math.min(230, innerWidth - 60) / 384;   // FEED: the blank paper fed out after the last slip
+  const H = cs.reduce((n, c) => n + c.height, 0) + GAP * (cs.length - 1) + FEED;
+  const pv = document.createElement('canvas'); pv.width = 384; pv.height = H;
+  const px = pv.getContext('2d'); px.fillStyle = '#fff'; px.fillRect(0, 0, 384, H);
+  const stops = []; let at = 0;
+  cs.forEach((c, i) => {
+    const img = px.createImageData(c.width, c.height), d = img.data, dots = ds[i];
+    for (let j = 0; j < dots.length; j++) { const v = dots[j] ? 25 : 255; d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v; d[j * 4 + 3] = 255; }
+    px.putImageData(img, 0, at);
+    for (const y of printPhases(c)) stops.push(at + y);
+    at += c.height;
+    if (i < cs.length - 1) {   // the tear between two slips
+      px.strokeStyle = '#999'; px.setLineDash([6, 6]); px.beginPath(); px.moveTo(0, at + GAP / 2); px.lineTo(384, at + GAP / 2); px.stroke();
+      at += GAP; stops[stops.length - 1] = at;
+    }
+  });
+  stops[stops.length - 1] += FEED;
+  const ov = el('div', 'posov'), paper = el('div', 'pospaper'), m = el('div', 'posm'), scr = el('div', 'posscr');
+  pv.style.width = '100%';
+  paper.style.width = `${384 * k}px`;
+  paper.append(pv);
+  const keys = el('div', 'poskeys');
+  for (const t of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '✕', '0', '✓']) keys.append(el('span', null, t));
+  m.append(el('div', 'posslot'), el('div', 'posled'), scr, keys, el('div', 'posbrand', 'Rajelection'));
+  const foot = el('div', 'posfoot');
+  ov.append(paper, m, foot);
+  document.body.append(ov);
+  let gone = false;
+  const close = () => { gone = true; ov.remove(); };
+  const pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  return {
+    close,
+    async run() {
+      for (let i = 0; i < stops.length && !gone; i++) {
+        const t = Math.max(0.8, (stops[i] - (i ? stops[i - 1] : 0)) / 260);
+        scr.textContent = L(`प्रिंट हो रही है… ${i + 1}/${stops.length}`, `Printing… ${i + 1}/${stops.length}`);
+        m.classList.add('run');
+        paper.style.transition = `height ${t}s linear`;
+        paper.style.height = `${stops[i] * k}px`;
+        await pause(t * 1000);
+        m.classList.remove('run');
+        scr.textContent = L('कृपया रुकें…', 'Please wait…');
+        await pause(2000);
+      }
+    },
+    end(text) {
+      if (gone) return;
+      scr.textContent = '✓ ' + L('पूरा हुआ', 'Done');
+      const ok = el('button', null, L('ठीक है', 'OK')); ok.type = 'button';
+      ok.addEventListener('click', close);
+      foot.replaceChildren(el('div', null, text), ok);
+    },
+  };
+}
 const thermalB64 = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192)); return btoa(s); };
 async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or several (a whole family), one after another
   rs = [].concat(rs);
@@ -3140,17 +3163,20 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
       try { ch = await thermalConnect(); } catch (e) { ch = null; }
     }
     note.textContent = rs.length > 1 ? L(`${rs.length} पर्चियाँ बन रही हैं…`, `Making ${rs.length} slips…`) : L('पर्ची बन रही है…', 'Making the slip…');
-    const parts = [];
-    for (const r of rs) parts.push(thermalBytes(await thermalCanvas(r)));
+    const cs = [];
+    for (const r of rs) cs.push(await thermalCanvas(r));
+    const ds = cs.map(thermalDots), parts = cs.map((c, i) => thermalBytes(c, ds[i]));
     const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
     parts.reduce((at, p) => (bytes.set(p, at), at + p.length), 0);
     if (ch) {
+      const show = posShow(cs, ds);
       try {
         note.textContent = L('प्रिंट हो रही है…', 'Printing…');
-        await thermalSend(ch, bytes);
+        await Promise.all([thermalSend(ch, bytes), show.run()]);
         note.textContent = rs.length > 1 ? L(`✓ ${rs.length} पर्चियाँ प्रिंटर को भेज दीं।`, `✓ ${rs.length} slips went to the printer.`) : L('✓ पर्ची प्रिंटर को भेज दी।', '✓ The slip went to the printer.');
+        show.end(note.textContent);
         return;
-      } catch (e) { TP.ch = null; }
+      } catch (e) { show.close(); TP.ch = null; }
     }
     // not reached directly: hand it to RawBT (a fresh tap, since opening another app needs one)
     if (!/Android/i.test(navigator.userAgent)) {
@@ -3159,7 +3185,11 @@ async function thermalPrint(rs, b, note = $('spNote')) {   // one slip or severa
     }
     const go = el('button', null, L('🧾 Rajelection से प्रिंट करें', '🧾 Print with Rajelection')); go.type = 'button';
     go.style.cssText = 'display:block;width:100%;margin:8px 0;padding:10px;border-radius:10px;border:0;background:#111;color:#fff;font:inherit;font-weight:700';
-    go.addEventListener('click', () => { location.href = `intent:base64,${thermalB64(bytes)}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`; });
+    go.addEventListener('click', () => {
+      const show = posShow(cs, ds);
+      show.run().then(() => show.end(L('✓ पर्ची प्रिंट ऐप को भेज दी।', '✓ The slip went to the print app.')));
+      location.href = `intent:base64,${thermalB64(bytes)}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+    });
     const get = el('a', null, L('Rajelection प्रिंट ऐप नहीं है? Play Store से लें', 'No Rajelection print app? Get it from the Play Store'));
     get.href = 'https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter'; get.target = '_blank'; get.rel = 'noopener';
     note.replaceChildren(el('div', null, L('प्रिंटर सीधे नहीं जुड़ा। प्रिंटर को फ़ोन की Bluetooth सेटिंग में जोड़ें (PIN 0000), फिर:', 'The printer did not connect directly. Pair it in the phone\'s Bluetooth settings (PIN 0000), then:')), go, get);
