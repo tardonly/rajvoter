@@ -166,6 +166,7 @@ const view = (u) => ({
   // referrals: who invited this login, and what this login's invites earned (refRule in _lib.js)
   refBy: u.refBy || '', refByName: u.refByName || '', refPaid: u.refPaid === '1', refBought: Number(u.refBought) || 0, refEarned: Number(u.refEarned) || 0,
   refCash: Number(u.refCash) || 0, refBonus: Number(u.refBonus) || 0, wallet: walletOf(u), walletOut: Number(u.walletOut) || 0,   // ₹: referral cashback earned, in the wallet now, taken out by UPI
+  agentSales: Number(u.agentSales) || 0, agentCash: Number(u.agentCash) || 0,   // an admin's sales by their QR and the ₹ they earned (agentReward in _lib.js)
   loggedIn: !!u.session && u.retired !== '1',
   sessionAt: u.sessionAt || null, sessionIp: u.sessionIp || null, sessionDevice: u.sessionDevice || null,
   logins: Number(u.logins || 0), kicks: Number(u.kicks || 0),

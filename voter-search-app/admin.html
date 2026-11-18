@@ -343,6 +343,10 @@
       <div class="phead" style="margin-top:18px"><b id="wdTitle"></b> · <span id="wdNow"></span></div>
       <div class="sub" id="wdHow" style="margin:4px 0 0"></div>
       <div class="stack" id="wdList" style="margin-top:10px"></div>
+      <!-- every login's earnings: referral cashback and bonus, and an admin's % on QR sales (showEarn) -->
+      <div class="phead" style="margin-top:18px"><b id="earnTitle"></b> · <span id="earnNow"></span></div>
+      <input id="earnQ" type="search" autocomplete="off" style="margin-top:8px;width:100%;max-width:360px">
+      <div class="stack" id="earnList" style="margin-top:6px"></div>
     </div>
 
     <!-- village admins (and the superadmin): a Razorpay UPI QR for another person's pack; the admin earns % in their wallet
@@ -796,7 +800,7 @@ function loadSettings() {   // superadmin: free searches, referrals and coupons 
     const r = await api({ action: 'settings' });
     if (r.error) { for (const id of ['freeNow', 'refNow', 'cpnNow']) $(id).textContent = errText(r); return; }
     settingsIn = true;
-    WARD_AREAS = r.wardPayAreas || {}; WCFG = r.wardCfg || WCFG; showWardPay(r.wardPay); showWardCfg(); showDaily(r.dailyDefault, r.dailyBase); showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showCoupons(r.coupons);
+    WARD_AREAS = r.wardPayAreas || {}; WCFG = r.wardCfg || WCFG; showWardPay(r.wardPay); showWardCfg(); showDaily(r.dailyDefault, r.dailyBase); showFreeRule(r.freeRule); showRefRule(r.refRule); showWds(r.wds); showEarn(); showCoupons(r.coupons);
     loadCouponUses();
   })();
   return settingsBusy.finally(() => { settingsBusy = null; });
@@ -1067,6 +1071,38 @@ function showWds(list) {
     box.append(row);
   }
 }
+// every login that earned ₹ (superadmin, from the lists the page already has): referral cashback (with its bonus) and an
+// admin's % on QR sales, what is in the wallet now and what was taken out by UPI; most earned first, with totals
+function showEarn() {
+  if (!me || me.role !== 'super') return;
+  const seen = new Map();
+  for (const u of [...users, ...admins]) seen.set(u.id, u);
+  const all = [...seen.values()].map((u) => ({ u, ref: u.refCash || 0, ag: u.agentCash || 0 }))
+    .filter((x) => x.ref || x.ag || x.u.wallet || x.u.walletOut).map((x) => ({ ...x, tot: x.ref + x.ag }))
+    .sort((a, b) => b.tot - a.tot || (b.u.wallet || 0) - (a.u.wallet || 0));
+  const sum = (f) => all.reduce((t, x) => t + f(x), 0);
+  const tot = sum((x) => x.tot), wal = sum((x) => x.u.wallet || 0), out = sum((x) => x.u.walletOut || 0);
+  $('earnTitle').textContent = L('💰 सबकी कमाई', '💰 Everyone\'s earnings');
+  $('earnNow').textContent = L(`${all.length} लोग · कुल ₹${tot} कमाए · ₹${wal} वॉलेट में · ₹${out} निकाले`, `${all.length} people · ₹${tot} earned · ₹${wal} in wallets · ₹${out} taken out`);
+  $('earnQ').placeholder = L('नाम या मोबाइल से खोजें', 'Search by name or mobile');
+  const q = $('earnQ').value.trim().toLowerCase();
+  const box = $('earnList'); box.replaceChildren();
+  if (!all.length) { box.append(el('div', 'sub', L('अभी किसी ने कुछ नहीं कमाया', 'Nobody has earned anything yet'))); return; }
+  const list = q ? all.filter(({ u }) => `${u.name} ${u.phone} ${u.id}`.toLowerCase().includes(q)) : all;
+  if (!list.length) { box.append(el('div', 'sub', L('कोई नहीं मिला', 'No one found'))); return; }
+  for (const { u, ref, ag, tot: t } of list) {
+    const row = el('div', 'person');
+    row.append(el('div', 'name', `${u.name || u.id} · ₹${t}`),
+      el('div', 'info', [
+        [showPhone(u.phone), u.role === 'admin' ? L('एडमिन', 'admin') : u.village && vName(u.village)].filter(Boolean).join(' · '),
+        ref && L(`रेफ़रल ₹${ref}${u.refBonus ? ` (₹${u.refBonus} बोनस सहित)` : ''} · ${u.refBought || 0} दोस्तों ने ख़रीदा`, `Referrals ₹${ref}${u.refBonus ? ` (incl. ₹${u.refBonus} bonus)` : ''} · ${u.refBought || 0} friends bought`),
+        ag && L(`QR बिक्री ₹${ag} (${u.agentSales || 0} बिक्री)`, `QR sales ₹${ag} (${u.agentSales || 0} sales)`),
+        L(`वॉलेट ₹${u.wallet || 0}${u.walletOut ? ` · ₹${u.walletOut} निकाले` : ''}`, `Wallet ₹${u.wallet || 0}${u.walletOut ? ` · ₹${u.walletOut} taken out` : ''}`),
+      ].filter(Boolean).join(' · ')));
+    box.append(row);
+  }
+}
+$('earnQ').addEventListener('input', showEarn);
 // 💳 QR से भुगतान: a village admin makes a Razorpay UPI QR for another person's pack; once paid, the person gets the
 // searches and the admin the % in their wallet (api/_routes/admin.js "agent…"). The QR is checked every few seconds.
 let SELL = null, sellWho = null, sellN = 0, sellCur = null, sellTimer = null;
@@ -2100,6 +2136,7 @@ function matches(u, q) {
 }
 function render() {
   if (!me) return;
+  if (settingsIn) showEarn();   // the lists just came in again
   const fv = $('fVillage').value, q = $('qUsers').value, qa = $('qAdmins').value;
   const area = fv || !fMine.length || ($('fDistrict').selectedIndex <= 0 && !$('fSamiti').value) ? null : new Set(filterArea());   // a ज़िला / समिति chosen
   const shown = users.filter((u) => (filter === 'all' || (filter === 'on' ? !u.retired : u.retired)) && (!fv || u.village === fv) && (!area || area.has(u.village)) && matches(u, q));
