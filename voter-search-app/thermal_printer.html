@@ -27,8 +27,16 @@
   .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 22px 12px; text-align: center; color: var(--mute); cursor: pointer; }
   .drop.over { border-color: var(--acc); color: var(--ink); }
   .paper { background: #e9e9e6; border-radius: 10px; padding: 14px; display: flex; justify-content: center; min-height: 200px; align-items: flex-start; overflow: auto; }
-  .roll { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.15); padding: 4mm 0 6mm; display: flex; justify-content: center; }
-  canvas#out { display: block; image-rendering: pixelated; }
+  .roll { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.15); padding: 4mm 0 6mm; display: flex; flex-direction: column; align-items: center; }
+  .roll canvas { display: block; image-rendering: pixelated; }
+  .roll canvas + canvas { margin-top: 3mm; padding-top: 3mm; border-top: 1px dashed #bbb; box-sizing: content-box; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .thumbs:empty { display: none; }
+  .thumb { position: relative; width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fafafa; }
+  .thumb canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .thumb button { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 13px; line-height: 20px; background: rgba(255,255,255,.92); }
+  .thumb span { position: absolute; left: 3px; bottom: 2px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.85); border-radius: 4px; padding: 0 3px; }
+  .linkbtn { border: 0; padding: 0; background: none; color: var(--mute); text-decoration: underline; font-weight: 600; font-size: 13px; margin-top: 6px; }
   .status { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: #f0f0ee; font-size: 14px; white-space: pre-wrap; }
   .status.ok { background: #e6f4ea; color: var(--ok); }
   .status.bad { background: #fce8e6; color: var(--bad); }
@@ -89,22 +97,24 @@
     </div>
 
     <div class="card">
-      <h2>3 · Image</h2>
-      <div class="drop" id="drop">Drop an image here, click to choose, or paste (⌘V)</div>
-      <input id="file" type="file" accept="image/*,.heic,.heif" hidden>
-      <div class="paper" style="margin-top:12px"><div class="roll" id="roll"><canvas id="out" width="384" height="120"></canvas></div></div>
+      <h2>3 · Photos</h2>
+      <div class="drop" id="drop">Drop photos here, click to choose (pick as many as you like), or paste (⌘V)</div>
+      <input id="file" type="file" accept="image/*,.heic,.heif" multiple hidden>
+      <div class="thumbs" id="thumbs"></div>
+      <button class="linkbtn" id="clear" style="display:none">Remove all</button>
+      <div class="paper" style="margin-top:12px"><div class="roll" id="roll"></div></div>
       <label class="chk"><input id="real" type="checkbox" checked> Actual paper size preview</label>
       <div class="conn" id="size"></div>
       <button class="main" id="print" disabled>Print</button>
-      <div class="status" id="status">Choose an image to start.</div>
+      <div class="status" id="status">Choose photos to start.</div>
     </div>
   </div>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const out = $('out');
-let img = null;
+let imgs = [];        // [{ im, name }] in print order
+let strips = [];      // one canvas per photo, with .dots
 const P = { kind: null, ble: null, ch: null, port: null, writer: null };
 
 function say(msg, cls = '') { const s = $('status'); s.textContent = msg; s.className = 'status ' + cls; }
@@ -112,8 +122,23 @@ const errText = (e) => (e && (e.name ? e.name + ': ' : '') + (e.message || e)) |
 
 // ---------- image → dots ----------
 function render() {
-  const W = +$('width').value;
-  if (!img) { out.width = W; out.height = 120; const g = out.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, 120); out.dots = null; fitPreview(); $('print').disabled = true; return; }
+  const W = +$('width').value, roll = $('roll');
+  roll.textContent = '';
+  if (!imgs.length) {
+    const c = document.createElement('canvas'); c.width = W; c.height = 120;
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, 120);
+    roll.appendChild(c); strips = []; fitPreview(); $('size').textContent = ''; $('print').disabled = true; return;
+  }
+  strips = imgs.map(({ im }) => { const c = toDots(im, W); roll.appendChild(c); return c; });
+  fitPreview();
+  const H = strips.reduce((s, c) => s + c.height, 0), n = strips.length;
+  $('size').textContent = `${n} photo${n > 1 ? 's' : ''} · ${W / 8} mm wide × about ${(H / 8).toFixed(0)} mm long in all on ${W === 576 ? 80 : 57} mm paper`;
+  $('print').disabled = false;
+  $('print').textContent = n > 1 ? `Print ${n} photos` : 'Print';
+}
+
+function toDots(img, W) {
+  const out = document.createElement('canvas');
   const rot = +$('rot').value, side = rot === 90 || rot === 270;
   const iw = side ? img.height : img.width, ih = side ? img.width : img.height;
   const tw = Math.max(8, Math.round(W * $('scale').value / 100)), th = Math.max(1, Math.round(ih * tw / iw));
@@ -150,21 +175,21 @@ function render() {
   for (let i = 0; i < n; i++) { const v = dots[i] ? 0 : 255; px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v; px[i * 4 + 3] = 255; }
   g.putImageData(d, 0, 0);
   out.dots = dots;
-  fitPreview();
-  $('size').textContent = `${W} × ${th} dots · prints ${W / 8} mm wide × ${(th / 8).toFixed(0)} mm long on ${W === 576 ? 80 : 57} mm paper`;
-  $('print').disabled = false;
+  return out;
 }
 
 // preview at the size it comes out: 8 dots per mm, on a strip as wide as the roll (57 mm or 80 mm)
 function fitPreview() {
-  const W = out.width, paper = W === 576 ? 80 : 57, real = $('real').checked;
+  const W = +$('width').value, paper = W === 576 ? 80 : 57, real = $('real').checked;
   $('roll').style.width = real ? paper + 'mm' : 'auto';
   $('roll').style.padding = real ? '' : '0';
-  out.style.width = real ? (W / 8) + 'mm' : W + 'px';
-  out.style.height = real ? (out.height / 8) + 'mm' : out.height + 'px';
+  for (const c of $('roll').querySelectorAll('canvas')) {
+    c.style.width = real ? (c.width / 8) + 'mm' : c.width + 'px';
+    c.style.height = real ? (c.height / 8) + 'mm' : c.height + 'px';
+  }
 }
-// ESC @, GS v 0 raster in 64-row bands, feed, optional cut
-function bytes() {
+// ESC @, GS v 0 raster in 64-row bands, feed, optional cut — one photo
+function bytes(out) {
   const W = out.width, H = out.height, bw = W >> 3, dots = out.dots, o = [0x1b, 0x40];
   for (let y0 = 0; y0 < H; y0 += 64) {
     const h = Math.min(64, H - y0);
@@ -255,8 +280,38 @@ function loadHeicLib() {
     document.head.appendChild(s);
   });
 }
+// add every image among the files, in the order given; skips anything that is not an image
+async function loadFiles(list) {
+  const files = [...(list || [])].filter((f) => f && (f.type.startsWith('image/') || isHeic(f)));
+  if (!files.length) { say('That is not an image.', 'bad'); return; }
+  let ok = 0; const bad = [];
+  for (let i = 0; i < files.length; i++) {
+    if (files.length > 1) say(`Loading photo ${i + 1} of ${files.length}…`);
+    const im = await loadFile(files[i]);
+    if (im) { imgs.push({ im, name: files[i].name || 'photo' }); ok++; } else bad.push(files[i].name || 'photo');
+  }
+  showThumbs(); render();
+  if (bad.length) say(`Added ${ok} photo${ok === 1 ? '' : 's'}. Could not read: ${bad.join(', ')}\nHEIC needs internet once; or export as JPEG first.`, ok ? '' : 'bad');
+  else say(`Added ${ok} photo${ok === 1 ? '' : 's'} · ${imgs.length} ready to print.`);
+}
+
+function showThumbs() {
+  const box = $('thumbs'); box.textContent = '';
+  imgs.forEach(({ im, name }, i) => {
+    const d = document.createElement('div'); d.className = 'thumb'; d.title = name;
+    const c = document.createElement('canvas'), s = 128 / Math.max(im.width, im.height);
+    c.width = Math.max(1, Math.round(im.width * s)); c.height = Math.max(1, Math.round(im.height * s));
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    const x = document.createElement('button'); x.textContent = '×'; x.title = 'Remove';
+    x.onclick = () => { imgs.splice(i, 1); showThumbs(); render(); say(imgs.length ? `${imgs.length} ready to print.` : 'Choose photos to start.'); };
+    const n = document.createElement('span'); n.textContent = i + 1;
+    d.append(c, x, n); box.appendChild(d);
+  });
+  $('clear').style.display = imgs.length > 1 ? '' : 'none';
+}
+
+// one file → loaded Image, or null
 async function loadFile(f) {
-  if (!f || !(f.type.startsWith('image/') || isHeic(f))) { say('That is not an image.', 'bad'); return; }
   const open = (blob) => new Promise((ok, bad) => {
     const url = URL.createObjectURL(blob), im = new Image();
     im.onload = () => { URL.revokeObjectURL(url); ok(im); };
@@ -266,25 +321,23 @@ async function loadFile(f) {
   let im = null;
   try { im = await open(f); } catch (e) {
     // iPhone / Safari open HEIC themselves; Chrome cannot, so convert it to JPEG (needs internet once)
-    if (!isHeic(f)) { say('Could not read that image. Export it as JPEG or PNG first.', 'bad'); return; }
+    if (!isHeic(f)) return null;
     try {
       say('Converting HEIC photo…');
       const conv = await loadHeicLib();
       const r = await conv({ blob: f, toType: 'image/jpeg', quality: 0.92 });
       im = await open(Array.isArray(r) ? r[0] : r);
-    } catch (e2) {
-      say('Could not convert the HEIC photo — ' + errText(e2) + '\nOn the Mac: open it in Preview → File → Export → JPEG, then load that.', 'bad');
-      return;
-    }
+    } catch (e2) { return null; }
   }
-  img = im; render(); say(`Loaded ${f.name || 'image'} (${im.width} × ${im.height}).`);
+  return im;
 }
 $('drop').onclick = () => $('file').click();
-$('file').onchange = (e) => loadFile(e.target.files[0]);
+$('file').onchange = (e) => { loadFiles(e.target.files); e.target.value = ''; };
 $('drop').ondragover = (e) => { e.preventDefault(); $('drop').classList.add('over'); };
 $('drop').ondragleave = () => $('drop').classList.remove('over');
-$('drop').ondrop = (e) => { e.preventDefault(); $('drop').classList.remove('over'); loadFile(e.dataTransfer.files[0]); };
-document.addEventListener('paste', (e) => { const it = [...e.clipboardData.items].find((i) => i.type.startsWith('image/')); if (it) loadFile(it.getAsFile()); });
+$('drop').ondrop = (e) => { e.preventDefault(); $('drop').classList.remove('over'); loadFiles(e.dataTransfer.files); };
+document.addEventListener('paste', (e) => { const fs = [...e.clipboardData.items].filter((i) => i.type.startsWith('image/')).map((i) => i.getAsFile()); if (fs.length) loadFiles(fs); });
+$('clear').onclick = () => { imgs = []; showThumbs(); render(); say('Choose photos to start.'); };
 
 for (const id of ['width', 'mode', 'rot', 'inv']) $(id).onchange = render;
 $('real').onchange = fitPreview;
@@ -318,14 +371,16 @@ $('print').onclick = async () => {
   const b = $('print');
   b.disabled = true;
   try {
-    const one = bytes(), copies = Math.max(1, Math.min(20, +$('copies').value || 1));
+    const parts = strips.map(bytes), one = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+    parts.reduce((at, p) => (one.set(p, at), at + p.length), 0);
+    const copies = Math.max(1, Math.min(20, +$('copies').value || 1));
     const data = new Uint8Array(one.length * copies);
     for (let i = 0; i < copies; i++) data.set(one, i * one.length);
     await send(data, (p) => say(`Printing… ${Math.round(p * 100)}%`));
     say(`✓ Sent ${(data.length / 1024).toFixed(1)} KB to the printer.`, 'ok');
   } catch (e) {
     say('Print failed — ' + errText(e) + (P.kind === 'serial' ? '\nIf nothing came out, try another baud rate or a smaller chunk size.' : ''), 'bad');
-  } finally { b.disabled = !img; }
+  } finally { b.disabled = !imgs.length; }
 };
 
 render();
