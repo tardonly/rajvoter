@@ -36,6 +36,7 @@
   .thumb canvas { width: 100%; height: 100%; object-fit: contain; display: block; }
   .thumb button { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 13px; line-height: 20px; background: rgba(255,255,255,.92); }
   .thumb span { position: absolute; left: 3px; bottom: 2px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.85); border-radius: 4px; padding: 0 3px; }
+  .thumb.done::after { content: '✓'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 28px; font-weight: 800; color: #0a7d32; background: rgba(255,255,255,.6); }
   .linkbtn { border: 0; padding: 0; background: none; color: var(--mute); text-decoration: underline; font-weight: 600; font-size: 13px; margin-top: 6px; }
   .status { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: #f0f0ee; font-size: 14px; white-space: pre-wrap; }
   .status.ok { background: #e6f4ea; color: var(--ok); }
@@ -106,6 +107,7 @@
       <label class="chk"><input id="real" type="checkbox" checked> Actual paper size preview</label>
       <div class="conn" id="size"></div>
       <button class="main" id="print" disabled>Print</button>
+      <button class="linkbtn" id="restart" style="display:none">Start over from photo 1</button>
       <div class="status" id="status">Choose photos to start.</div>
     </div>
   </div>
@@ -115,6 +117,7 @@
 const $ = (id) => document.getElementById(id);
 let imgs = [];        // [{ im, name }] in print order
 let strips = [];      // one canvas per photo, with .dots
+let done = 0;         // print jobs (copy × photo) already sent in full; a failed print continues from here
 const P = { kind: null, ble: null, ch: null, port: null, writer: null };
 
 function say(msg, cls = '') { const s = $('status'); s.textContent = msg; s.className = 'status ' + cls; }
@@ -127,14 +130,28 @@ function render() {
   if (!imgs.length) {
     const c = document.createElement('canvas'); c.width = W; c.height = 120;
     const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, 120);
-    roll.appendChild(c); strips = []; fitPreview(); $('size').textContent = ''; $('print').disabled = true; return;
+    roll.appendChild(c); strips = []; fitPreview(); $('size').textContent = ''; resetRun(); return;
   }
   strips = imgs.map(({ im }) => { const c = toDots(im, W); roll.appendChild(c); return c; });
   fitPreview();
   const H = strips.reduce((s, c) => s + c.height, 0), n = strips.length;
   $('size').textContent = `${n} photo${n > 1 ? 's' : ''} · ${W / 8} mm wide × about ${(H / 8).toFixed(0)} mm long in all on ${W === 576 ? 80 : 57} mm paper`;
-  $('print').disabled = false;
-  $('print').textContent = n > 1 ? `Print ${n} photos` : 'Print';
+  resetRun();
+}
+
+// ---------- print progress (so a failed print does not start again from photo 1) ----------
+const copiesN = () => Math.max(1, Math.min(20, +$('copies').value || 1));
+function resetRun() { done = 0; showRun(); }
+function showRun() {
+  const n = strips.length, b = $('print');
+  b.disabled = !n;
+  if (done > 0 && n) {
+    const c = Math.floor(done / n), i = done % n;
+    b.textContent = `Continue from photo ${i + 1}` + (copiesN() > 1 ? ` (copy ${c + 1})` : '');
+  } else b.textContent = n > 1 ? `Print ${n} photos` : 'Print';
+  $('restart').style.display = done > 0 && n ? '' : 'none';
+  const k = n ? done % n : 0;
+  $('thumbs').querySelectorAll('.thumb').forEach((t, i) => t.classList.toggle('done', done > 0 && i < k));
 }
 
 function toDots(img, W) {
@@ -308,6 +325,7 @@ function showThumbs() {
     d.append(c, x, n); box.appendChild(d);
   });
   $('clear').style.display = imgs.length > 1 ? '' : 'none';
+  showRun();
 }
 
 // one file → loaded Image, or null
@@ -341,6 +359,8 @@ $('clear').onclick = () => { imgs = []; showThumbs(); render(); say('Choose phot
 
 for (const id of ['width', 'mode', 'rot', 'inv']) $(id).onchange = render;
 $('real').onchange = fitPreview;
+$('copies').onchange = resetRun;
+$('restart').onclick = () => { resetRun(); say(`${imgs.length} ready to print.`); };
 $('thr').oninput = () => { $('thrV').textContent = $('thr').value; render(); };
 $('scale').oninput = () => { $('scaleV').textContent = $('scale').value; render(); };
 
@@ -368,19 +388,27 @@ if (IOS) {
 }
 
 $('print').onclick = async () => {
-  const b = $('print');
-  b.disabled = true;
+  const b = $('print'), n = strips.length, copies = copiesN(), total = n * copies;
+  if (!n) return;
+  if (done >= total) done = 0;
+  b.disabled = true; $('restart').style.display = 'none';
+  const from = done, copyTxt = (c) => copies > 1 ? ` · copy ${c + 1} of ${copies}` : '';
+  let sent = 0;
   try {
-    const parts = strips.map(bytes), one = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
-    parts.reduce((at, p) => (one.set(p, at), at + p.length), 0);
-    const copies = Math.max(1, Math.min(20, +$('copies').value || 1));
-    const data = new Uint8Array(one.length * copies);
-    for (let i = 0; i < copies; i++) data.set(one, i * one.length);
-    await send(data, (p) => say(`Printing… ${Math.round(p * 100)}%`));
-    say(`✓ Sent ${(data.length / 1024).toFixed(1)} KB to the printer.`, 'ok');
+    const parts = strips.map(bytes);
+    // one photo at a time, so we know which ones finished if the link drops
+    for (let j = done; j < total; j++) {
+      const i = j % n, c = Math.floor(j / n);
+      await send(parts[i], (p) => say(`Printing photo ${i + 1} of ${n}${copyTxt(c)}… ${Math.round(p * 100)}%`));
+      sent += parts[i].length; done = j + 1; showRun(); b.disabled = true;
+    }
+    done = 0;
+    say(`✓ Sent ${total - from} photo${total - from === 1 ? '' : 's'} (${(sent / 1024).toFixed(1)} KB) to the printer.`, 'ok');
   } catch (e) {
-    say('Print failed — ' + errText(e) + (P.kind === 'serial' ? '\nIf nothing came out, try another baud rate or a smaller chunk size.' : ''), 'bad');
-  } finally { b.disabled = !imgs.length; }
+    const i = done % n, c = Math.floor(done / n);
+    const ok = done > 0 ? `Photos before it printed fine. Reconnect if needed, then tap “Continue from photo ${i + 1}” to print the rest (photo ${i + 1} prints again from its top).` : 'Reconnect if needed and tap Print again.';
+    say(`Print stopped at photo ${i + 1}${copyTxt(c)} — ` + errText(e) + '\n' + ok + (P.kind === 'serial' && done === 0 ? '\nIf nothing came out, try another baud rate or a smaller chunk size.' : ''), 'bad');
+  } finally { showRun(); }
 };
 
 render();
