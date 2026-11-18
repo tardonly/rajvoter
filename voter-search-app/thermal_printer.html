@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Thermal Printer</title>
+<style>
+  :root { --bg:#f4f4f2; --card:#fff; --ink:#151515; --mute:#666; --line:#ddd; --acc:#111; --ok:#137a3a; --bad:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--mute); margin: 0 0 18px; }
+  .grid { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); margin: 0 0 10px; }
+  label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 14px; }
+  select, input[type=number] { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: #fff; }
+  input[type=range] { width: 100%; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  button { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--acc); background: #fff; color: var(--acc); font: inherit; font-weight: 700; cursor: pointer; }
+  button.main { background: var(--acc); color: #fff; width: 100%; margin-top: 12px; }
+  button:disabled { opacity: .45; cursor: default; }
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 22px 12px; text-align: center; color: var(--mute); cursor: pointer; }
+  .drop.over { border-color: var(--acc); color: var(--ink); }
+  .paper { background: #e9e9e6; border-radius: 10px; padding: 14px; display: flex; justify-content: center; min-height: 200px; align-items: flex-start; overflow: auto; }
+  .roll { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.15); padding: 4mm 0 6mm; display: flex; justify-content: center; }
+  canvas#out { display: block; image-rendering: pixelated; }
+  .status { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: #f0f0ee; font-size: 14px; white-space: pre-wrap; }
+  .status.ok { background: #e6f4ea; color: var(--ok); }
+  .status.bad { background: #fce8e6; color: var(--bad); }
+  .conn { font-size: 14px; margin-top: 8px; color: var(--mute); }
+  .conn b { color: var(--ink); }
+  .chk { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-weight: 600; font-size: 14px; }
+  small { color: var(--mute); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Thermal Printer</h1>
+  <p class="sub">Print any image on a 57 mm (or 80 mm) ESC/POS receipt printer, from Chrome or Edge, or from the Bluefy browser on iPhone.</p>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>1 · Printer</h2>
+        <div class="row">
+          <button id="btBle" title="Bluetooth LE printers">Bluetooth LE</button>
+          <button id="btSerial" title="Bluetooth Classic (paired), USB serial">Serial / Classic</button>
+        </div>
+        <div class="conn" id="iosNote" style="display:none"></div>
+        <label for="baud" id="baudLbl">Serial baud rate</label>
+        <select id="baud"><option>9600</option><option>19200</option><option>38400</option><option>57600</option><option selected>115200</option></select>
+        <div class="conn" id="conn">Not connected</div>
+        <small id="macTip">On a Mac most cheap printers are Bluetooth Classic: pair it in System Settings → Bluetooth, then use <b>Serial / Classic</b> and pick the <code>cu.…</code> port.</small>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>2 · Settings</h2>
+        <label for="width">Paper</label>
+        <select id="width">
+          <option value="384" selected>57 / 58 mm (384 dots)</option>
+          <option value="576">80 mm (576 dots)</option>
+        </select>
+        <label for="mode">Style</label>
+        <select id="mode">
+          <option value="dither" selected>Photo (dithered)</option>
+          <option value="thresh">Text / logo (black &amp; white)</option>
+        </select>
+        <label for="thr">Darkness: <span id="thrV">128</span></label>
+        <input id="thr" type="range" min="40" max="220" value="128">
+        <label for="scale">Image width: <span id="scaleV">100</span>%</label>
+        <input id="scale" type="range" min="20" max="100" value="100">
+        <div class="row">
+          <div><label for="rot">Rotate</label>
+            <select id="rot"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
+          <div><label for="feed">Feed lines</label><input id="feed" type="number" min="0" max="20" value="4"></div>
+        </div>
+        <div class="row">
+          <div><label for="copies">Copies</label><input id="copies" type="number" min="1" max="20" value="1"></div>
+          <div><label for="chunk">Chunk bytes</label><input id="chunk" type="number" min="20" max="512" value="180"></div>
+        </div>
+        <label class="chk"><input id="inv" type="checkbox"> Invert</label>
+        <label class="chk"><input id="cut" type="checkbox"> Cut paper (80 mm printers)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Image</h2>
+      <div class="drop" id="drop">Drop an image here, click to choose, or paste (⌘V)</div>
+      <input id="file" type="file" accept="image/*,.heic,.heif" hidden>
+      <div class="paper" style="margin-top:12px"><div class="roll" id="roll"><canvas id="out" width="384" height="120"></canvas></div></div>
+      <label class="chk"><input id="real" type="checkbox" checked> Actual paper size preview</label>
+      <div class="conn" id="size"></div>
+      <button class="main" id="print" disabled>Print</button>
+      <div class="status" id="status">Choose an image to start.</div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const out = $('out');
+let img = null;
+const P = { kind: null, ble: null, ch: null, port: null, writer: null };
+
+function say(msg, cls = '') { const s = $('status'); s.textContent = msg; s.className = 'status ' + cls; }
+const errText = (e) => (e && (e.name ? e.name + ': ' : '') + (e.message || e)) || String(e);
+
+// ---------- image → dots ----------
+function render() {
+  const W = +$('width').value;
+  if (!img) { out.width = W; out.height = 120; const g = out.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, 120); out.dots = null; fitPreview(); $('print').disabled = true; return; }
+  const rot = +$('rot').value, side = rot === 90 || rot === 270;
+  const iw = side ? img.height : img.width, ih = side ? img.width : img.height;
+  const tw = Math.max(8, Math.round(W * $('scale').value / 100)), th = Math.max(1, Math.round(ih * tw / iw));
+  out.width = W; out.height = th;
+  const g = out.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, th);
+  g.save();
+  g.translate((W - tw) / 2 + tw / 2, th / 2);
+  g.rotate(rot * Math.PI / 180);
+  const dw = side ? th : tw, dh = side ? tw : th;
+  g.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+  g.restore();
+
+  const d = g.getImageData(0, 0, W, th), px = d.data, n = W * th;
+  const gray = new Float32Array(n), thr = +$('thr').value, inv = $('inv').checked, dither = $('mode').value === 'dither';
+  for (let i = 0; i < n; i++) {
+    const a = px[i * 4 + 3] / 255;   // transparent → white
+    let v = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) * a + 255 * (1 - a);
+    gray[i] = inv ? 255 - v : v;
+  }
+  const dots = new Uint8Array(n);
+  for (let y = 0; y < th; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, old = gray[i], black = old < thr;
+    dots[i] = black ? 1 : 0;
+    if (!dither) continue;
+    const e = old - (black ? 0 : 255);
+    if (x + 1 < W) gray[i + 1] += e * 7 / 16;
+    if (y + 1 < th) {
+      if (x > 0) gray[i + W - 1] += e * 3 / 16;
+      gray[i + W] += e * 5 / 16;
+      if (x + 1 < W) gray[i + W + 1] += e / 16;
+    }
+  }
+  for (let i = 0; i < n; i++) { const v = dots[i] ? 0 : 255; px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v; px[i * 4 + 3] = 255; }
+  g.putImageData(d, 0, 0);
+  out.dots = dots;
+  fitPreview();
+  $('size').textContent = `${W} × ${th} dots · prints ${W / 8} mm wide × ${(th / 8).toFixed(0)} mm long on ${W === 576 ? 80 : 57} mm paper`;
+  $('print').disabled = false;
+}
+
+// preview at the size it comes out: 8 dots per mm, on a strip as wide as the roll (57 mm or 80 mm)
+function fitPreview() {
+  const W = out.width, paper = W === 576 ? 80 : 57, real = $('real').checked;
+  $('roll').style.width = real ? paper + 'mm' : 'auto';
+  $('roll').style.padding = real ? '' : '0';
+  out.style.width = real ? (W / 8) + 'mm' : W + 'px';
+  out.style.height = real ? (out.height / 8) + 'mm' : out.height + 'px';
+}
+// ESC @, GS v 0 raster in 64-row bands, feed, optional cut
+function bytes() {
+  const W = out.width, H = out.height, bw = W >> 3, dots = out.dots, o = [0x1b, 0x40];
+  for (let y0 = 0; y0 < H; y0 += 64) {
+    const h = Math.min(64, H - y0);
+    o.push(0x1d, 0x76, 0x30, 0x00, bw & 255, bw >> 8, h & 255, h >> 8);
+    for (let y = y0; y < y0 + h; y++) for (let b = 0; b < bw; b++) {
+      let v = 0;
+      for (let k = 0; k < 8; k++) v = (v << 1) | dots[y * W + b * 8 + k];
+      o.push(v);
+    }
+  }
+  o.push(0x1b, 0x64, Math.max(0, Math.min(255, +$('feed').value || 0)));
+  if ($('cut').checked) o.push(0x1d, 0x56, 0x42, 0x00);
+  return new Uint8Array(o);
+}
+
+// ---------- connections ----------
+function showConn(text) { $('conn').innerHTML = text; }
+
+async function connectBle() {
+  if (!navigator.bluetooth) throw new Error('This browser has no Web Bluetooth. Use Chrome or Edge, from https:// or a local file / localhost.');
+  const SVC = ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+    '0000ff00-0000-1000-8000-00805f9b34fb', '0000fee7-0000-1000-8000-00805f9b34fb', '0000ffe0-0000-1000-8000-00805f9b34fb', '0000ae30-0000-1000-8000-00805f9b34fb'];
+  const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SVC });
+  say(`Connecting to ${dev.name || 'printer'}…`);
+  const server = await dev.gatt.connect();
+  let ch = null;
+  let services = [];
+  try { services = await server.getPrimaryServices(); } catch (e) { throw new Error('Connected, but the printer offers none of the known print services. It is probably Bluetooth Classic only — use Serial / Classic.'); }
+  for (const s of services) {
+    for (const c of await s.getCharacteristics()) if (c.properties.write || c.properties.writeWithoutResponse) { ch = c; break; }
+    if (ch) break;
+  }
+  if (!ch) { dev.gatt.disconnect(); throw new Error('Connected, but found nowhere to write. Try Serial / Classic.'); }
+  dev.addEventListener('gattserverdisconnected', () => { if (P.ble === dev) { P.kind = null; showConn('Disconnected'); } });
+  await closeSerial();
+  Object.assign(P, { kind: 'ble', ble: dev, ch });
+  showConn(`Connected: <b>${dev.name || 'Bluetooth LE printer'}</b> (Bluetooth LE)`);
+}
+
+async function closeSerial() {
+  try { if (P.writer) { P.writer.releaseLock(); } } catch (e) {}
+  try { if (P.port) await P.port.close(); } catch (e) {}
+  P.writer = null; P.port = null;
+}
+
+async function connectSerial() {
+  if (!navigator.serial) throw new Error('This browser has no Web Serial. Use desktop Chrome or Edge.');
+  const port = await navigator.serial.requestPort();
+  await closeSerial();
+  await port.open({ baudRate: +$('baud').value });
+  P.port = port; P.writer = port.writable.getWriter(); P.kind = 'serial';
+  if (P.ble) { try { P.ble.gatt.disconnect(); } catch (e) {} P.ble = null; P.ch = null; }
+  const info = port.getInfo ? port.getInfo() : {};
+  showConn(`Connected: <b>serial port</b>${info.usbVendorId ? ' (USB ' + info.usbVendorId.toString(16) + ')' : ''} at ${$('baud').value} baud`);
+}
+
+async function send(data, onProgress) {
+  let n = Math.max(20, +$('chunk').value || 180);
+  if (P.kind === 'serial') {
+    for (let i = 0; i < data.length; i += n) { await P.writer.write(data.slice(i, i + n)); onProgress(Math.min(1, (i + n) / data.length)); }
+    return;
+  }
+  if (P.kind === 'ble') {
+    const ch = P.ch, slow = !ch.properties.write;
+    const put = (v) => slow ? ch.writeValueWithoutResponse(v) : (ch.writeValueWithResponse ? ch.writeValueWithResponse(v) : ch.writeValue(v));
+    for (let i = 0; i < data.length;) {
+      const part = data.slice(i, i + n);
+      try { await put(part); i += part.length; }
+      catch (e) { if (n > 20) { n = 20; continue; } throw e; }
+      onProgress(i / data.length);
+      if (slow) await new Promise((r) => setTimeout(r, 25));
+    }
+    return;
+  }
+  throw new Error('No printer connected. Pick Bluetooth LE or Serial / Classic first.');
+}
+
+// ---------- UI ----------
+// iPhone photos come as HEIC, which Chrome cannot open: those are turned into JPEG first (needs internet once)
+const isHeic = (f) => /image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name || '');
+let heicLib = null;
+function loadHeicLib() {
+  return heicLib ||= new Promise((ok, no) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    s.onload = () => ok(window.heic2any);
+    s.onerror = () => { heicLib = null; no(new Error('could not load the HEIC converter (no internet?)')); };
+    document.head.appendChild(s);
+  });
+}
+async function loadFile(f) {
+  if (!f || !(f.type.startsWith('image/') || isHeic(f))) { say('That is not an image.', 'bad'); return; }
+  const open = (blob) => new Promise((ok, bad) => {
+    const url = URL.createObjectURL(blob), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); ok(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); bad(new Error('unreadable')); };
+    im.src = url;
+  });
+  let im = null;
+  try { im = await open(f); } catch (e) {
+    // iPhone / Safari open HEIC themselves; Chrome cannot, so convert it to JPEG (needs internet once)
+    if (!isHeic(f)) { say('Could not read that image. Export it as JPEG or PNG first.', 'bad'); return; }
+    try {
+      say('Converting HEIC photo…');
+      const conv = await loadHeicLib();
+      const r = await conv({ blob: f, toType: 'image/jpeg', quality: 0.92 });
+      im = await open(Array.isArray(r) ? r[0] : r);
+    } catch (e2) {
+      say('Could not convert the HEIC photo — ' + errText(e2) + '\nOn the Mac: open it in Preview → File → Export → JPEG, then load that.', 'bad');
+      return;
+    }
+  }
+  img = im; render(); say(`Loaded ${f.name || 'image'} (${im.width} × ${im.height}).`);
+}
+$('drop').onclick = () => $('file').click();
+$('file').onchange = (e) => loadFile(e.target.files[0]);
+$('drop').ondragover = (e) => { e.preventDefault(); $('drop').classList.add('over'); };
+$('drop').ondragleave = () => $('drop').classList.remove('over');
+$('drop').ondrop = (e) => { e.preventDefault(); $('drop').classList.remove('over'); loadFile(e.dataTransfer.files[0]); };
+document.addEventListener('paste', (e) => { const it = [...e.clipboardData.items].find((i) => i.type.startsWith('image/')); if (it) loadFile(it.getAsFile()); });
+
+for (const id of ['width', 'mode', 'rot', 'inv']) $(id).onchange = render;
+$('real').onchange = fitPreview;
+$('thr').oninput = () => { $('thrV').textContent = $('thr').value; render(); };
+$('scale').oninput = () => { $('scaleV').textContent = $('scale').value; render(); };
+
+async function connectWith(fn, btn) {
+  btn.disabled = true;
+  try { say('Choose the printer in the browser list…'); await fn(); say('Printer connected. Ready to print.', 'ok'); }
+  catch (e) {
+    if (e && e.name === 'NotFoundError') say('No printer was chosen (or none showed up in the list).\nBluetooth LE list empty? The printer is likely Classic only — pair it in System Settings, then use Serial / Classic.', 'bad');
+    else if (e && e.name === 'SecurityError') say('Blocked by the browser: ' + errText(e) + '\nOpen this page from https:// or localhost, and allow Chrome to use Bluetooth in System Settings → Privacy & Security.', 'bad');
+    else say('Could not connect — ' + errText(e), 'bad');
+  } finally { btn.disabled = false; }
+}
+$('btBle').onclick = () => connectWith(connectBle, $('btBle'));
+$('btSerial').onclick = () => connectWith(connectSerial, $('btSerial'));
+
+// iPhone / iPad: no Serial at all; Bluetooth only inside the Bluefy browser (Safari and Chrome on iOS have none)
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (IOS) {
+  for (const id of ['btSerial', 'baud', 'baudLbl', 'macTip']) $(id).style.display = 'none';
+  const n = $('iosNote'); n.style.display = '';
+  n.innerHTML = navigator.bluetooth
+    ? 'iPhone: tap <b>Bluetooth LE</b> and pick the printer. Do <b>not</b> pair it in iPhone Settings first. Only printers with Bluetooth LE (BLE) show up.'
+    : 'iPhone Safari and Chrome cannot use Bluetooth. Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store and open this same page in it.';
+  if (!navigator.bluetooth) $('btBle').disabled = true;
+}
+
+$('print').onclick = async () => {
+  const b = $('print');
+  b.disabled = true;
+  try {
+    const one = bytes(), copies = Math.max(1, Math.min(20, +$('copies').value || 1));
+    const data = new Uint8Array(one.length * copies);
+    for (let i = 0; i < copies; i++) data.set(one, i * one.length);
+    await send(data, (p) => say(`Printing… ${Math.round(p * 100)}%`));
+    say(`✓ Sent ${(data.length / 1024).toFixed(1)} KB to the printer.`, 'ok');
+  } catch (e) {
+    say('Print failed — ' + errText(e) + (P.kind === 'serial' ? '\nIf nothing came out, try another baud rate or a smaller chunk size.' : ''), 'bad');
+  } finally { b.disabled = !img; }
+};
+
+render();
+</script>
+</body>
+</html>
