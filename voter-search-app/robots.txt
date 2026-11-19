@@ -1,6 +1,6 @@
-# rajelection.com: the public pages (/, /rajasthan-voter-list, /promo, /demo) may be crawled.
+# rajelection.com: the public pages (/, /rajasthan-voter-list, /promo, /demo, /<village>) may be crawled.
 # The app's API, the admin page and the demo villages (/demo/<village>) hold voter data or need a login: never crawled.
-# Village pages (/<village>) are login screens and send "X-Robots-Tag: noindex" (vercel.json).
+# Village pages (/<village>) may be crawled: each has its own title and description, and the voter list behind it needs a login.
 User-agent: *
 Allow: /
 Disallow: /api/

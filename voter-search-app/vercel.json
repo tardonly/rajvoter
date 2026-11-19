@@ -4,6 +4,9 @@
   "functions": {
     "api/data.js": {
       "includeFiles": "api/_data/**"
+    },
+    "api/page.js": {
+      "includeFiles": "index.html"
     }
   },
   "redirects": [
@@ -58,7 +61,7 @@
     },
     {
       "source": "/:village([a-z0-9-]+)",
-      "destination": "/index.html"
+      "destination": "/api/page?village=:village"
     }
   ],
   "headers": [
@@ -143,7 +146,7 @@
       ]
     },
     {
-      "source": "/:village((?!promo$|rajasthan-voter-list$|demo$)[a-z0-9-]+)",
+      "source": "/:req(\\d{8})",
       "headers": [
         {
           "key": "X-Robots-Tag",

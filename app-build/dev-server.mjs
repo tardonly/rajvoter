@@ -133,7 +133,7 @@ http.createServer(async (req, res) => {
   else if (url.pathname === '/admin' || /^\/\d{8}$/.test(url.pathname)) url.pathname = '/admin.html';   // /<8 digits>: a search request
   else if (seg && seg[1] !== 'api' && !existsSync(join(root, url.pathname))) {
     if (seg[2] === '/manifest.webmanifest') { url.pathname = '/api/manifest'; url.searchParams.set('village', seg[1]); }
-    else url.pathname = '/index.html';
+    else { url.pathname = '/api/page'; url.searchParams.set('village', seg[1]); req.url = `/api/page${url.search}`; }   // a village: its own title and canonical
   }
 
   // a video with no local copy: the same redirect to jsDelivr (GitHub repo ramcala/rajelection-videos) as vercel.json
